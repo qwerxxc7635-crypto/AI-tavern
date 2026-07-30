@@ -7,6 +7,14 @@ export type {
   GameEventType,
   ModelSelectionRef,
 } from './game-event.js';
+export { AI_REQUEST_STATUSES } from './pending-ai-request.js';
+export type {
+  AiRequestError,
+  AiRequestStatus,
+  JsonPrimitive,
+  JsonValue,
+  PendingAiRequest,
+} from './pending-ai-request.js';
 export {
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
@@ -107,6 +115,7 @@ export type {
 } from './campaign.js';
 export {
   actionOptionId,
+  aiRequestId,
   adventureId,
   campaignId,
   checkRequestId,
@@ -116,10 +125,12 @@ export {
   factionId,
   gameEventId,
   generationRecordId,
+  idempotencyKey,
   characterTraitId,
   isoTimestamp,
   locationId,
   messageId,
+  modelProfileId,
   itemId,
   npcId,
   npcMemoryId,
@@ -137,6 +148,7 @@ export {
 } from './foundation.js';
 export type {
   ActionOptionId,
+  AiRequestId,
   AdventureId,
   CampaignId,
   CheckRequestId,
@@ -146,10 +158,12 @@ export type {
   FactionId,
   GameEventId,
   GenerationRecordId,
+  IdempotencyKey,
   CharacterTraitId,
   IsoTimestamp,
   LocationId,
   MessageId,
+  ModelProfileId,
   ItemId,
   NpcId,
   NpcMemoryId,

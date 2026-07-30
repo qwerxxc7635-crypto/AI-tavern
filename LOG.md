@@ -690,5 +690,37 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`3fbb7b3`。
 - Commit message：`feat(M2-T07): add transactional turn commits`
+
+## 2026-07-31 00:05 — M2-T08 实现pending_ai_requests
+
+### 范围
+
+实现pending AI请求状态、错误码、重试次数和幂等键，并将幂等请求结算接入M2-T07事务；不实现AI协议、Provider或数据库启动检查。
+
+### 主要改动
+
+- 新增AI请求品牌ID、JSON值、八状态生命周期、错误和pending请求共享协议。
+- `PendingAiRequestRepository` 实现创建或复用、读取、未完成列表、上下文、发送/接收/验证、失败、重试、取消及幂等结算。
+- Turn事务支持已保存玩家输入的回合更新和ITEM_REWARD补丁；奖励、GameEvent与请求COMMITTED状态同事务提交。
+- input/context/error JSON拒绝非JSON结构和凭证字段，回合与奖励归属必须匹配Campaign。
+
+### 验证
+
+- 同一幂等键和相同请求返回原记录；不同请求复用相同键抛出冲突。
+- TIMEOUT错误码、可重试标记和两次发送尝试均从SQLite准确恢复。
+- 同一幂等键连续结算两次，结果为COMMITTED和ALREADY_COMMITTED；SQLite中只有一件奖励物品和一组事件。
+- API Key字段在写入前被拒绝。
+- `pnpm check`：通过；Vitest 15个文件、112项，Node迁移3项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### 自审
+
+- 幂等判断和游戏写入不依赖内存；已提交终态在事务中短路。
+- Pending请求不能跨Campaign引用回合，ITEM_REWARD持有人和来源冒险同样校验归属。
+- 未实现M2-T09启动检查、M3 AI协议或真实模型调用。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T08): implement idempotent AI request lifecycle`

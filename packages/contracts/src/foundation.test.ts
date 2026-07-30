@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
   actionOptionId,
+  aiRequestId,
   adventureId,
   campaignId,
   checkRequestId,
@@ -11,11 +12,13 @@ import {
   gameEventId,
   conversationId,
   generationRecordId,
+  idempotencyKey,
   compatibleEnum,
   isoTimestamp,
   itemId,
   locationId,
   messageId,
+  modelProfileId,
   npcId,
   npcMemoryId,
   playerCharacterId,
@@ -58,6 +61,9 @@ describe('opaque identifiers', () => {
     expect(conversationId('conversation-1')).toBe('conversation-1');
     expect(messageId('message-1')).toBe('message-1');
     expect(generationRecordId('generation-1')).toBe('generation-1');
+    expect(aiRequestId('request-1')).toBe('request-1');
+    expect(idempotencyKey('campaign:turn:task')).toBe('campaign:turn:task');
+    expect(modelProfileId('model-1')).toBe('model-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {

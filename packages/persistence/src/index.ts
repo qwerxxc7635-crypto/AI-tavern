@@ -13,6 +13,15 @@ export {
   PlayerCharacterNotFoundError,
   PlayerCharacterRepository,
 } from './player-character-repository.js';
+export {
+  AiRequestTransitionError,
+  IdempotencyConflictError,
+  PendingAiRequestRepository,
+} from './pending-ai-request-repository.js';
+export type {
+  CreatePendingAiRequest,
+  IdempotentCommitResult,
+} from './pending-ai-request-repository.js';
 export { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 export { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 export { TurnTransaction } from './turn-transaction.js';

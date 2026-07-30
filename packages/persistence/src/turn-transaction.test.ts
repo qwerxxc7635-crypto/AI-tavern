@@ -5,10 +5,13 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
   adventureId,
+  aiRequestId,
   campaignId,
   createNpcRelationship,
   gameEventId,
   isoTimestamp,
+  idempotencyKey,
+  itemId,
   npcId,
   playerCharacterId,
   questId,
@@ -18,6 +21,7 @@ import {
   type Adventure,
   type AdventureTurn,
   type GameEvent,
+  type Item,
   type Quest,
 } from '@ember-tavern/contracts';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -25,7 +29,10 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   AdventureRepository,
   GameEventRepository,
+  IdempotencyConflictError,
+  ItemRepository,
   NpcRepository,
+  PendingAiRequestRepository,
   QuestRepository,
   TurnTransaction,
   type TransactionalSqliteDatabase,
@@ -142,6 +149,111 @@ describe('transactional turn commit', () => {
     expect(new QuestRepository(database).get(questKey)?.status).toBe('ACCEPTED');
     expect(new NpcRepository(database).getRelationship(npcKey)).toBeNull();
     expect(new GameEventRepository(database).list(campaignKey)).toEqual([firstEvent]);
+  });
+});
+
+describe('pending AI request lifecycle and idempotency', () => {
+  it('tracks error codes and retry attempts without duplicating a request key', async () => {
+    const database = await createDatabase();
+    seed(database);
+    new AdventureRepository(database).addTurn({
+      ...completeTurn('turn-lifecycle', 1),
+      sceneText: 'The cellar door remains sealed.',
+      resolvedAt: null,
+    });
+    const requests = new PendingAiRequestRepository(database);
+    const input = pendingRequestInput(
+      'request-lifecycle',
+      'request-key-lifecycle',
+      turnId('turn-lifecycle'),
+    );
+    const created = requests.createOrGet(input);
+
+    expect(requests.createOrGet(input)).toEqual(created);
+    expect(() =>
+      requests.createOrGet({
+        ...input,
+        id: aiRequestId('request-conflict'),
+      }),
+    ).toThrow(IdempotencyConflictError);
+    expect(() =>
+      requests.createOrGet({
+        ...pendingRequestInput('request-secret', 'request-key-secret', turnId('turn-lifecycle')),
+        input: { apiKey: 'must-not-be-stored' },
+      }),
+    ).toThrow(/forbidden credential field/);
+
+    requests.setContext(created.id, { recentTurns: [] }, at);
+    expect(requests.startAttempt(created.id, at).attemptCount).toBe(1);
+    const failed = requests.fail(
+      created.id,
+      { code: 'TIMEOUT', message: 'Provider timed out', retryable: true },
+      at,
+    );
+    expect(failed).toMatchObject({
+      status: 'FAILED',
+      attemptCount: 1,
+      lastError: { code: 'TIMEOUT', retryable: true },
+    });
+
+    requests.retryWithContext(created.id, { recentTurns: ['turn-0'] }, at);
+    expect(requests.startAttempt(created.id, at).attemptCount).toBe(2);
+    requests.markReceived(created.id, at);
+    expect(requests.markValidating(created.id, at).status).toBe('VALIDATING');
+    expect(requests.listUnfinished(campaignKey)).toHaveLength(1);
+  });
+
+  it('does not submit an item reward twice for a repeated idempotency key', async () => {
+    const database = await createDatabase();
+    seed(database);
+    const adventures = new AdventureRepository(database);
+    adventures.addTurn({
+      ...completeTurn('turn-reward', 1),
+      sceneText: 'A sealed cellar door waits beneath the inn.',
+      resolvedAt: null,
+    });
+    const requests = new PendingAiRequestRepository(database);
+    const request = requests.createOrGet(
+      pendingRequestInput('request-reward', 'request-key-reward', turnId('turn-reward')),
+    );
+    requests.setContext(request.id, { objective: 'Open the cellar' }, at);
+    requests.startAttempt(request.id, at);
+    requests.markReceived(request.id, at);
+    requests.markValidating(request.id, at);
+    const item = rewardItem();
+    const itemEvent: GameEvent = {
+      id: gameEventId('event-item-reward'),
+      campaignId: campaignKey,
+      schemaVersion: schemaVersion(1),
+      type: 'ITEM_ACQUIRED',
+      payload: {
+        itemId: item.id,
+        playerCharacterId: characterKey,
+        sourceAdventureId: adventureKey,
+      },
+      occurredAt: at,
+    };
+    const command = {
+      campaignId: campaignKey,
+      adventure: adventure(1),
+      turn: completeTurn('turn-reward', 1),
+      statePatches: [
+        {
+          kind: 'ITEM_REWARD',
+          item,
+          ownerCharacterId: characterKey,
+          sourceAdventureId: adventureKey,
+        },
+      ],
+      events: [playerActionEvent('event-action-reward', 'turn-reward'), itemEvent],
+    } as const;
+
+    expect(requests.commitTurnOnce(request.idempotencyKey, command, at)).toBe('COMMITTED');
+    expect(requests.commitTurnOnce(request.idempotencyKey, command, at)).toBe('ALREADY_COMMITTED');
+
+    expect(new ItemRepository(database).listOwned(characterKey)).toEqual([item]);
+    expect(new GameEventRepository(database).list(campaignKey)).toHaveLength(2);
+    expect(requests.get(request.id)?.status).toBe('COMMITTED');
   });
 });
 
@@ -309,5 +421,36 @@ function playerActionEvent(id: string, turn: string): GameEvent {
       action: { kind: 'FREEFORM', text: 'Open the cellar door' },
     },
     occurredAt: at,
+  };
+}
+
+function pendingRequestInput(
+  id: string,
+  key: string,
+  requestTurnId: ReturnType<typeof turnId> | null,
+) {
+  return {
+    id: aiRequestId(id),
+    campaignId: campaignKey,
+    turnId: requestTurnId,
+    idempotencyKey: idempotencyKey(key),
+    task: 'ADVENTURE_TURN',
+    modelProfileId: null,
+    input: { action: 'Open the cellar door' },
+    createdAt: at,
+  } as const;
+}
+
+function rewardItem(): Item {
+  return {
+    id: itemId('item-reward'),
+    campaignId: campaignKey,
+    content: {
+      name: 'Ember Lens',
+      description: 'Reveals warm traces in darkness.',
+    },
+    rewardTier: 'BASIC',
+    effect: { kind: 'CHECK_MODIFIER', attribute: 'knowledge', modifier: 1 },
+    createdAt: at,
   };
 }

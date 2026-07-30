@@ -27,6 +27,9 @@ export type GameEventId = Branded<string, 'GameEventId'>;
 export type ConversationId = Branded<string, 'ConversationId'>;
 export type MessageId = Branded<string, 'MessageId'>;
 export type GenerationRecordId = Branded<string, 'GenerationRecordId'>;
+export type AiRequestId = Branded<string, 'AiRequestId'>;
+export type IdempotencyKey = Branded<string, 'IdempotencyKey'>;
+export type ModelProfileId = Branded<string, 'ModelProfileId'>;
 export type IsoTimestamp = Branded<string, 'IsoTimestamp'>;
 export type SchemaVersion = Branded<number, 'SchemaVersion'>;
 export type PromptVersion = Branded<number, 'PromptVersion'>;
@@ -68,6 +71,9 @@ export const conversationId = (value: string): ConversationId => createId(value,
 export const messageId = (value: string): MessageId => createId(value, 'MessageId');
 export const generationRecordId = (value: string): GenerationRecordId =>
   createId(value, 'GenerationRecordId');
+export const aiRequestId = (value: string): AiRequestId => createId(value, 'AiRequestId');
+export const idempotencyKey = (value: string): IdempotencyKey => createId(value, 'IdempotencyKey');
+export const modelProfileId = (value: string): ModelProfileId => createId(value, 'ModelProfileId');
 
 export function isoTimestamp(value: string): IsoTimestamp {
   requireCanonicalText(value, 'IsoTimestamp');

@@ -768,3 +768,43 @@
 - 已验证AI场景作为完整Turn的一部分保存；原始模型输出不能直接写入游戏状态。
 - 故障注入位于事务末端，确实覆盖此前多表写入的回滚，不是事务开始前失败。
 - 未实现pending_ai_requests或后续任务内容，不提前执行M2-T08。
+
+## 2026-07-31 00:05 — M2-T08 实现pending_ai_requests
+
+### 依赖与范围
+
+- 依赖 `M2-T02`、`M2-T07`：均已完成；事务型回合提交已提交 `3fbb7b3`。
+- 仅实现请求状态、错误码、重试次数、幂等键及防止重复奖励所需的事务集成。
+- 不实现GenerationRecord、AI Provider、任务Schema或M2-T09数据库启动检查。
+
+### 计划验证
+
+- 请求按CREATED、CONTEXT_READY、SENDING、RECEIVED、VALIDATING等状态前进，非法终态转换被拒绝。
+- 失败保存错误码、消息和retryable；重试清除旧错误且每次发送递增attemptCount。
+- 相同幂等键创建不重复记录，不同请求复用键显式冲突。
+- 同一幂等键结算两次只提交一次奖励、回合和事件。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增AiRequestId、IdempotencyKey、ModelProfileId品牌类型，以及JsonValue、八种请求状态、AiRequestError和PendingAiRequest共享协议。
+- `PendingAiRequestRepository` 实现createOrGet、按ID/幂等键读取、未完成列表、上下文准备、尝试开始、接收、验证、失败、可重试恢复、取消和幂等回合结算。
+- 同一幂等键仅在请求ID、Campaign、Turn、任务、模型和规范输入均一致时返回现有记录；不同逻辑请求复用键抛出 `IdempotencyConflictError`。
+- attemptCount只在CONTEXT_READY进入SENDING时递增；失败保存非空错误码、消息和retryable，重试仅允许可重试FAILED请求。
+- input、context和lastError从unknown递归验证为有限JSON；普通对象键稳定排序比较，API Key、Authorization、Bearer和令牌类字段在入库前拒绝。
+- pending请求引用回合时，通过Turn→Adventure查询验证同Campaign，不依赖外键仅验证ID存在。
+- M2-T07事务提取内部受控 `applyTurnCommit` 供幂等结算复用；AdventureRepository新增saveTurn以完成已保存玩家输入的未解决回合，不创建重复回合。
+- Turn状态补丁新增明确的ITEM_REWARD分支，验证物品Campaign、来源Adventure和持有人Campaign后才创建并分配奖励。
+- `commitTurnOnce` 在 `BEGIN IMMEDIATE` 内读取幂等键；VALIDATING请求原子提交完整回合、奖励、事件及COMMITTED状态，已COMMITTED请求返回ALREADY_COMMITTED且不再写游戏状态。
+- 真实SQLite生命周期测试覆盖相同键复用、冲突键、凭证字段拒绝、TIMEOUT错误、两次尝试和VALIDATING状态。
+- 真实SQLite幂等测试对同一键连续结算两次，仅恢复一件归属物品和两条首次事件，请求保持COMMITTED。
+- 完整检查首轮仅发现只读数组联合未被 `Array.isArray` 完全收窄；增加显式JSON对象类型守卫，未使用any或断言绕过。
+- 最终 `pnpm check`：通过；Vitest 15个文件、112项通过，Node迁移3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-013` 记录幂等终态短路与请求状态/游戏补丁同事务原则。
+
+### 自审
+
+- 重复结算实际执行两次Repository调用并检查SQLite结果，不是通过mock调用次数证明。
+- COMMITTED前任一写入失败会由同一事务回滚，请求不会提前进入终态。
+- Repository未保存API Key或Authorization，错误详情同样经过凭证字段扫描。
+- 未实现M2-T09或M3任务，不提前扩展AI厂商协议。

@@ -4,12 +4,16 @@ import type {
   CampaignId,
   GameEvent,
   IsoTimestamp,
+  Item,
   NpcRelationship,
+  PlayerCharacterId,
   Quest,
+  AdventureId,
   WorldFact,
 } from '@ember-tavern/contracts';
 
 import { PersistenceDataError } from './campaign-repository.js';
+import { ItemRepository } from './conversation-item-clock-repository.js';
 import { GameEventRepository } from './game-event-repository.js';
 import { requireRecord, requireString } from './persistence-validation.js';
 import { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
@@ -23,6 +27,12 @@ export type TurnStatePatch =
       readonly kind: 'NPC_RELATIONSHIP';
       readonly relationship: NpcRelationship;
       readonly updatedAt: IsoTimestamp;
+    }
+  | {
+      readonly kind: 'ITEM_REWARD';
+      readonly item: Item;
+      readonly ownerCharacterId: PlayerCharacterId;
+      readonly sourceAdventureId: AdventureId;
     }
   | { readonly kind: 'WORLD_FACT'; readonly fact: WorldFact };
 
@@ -38,33 +48,9 @@ export class TurnTransaction {
   public constructor(private readonly database: TransactionalSqliteDatabase) {}
 
   public commit(command: TurnCommit): void {
-    validateCommand(command);
     this.database.exec('BEGIN IMMEDIATE');
     try {
-      const adventures = new AdventureRepository(this.database);
-      adventures.update(command.adventure);
-      adventures.addTurn(command.turn);
-
-      const quests = new QuestRepository(this.database);
-      const npcs = new NpcRepository(this.database);
-      const worlds = new WorldRepository(this.database);
-      for (const patch of command.statePatches) {
-        switch (patch.kind) {
-          case 'QUEST':
-            quests.update(patch.quest);
-            break;
-          case 'NPC_RELATIONSHIP':
-            requireRelationshipCampaign(this.database, patch.relationship, command.campaignId);
-            npcs.saveRelationship(patch.relationship, patch.updatedAt);
-            break;
-          case 'WORLD_FACT':
-            worlds.addFact(patch.fact);
-            break;
-        }
-      }
-
-      const events = new GameEventRepository(this.database);
-      for (const event of command.events) events.append(event);
+      applyTurnCommit(this.database, command);
       this.database.exec('COMMIT');
     } catch (error) {
       try {
@@ -77,6 +63,40 @@ export class TurnTransaction {
       throw error;
     }
   }
+}
+
+export function applyTurnCommit(database: TransactionalSqliteDatabase, command: TurnCommit): void {
+  validateCommand(command);
+  const adventures = new AdventureRepository(database);
+  adventures.update(command.adventure);
+  adventures.saveTurn(command.turn);
+
+  const quests = new QuestRepository(database);
+  const npcs = new NpcRepository(database);
+  const items = new ItemRepository(database);
+  const worlds = new WorldRepository(database);
+  for (const patch of command.statePatches) {
+    switch (patch.kind) {
+      case 'QUEST':
+        quests.update(patch.quest);
+        break;
+      case 'NPC_RELATIONSHIP':
+        requireRelationshipCampaign(database, patch.relationship, command.campaignId);
+        npcs.saveRelationship(patch.relationship, patch.updatedAt);
+        break;
+      case 'ITEM_REWARD':
+        requireCharacterCampaign(database, patch.ownerCharacterId, command.campaignId);
+        items.create(patch.item);
+        items.assign(patch.item.id, patch.ownerCharacterId, patch.sourceAdventureId);
+        break;
+      case 'WORLD_FACT':
+        worlds.addFact(patch.fact);
+        break;
+    }
+  }
+
+  const events = new GameEventRepository(database);
+  for (const event of command.events) events.append(event);
 }
 
 function validateCommand(command: TurnCommit): void {
@@ -118,6 +138,9 @@ function validateCommand(command: TurnCommit): void {
   for (const patch of command.statePatches) {
     if (
       (patch.kind === 'QUEST' && patch.quest.campaignId !== command.campaignId) ||
+      (patch.kind === 'ITEM_REWARD' &&
+        (patch.item.campaignId !== command.campaignId ||
+          patch.sourceAdventureId !== command.adventure.id)) ||
       (patch.kind === 'WORLD_FACT' && patch.fact.campaignId !== command.campaignId)
     ) {
       throw new PersistenceDataError('State patch belongs to another campaign');
@@ -139,6 +162,19 @@ function requireRelationshipCampaign(
     campaignOf(character, 'PlayerCharacter') !== campaign
   ) {
     throw new PersistenceDataError('NPC relationship patch belongs to another campaign');
+  }
+}
+
+function requireCharacterCampaign(
+  database: TransactionalSqliteDatabase,
+  characterId: PlayerCharacterId,
+  campaign: CampaignId,
+): void {
+  const character = database
+    .prepare('SELECT campaign_id FROM player_characters WHERE id = ?')
+    .get(characterId);
+  if (campaignOf(character, 'PlayerCharacter') !== campaign) {
+    throw new PersistenceDataError('Item reward owner belongs to another campaign');
   }
 }
 

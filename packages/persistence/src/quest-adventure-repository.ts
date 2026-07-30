@@ -215,6 +215,44 @@ export class AdventureRepository {
       );
   }
 
+  public saveTurn(turn: AdventureTurn): void {
+    const current = this.getTurn(turn.id);
+    if (current === null) {
+      this.addTurn(turn);
+      return;
+    }
+    if (
+      current.adventureId !== turn.adventureId ||
+      current.turnNumber !== turn.turnNumber ||
+      current.createdAt !== turn.createdAt
+    ) {
+      throw new PersistenceDataError(
+        `AdventureTurn identity changed or record not found: ${turn.id}`,
+      );
+    }
+    one(
+      this.database
+        .prepare(
+          `UPDATE adventure_turns SET
+             scene_text = ?, speaker_npc_ids_json = ?, suggested_actions_json = ?,
+             player_action_json = ?, check_request_json = ?, dice_result_json = ?,
+             resolved_at = ?
+           WHERE id = ?`,
+        )
+        .run(
+          turn.sceneText,
+          JSON.stringify(turn.speakerNpcIds),
+          JSON.stringify(turn.suggestedActions),
+          turn.playerAction === null ? null : JSON.stringify(turn.playerAction),
+          turn.checkRequest === null ? null : JSON.stringify(turn.checkRequest),
+          turn.diceResult === null ? null : JSON.stringify(turn.diceResult),
+          turn.resolvedAt,
+          turn.id,
+        ),
+      `AdventureTurn not found: ${turn.id}`,
+    );
+  }
+
   public getTurn(id: AdventureTurn['id']): AdventureTurn | null {
     const row = this.database.prepare('SELECT * FROM adventure_turns WHERE id = ?').get(id);
     return row === undefined ? null : mapTurn(row);
