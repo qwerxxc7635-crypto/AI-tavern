@@ -1,8 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
+  actionOptionId,
   adventureId,
   campaignId,
+  checkRequestId,
+  clueId,
   characterTraitId,
   factionId,
   compatibleEnum,
@@ -42,6 +45,9 @@ describe('opaque identifiers', () => {
     expect(tavernChangeId('change-1')).toBe('change-1');
     expect(npcMemoryId('memory-1')).toBe('memory-1');
     expect(rumorId('rumor-1')).toBe('rumor-1');
+    expect(checkRequestId('check-1')).toBe('check-1');
+    expect(clueId('clue-1')).toBe('clue-1');
+    expect(actionOptionId('option-1')).toBe('option-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {

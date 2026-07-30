@@ -1,3 +1,22 @@
+export {
+  ADVENTURE_STATES,
+  ADVENTURE_TRANSITIONS,
+  AdventureTransitionError,
+  transitionAdventureState,
+} from './adventure.js';
+export type {
+  Adventure,
+  AdventureEnding,
+  AdventureOutcome,
+  AdventurePlan,
+  AdventureState,
+  AdventureTurn,
+  CheckDifficulty,
+  CheckRequest,
+  Clue,
+  DiceResult,
+  PlayerAction,
+} from './adventure.js';
 export { QUEST_STATUSES } from './quest.js';
 export type {
   Item,
@@ -78,8 +97,11 @@ export type {
   CreateCampaignInput,
 } from './campaign.js';
 export {
+  actionOptionId,
   adventureId,
   campaignId,
+  checkRequestId,
+  clueId,
   compatibleEnum,
   factionId,
   characterTraitId,
@@ -100,8 +122,11 @@ export {
   worldFactId,
 } from './foundation.js';
 export type {
+  ActionOptionId,
   AdventureId,
   CampaignId,
+  CheckRequestId,
+  ClueId,
   CompatibleEnum,
   FactionId,
   CharacterTraitId,

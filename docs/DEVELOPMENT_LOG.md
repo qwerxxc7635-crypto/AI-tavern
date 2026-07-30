@@ -412,3 +412,32 @@
 - 测试证明同一 `content` 可对应 NONE 或 CHECK_MODIFIER，不会从文本推断规则。
 - Quest 所有规格结构字段均有完整实例验证；传闻真实性不混入玩家文本。
 - 未实现任务迁移、接受任务、奖励发放、数据库或 M1-T07 冒险协议。
+
+## 2026-07-30 22:58 — M1-T07 定义冒险协议（开始）
+
+### 依赖与范围
+
+- 依赖 `M1-T04`、`M1-T06`：均已完成。
+- 仅定义协议与状态机，不实现随机数、D20结算、持久化或用例。
+
+### 计划验证
+
+- 完整冒险状态流程和合法分支成功，跳阶段与 SETTLED 后迁移被拒绝。
+- 8至12回合计划、核心线索、检定请求和骰子记录可表达。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 定义 AdventurePlan、Adventure、AdventureState、AdventureTurn、PlayerAction、CheckRequest、DiceResult、AdventureEnding 和 Clue。
+- AdventurePlan 可表达8至12回合、核心场景、至少三条必要线索、障碍、至少两个结局与失败代价，并与玩家回合文本分离。
+- 状态表覆盖 PREPARING、SCENE、WAITING_FOR_PLAYER、CHECK_REQUIRED、RESOLVING、ENDING、SETTLED，支持有/无检定回合和提前进入结局。
+- SETTLED 为终态；非法跳阶段由 `AdventureTransitionError` 拒绝。
+- PlayerAction 使用判别联合，自由输入、建议选项、使用物品和退出意图独立；建议选项自审后改用 ActionOptionId，未保留裸 optionId。
+- CheckRequest 使用固定难度 8、11、14、17；DiceResult只记录本地程序将提供的骰面、修正、总值与成功标记，本任务不生成结果。
+- `pnpm check`：通过；7 个测试文件、58 个测试全部通过，新增冒险测试9项。
+
+### 自审
+
+- 测试覆盖完整检定路径、无检定分支、两种进入结局路径、四类非法迁移、隐藏计划和回合记录。
+- 新增 CheckRequestId、ClueId、ActionOptionId，所有语义 ID 都是brand。
+- 未实现随机源、D20计算、持久化或冒险用例。

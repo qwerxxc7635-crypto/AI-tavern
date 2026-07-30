@@ -334,5 +334,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`7e5c039`。
 - Commit message：`feat(M1-T06): define quest and item contracts`
+
+## 2026-07-30 22:58 — M1-T07 定义冒险协议
+
+### 范围
+
+定义 AdventurePlan、AdventureState、AdventureTurn、PlayerAction、CheckRequest、DiceResult、AdventureEnding 和 Clue，并实现状态迁移校验；不掷骰。
+
+### 主要改动
+
+- 计划新增 adventure 协议、Check/Clue ID、状态机和测试。
+- 计划更新 contracts 出口、任务状态、日志与交接。
+
+### 决策
+
+- 隐藏骨架作为 AdventurePlan 独立保存，不混入玩家可见回合文本。
+- 玩家行动使用判别联合，自由输入和建议行动明确区分。
+- 冒险状态迁移为封闭表，SETTLED 为终态。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：7 个文件、58 个测试通过，冒险新增9项。
+- 完整状态路径、合法分支、非法迁移、隐藏计划和回合记录均有覆盖。
+
+### 自审
+
+- SETTLED为终态，PlayerAction为判别联合，骰子仅记录不生成。
+- 发现裸 `optionId` 后改为 ActionOptionId brand。
+- 未实现D20引擎、持久化或应用用例。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T07): define adventure contracts`
