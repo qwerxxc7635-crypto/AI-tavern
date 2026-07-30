@@ -22,6 +22,7 @@ export type RumorId = Branded<string, 'RumorId'>;
 export type CheckRequestId = Branded<string, 'CheckRequestId'>;
 export type ClueId = Branded<string, 'ClueId'>;
 export type ActionOptionId = Branded<string, 'ActionOptionId'>;
+export type WorldClockId = Branded<string, 'WorldClockId'>;
 export type IsoTimestamp = Branded<string, 'IsoTimestamp'>;
 export type SchemaVersion = Branded<number, 'SchemaVersion'>;
 export type PromptVersion = Branded<number, 'PromptVersion'>;
@@ -57,6 +58,7 @@ export const rumorId = (value: string): RumorId => createId(value, 'RumorId');
 export const checkRequestId = (value: string): CheckRequestId => createId(value, 'CheckRequestId');
 export const clueId = (value: string): ClueId => createId(value, 'ClueId');
 export const actionOptionId = (value: string): ActionOptionId => createId(value, 'ActionOptionId');
+export const worldClockId = (value: string): WorldClockId => createId(value, 'WorldClockId');
 
 export function isoTimestamp(value: string): IsoTimestamp {
   requireCanonicalText(value, 'IsoTimestamp');

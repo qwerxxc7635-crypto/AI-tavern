@@ -23,6 +23,7 @@ import {
   tavernId,
   timestampFromDate,
   turnId,
+  worldClockId,
   worldFactId,
   type CampaignId,
   type NpcId,
@@ -48,6 +49,7 @@ describe('opaque identifiers', () => {
     expect(checkRequestId('check-1')).toBe('check-1');
     expect(clueId('clue-1')).toBe('clue-1');
     expect(actionOptionId('option-1')).toBe('option-1');
+    expect(worldClockId('clock-1')).toBe('clock-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {

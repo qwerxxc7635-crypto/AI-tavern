@@ -119,6 +119,7 @@ export {
   tavernId,
   timestampFromDate,
   turnId,
+  worldClockId,
   worldFactId,
 } from './foundation.js';
 export type {
@@ -143,5 +144,6 @@ export type {
   TavernChangeId,
   TavernId,
   TurnId,
+  WorldClockId,
   WorldFactId,
 } from './foundation.js';
