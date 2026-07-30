@@ -373,3 +373,31 @@ AI请求可能因超时、应用重启或用户重试而以同一逻辑意图重
 ### 可逆性
 
 平台层可将文件复制/切换替换为Rust或iOS原生原子文件API，但副本验证、成功后切换、失败保留原件和不静默覆盖的语义必须保持。
+
+## DEC-015：业务AI边界只使用规范化协议
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第22、23节；`docs/TASKS.md` 的 `M3-T01`
+
+### 背景
+
+项目需要支持云端原生Provider、OpenAI-Compatible服务和本地模型。若业务层直接引用任一厂商SDK的消息、响应、错误或模型类型，切换Provider会把厂商差异扩散到上下文、任务编排和游戏状态逻辑，也会让本地Fake Provider无法完整替代真实服务。
+
+### 可选方案
+
+- 业务层直接使用首个接入厂商的SDK类型。
+- 为每个业务任务分别定义一套Provider专用接口。
+- 在ai-core定义唯一规范化请求、响应、配置、模型与能力协议，厂商适配器只在边界转换。
+
+### 决定与理由
+
+采用统一规范化协议。业务层只依赖 `AIProvider`、`NormalizedAIRequest`、`NormalizedAIResponse`、`ProviderConfig`、`ModelInfo` 和 `ModelCapabilities`；Provider实现负责把规范消息、响应格式、结束原因和用量转换为厂商调用。配置只暴露安全存储引用 `credentialRef`，不包含API Key字段。
+
+### 影响
+
+任务、Prompt、Orchestrator和游戏流程不得导入厂商SDK类型。模型能力包含检测时间和UNKNOWN/FREE/PAID动态状态，不能把免费状态永久硬编码。新增Provider只能扩展适配层；本地Fake Provider必须实现同一接口。任务Schema和Prompt版本仍由后续任务独立定义。
+
+### 可逆性
+
+规范化字段可按版本兼容扩展；若未来需要流式事件接口，可在ai-core增加标准事件协议，但厂商类型不得越过适配层。

@@ -846,3 +846,38 @@
 - 启动服务不打开原数据库做探测；版本与完整性检查均发生在工作副本。
 - pre-migration文件不自动轮换或恢复，避免提前执行M7-T05/M7-T06。
 - 未执行M3-T01或任何AI Provider工作。
+
+## 2026-07-31 00:15 — M3-T01 定义统一AI请求与响应协议
+
+### 依赖与范围
+
+- 依赖M1全部任务：已完成；M2全部任务已提交，最近提交为 `f11622e`。
+- 仅定义AIProvider、规范化请求/响应、Provider配置、模型信息和能力协议。
+- 不实现M3-T02任务Schema、Prompt、Fake Provider、厂商适配器或真实网络调用。
+
+### 计划验证
+
+- 协议覆盖规格全部首批AITask、Provider类型与预设。
+- 一个仅使用本地对象的测试实现可满足AIProvider并返回规范化结果。
+- ProviderConfig不含API Key字段，ModelCapabilities记录动态检查时间和成本状态。
+- 扫描业务package没有厂商SDK导入，根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- `packages/ai-core` 建立src入口、公共exports和contracts workspace依赖；离线 `pnpm install` 下载0项。
+- 定义规格列出的15类AITask、5类Provider类型和17个预设键；只提供协议名称，不提前定义任务输入输出Schema。
+- `ProviderConfig` 包含Provider类型、预设、显示名、可选baseUrl、安全凭证引用、非秘密options和启用状态；没有API Key字段。
+- `ModelCapabilities` 覆盖文本、流式、system消息、JSON Mode、JSON Schema、Tool Calling、推理、上下文长度及成本状态，并携带checkedAt，避免永久硬编码免费状态。
+- `NormalizedAIRequest` 统一requestId、任务、Prompt版本、模型、消息、响应格式、温度、输出限制和超时；JSON Schema为厂商无关JSON对象。
+- `NormalizedAIResponse` 统一请求关联、Provider请求ID、模型、内容、结束原因、token用量和接收时间，不暴露SDK响应对象。
+- `AIProvider` 按规格提供listModels、testConnection和generate；TestResult使用标准连接错误码。
+- 4项协议测试验证列表覆盖、无Schema提前实现、本地对象实现接口、间接凭证和动态能力时间。
+- 首次SDK扫描命令因PowerShell双引号正则解析失败，未执行项目检查；改用简单单引号包名模式后扫描0命中。
+- 最终 `pnpm check`：通过；Vitest 16个文件、116项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-015` 记录厂商类型不得越过ai-core规范化边界。
+
+### 自审
+
+- ai-core只依赖共享contracts，package依赖中没有任何厂商SDK。
+- 测试中的Provider只是接口契约夹具，不是M3-T04 FakeAIProvider产品实现。
+- 未实现M3-T02、M3-T03或任何后续任务。

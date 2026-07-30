@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M2-T09 实现数据库启动检查和迁移框架`
+- 最近完成任务：`M3-T01 定义统一AI请求与响应协议`
 - 已完成里程碑：M0、M1、M2
-- 当前任务：`M2-T09` 已验收，准备提交
-- 下一任务：`M3-T01 定义统一AI请求与响应协议`
+- 当前任务：`M3-T01` 已验收，准备提交
+- 下一任务：`M3-T02 定义首批AI任务Schema`
 
 ## 架构摘要
 
@@ -15,16 +15,17 @@
 - JSON从unknown逐字段验证；共享Repository依赖最小SQLite端口。
 - GameEvent只追加且按判别字段验证；pending请求状态与游戏补丁支持幂等同事务提交。
 - 数据库启动在副本上做版本、迁移和完整性检查；失败保持原文件不变。
+- ai-core提供厂商无关请求、响应、Provider、模型与能力协议；业务层无SDK依赖。
 
 ## 最近成功验证
 
-- v0库安全升级并保留迁移前原件；迁移失败、未来版本和损坏文件均不改原文件。
-- `pnpm check`：通过；Vitest 112项、Node SQLite 7项通过。
+- 本地无SDK测试对象可实现AIProvider；厂商SDK导入扫描0命中。
+- `pnpm check`：通过；Vitest 116项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M2-T09` 变更。
-4. 从 `M3-T01` 定义厂商无关AI请求、响应、Provider、模型与能力协议。
+3. 完成并提交当前 `M3-T01` 变更。
+4. 从 `M3-T02` 为15类首批AI任务定义独立Zod输入输出Schema和版本。

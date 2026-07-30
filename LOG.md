@@ -753,5 +753,35 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`f11622e`。
 - Commit message：`feat(M2-T09): add safe database startup migrations`
+
+## 2026-07-31 00:15 — M3-T01 定义统一AI请求与响应协议
+
+### 范围
+
+只定义厂商无关AI协议；不实现任务Schema、Prompt、Fake Provider或真实API。
+
+### 主要改动
+
+- ai-core新增15类AITask、5类Provider和17个预设键。
+- 定义AIProvider、NormalizedAIRequest/Response、ProviderConfig、ModelInfo、ModelCapabilities和TestResult。
+- 配置只含credentialRef；模型免费/付费状态带动态能力检查时间。
+- ai-core声明contracts workspace依赖并建立公共导出。
+
+### 验证
+
+- 本地测试对象不依赖任何SDK即可完整实现AIProvider并生成规范化响应。
+- 任务、Provider类别、预设、能力与间接凭证字段均有断言。
+- 业务相关package扫描未发现OpenAI、Anthropic或Gemini SDK导入。
+- `pnpm check`：通过；Vitest 16个文件、116项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### 自审
+
+- 未发送网络请求、未加入SDK依赖、未写入API Key。
+- 未定义M3-T02任务Schema或M3-T03 Prompt。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T01): define vendor-neutral AI protocol`

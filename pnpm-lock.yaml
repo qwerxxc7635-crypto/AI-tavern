@@ -32,7 +32,11 @@ importers:
 
   ios-app: {}
 
-  packages/ai-core: {}
+  packages/ai-core:
+    dependencies:
+      '@ember-tavern/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/application: {}
 
