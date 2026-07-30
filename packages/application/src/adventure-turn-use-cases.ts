@@ -27,6 +27,7 @@ import {
   type ModelProfileId,
   type PlayerAction,
   type PlayerCharacterId,
+  type SnapshotId,
   type TurnId,
   type WorldFactId,
 } from '@ember-tavern/contracts';
@@ -42,6 +43,7 @@ import {
   NpcRepository,
   PlayerCharacterRepository,
   QuestRepository,
+  SnapshotRepository,
   WorldClockRepository,
   WorldRepository,
   type TransactionalSqliteDatabase,
@@ -60,6 +62,7 @@ export interface AdventureTurnIdentityFactory {
   option(turnId: TurnId, index: number): ActionOptionId;
   event(turnId: TurnId, kind: 'ACTION' | 'DICE'): GameEventId;
   fact(turnId: TurnId, phase: 'ACTION' | 'DICE', index: number): WorldFactId;
+  snapshot(turnId: TurnId): SnapshotId;
 }
 
 export interface SubmitPlayerActionCommand {
@@ -99,6 +102,7 @@ export class AdventureTurnUseCases {
   private readonly npcs: NpcRepository;
   private readonly items: ItemRepository;
   private readonly clocks: WorldClockRepository;
+  private readonly snapshots: SnapshotRepository;
   private readonly orchestrator: AITurnOrchestrator;
 
   public constructor(
@@ -116,6 +120,7 @@ export class AdventureTurnUseCases {
     this.npcs = new NpcRepository(database);
     this.items = new ItemRepository(database);
     this.clocks = new WorldClockRepository(database);
+    this.snapshots = new SnapshotRepository(database);
     this.orchestrator = new AITurnOrchestrator(database, provider, providerConfig, now);
   }
 
@@ -159,6 +164,22 @@ export class AdventureTurnUseCases {
         cause: error,
       });
     }
+    try {
+      this.snapshots.create({
+        id: this.identities.snapshot(turn.id),
+        campaignId: command.campaignId,
+        kind: 'AUTO',
+        reason: turnInputSnapshotReason(turn.id),
+        schemaVersion: schemaVersion(1),
+        createdAt: timestamp,
+      });
+    } catch (error) {
+      throw new AIOrchestrationError(
+        'SNAPSHOT_CREATE_FAILED',
+        'Player action was saved but its pre-generation snapshot could not be created',
+        { cause: error },
+      );
+    }
     return this.requireTurn(turn.id, adventure.id);
   }
 
@@ -167,6 +188,12 @@ export class AdventureTurnUseCases {
     const turn = this.requireTurn(command.turnId, adventure.id);
     if (turn.playerAction === null) {
       throw new AIOrchestrationError('TURN_INPUT_MISSING', 'Adventure turn has no player action');
+    }
+    if (this.snapshots.findLatest(command.campaignId, turnInputSnapshotReason(turn.id)) === null) {
+      throw new AIOrchestrationError(
+        'TURN_SNAPSHOT_MISSING',
+        'Adventure turn cannot resolve without a pre-generation snapshot',
+      );
     }
     if (turn.diceResult !== null) {
       if (adventure.state !== 'RESOLVING' || turn.checkRequest === null) {
@@ -533,6 +560,10 @@ export class AdventureTurnUseCases {
     }
     return character;
   }
+}
+
+export function turnInputSnapshotReason(turn: TurnId): string {
+  return `TURN_INPUT:${turn}`;
 }
 
 function generation(command: ResolveAdventureTurnCommand) {

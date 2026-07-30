@@ -30,6 +30,7 @@ export type GenerationRecordId = Branded<string, 'GenerationRecordId'>;
 export type AiRequestId = Branded<string, 'AiRequestId'>;
 export type IdempotencyKey = Branded<string, 'IdempotencyKey'>;
 export type ModelProfileId = Branded<string, 'ModelProfileId'>;
+export type SnapshotId = Branded<string, 'SnapshotId'>;
 export type IsoTimestamp = Branded<string, 'IsoTimestamp'>;
 export type SchemaVersion = Branded<number, 'SchemaVersion'>;
 export type PromptVersion = Branded<number, 'PromptVersion'>;
@@ -74,6 +75,7 @@ export const generationRecordId = (value: string): GenerationRecordId =>
 export const aiRequestId = (value: string): AiRequestId => createId(value, 'AiRequestId');
 export const idempotencyKey = (value: string): IdempotencyKey => createId(value, 'IdempotencyKey');
 export const modelProfileId = (value: string): ModelProfileId => createId(value, 'ModelProfileId');
+export const snapshotId = (value: string): SnapshotId => createId(value, 'SnapshotId');
 
 export function isoTimestamp(value: string): IsoTimestamp {
   requireCanonicalText(value, 'IsoTimestamp');

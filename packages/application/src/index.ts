@@ -40,7 +40,7 @@ export type {
   AdventureStartState,
   GenerateAdventurePlanCommand,
 } from './adventure-start-use-cases.js';
-export { AdventureTurnUseCases } from './adventure-turn-use-cases.js';
+export { AdventureTurnUseCases, turnInputSnapshotReason } from './adventure-turn-use-cases.js';
 export type {
   AdventureTurnIdentityFactory,
   ResolveAdventureTurnCommand,
@@ -58,3 +58,9 @@ export type {
   SettlementGenerationUse,
   SummarizeAdventureCommand,
 } from './adventure-settlement-use-cases.js';
+export { RegenerationUseCases } from './regeneration-use-cases.js';
+export type {
+  PreviousModelSelection,
+  RegenerateAdventureTurnCommand,
+  RegenerationPolicy,
+} from './regeneration-use-cases.js';

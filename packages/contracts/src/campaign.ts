@@ -20,6 +20,14 @@ export type CampaignActiveState = (typeof CAMPAIGN_ACTIVE_STATES)[number];
 export type CampaignExceptionState = (typeof CAMPAIGN_EXCEPTION_STATES)[number];
 export type CampaignState = CampaignActiveState | CampaignExceptionState | 'ARCHIVED';
 
+export const MODEL_SWITCH_POLICIES = [
+  'ASK',
+  'SAME_PROVIDER',
+  'CROSS_PROVIDER',
+  'DISABLED',
+] as const;
+export type ModelSwitchPolicy = (typeof MODEL_SWITCH_POLICIES)[number];
+
 export interface Campaign {
   readonly id: CampaignId;
   readonly schemaVersion: SchemaVersion;

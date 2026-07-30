@@ -1,4 +1,6 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
+export { SNAPSHOT_KINDS } from './snapshot.js';
+export type { SaveSnapshot, SnapshotKind } from './snapshot.js';
 export type {
   GenerationRecord,
   GenerationValidationError,
@@ -105,6 +107,7 @@ export {
   CAMPAIGN_ACTIVE_STATES,
   CAMPAIGN_EXCEPTION_STATES,
   CAMPAIGN_NORMAL_TRANSITIONS,
+  MODEL_SWITCH_POLICIES,
   CampaignTransitionError,
   createCampaign,
   isCampaignActiveState,
@@ -117,6 +120,7 @@ export type {
   CampaignExceptionState,
   CampaignState,
   CreateCampaignInput,
+  ModelSwitchPolicy,
 } from './campaign.js';
 export {
   actionOptionId,
@@ -136,6 +140,7 @@ export {
   locationId,
   messageId,
   modelProfileId,
+  snapshotId,
   itemId,
   npcId,
   npcMemoryId,
@@ -169,6 +174,7 @@ export type {
   LocationId,
   MessageId,
   ModelProfileId,
+  SnapshotId,
   ItemId,
   NpcId,
   NpcMemoryId,

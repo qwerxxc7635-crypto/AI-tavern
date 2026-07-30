@@ -23,6 +23,7 @@ import {
   playerCharacterId,
   questId,
   schemaVersion,
+  snapshotId,
   tavernId,
   transitionCampaign,
   turnId,
@@ -55,6 +56,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyMigrations } from '../../persistence/src/migrations.mjs';
 import { AdventureTurnUseCases, type AdventureTurnIdentityFactory } from './index.js';
+import { RegenerationUseCases } from './regeneration-use-cases.js';
 
 const directories: string[] = [];
 const campaignKey = campaignId('campaign-adventure-turn');
@@ -85,6 +87,7 @@ const identities: AdventureTurnIdentityFactory = {
   option: (turn, index) => actionOptionId(`option:${turn}:${index}`),
   event: (turn, kind) => gameEventId(`event:${turn}:${kind}`),
   fact: (turn, phase, index) => worldFactId(`fact:${turn}:${phase}:${index}`),
+  snapshot: (turn) => snapshotId(`snapshot:${turn}`),
 };
 
 afterEach(async () => {
@@ -193,6 +196,148 @@ describe('AdventureTurnUseCases', () => {
       database.close();
     }
   });
+
+  it('regenerates from the input snapshot and can roll back without combining AI results', async () => {
+    const database = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seedCampaign(sqlite);
+      const turn = turnId('turn-regenerate');
+      const originalTurns = useCases(
+        sqlite,
+        factProvider('Old result.', 'The old path opens.'),
+        10,
+      );
+      originalTurns.submitPlayerAction({
+        campaignId: campaignKey,
+        adventureId: adventureKey,
+        turnId: turn,
+        currentScene: 'Two sealed paths wait below the tavern.',
+        action: { kind: 'FREEFORM', text: 'Open one path.' },
+      });
+      await originalTurns.resolveAdventureTurn(resolveCommand(turn, 'original'));
+      expect(
+        new WorldRepository(sqlite).listFacts(campaignKey).map(({ statement }) => statement),
+      ).toEqual(['Old result.']);
+
+      const targetConfig: ProviderConfig = {
+        ...config,
+        id: 'other-provider',
+        providerType: 'OPENAI_COMPATIBLE',
+        presetKey: 'openrouter',
+        displayName: 'Other Fake',
+      };
+      const targetTurns = new AdventureTurnUseCases(
+        sqlite,
+        factProvider('New result.', 'The new path opens.'),
+        targetConfig,
+        identities,
+        { nextD20: () => 10 },
+        () => at,
+      );
+      const regeneration = new RegenerationUseCases(sqlite, targetTurns, targetConfig, () => at);
+      await expect(
+        regeneration.regenerateCurrentReply({
+          ...resolveCommand(turn, 'rejected-switch'),
+          previous: {
+            providerConfigId: config.id,
+            providerType: config.providerType,
+            providerKey: config.presetKey,
+            modelName: 'ember-fake-v1',
+          },
+          switchApproved: true,
+          crossProviderDisclosureAccepted: false,
+          policy: { mode: 'FREE_STORY' },
+          safetySnapshotId: snapshotId('snapshot:rejected'),
+          modelSwitchedEventId: gameEventId('event:rejected-switch'),
+        }),
+      ).rejects.toThrow('data-transfer disclosure');
+      expect(new AdventureRepository(sqlite).getTurn(turn)?.sceneText).toBe('The old path opens.');
+
+      const failingTurns = new AdventureTurnUseCases(
+        sqlite,
+        failingProvider(),
+        config,
+        identities,
+        { nextD20: () => 10 },
+        () => at,
+      );
+      const failingRegeneration = new RegenerationUseCases(sqlite, failingTurns, config, () => at);
+      await expect(
+        failingRegeneration.regenerateCurrentReply({
+          ...resolveCommand(turn, 'failed-regeneration'),
+          previous: {
+            providerConfigId: config.id,
+            providerType: config.providerType,
+            providerKey: config.presetKey,
+            modelName: 'ember-fake-v1',
+          },
+          switchApproved: false,
+          crossProviderDisclosureAccepted: false,
+          policy: { mode: 'FREE_STORY' },
+          safetySnapshotId: snapshotId('snapshot:y-failed-regeneration'),
+          modelSwitchedEventId: gameEventId('event:unused-switch'),
+        }),
+      ).rejects.toThrow('Provider request failed');
+      expect(new AdventureRepository(sqlite).getTurn(turn)?.sceneText).toBe('The old path opens.');
+      expect(
+        new WorldRepository(sqlite).listFacts(campaignKey).map(({ statement }) => statement),
+      ).toEqual(['Old result.']);
+
+      const regenerated = await regeneration.regenerateCurrentReply({
+        ...resolveCommand(turn, 'regenerated'),
+        previous: {
+          providerConfigId: config.id,
+          providerType: config.providerType,
+          providerKey: config.presetKey,
+          modelName: 'ember-fake-v1',
+        },
+        switchApproved: true,
+        crossProviderDisclosureAccepted: true,
+        policy: { mode: 'FREE_STORY' },
+        safetySnapshotId: snapshotId('snapshot:a-safety'),
+        modelSwitchedEventId: gameEventId('event:model-switched'),
+      });
+
+      expect(regenerated.playerAction).toEqual({ kind: 'FREEFORM', text: 'Open one path.' });
+      expect(regenerated.sceneText).toBe('The new path opens.');
+      expect(
+        new WorldRepository(sqlite).listFacts(campaignKey).map(({ statement }) => statement),
+      ).toEqual(['New result.']);
+      expect(new GameEventRepository(sqlite).list(campaignKey).map(({ type }) => type)).toEqual([
+        'MODEL_SWITCHED',
+        'PLAYER_ACTION_SUBMITTED',
+      ]);
+
+      await expect(
+        regeneration.regenerateCurrentReply({
+          ...resolveCommand(turn, 'rules-limit'),
+          previous: {
+            providerConfigId: targetConfig.id,
+            providerType: targetConfig.providerType,
+            providerKey: targetConfig.presetKey,
+            modelName: 'ember-fake-v1',
+          },
+          switchApproved: false,
+          crossProviderDisclosureAccepted: false,
+          policy: { mode: 'RULES', maxRegenerations: 1 },
+          safetySnapshotId: snapshotId('snapshot:rules-limit'),
+          modelSwitchedEventId: gameEventId('event:rules-limit'),
+        }),
+      ).rejects.toThrow('regeneration limit');
+      expect(
+        new WorldRepository(sqlite).listFacts(campaignKey).map(({ statement }) => statement),
+      ).toEqual(['New result.']);
+
+      regeneration.rollbackLatestSnapshot(campaignKey);
+      expect(new AdventureRepository(sqlite).getTurn(turn)?.sceneText).toBe('The old path opens.');
+      expect(
+        new WorldRepository(sqlite).listFacts(campaignKey).map(({ statement }) => statement),
+      ).toEqual(['Old result.']);
+    } finally {
+      database.close();
+    }
+  });
 });
 
 function useCases(
@@ -231,6 +376,50 @@ function noCheckProvider(): AIProvider {
           adventureState: 'WAITING_FOR_PLAYER',
         }),
       });
+    },
+  };
+}
+
+function factProvider(statement: string, sceneText: string): AIProvider {
+  const fake = new FakeAIProvider(() => at);
+  return {
+    id: `fact:${statement}`,
+    listModels: () => fake.listModels(),
+    testConnection: (providerConfig) => fake.testConnection(providerConfig),
+    async generate(request, providerConfig) {
+      const response = await fake.generate(request, providerConfig);
+      if (request.task !== 'GENERATE_ADVENTURE_TURN') return response;
+      return Object.freeze({
+        ...response,
+        content: JSON.stringify({
+          sceneText,
+          speakerNpcIds: [],
+          suggestedActions: [{ text: 'Continue.' }],
+          checkRequest: null,
+          discoveredClues: [],
+          statePatchProposals: [
+            {
+              kind: 'FACT',
+              targetId: null,
+              rationale: 'The selected path becomes persistent.',
+              payload: { statement },
+            },
+          ],
+          adventureState: 'WAITING_FOR_PLAYER',
+        }),
+      });
+    },
+  };
+}
+
+function failingProvider(): AIProvider {
+  const fake = new FakeAIProvider(() => at);
+  return {
+    id: 'failing-provider',
+    listModels: () => fake.listModels(),
+    testConnection: (providerConfig) => fake.testConnection(providerConfig),
+    generate: () => {
+      throw new Error('simulated provider failure');
     },
   };
 }

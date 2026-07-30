@@ -1123,5 +1123,20 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`48001da`。
 - Commit message：`feat(M4-T08): atomically settle adventures`
+
+## 2026-07-31 02:14 — M4-T09 重生成和回退用例
+
+- 玩家输入提交后立即创建校验和保护的AUTO快照，AI生效前状态可恢复。
+- 重生成先恢复输入快照，再通过统一Provider、Schema和领域规则生成；旧游戏事实不会与新结果并存。
+- Provider切换遵守存档策略；跨厂商始终要求数据发送披露确认，并记录MODEL_SWITCHED事件。
+- Provider或验证失败时恢复安全快照；自由故事和规则限次模式均有本地用例约束。
+- 最新快照回退、SHA-256完整性校验和最近10个AUTO快照保留策略由SnapshotRepository执行。
+- `pnpm check`通过：Vitest 32文件206项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M5-T01。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T09): regenerate turns from SQLite snapshots`

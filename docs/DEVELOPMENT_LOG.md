@@ -1335,3 +1335,31 @@
 - AI只提出叙事和补丁；Outcome、奖励效果、实体ID、状态迁移、引用范围、变化幅度和事务提交均由本地程序控制。
 - `DEC-025` 记录“验证草案后单事务结算”和ending_json档案索引方案。
 - 未实现M4-T09或任何后续任务。
+
+## 2026-07-31 02:14 — M4-T09 实现重生成和回退用例
+
+### 依赖与范围
+
+- 依赖 `M4-T07`：已完成并提交 `2eaa001`；M4-T08也已完成并提交 `48001da`。
+- 仅实现保留玩家输入重生成、切换Provider重生成、规则模式限次和最新快照回退。
+- 不实现Windows页面、真实Provider、导入导出或M5任务。
+
+### 完成结果与验收
+
+- SubmitPlayerAction在玩家输入写入SQLite后创建TURN_INPUT AUTO快照；ResolveAdventureTurn拒绝缺少生成前快照的回合，确保AI结果始终有可恢复基线。
+- SnapshotRepository按Campaign捕获游戏状态表和Campaign设置，使用规范JSON、UTF-8 BLOB与SHA-256校验；恢复时先校验完整性，再以BEGIN IMMEDIATE单事务替换有效状态。
+- 快照不保存API Key、全局Provider配置或GenerationRecord；回合仍存在时保留pending请求审计，使规则模式可从SQLite统计已提交的生成次数。
+- RegenerationUseCases先校验自由故事/规则限次模式和Campaign的模型切换策略，再保存安全快照、恢复TURN_INPUT快照，并调用既有AdventureTurnUseCases及统一AI编排链。
+- 跨Provider类型切换无论自动策略如何都必须明确接受数据发送披露；需要人工批准的策略未获批准时不会创建快照或调用Provider。
+- Provider、结构、领域或提交失败时恢复安全快照；成功时保留原PlayerAction，以新回合叙事、补丁和事件替换旧游戏状态，并记录MODEL_SWITCHED事件。
+- rollbackLatestSnapshot恢复最近快照；AUTO快照按Campaign只保留最近10个，符合规格保留策略。
+- 真实SQLite测试覆盖跨厂商披露拒绝、Provider失败恢复、切换Provider成功重生成、旧/新事实互斥、玩家输入不变、规则模式限次和最新快照回退。
+- 首轮全量检查准确发现类型导入、未使用声明和异常cause规则问题；逐项修正后重新执行全量门禁通过，未关闭或降低检查。
+- 最终 `pnpm check`：通过；Vitest 32个文件、206项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- SQLite仍是唯一游戏事实来源；快照恢复与新生成不会让旧AI补丁和新补丁同时生效。
+- AI调用仍经过统一Provider接口、结构Schema和领域补丁验证，快照层不接触密钥。
+- `DEC-026` 记录Campaign逻辑快照、审计保留及重生成失败恢复边界。
+- 未实现M5-T01或任何后续任务。

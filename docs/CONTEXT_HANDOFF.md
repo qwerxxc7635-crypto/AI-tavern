@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M4-T08 实现冒险结算用例`
-- 已完成里程碑：M0、M1、M2、M3
-- 当前任务：`M4-T08` 已验收，准备提交
-- 下一任务：`M4-T09 实现重生成和回退用例`
+- 最近完成任务：`M4-T09 实现重生成和回退用例`
+- 已完成里程碑：M0、M1、M2、M3、M4
+- 当前任务：`M4-T09` 已验收，准备提交
+- 下一任务：`M5-T01 初始化Windows Tauri应用`
 
 ## 架构摘要
 
@@ -36,16 +36,18 @@
 - 回合、线索、受验证状态补丁和事件在SQLite事务边界提交；无需检定和需要检定的回合均遵守Adventure状态机。
 - AdventureSettlementUseCases先生成并验证冒险摘要与世界事件，不提前改变游戏事实；FinishAdventure将任务结果、NPC心情/关系、酒馆变化、程序授权奖励、世界事实/时钟、档案、事件、pending状态和Campaign返回酒馆一次性提交。
 - AdventureEnding的ending_json保存关键选择、未决方向、未发现线索、参与NPC、奖励/世界事实/酒馆变化ID以及摘要/世界事件GenerationRecord引用；完整档案可从SQLite重新组装。
+- 玩家行动写入后创建TURN_INPUT AUTO快照；SnapshotRepository以规范JSON、SHA-256和SQLite事务恢复Campaign有效游戏状态，保留独立AI审计并限制最近10个AUTO快照。
+- RegenerationUseCases支持自由故事和规则限次模式，按Campaign策略与跨厂商披露控制Provider切换；失败恢复安全快照，成功从输入基线替换旧AI游戏结果。
 
 ## 最近成功验证
 
-- 成功与失败结算的真实SQLite集成测试通过；成功奖励由本地策略决定效果，失败不生成未授权奖励，结算可幂等重放。
-- `pnpm check`：通过；Vitest 205项、Node SQLite 7项通过。
+- 重生成真实SQLite集成测试覆盖披露拒绝、Provider失败恢复、Provider切换、旧/新事实互斥、规则限次和最新快照回退。
+- `pnpm check`：通过；Vitest 206项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M4-T08` 变更。
-4. 从 `M4-T09` 实现保留输入重生成、切换Provider重生成和回退快照。
+3. 完成并提交当前 `M4-T09` 变更。
+4. 从 `M5-T01` 初始化Windows Tauri应用；不要提前实现M5-T02导航。

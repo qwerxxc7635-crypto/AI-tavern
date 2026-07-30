@@ -41,6 +41,7 @@ export { AdventureRepository, QuestRepository } from './quest-adventure-reposito
 export { TurnTransaction } from './turn-transaction.js';
 export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';
+export { SnapshotRepository } from './snapshot-repository.js';
 export type {
   SqliteDatabase,
   SqliteRunResult,

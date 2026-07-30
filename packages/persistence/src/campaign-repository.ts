@@ -1,6 +1,7 @@
 import {
   CAMPAIGN_ACTIVE_STATES,
   CAMPAIGN_EXCEPTION_STATES,
+  MODEL_SWITCH_POLICIES,
   campaignId,
   isoTimestamp,
   schemaVersion,
@@ -9,6 +10,7 @@ import {
   type CampaignActiveState,
   type CampaignState,
   type IsoTimestamp,
+  type ModelSwitchPolicy,
 } from '@ember-tavern/contracts';
 
 import type { SqliteDatabase, SqliteRunResult } from './sqlite-port.js';
@@ -71,6 +73,24 @@ export class CampaignRepository {
       )
       .get(id);
     return row === undefined ? null : mapCampaign(row);
+  }
+
+  public getModelSwitchPolicy(id: Campaign['id']): ModelSwitchPolicy {
+    const row = this.database
+      .prepare('SELECT model_switch_policy FROM campaigns WHERE id = ?')
+      .get(id);
+    if (row === undefined) throw new CampaignNotFoundError(id);
+    const value =
+      typeof row === 'object' && row !== null
+        ? (row as Record<string, unknown>)['model_switch_policy']
+        : undefined;
+    if (
+      typeof value !== 'string' ||
+      !(MODEL_SWITCH_POLICIES as readonly string[]).includes(value)
+    ) {
+      throw new PersistenceDataError(`Unknown model switch policy: ${String(value)}`);
+    }
+    return value as ModelSwitchPolicy;
   }
 
   public update(campaign: Campaign): void {
