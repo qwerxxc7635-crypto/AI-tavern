@@ -1168,5 +1168,21 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`308adc3`。
 - Commit message：`feat(M5-T02): add Windows shell navigation`
+
+## 2026-07-31 02:52 — M5-T03 Windows存档首页
+
+- 应用默认进入本地存档首页，可新建、继续、归档并显示最后游玩时间。
+- Windows原生桥在系统应用数据目录管理SQLite，只开放四个固定Campaign命令，不向WebView暴露SQL或文件路径。
+- Rust复用首版迁移、校验Schema/存档摘要，并以真实SQLite文件验证关闭连接后两次重开仍可恢复列表。
+- 归档保留SQLite记录但退出活动列表；继续操作更新SQLite中的updated_at。
+- 4项jsdom测试覆盖读取、新建、继续、归档和模拟重启；3项Rust测试覆盖真实持久化、归档和未来Schema拒绝。
+- Windows生产构建和Tauri release无bundle构建通过，实际窗口响应且平台数据库成功创建。
+- `pnpm check`通过：Vitest 34个文件213项、Node SQLite 7项、Rust 3项及全部类型、lint、格式检查成功。
+- 未执行M5-T04。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T03): add persistent save home`

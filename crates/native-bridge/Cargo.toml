@@ -7,5 +7,15 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[dependencies]
+rusqlite = { version = "0.38.0", features = ["bundled"] }
+serde = { version = "1.0.228", features = ["derive"] }
+thiserror = "2.0.18"
+time = { version = "0.3.47", features = ["formatting", "macros", "parsing"] }
+uuid = { version = "1.21.0", features = ["v4"] }
+
+[dev-dependencies]
+tempfile = "3.26.0"
+
 [lints]
 workspace = true

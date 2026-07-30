@@ -12,6 +12,8 @@ crate-type = ["rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+ember-native-bridge = { path = "../../crates/native-bridge" }
+serde = { version = "1.0.228", features = ["derive"] }
 tauri = { version = "2", features = [] }
 
 [lints]

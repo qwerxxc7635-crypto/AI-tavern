@@ -1420,3 +1420,32 @@
 - 错误边界不写日志或存档，不会把异常文本泄露到UI；原生日志能力留给对应任务。
 - 沿用 `DEC-027` 的HashRouter和最小Tauri capability，没有产生新的重大架构决定。
 - 未实现M5-T03或任何后续任务。
+
+## 2026-07-31 02:52 — M5-T03 实现存档首页
+
+### 依赖与范围
+
+- 依赖 `M4-T01` 和 `M5-T02`：均已完成，M5-T02已提交 `308adc3`。
+- 仅实现Windows存档首页的新建、继续、归档、最后游玩时间和本地重启恢复。
+- 不实现M5-T04世界创建页面、真实Provider、通用SQL桥、导入导出或后续业务页面。
+
+### 完成结果与验收
+
+- Windows启动时由Rust在Tauri应用数据目录打开固定 `ember-tavern.sqlite`，复用 `0001_initial.sql` 并维护兼容的 `schema_migrations`；未来Schema版本会被明确拒绝。
+- 原生桥只提供campaign_list、campaign_create、campaign_continue、campaign_archive四个高层命令；WebView不能提交SQL、文件路径、时间或存档内容。
+- 新存档由原生程序生成UUID和规范UTC时间，并以CREATING_WORLD状态写入SQLite；继续操作验证存档存在且未归档，再更新updated_at作为最后游玩时间。
+- 归档在SQLite保留原行并设为ARCHIVED，活动列表不再显示；页面在启动及每次变更后都重新查询SQLite。
+- 前端网关将Tauri返回值视为unknown，逐字段验证ID、状态和规范时间；错误界面使用固定文案，不显示底层数据库异常。
+- 存档首页提供加载、空列表、错误、操作中状态，显示本地存档数量、当前阶段和最后游玩时间；继续后把经原生验证的Campaign ID带入现有应用壳，不提前实现世界创建页面。
+- 3项Rust真实SQLite测试覆盖创建后两次重开仍可列出、继续更新时间、归档保留数据及未来Schema拒绝；4项jsdom测试覆盖读取、时间显示、新建、继续、归档和模拟应用重启重新读取。
+- `pnpm --filter @ember-tavern/windows-app build`通过；Vite构建59个模块并生成独立save-home-page chunk。
+- `pnpm --filter @ember-tavern/windows-app tauri build --no-bundle`通过；release应用实际启动，窗口标题为Ember Tavern、MainWindowHandle非零且Responding=True。
+- 实际启动在 `C:\Users\PC\AppData\Roaming\com.embertavern.windows\ember-tavern.sqlite` 创建/打开385,024字节数据库；烟测后应用进程已停止。
+- 最终 `pnpm check`：通过；Vitest 34个文件、213项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo workspace测试均通过。
+
+### 自审
+
+- SQLite是存档列表、状态和最后游玩时间的唯一真实数据源；没有使用localStorage、写死存档或前端数据库。
+- 原生边界未开放任意SQL、文件或网络能力；没有API Key或模型调用。
+- `DEC-028` 记录受限存档命令、平台数据库路径、双边响应验证和共享迁移来源。
+- 未实现M5-T04或任何后续任务。

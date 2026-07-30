@@ -707,3 +707,27 @@ Tauri只创建main窗口并授予 `core:default`，不注册业务命令或文�
 ### 可逆性
 
 若未来Tauri自定义协议提供可靠history回退，可在路由测试覆盖后迁移BrowserRouter。Capability可按高层命令逐项扩展，但禁止一次性授予宽泛文件或网络权限。
+
+## DEC-028：Windows存档首页通过受限原生命令访问平台SQLite
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第4.1、18、20、24、31节；`docs/TASKS.md` 的 `M5-T03`；`DEC-012`
+
+### 背景
+
+存档首页必须在应用重启后列出本地存档，而Windows数据库应位于系统应用数据目录。共享TypeScript Repository依赖最小SQLite端口，但Tauri WebView不能获得任意SQL、任意文件路径或宽泛数据库能力；把SQLite连接或原始查询接口直接暴露给页面会破坏分层和原生安全边界。
+
+### 决定与理由
+
+Windows Tauri启动时由Rust解析应用数据目录并打开固定文件 `ember-tavern.sqlite`，原生桥执行与共享持久化层相同的 `0001_initial.sql` 和 `schema_migrations` 版本语义。WebView仅能调用 `campaign_list`、`campaign_create`、`campaign_continue`、`campaign_archive` 四个固定高层命令，不能传入SQL、数据库路径或时间；ID和规范UTC时间由原生程序生成。
+
+原生命令只返回存档摘要，Rust先校验ID、状态、时间和Schema版本，TypeScript网关再把跨进程的 `unknown` 响应逐字段验证。继续存档只更新SQLite中的 `updated_at` 作为最后游玩时间；归档保留数据库行并设为 `ARCHIVED`，活动列表不再显示。页面每次启动和变更后重新从SQLite查询，不把存档事实持久化到Zustand或浏览器存储。
+
+### 影响
+
+SQLite仍是存档唯一真实数据源，应用关闭、WebView重建或模型不可用都不会影响存档列表。后续Windows页面应继续通过稳定用例或同等受限的原生命令访问游戏数据，不得扩展为通用SQL桥。共享迁移SQL是两种执行器的共同Schema来源；新增迁移时必须同步验证Node和Rust启动路径。
+
+### 可逆性
+
+未来可在保持命令语义与测试的前提下，把Rust实现替换为能够承载共享Repository端口的适配机制；数据库路径所有权、未知响应验证和不暴露任意SQL的边界不得撤销。

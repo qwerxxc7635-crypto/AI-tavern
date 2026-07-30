@@ -4,6 +4,9 @@ import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-rou
 import { AppErrorBoundary } from './ui-states.js';
 
 const sectionPages = () => import('./section-pages.js');
+const SaveHomePage = lazy(() =>
+  import('./save-home-page.js').then(({ SaveHomePage: page }) => ({ default: page })),
+);
 const TavernPage = lazy(() => sectionPages().then(({ TavernPage: page }) => ({ default: page })));
 const QuestsPage = lazy(() => sectionPages().then(({ QuestsPage: page }) => ({ default: page })));
 const AdventurePage = lazy(() =>
@@ -31,8 +34,18 @@ export const WINDOWS_NAVIGATION = [
 export function AppRoutes() {
   return (
     <Routes>
+      <Route index element={<Navigate to="/saves" replace />} />
+      <Route
+        path="saves"
+        element={
+          <AppErrorBoundary>
+            <Suspense fallback={<AppLoading />}>
+              <SaveHomePage />
+            </Suspense>
+          </AppErrorBoundary>
+        }
+      />
       <Route element={<AppShell />}>
-        <Route index element={<Navigate to="/tavern" replace />} />
         <Route path="tavern" element={<TavernPage />} />
         <Route path="quests" element={<QuestsPage />} />
         <Route path="adventure" element={<AdventurePage />} />
@@ -48,6 +61,7 @@ export function AppRoutes() {
 export function AppShell() {
   const location = useLocation();
   const current = WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname);
+  const campaignId = new URLSearchParams(location.search).get('campaignId');
 
   return (
     <div className="app-frame">
@@ -63,7 +77,7 @@ export function AppShell() {
         </div>
         <nav className="navigation" aria-label="主导航">
           {WINDOWS_NAVIGATION.map(({ path, label, marker }) => (
-            <NavLink key={path} to={path}>
+            <NavLink key={path} to={{ pathname: path, search: location.search }}>
               <span className="navigation__marker" aria-hidden="true">
                 {marker}
               </span>
@@ -83,7 +97,9 @@ export function AppShell() {
             <p className="eyebrow">Current room</p>
             <p className="titlebar__title">{current?.label ?? '未知路径'}</p>
           </div>
-          <p className="titlebar__mode">Local session</p>
+          <p className="titlebar__mode">
+            {campaignId === null ? 'Local session' : `存档 ${campaignId.slice(0, 8)}`}
+          </p>
         </header>
         <AppErrorBoundary key={location.pathname}>
           <Suspense fallback={<AppLoading />}>
