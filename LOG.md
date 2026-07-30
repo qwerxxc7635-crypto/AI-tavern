@@ -783,5 +783,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`42e9330`。
 - Commit message：`feat(M3-T01): define vendor-neutral AI protocol`
+
+## 2026-07-31 00:22 — M3-T02 定义首批AI任务Schema
+
+### 范围
+
+为15类首批AI任务定义独立输入/输出Zod Schema和版本；不实现Prompt、Fake Provider或领域补丁提交。
+
+### 主要改动
+
+- ai-core加入Zod运行依赖。
+- 新增世界、角色、酒馆/NPC、对话、任务、冒险、骰子叙事、世界事件、摘要、记忆和一致性Schema。
+- `AI_TASK_SCHEMAS` 对全部AITask逐项注册独立Schema及版本1。
+- 状态补丁只验证结构化提案，业务合法性留给M3-T07。
+
+### 验证
+
+- 15个任务各自有效输入输出夹具通过，空输出全部拒绝。
+- 确认30个顶层Schema对象均独立，版本均为1。
+- 特质数量、任务回合范围和严格额外字段有代表性失败断言。
+- `pnpm check`：通过；Vitest 17个文件、148项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### Bug修复
+
+- 首轮6项夹具失败定位为共享世界上下文漏 `technologyLevel`；补入规格字段后全部通过，未放宽strict校验。
+
+### 自审
+
+- 未写Prompt、未实现Provider、未接收或提交真实AI输出。
+- 领域规则仍需M3-T07验证，Schema通过不代表状态补丁可提交。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T02): add versioned AI task schemas`

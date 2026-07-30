@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目准备里程碑 M0、领域模型里程碑 M1 和持久化里程碑 M2 已完成。共享协议及D20、关系、时钟规则已实现；SQLite持久化与安全启动检查均已完成；厂商无关AI请求、响应、Provider、模型和能力协议已定义。任务Schema、Provider实现与应用功能仍未实现。
+项目准备里程碑 M0、领域模型里程碑 M1 和持久化里程碑 M2 已完成。SQLite持久化与安全启动检查均已完成；厂商无关AI协议及15类首批任务的独立版本化Zod Schema已定义。Prompt、Provider实现与应用功能仍未实现。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 

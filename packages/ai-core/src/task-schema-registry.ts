@@ -1,0 +1,78 @@
+import type { z } from 'zod';
+
+import type { AITask } from './protocol.js';
+import {
+  CheckConsistencyInputSchema,
+  CheckConsistencyOutputSchema,
+  CompleteCharacterBackgroundInputSchema,
+  CompleteCharacterBackgroundOutputSchema,
+  ExtractMemoriesInputSchema,
+  ExtractMemoriesOutputSchema,
+  GenerateAdventurePlanInputSchema,
+  GenerateAdventurePlanOutputSchema,
+  GenerateAdventureTurnInputSchema,
+  GenerateAdventureTurnOutputSchema,
+  GenerateCharacterTraitsInputSchema,
+  GenerateCharacterTraitsOutputSchema,
+  GenerateNpcsInputSchema,
+  GenerateNpcsOutputSchema,
+  GenerateQuestInputSchema,
+  GenerateQuestOutputSchema,
+  GenerateTavernInputSchema,
+  GenerateTavernOutputSchema,
+  GenerateWorldEventInputSchema,
+  GenerateWorldEventOutputSchema,
+  GenerateWorldInputSchema,
+  GenerateWorldOutputSchema,
+  NpcReplyInputSchema,
+  NpcReplyOutputSchema,
+  RefineWorldInputSchema,
+  RefineWorldOutputSchema,
+  ResolveDiceResultInputSchema,
+  ResolveDiceResultOutputSchema,
+  SummarizeAdventureInputSchema,
+  SummarizeAdventureOutputSchema,
+} from './task-schemas.js';
+
+export interface AITaskSchemaDefinition {
+  readonly schemaVersion: 1;
+  readonly input: z.ZodType;
+  readonly output: z.ZodType;
+}
+
+const definition = (input: z.ZodType, output: z.ZodType): AITaskSchemaDefinition =>
+  Object.freeze({ schemaVersion: 1, input, output });
+
+export const AI_TASK_SCHEMAS = Object.freeze({
+  GENERATE_WORLD: definition(GenerateWorldInputSchema, GenerateWorldOutputSchema),
+  REFINE_WORLD: definition(RefineWorldInputSchema, RefineWorldOutputSchema),
+  GENERATE_CHARACTER_TRAITS: definition(
+    GenerateCharacterTraitsInputSchema,
+    GenerateCharacterTraitsOutputSchema,
+  ),
+  COMPLETE_CHARACTER_BACKGROUND: definition(
+    CompleteCharacterBackgroundInputSchema,
+    CompleteCharacterBackgroundOutputSchema,
+  ),
+  GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
+  GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema),
+  NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema),
+  GENERATE_QUEST: definition(GenerateQuestInputSchema, GenerateQuestOutputSchema),
+  GENERATE_ADVENTURE_PLAN: definition(
+    GenerateAdventurePlanInputSchema,
+    GenerateAdventurePlanOutputSchema,
+  ),
+  GENERATE_ADVENTURE_TURN: definition(
+    GenerateAdventureTurnInputSchema,
+    GenerateAdventureTurnOutputSchema,
+  ),
+  RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema),
+  GENERATE_WORLD_EVENT: definition(GenerateWorldEventInputSchema, GenerateWorldEventOutputSchema),
+  SUMMARIZE_ADVENTURE: definition(SummarizeAdventureInputSchema, SummarizeAdventureOutputSchema),
+  EXTRACT_MEMORIES: definition(ExtractMemoriesInputSchema, ExtractMemoriesOutputSchema),
+  CHECK_CONSISTENCY: definition(CheckConsistencyInputSchema, CheckConsistencyOutputSchema),
+} satisfies Readonly<Record<AITask, AITaskSchemaDefinition>>);
+
+export function taskSchemas(task: AITask): AITaskSchemaDefinition {
+  return AI_TASK_SCHEMAS[task];
+}

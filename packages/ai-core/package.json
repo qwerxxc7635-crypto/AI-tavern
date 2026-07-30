@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@ember-tavern/contracts": "workspace:*"
+    "@ember-tavern/contracts": "workspace:*",
+    "zod": "^4.4.3"
   }
 }

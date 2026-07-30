@@ -881,3 +881,40 @@
 - ai-core只依赖共享contracts，package依赖中没有任何厂商SDK。
 - 测试中的Provider只是接口契约夹具，不是M3-T04 FakeAIProvider产品实现。
 - 未实现M3-T02、M3-T03或任何后续任务。
+
+## 2026-07-31 00:22 — M3-T02 定义首批AI任务Schema
+
+### 依赖与范围
+
+- 依赖 `M3-T01`：已完成并提交 `42e9330`。
+- 为规格15类首批AITask分别定义输入、输出Zod Schema和版本号。
+- 不实现M3-T03 Prompt、M3-T04 Fake Provider、M3-T06解析流程或M3-T07领域验证器。
+
+### 计划验证
+
+- 注册表与AI_TASKS精确一致，每个任务input/output顶层Schema对象独立且版本为1。
+- 每类任务各有一组有效输入输出夹具，空输出全部拒绝。
+- 代表性元组、跨字段范围和strict未知字段规则有失败测试。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- Zod仅加入 `@ember-tavern/ai-core` 运行依赖；pnpm复用本地缓存，下载0项。
+- 新增GenerateWorld与RefineWorld严格Schema，覆盖世界核心冲突、技术水平、力量规则、阵营、地点、叙事风格、禁用元素、酒馆原因和故事钩子。
+- 新增角色特质二元组和完整背景Schema；特质输出必须恰好两项。
+- 新增酒馆与NPC生成Schema，覆盖老板资料、常驻/访客身份、访问原因和数量上限。
+- 新增NPC回复Schema，输入只含该NPC知识、错误认知、关系和最近消息；输出包含回复、情绪、话题、记忆候选和单步关系提案结构。
+- 新增Quest、AdventurePlan、AdventureTurn和ResolveDiceResult Schema；回合范围max不得小于min，检定难度只允许8/11/14/17。
+- 新增世界事件、冒险摘要、NPC记忆提取和一致性检查Schema；一致性布尔值必须与issues是否为空匹配。
+- 状态补丁提案限制为QUEST、RELATIONSHIP、FACT、CLOCK和ITEM_REWARD，payload递归限制为有限JSON；尚不判断补丁是否符合当前游戏事实。
+- `AI_TASK_SCHEMAS` 使用完整Record约束15个AITask，逐项注册不同input/output对象和schemaVersion 1；遗漏或多余任务会在类型检查失败。
+- 32项Schema测试覆盖注册完整性、30个独立顶层对象、15组有效夹具、15个空输出拒绝及代表性结构失败。
+- 首轮测试6项失败都来自worldContext严格Schema漏technologyLevel，而共享夹具包含该规格字段；补齐字段后32项全部通过。
+- 最终 `pnpm check`：通过；Vitest 17个文件、148项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-016` 记录逐任务版本化和结构/领域验证分层。
+
+### 自审
+
+- 每类任务有独立命名导出和注册项，不以单一宽松Schema冒充覆盖。
+- 所有顶层和主要嵌套对象使用strict；缺字段、错误枚举和意外字段不会静默进入输出。
+- 未实现Prompt、Fake Provider、输出修复或状态提交，不提前执行后续任务。
