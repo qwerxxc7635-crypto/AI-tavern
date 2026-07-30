@@ -490,6 +490,7 @@
 ## M4-T07 实现冒险回合用例
 
 - 优先级：P0
+- 状态：已完成（2026-07-31）
 - 依赖：M4-T06
 - 用例：SubmitPlayerAction、RollCheck、ResolveAdventureTurn。
 - 验收：可完成无检定回合和需要检定的回合。

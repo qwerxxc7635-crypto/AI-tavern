@@ -1,6 +1,7 @@
 import type {
   Adventure,
   AdventureTurn,
+  Clue,
   CampaignId,
   GameEvent,
   IsoTimestamp,
@@ -40,6 +41,7 @@ export interface TurnCommit {
   readonly campaignId: CampaignId;
   readonly adventure: Adventure;
   readonly turn: AdventureTurn;
+  readonly clues?: readonly Clue[];
   readonly statePatches: readonly TurnStatePatch[];
   readonly events: readonly GameEvent[];
 }
@@ -66,10 +68,12 @@ export class TurnTransaction {
 }
 
 export function applyTurnCommit(database: TransactionalSqliteDatabase, command: TurnCommit): void {
-  validateCommand(command);
   const adventures = new AdventureRepository(database);
+  const isNewTurn = adventures.getTurn(command.turn.id) === null;
+  validateCommand(command, isNewTurn);
   adventures.update(command.adventure);
   adventures.saveTurn(command.turn);
+  if (command.clues !== undefined) adventures.saveClues(command.adventure.id, command.clues);
 
   const quests = new QuestRepository(database);
   const npcs = new NpcRepository(database);
@@ -99,7 +103,7 @@ export function applyTurnCommit(database: TransactionalSqliteDatabase, command: 
   for (const event of command.events) events.append(event);
 }
 
-function validateCommand(command: TurnCommit): void {
+function validateCommand(command: TurnCommit, isNewTurn: boolean): void {
   if (command.adventure.campaignId !== command.campaignId) {
     throw new PersistenceDataError('Adventure belongs to another campaign');
   }
@@ -109,13 +113,19 @@ function validateCommand(command: TurnCommit): void {
   if (command.turn.turnNumber !== command.adventure.currentTurnNumber) {
     throw new PersistenceDataError('Adventure current turn number must match committed turn');
   }
-  if (command.turn.playerAction === null || command.turn.resolvedAt === null) {
-    throw new PersistenceDataError('Only complete turns with player input can be committed');
+  const awaitingCheck =
+    command.adventure.state === 'CHECK_REQUIRED' &&
+    command.turn.checkRequest !== null &&
+    command.turn.diceResult === null;
+  if (command.turn.playerAction === null || (command.turn.resolvedAt === null && !awaitingCheck)) {
+    throw new PersistenceDataError(
+      'Only complete turns or turns awaiting a local check can be committed',
+    );
   }
   if (command.turn.sceneText.trim().length === 0) {
     throw new PersistenceDataError('Committed AI scene output cannot be empty');
   }
-  if (command.events.length === 0) {
+  if (isNewTurn && command.events.length === 0) {
     throw new PersistenceDataError('A turn commit must append at least one GameEvent');
   }
   const actionEvent = command.events.find(
@@ -125,8 +135,9 @@ function validateCommand(command: TurnCommit): void {
       event.payload.turnId === command.turn.id,
   );
   if (
-    actionEvent?.type !== 'PLAYER_ACTION_SUBMITTED' ||
-    JSON.stringify(actionEvent.payload.action) !== JSON.stringify(command.turn.playerAction)
+    isNewTurn &&
+    (actionEvent?.type !== 'PLAYER_ACTION_SUBMITTED' ||
+      JSON.stringify(actionEvent.payload.action) !== JSON.stringify(command.turn.playerAction))
   ) {
     throw new PersistenceDataError('Player action event must match the committed turn input');
   }

@@ -199,7 +199,7 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
       difficulty: 11,
       reason: 'Identify the hidden locking mechanism.',
     },
-    discoveredClues: ['The lock is heated from the tunnel side.'],
+    discoveredClues: ['Scorched Lens'],
     statePatchProposals: [factPatch],
     adventureState: 'CHECK_REQUIRED',
   },

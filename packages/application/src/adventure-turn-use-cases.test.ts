@@ -1,0 +1,501 @@
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { DatabaseSync, type StatementSync } from 'node:sqlite';
+
+import { FakeAIProvider, type AIProvider, type ProviderConfig } from '@ember-tavern/ai-core';
+import {
+  actionOptionId,
+  adventureId,
+  aiRequestId,
+  campaignId,
+  characterTraitId,
+  checkRequestId,
+  clueId,
+  createCampaign,
+  gameEventId,
+  generationRecordId,
+  idempotencyKey,
+  isoTimestamp,
+  itemId,
+  locationId,
+  npcId,
+  playerCharacterId,
+  questId,
+  schemaVersion,
+  tavernId,
+  transitionCampaign,
+  turnId,
+  worldFactId,
+  type Adventure,
+  type Clue,
+  type Item,
+  type NpcProfile,
+  type PlayerCharacter,
+  type Quest,
+  type Tavern,
+  type TurnId,
+  type WorldBible,
+} from '@ember-tavern/contracts';
+import {
+  AdventureRepository,
+  CampaignRepository,
+  GameEventRepository,
+  ItemRepository,
+  NpcRepository,
+  PlayerCharacterRepository,
+  QuestRepository,
+  TavernRepository,
+  WorldRepository,
+  type SqliteStatement,
+  type SqliteValue,
+  type TransactionalSqliteDatabase,
+} from '@ember-tavern/persistence';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { applyMigrations } from '../../persistence/src/migrations.mjs';
+import { AdventureTurnUseCases, type AdventureTurnIdentityFactory } from './index.js';
+
+const directories: string[] = [];
+const campaignKey = campaignId('campaign-adventure-turn');
+const characterKey = playerCharacterId('character-adventure-turn');
+const questKey = questId('quest-adventure-turn');
+const adventureKey = adventureId('adventure-turn');
+const locationKey = locationId('location-adventure-turn');
+const tavernKey = tavernId('tavern-adventure-turn');
+const ownerKey = npcId('npc-adventure-turn-owner');
+const at = isoTimestamp('2026-07-31T07:00:00.000Z');
+const config: ProviderConfig = {
+  id: 'fake-provider',
+  providerType: 'LOCAL_OPENAI_COMPATIBLE',
+  presetKey: 'custom',
+  displayName: 'Fake',
+  baseUrl: null,
+  credentialRef: null,
+  options: {},
+  enabled: true,
+};
+const generationOptions = {
+  temperature: 0,
+  maxOutputTokens: 6_000,
+  timeoutMs: 1_000,
+} as const;
+const identities: AdventureTurnIdentityFactory = {
+  check: (turn) => checkRequestId(`check:${turn}`),
+  option: (turn, index) => actionOptionId(`option:${turn}:${index}`),
+  event: (turn, kind) => gameEventId(`event:${turn}:${kind}`),
+  fact: (turn, phase, index) => worldFactId(`fact:${turn}:${phase}:${index}`),
+};
+
+afterEach(async () => {
+  await Promise.all(
+    directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
+
+describe('AdventureTurnUseCases', () => {
+  it('resolves check-required and no-check turns through SQLite', async () => {
+    const database = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seedCampaign(sqlite);
+      const checked = useCases(sqlite, new FakeAIProvider(() => at), 7);
+      const firstTurnId = turnId('turn-check');
+
+      expect(
+        checked.submitPlayerAction({
+          campaignId: campaignKey,
+          adventureId: adventureKey,
+          turnId: firstTurnId,
+          currentScene: 'The cellar lock glows in the storm.',
+          action: { kind: 'FREEFORM', text: 'Study the lock.' },
+        }),
+      ).toMatchObject({ turnNumber: 1, resolvedAt: null });
+      expect(() =>
+        checked.submitPlayerAction({
+          campaignId: campaignKey,
+          adventureId: adventureKey,
+          turnId: turnId('turn-duplicate'),
+          currentScene: 'A duplicate action must not create another pending turn.',
+          action: { kind: 'FREEFORM', text: 'Submit twice.' },
+        }),
+      ).toThrow('Player action could not be saved');
+
+      const awaitingRoll = await checked.resolveAdventureTurn(
+        resolveCommand(firstTurnId, 'check-action'),
+      );
+      expect(awaitingRoll.checkRequest).toMatchObject({
+        attribute: 'knowledge',
+        difficulty: 11,
+      });
+      expect(awaitingRoll.resolvedAt).toBeNull();
+      expect(new AdventureRepository(sqlite).get(adventureKey)?.state).toBe('CHECK_REQUIRED');
+      expect(
+        new AdventureRepository(sqlite)
+          .getClues(adventureKey)
+          .find((clue) => clue.title === 'Scorched Lens')?.discoveredInTurnId,
+      ).toBe(firstTurnId);
+
+      const rolled = checked.rollCheck({
+        campaignId: campaignKey,
+        adventureId: adventureKey,
+        turnId: firstTurnId,
+        playerCharacterId: characterKey,
+        statusModifier: 0,
+      });
+      expect(rolled.diceResult).toEqual({
+        checkRequestId: checkRequestId(`check:${firstTurnId}`),
+        d20: 7,
+        attributeModifier: 3,
+        equipmentModifier: 1,
+        statusModifier: 0,
+        total: 11,
+        difficulty: 11,
+        success: true,
+      });
+      expect(new AdventureRepository(sqlite).get(adventureKey)?.state).toBe('RESOLVING');
+
+      const narrated = await checked.resolveAdventureTurn(
+        resolveCommand(firstTurnId, 'check-dice'),
+      );
+      expect(narrated.diceResult).toEqual(rolled.diceResult);
+      expect(narrated.sceneText).toContain('The hidden catch yields');
+      expect(new AdventureRepository(sqlite).get(adventureKey)?.state).toBe('SCENE');
+
+      const secondTurnId = turnId('turn-no-check');
+      const noCheck = useCases(sqlite, noCheckProvider(), 20);
+      noCheck.submitPlayerAction({
+        campaignId: campaignKey,
+        adventureId: adventureKey,
+        turnId: secondTurnId,
+        currentScene: narrated.sceneText,
+        action: { kind: 'FREEFORM', text: 'Enter the open passage.' },
+      });
+      const resolved = await noCheck.resolveAdventureTurn(resolveCommand(secondTurnId, 'no-check'));
+
+      expect(resolved).toMatchObject({
+        turnNumber: 2,
+        checkRequest: null,
+        diceResult: null,
+        resolvedAt: at,
+      });
+      expect(resolved.sceneText).toContain('The passage opens');
+      expect(new AdventureRepository(sqlite).get(adventureKey)).toMatchObject({
+        state: 'SCENE',
+        currentTurnNumber: 2,
+      });
+      expect(new GameEventRepository(sqlite).list(campaignKey).map(({ type }) => type)).toEqual([
+        'PLAYER_ACTION_SUBMITTED',
+        'DICE_ROLLED',
+        'PLAYER_ACTION_SUBMITTED',
+      ]);
+    } finally {
+      database.close();
+    }
+  });
+});
+
+function useCases(
+  database: TransactionalSqliteDatabase,
+  provider: AIProvider,
+  roll: number,
+): AdventureTurnUseCases {
+  return new AdventureTurnUseCases(
+    database,
+    provider,
+    config,
+    identities,
+    { nextD20: () => roll },
+    () => at,
+  );
+}
+
+function noCheckProvider(): AIProvider {
+  const fake = new FakeAIProvider(() => at);
+  return {
+    id: 'no-check',
+    listModels: () => fake.listModels(),
+    testConnection: (providerConfig) => fake.testConnection(providerConfig),
+    async generate(request, providerConfig) {
+      const response = await fake.generate(request, providerConfig);
+      if (request.task !== 'GENERATE_ADVENTURE_TURN') return response;
+      return Object.freeze({
+        ...response,
+        content: JSON.stringify({
+          sceneText: 'The passage opens onto a quiet stone stair.',
+          speakerNpcIds: [],
+          suggestedActions: [{ text: 'Descend the stair.' }],
+          checkRequest: null,
+          discoveredClues: [],
+          statePatchProposals: [],
+          adventureState: 'WAITING_FOR_PLAYER',
+        }),
+      });
+    },
+  };
+}
+
+function resolveCommand(turn: TurnId, phase: string) {
+  return {
+    campaignId: campaignKey,
+    adventureId: adventureKey,
+    turnId: turn,
+    playerCharacterId: characterKey,
+    requestId: aiRequestId(`request:${phase}`),
+    generationRecordId: generationRecordId(`generation:${phase}`),
+    idempotencyKey: idempotencyKey(`adventure-turn:${phase}`),
+    modelProfileId: null,
+    modelName: 'ember-fake-v1',
+    generationOptions,
+  };
+}
+
+function seedCampaign(database: TransactionalSqliteDatabase): void {
+  const campaigns = new CampaignRepository(database);
+  const created = createCampaign({ id: campaignKey, schemaVersion: schemaVersion(1), now: at });
+  campaigns.create(created);
+  const reviewing = transitionCampaign(created, 'REVIEWING_WORLD', at);
+  campaigns.update(reviewing);
+  const characterCreation = transitionCampaign(reviewing, 'CREATING_CHARACTER', at);
+  campaigns.update(characterCreation);
+  const tavernGeneration = transitionCampaign(characterCreation, 'GENERATING_TAVERN', at);
+  campaigns.update(tavernGeneration);
+  const tavernState = transitionCampaign(tavernGeneration, 'TAVERN', at);
+  campaigns.update(tavernState);
+  campaigns.update(transitionCampaign(tavernState, 'ADVENTURE', at));
+
+  new WorldRepository(database).saveBible(world());
+  new PlayerCharacterRepository(database).create(character());
+  const taverns = new TavernRepository(database);
+  taverns.create(tavern());
+  new NpcRepository(database).create(owner());
+  taverns.assignOwner(tavernKey, ownerKey);
+  new QuestRepository(database).create(quest());
+  new AdventureRepository(database).create(adventure(), clues());
+  new ItemRepository(database).create(item(), characterKey);
+}
+
+function adventure(): Adventure {
+  return {
+    id: adventureKey,
+    campaignId: campaignKey,
+    questId: questKey,
+    state: 'SCENE',
+    plan: {
+      adventureId: adventureKey,
+      objective: 'Restore the beacon flame.',
+      risk: 'MODERATE',
+      expectedTurns: { min: 8, max: 12 },
+      coreScenes: ['Open the cellar.', 'Cross the tunnel.', 'Reach the beacon.'],
+      necessaryClueIds: [clueId('clue-lens'), clueId('clue-ledger'), clueId('clue-signet')],
+      majorObstacles: ['A rusted lock.'],
+      possibleEndings: ['The beacon is restored.'],
+      failureCost: 'Ships remain trapped.',
+    },
+    currentTurnNumber: 0,
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+function clues(): readonly Clue[] {
+  return [
+    {
+      id: clueId('clue-lens'),
+      adventureId: adventureKey,
+      title: 'Scorched Lens',
+      description: 'The lens burned from inside.',
+      isCore: true,
+      discoveredInTurnId: null,
+    },
+    {
+      id: clueId('clue-ledger'),
+      adventureId: adventureKey,
+      title: 'Tide Ledger',
+      description: 'The flood follows a schedule.',
+      isCore: true,
+      discoveredInTurnId: null,
+    },
+    {
+      id: clueId('clue-signet'),
+      adventureId: adventureKey,
+      title: 'Keeper Signet',
+      description: 'The keeper sealed the chamber.',
+      isCore: true,
+      discoveredInTurnId: null,
+    },
+  ];
+}
+
+function quest(): Quest {
+  return {
+    id: questKey,
+    campaignId: campaignKey,
+    publisherNpcId: ownerKey,
+    content: {
+      title: 'The Fading Beacon',
+      summary: 'Investigate the lighthouse.',
+      objective: 'Restore the beacon flame.',
+      failureCost: 'Ships remain trapped.',
+    },
+    status: 'ACTIVE',
+    risk: 'MODERATE',
+    recommendedAttributes: ['knowledge', 'agility'],
+    expectedTurns: { min: 8, max: 12 },
+    rewardTier: 'NOTABLE',
+    relatedNpcIds: [ownerKey],
+    relatedFactIds: [],
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+function item(): Item {
+  return {
+    id: itemId('item-lens-tool'),
+    campaignId: campaignKey,
+    content: { name: 'Lens Tool', description: 'A precise brass inspection tool.' },
+    rewardTier: 'BASIC',
+    effect: { kind: 'CHECK_MODIFIER', attribute: 'knowledge', modifier: 1 },
+    createdAt: at,
+  };
+}
+
+function world(): WorldBible {
+  return {
+    campaignId: campaignKey,
+    schemaVersion: schemaVersion(1),
+    name: 'Ember Coast',
+    currentRegion: 'Ash Harbor',
+    summary: 'A storm-bound coast.',
+    coreConflict: 'The lighthouse fire is fading.',
+    technologyLevel: 'Late medieval',
+    powerRules: ['Magic leaves a warm trace.'],
+    factions: [],
+    locations: [
+      {
+        id: locationKey,
+        name: 'Ash Harbor',
+        description: 'A sheltered port.',
+        parentLocationId: null,
+        factionIds: [],
+      },
+    ],
+    narrativeStyle: 'Grounded fantasy.',
+    forbiddenElements: [],
+    tavernReason: 'Travelers wait for safe tides.',
+    storyHooks: ['The beacon dims.'],
+    lockedFields: [],
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+function character(): PlayerCharacter {
+  return {
+    id: characterKey,
+    campaignId: campaignKey,
+    name: 'Mira',
+    gender: null,
+    age: null,
+    concept: 'Curious scout',
+    storyPreferences: [],
+    contentBoundaries: {
+      allowHorror: true,
+      allowPermanentDeath: false,
+      allowRomance: true,
+      allowBetrayal: true,
+      excludedContent: [],
+    },
+    classArchetype: 'ROGUE',
+    classDisplayName: 'Wayfinder',
+    attributes: { physique: 2, agility: 4, knowledge: 3, charisma: 1 },
+    traits: [
+      { id: characterTraitId('trait-listener'), name: 'Listener', description: 'Notices changes.' },
+      { id: characterTraitId('trait-roadwise'), name: 'Roadwise', description: 'Reads routes.' },
+    ],
+    personalGoal: 'Find a lost sibling.',
+    background: {
+      birthplace: 'North Road',
+      formativeExperience: 'Survived winter.',
+      adventureMotivation: 'Protect travelers.',
+      secret: 'Followed a false beacon.',
+      importantPerson: 'A sibling.',
+      tavernArrivalReason: 'Seeking a caravan.',
+    },
+    initialEquipment: [],
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+function tavern(): Tavern {
+  return {
+    id: tavernKey,
+    campaignId: campaignKey,
+    locationId: locationKey,
+    name: 'Ember Rest',
+    position: 'Harbor crossroads',
+    environment: 'A warm stone hall.',
+    specialRules: [],
+    longTermProblem: 'A cellar light.',
+    ownerNpcId: ownerKey,
+    residentNpcIds: [ownerKey],
+    visitorNpcIds: [],
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+function owner(): NpcProfile {
+  return {
+    id: ownerKey,
+    campaignId: campaignKey,
+    tavernId: tavernKey,
+    residency: 'OWNER',
+    name: 'Ilyra Venn',
+    identity: 'Innkeeper',
+    appearance: 'A weathered traveler.',
+    personality: 'Practical and observant.',
+    goal: 'Keep the harbor road open.',
+    secret: 'Knows the old tunnels.',
+    speechStyle: 'Measured and direct.',
+    currentMood: 'Concerned',
+    currentStatus: 'ACTIVE',
+    createdAt: at,
+    updatedAt: at,
+  };
+}
+
+async function createDatabase(): Promise<DatabaseSync> {
+  const directory = await mkdtemp(join(tmpdir(), 'ember-tavern-adventure-turn-'));
+  directories.push(directory);
+  const database = new DatabaseSync(join(directory, 'adventure.sqlite'));
+  await applyMigrations(database);
+  return database;
+}
+
+function adaptDatabase(database: DatabaseSync): TransactionalSqliteDatabase {
+  return {
+    exec(sql) {
+      database.exec(sql);
+    },
+    prepare(sql): SqliteStatement {
+      return adaptStatement(database.prepare(sql));
+    },
+  };
+}
+
+function adaptStatement(statement: StatementSync): SqliteStatement {
+  return {
+    run(...values: SqliteValue[]) {
+      return statement.run(...values);
+    },
+    get(...values: SqliteValue[]) {
+      return statement.get(...values);
+    },
+    all(...values: SqliteValue[]) {
+      return statement.all(...values);
+    },
+  };
+}

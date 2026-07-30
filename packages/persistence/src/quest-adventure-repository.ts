@@ -23,11 +23,13 @@ import {
   type CheckRequest,
   type Clue,
   type DiceResult,
+  type GameEvent,
   type PlayerAction,
   type Quest,
 } from '@ember-tavern/contracts';
 
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
+import { GameEventRepository } from './game-event-repository.js';
 import {
   parseJson,
   requireArray,
@@ -251,6 +253,78 @@ export class AdventureRepository {
         );
       }
       throw error;
+    }
+  }
+
+  public submitAction(adventure: Adventure, turn: AdventureTurn): void {
+    const database = requireTransactional(this.database);
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const current = this.get(adventure.id);
+      const unresolvedTurn = database
+        .prepare(
+          `SELECT id FROM adventure_turns
+           WHERE adventure_id = ? AND resolved_at IS NULL
+           LIMIT 1`,
+        )
+        .get(adventure.id);
+      if (
+        current === null ||
+        unresolvedTurn !== undefined ||
+        current.campaignId !== adventure.campaignId ||
+        current.questId !== adventure.questId ||
+        !['SCENE', 'WAITING_FOR_PLAYER'].includes(current.state) ||
+        adventure.state !== 'WAITING_FOR_PLAYER' ||
+        turn.adventureId !== adventure.id ||
+        turn.turnNumber !== current.currentTurnNumber + 1 ||
+        turn.playerAction === null ||
+        turn.checkRequest !== null ||
+        turn.diceResult !== null ||
+        turn.resolvedAt !== null
+      ) {
+        throw new PersistenceDataError('Player action submission is not valid for this adventure');
+      }
+      this.update(adventure);
+      this.addTurn(turn);
+      database.exec('COMMIT');
+    } catch (error) {
+      rollback(database, error, 'Player action submission and rollback both failed');
+    }
+  }
+
+  public saveRoll(adventure: Adventure, turn: AdventureTurn, event: GameEvent): void {
+    const database = requireTransactional(this.database);
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const currentAdventure = this.get(adventure.id);
+      const currentTurn = this.getTurn(turn.id);
+      if (
+        currentAdventure === null ||
+        currentTurn === null ||
+        currentAdventure.state !== 'CHECK_REQUIRED' ||
+        adventure.state !== 'RESOLVING' ||
+        currentTurn.checkRequest === null ||
+        currentTurn.diceResult !== null ||
+        turn.checkRequest?.id !== currentTurn.checkRequest.id ||
+        turn.diceResult?.checkRequestId !== currentTurn.checkRequest.id
+      ) {
+        throw new PersistenceDataError('Dice result is not valid for the pending check');
+      }
+      this.update(adventure);
+      this.saveTurn(turn);
+      if (
+        event.type !== 'DICE_ROLLED' ||
+        event.campaignId !== adventure.campaignId ||
+        event.payload.adventureId !== adventure.id ||
+        event.payload.turnId !== turn.id ||
+        JSON.stringify(event.payload.result) !== JSON.stringify(turn.diceResult)
+      ) {
+        throw new PersistenceDataError('Dice event does not match the saved result');
+      }
+      new GameEventRepository(database).append(event);
+      database.exec('COMMIT');
+    } catch (error) {
+      rollback(database, error, 'Dice result commit and rollback both failed');
     }
   }
 
@@ -645,4 +719,13 @@ function requireTransactional(database: SqliteDatabase): TransactionalSqliteData
     return database as TransactionalSqliteDatabase;
   }
   throw new PersistenceDataError('Quest acceptance requires a transactional SQLite database');
+}
+
+function rollback(database: TransactionalSqliteDatabase, error: unknown, message: string): never {
+  try {
+    database.exec('ROLLBACK');
+  } catch (rollbackError) {
+    throw new AggregateError([error, rollbackError], message, { cause: rollbackError });
+  }
+  throw error;
 }

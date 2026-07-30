@@ -40,3 +40,10 @@ export type {
   AdventureStartState,
   GenerateAdventurePlanCommand,
 } from './adventure-start-use-cases.js';
+export { AdventureTurnUseCases } from './adventure-turn-use-cases.js';
+export type {
+  AdventureTurnIdentityFactory,
+  ResolveAdventureTurnCommand,
+  RollCheckCommand,
+  SubmitPlayerActionCommand,
+} from './adventure-turn-use-cases.js';

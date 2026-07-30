@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M4-T06 实现冒险开始用例`
+- 最近完成任务：`M4-T07 实现冒险回合用例`
 - 已完成里程碑：M0、M1、M2、M3
-- 当前任务：`M4-T06` 已验收，准备提交
-- 下一任务：`M4-T07 实现冒险回合用例`
+- 当前任务：`M4-T07` 已验收，准备提交
+- 下一任务：`M4-T08 实现冒险结算用例`
 
 ## 架构摘要
 
@@ -32,16 +32,18 @@
 - NpcDialogueUseCases从SQLite构建单NPC有限认知上下文，并原子提交消息、情绪和关系；ExtractMemories验证来源后追加长期记忆。
 - QuestUseCases验证发布者、引用和冒险长度后创建AVAILABLE任务；AcceptQuest在SQLite写事务内保证单主任务。
 - AdventureStartUseCases保存PREPARING隐藏计划与线索，只返回公开状态；启动事务同步推进Adventure、Quest和Campaign。
+- AdventureTurnUseCases先持久化玩家行动，再通过统一编排判断是否需要检定；检定由本地D20、角色属性、装备与状态修正计算并记录不可变结果，AI只生成后续叙事。
+- 回合、线索、受验证状态补丁和事件在SQLite事务边界提交；无需检定和需要检定的回合均遵守Adventure状态机。
 
 ## 最近成功验证
 
-- 隐藏计划/3条核心线索持久化、公开投影不泄密和三状态同步推进测试通过。
-- `pnpm check`：通过；Vitest 202项、Node SQLite 7项通过。
+- 无检定回合与需要检定回合的真实SQLite集成测试通过；本地骰点含属性与装备修正，骰点叙事阶段不改变结果。
+- `pnpm check`：通过；Vitest 203项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M4-T06` 变更。
-4. 从 `M4-T07` 实现SubmitPlayerAction、RollCheck、ResolveAdventureTurn。
+3. 完成并提交当前 `M4-T07` 变更。
+4. 从 `M4-T08` 实现FinishAdventure、AdvanceWorldClocks、SummarizeAdventure。

@@ -1094,5 +1094,19 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`0b08fbf`。
 - Commit message：`feat(M4-T06): prepare and start hidden adventures`
+
+## 2026-07-31 01:42 — M4-T07 冒险回合用例
+
+- 新增SubmitPlayerAction、RollCheck、ResolveAdventureTurn稳定用例。
+- 玩家行动先写入SQLite；模型输出经结构和业务验证后决定是否进入检定。
+- D20在本地生成，叠加角色属性、装备与状态修正，并与DICE_ROLLED事件原子持久化。
+- 无检定路径合法完成至SCENE；检定路径在叙事解析后保留原始骰点并回到SCENE。
+- `pnpm check`通过：Vitest 31文件203项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T08。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T07): resolve local-dice adventure turns`

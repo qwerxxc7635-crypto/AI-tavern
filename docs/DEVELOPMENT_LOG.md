@@ -1284,3 +1284,28 @@
 - AI不能启动冒险或直接改变任务/Campaign状态；公开类型阻断隐藏骨架泄露。
 - `DEC-023` 记录隐藏数据投影边界。
 - 未实现M4-T07或任何后续任务。
+
+## 2026-07-31 01:42 — M4-T07 实现冒险回合用例
+
+### 依赖与范围
+
+- 依赖 `M4-T06`：已完成并提交 `0b08fbf`。
+- 仅实现SubmitPlayerAction、RollCheck、ResolveAdventureTurn及所需回合事务扩展。
+- 不实现冒险结算、世界时钟推进、回退/重生成、页面或真实Provider。
+
+### 完成结果与验收
+
+- SubmitPlayerAction仅接受SCENE或WAITING_FOR_PLAYER状态，按连续回合号先把玩家行动写入SQLite，再允许Provider参与解析。
+- ResolveAdventureTurn复用AITurnOrchestrator、最小冒险上下文、结构Schema和本地状态补丁验证；NPC与线索引用必须属于当前任务/冒险。
+- 无检定输出经合法的WAITING_FOR_PLAYER→RESOLVING→SCENE状态序列，在同一事务更新回合、冒险、线索、事实、事件与pending。
+- 需要检定的输出进入CHECK_REQUIRED；RollCheck只使用本地D20源、角色属性、已持有匹配装备效果和显式状态修正。
+- DiceResult与DICE_ROLLED事件原子写入SQLite，之后的RESOLVE_DICE_RESULT只能生成叙事和经验证补丁，不能修改本地骰点。
+- 当前任务不发放奖励或推进世界时钟；此类补丁明确拒绝并保留给M4-T08结算。
+- 真实SQLite集成测试依次完成需要检定回合和无检定回合，核对线索发现、装备+1、D20=7、总值11成功、事件序列及最终SCENE状态。
+- 最终 `pnpm check`：通过；Vitest 31个文件、203项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- AI不生成骰点、不直接写游戏状态；所有输出经过Schema与本地业务规则后才进入SQLite事务。
+- `DEC-024` 记录分阶段回合、不可变本地骰点与线索引用边界。
+- 未实现M4-T08或任何后续任务。
