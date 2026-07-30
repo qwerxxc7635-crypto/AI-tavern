@@ -7,3 +7,23 @@ settings:
 importers:
 
   .: {}
+
+  ios-app: {}
+
+  packages/ai-core: {}
+
+  packages/application: {}
+
+  packages/contracts: {}
+
+  packages/domain: {}
+
+  packages/persistence: {}
+
+  packages/prompts: {}
+
+  packages/test-fixtures: {}
+
+  packages/ui-kit: {}
+
+  windows-app: {}

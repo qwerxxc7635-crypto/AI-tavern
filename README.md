@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目目前已完成 `M0-T01` 和 `M0-T02`。pnpm 与 Cargo workspace 配置已经建立，Rust/Cargo 环境已经可用。Cargo 的 workspace 动态验证将在 `M0-T03` 创建首个真实 crate 后执行；当前尚未创建应用、共享包或 crate 目录，也尚未实现任何游戏功能。
+项目目前已完成 `M0-T01` 至 `M0-T03`。pnpm workspace 已识别 Windows、iOS 和八个共享 package，Cargo workspace 已识别首个真实 `ember-native-bridge` crate；当前仅完成工程骨架，尚未实现游戏功能。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
@@ -18,7 +18,31 @@ pnpm test
 pnpm typecheck
 ```
 
-这些 pnpm 命令统一检查当前 workspace 成员，并在尚无子项目时成功结束。`cargo metadata --format-version 1` 和 `cargo test --workspace` 将在 `M0-T03` 创建首个真实 crate 后作为必需验收执行；当前不创建占位 crate，本仓库不会自动开始 `M0-T03`。
+这些 pnpm 命令统一检查当前 workspace 成员。Cargo workspace 可通过以下命令验证：
+
+```powershell
+cargo metadata --format-version 1
+cargo test --workspace
+```
+
+当前没有可启动的应用；React、Tauri 和游戏功能尚未实现。
+
+## 本地开发缓存
+
+项目相关缓存、下载、构建输出和临时文件统一放在被 Git 忽略的 `.local/`。执行依赖安装或构建前，为当前 PowerShell 进程设置：
+
+```powershell
+$ProjectRoot = (Resolve-Path .).Path
+$env:PNPM_HOME = "$ProjectRoot\.local\tools\pnpm"
+$env:PNPM_STORE_DIR = "$ProjectRoot\.local\cache\pnpm-store"
+$env:npm_config_cache = "$ProjectRoot\.local\cache\npm"
+$env:CARGO_HOME = "$ProjectRoot\.local\cache\cargo"
+$env:CARGO_TARGET_DIR = "$ProjectRoot\.local\build\cargo-target"
+$env:TEMP = "$ProjectRoot\.local\cache\temp"
+$env:TMP = $env:TEMP
+```
+
+仓库配置已将 pnpm store 固定为 `.local/cache/pnpm-store`。现有 Rust 工具链继续从系统安装位置调用，Cargo 下载和构建输出必须使用上述 D 盘项目路径。
 
 ## 开发约定
 

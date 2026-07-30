@@ -114,6 +114,7 @@
 - `cargo metadata --format-version 1` 和 `cargo test --workspace` 的动态验证延后至 `M0-T03` 创建首个真实 crate 后执行，且在两项验证成功前不得关闭 `M0-T03`。
 - 该处理只调整验证时机，不删除或降低 Cargo 验收标准。
 - `M0-T02` 已完成；`M0-T03` 未开始，未创建占位 crate、package 或应用目录。
+
 ## 2026-07-30 22:18 — 自动开发启动基线
 
 ### 输入与依赖
@@ -138,3 +139,47 @@
 ### 下一步
 
 - 从 `M0-T03` 创建目录骨架和首个真实 crate，并按 `DEC-002` 执行 Cargo workspace 动态验证。
+
+## 2026-07-30 22:19 — M0-T03 创建项目目录骨架（开始）
+
+### 输入任务与依赖
+
+- 依赖 `M0-T02`：已完成。
+- 按 `DEC-002`，本任务创建首个真实 crate 后必须完成 Cargo workspace 动态验证。
+
+### 本轮范围与计划文件
+
+- 新增 `windows-app/package.json`、`ios-app/package.json`。
+- 新增 `packages/contracts`、`domain`、`application`、`persistence`、`ai-core`、`prompts`、`ui-kit`、`test-fixtures` 的 package manifest。
+- 新增 `crates/native-bridge/Cargo.toml` 与可编译的 crate 根文件。
+- 新增 `database/migrations/README.md`。
+- 完成后更新 `README.md`、`docs/TASKS.md`、`LOG.md` 和 `docs/CONTEXT_HANDOFF.md`。
+
+### 计划验证
+
+- pnpm workspace 成员识别与根 `lint`、`test`、`typecheck`。
+- Cargo metadata、格式检查和 workspace 测试。
+
+### 明确不处理
+
+- 不初始化 React、Tauri、TypeScript 质量工具、数据库迁移或任何游戏功能。
+- 不创建未具备真实职责的未来 Rust crate。
+
+### 完成结果与验收
+
+- pnpm 识别根项目、两个应用 package 和八个共享 package，共 11 个 workspace 项目。
+- 根 Cargo workspace 识别首个真实 crate：`ember-native-bridge`。
+- `pnpm --recursive list --depth -1`：通过。
+- `pnpm lint`、`pnpm test`、`pnpm typecheck`：通过；当前成员尚无质量脚本，根编排命令正常结束。
+- `cargo metadata --format-version 1`：通过，workspace member 与 default member 均为 `ember-native-bridge`，target 位于 `.local/build/cargo-target`。
+- `cargo fmt --all -- --check`：通过。
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`：通过。
+- `cargo test --workspace`：通过，0 个单元测试、0 个文档测试；本任务没有业务逻辑需要测试。
+- `DEC-002` 要求的 Cargo 动态验证已完成。
+
+### 自审与范围核对
+
+- 所有任务列出的 pnpm workspace 目录均有有效、唯一的 package manifest。
+- `native-bridge` 是可编译的真实 crate，只声明原生边界和禁止 unsafe，不包含占位返回值或未来功能。
+- 未创建其他无实现目的的 Rust crate；未初始化 React、Tauri、数据库迁移或应用功能。
+- `M0-T03` 验收通过并标记完成；下一任务为 `M0-T04`。
