@@ -239,3 +239,31 @@
 - 首次执行 `pnpm check` 时，TypeScript 检查全部通过，但 Rust 阶段报告 `cargo is not recognized`。
 - 根因是当前 Codex PowerShell 在 Rust 安装前启动，进程 PATH 未刷新；Cargo 本体已存在且单独用绝对路径验证通过。
 - 将已有 `%USERPROFILE%\.cargo\bin` 加入当前进程 PATH 后重跑原组合命令；未硬编码项目脚本、未跳过 Rust 检查。
+
+## 2026-07-30 22:37 — M1-T01 定义通用 ID、时间和版本类型（开始）
+
+### 依赖与范围
+
+- 依赖 `M0-T03`：已完成；M0 质量门已建立。
+- 仅修改 contracts 基础协议、测试及任务文档，不定义 `M1-T02` Campaign 状态机或其他未来实体。
+
+### 计划验证
+
+- Vitest 覆盖 ID、时间、版本、枚举已知/未知分支与非法输入。
+- 根 `pnpm check` 和 Cargo workspace metadata 回归。
+
+### 完成结果与验收
+
+- 新增五类 brand ID 及唯一公共构造路径；空值和首尾空白被拒绝。
+- 新增 canonical UTC `IsoTimestamp`、正整数 `SchemaVersion` 与 `PromptVersion`。
+- 新增 `CompatibleEnum`：已知值保持窄类型，未知值保留原始字符串供前向兼容。
+- contracts package 声明真实类型出口；没有引入新运行时依赖。
+- 首次写文件脚本因 `Test-Path` 与变量缺少空格而未创建 `src/`；确认仅 manifest 写入后修正脚本并重放，没有遗留半成品。
+- `pnpm check`：通过；Vitest 1 个文件、15 个测试全部通过，TypeScript、ESLint、Prettier和Rust回归通过。
+- `DEC-003` 记录基础序列化协议选择。
+
+### 自审
+
+- 编译期测试确认 `CampaignId` 与 `NpcId` 不相等；其他 ID 使用同一隔离机制。
+- 测试覆盖五类 ID、非法 ID、时间戳、无效版本、已知与未知枚举分支。
+- 未定义 Campaign 状态机或任何 M1-T02 以后内容。

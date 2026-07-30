@@ -116,5 +116,44 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`e555f8c`。
 - Commit message：`chore(M0-T04): establish code quality checks`
+
+## 2026-07-30 22:37 — M1-T01 定义通用 ID、时间和版本类型
+
+### 范围
+
+在 contracts 包定义五类不透明 ID、UTC 时间戳、Schema/Prompt 版本和可保留未知值的枚举兼容协议；不定义业务实体。
+
+### 主要改动
+
+- 计划新增 `packages/contracts/src` 公共协议与单元测试。
+- 计划更新 contracts package 出口、任务状态、README、日志和交接文档。
+
+### 决策
+
+- ID 使用 TypeScript brand 防止跨实体误用，运行时构造器拒绝空白值。
+- 时间戳统一为 `Date.toISOString()` 的 UTC 格式。
+- Schema 与 Prompt 版本使用正整数 brand。
+- 未知枚举值保留原始字符串，避免静默映射或数据丢失。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：1 个测试文件、15 个测试全部通过。
+- TypeScript、ESLint、Prettier 与 Rust 全量回归通过。
+
+### Bug修复
+
+- 写文件脚本的 `Test-Path` 调用漏空格，导致 `src/` 未创建；修正后重放并确认无半成品。
+
+### 自审
+
+- ID 类型不可互换，边界构造器拒绝非规范值。
+- 未知枚举保留原值；时间和版本拒绝非法输入。
+- 未提前实现 M1-T02 或其他实体。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T01): define foundational contract types`

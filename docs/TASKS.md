@@ -125,6 +125,7 @@
 ## M1-T01 定义通用ID、时间和版本类型
 
 - 优先级：P0
+- 状态：已完成（2026-07-30）
 - 依赖：M0-T03
 - 工作内容：定义：
   - `CampaignId`、`NpcId`、`QuestId`、`AdventureId`、`TurnId`；
