@@ -12,9 +12,11 @@ import {
   type IsoTimestamp,
   type JsonValue,
   type PendingAiRequest,
+  type Campaign,
+  type WorldBible,
 } from '@ember-tavern/contracts';
 
-import { PersistenceDataError } from './campaign-repository.js';
+import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
 import {
   parseJson,
   requireBoolean,
@@ -26,6 +28,7 @@ import {
 } from './persistence-validation.js';
 import type { SqliteRunResult, TransactionalSqliteDatabase } from './sqlite-port.js';
 import { applyTurnCommit, type TurnCommit } from './turn-transaction.js';
+import { WorldRepository } from './world-repository.js';
 
 const TERMINAL_STATUSES = ['COMMITTED', 'CANCELLED'] as const;
 const SECRET_FIELD = /api.?key|authorization|bearer|access.?token|secret.?key/i;
@@ -235,6 +238,60 @@ export class PendingAiRequestRepository {
         throw new AggregateError(
           [error, rollbackError],
           'AI request commit and rollback both failed',
+          { cause: rollbackError },
+        );
+      }
+      throw error;
+    }
+  }
+
+  public commitWorldOnce(
+    key: IdempotencyKey,
+    campaign: Campaign,
+    world: WorldBible,
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.getByIdempotencyKey(key);
+      if (request === null) {
+        throw new PersistenceDataError(`Pending AI request not found for idempotency key: ${key}`);
+      }
+      if (request.status === 'COMMITTED') {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (request.status !== 'VALIDATING') {
+        throw new AiRequestTransitionError(request.id, request.status, 'COMMITTED');
+      }
+      if (
+        request.turnId !== null ||
+        request.campaignId !== campaign.id ||
+        world.campaignId !== campaign.id
+      ) {
+        throw new PersistenceDataError('Pending AI request does not match the world commit');
+      }
+      new WorldRepository(this.database).saveBible(world);
+      new CampaignRepository(this.database).update(campaign);
+      one(
+        this.database
+          .prepare(
+            `UPDATE pending_ai_requests
+             SET status = 'COMMITTED', last_error_json = NULL, updated_at = ?
+             WHERE id = ? AND status = 'VALIDATING'`,
+          )
+          .run(at, request.id),
+        `Pending AI request changed during commit: ${request.id}`,
+      );
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      try {
+        this.database.exec('ROLLBACK');
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'AI world commit and rollback both failed',
           { cause: rollbackError },
         );
       }

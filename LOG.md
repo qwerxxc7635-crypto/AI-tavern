@@ -1016,5 +1016,18 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`be7da72`。
 - Commit message：`feat(M3-T08): orchestrate validated AI turn commits`
+
+## 2026-07-31 01:03 — M4-T01 新建存档和世界生成用例
+
+- 新增CreateCampaign、GenerateWorld、RefineWorld、ConfirmWorld稳定用例。
+- Fake输出经统一AI流程后映射程序ID，世界和REVIEWING_WORLD状态同事务提交。
+- Refine保留实体ID/createdAt并保护lockedFields；无世界不能Confirm。
+- `pnpm check`通过：Vitest 25文件196项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T02。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T01): add world creation use cases`

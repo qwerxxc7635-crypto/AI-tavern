@@ -442,6 +442,7 @@
 ## M4-T01 实现新建存档和世界生成用例
 
 - 优先级：P0
+- 状态：已完成（2026-07-31）
 - 依赖：M3-T08
 - 用例：CreateCampaign、GenerateWorld、RefineWorld、ConfirmWorld。
 - 验收：可使用Fake Provider创建并确认世界。

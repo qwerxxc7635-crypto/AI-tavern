@@ -1137,3 +1137,28 @@
 - Orchestrator不接受厂商SDK类型，不读取API Key，不把捕获异常文本写入数据库或日志。
 - Fake输出只有在结构与领域验证后才转换为TurnCommit，最后仍由SQLite事务决定事实提交。
 - 未实现M4-T01或任何后续任务。
+
+## 2026-07-31 01:03 — M4-T01 实现新建存档和世界生成用例
+
+### 依赖与范围
+
+- 依赖 `M3-T08`：已完成并提交 `be7da72`。
+- 仅实现CreateCampaign、GenerateWorld、RefineWorld、ConfirmWorld稳定用例及世界专用幂等事务。
+- 不创建角色、酒馆、NPC、页面或真实Provider。
+
+### 完成结果与验收
+
+- application新增 `WorldCreationUseCases` 与Generate/Refine命令、世界实体ID工厂协议。
+- CreateCampaign创建schemaVersion 1、CREATING_WORLD本地存档；重复或非法状态由Repository/用例拒绝。
+- GenerateWorld验证输入后走pending、Prompt、Fake/统一Provider、GenerationRecord和结构验证；将AI名称草稿映射为程序分配的FactionId/LocationId。
+- 世界与Campaign的REVIEWING_WORLD状态通过 `commitWorldOnce` 在同一SQLite事务提交；COMMITTED请求幂等短路。
+- RefineWorld仅允许REVIEWING_WORLD，保留已有实体ID、createdAt和lockedFields，并逐项拒绝锁定字段变化。
+- ConfirmWorld要求世界已存在并将状态迁移至CREATING_CHARACTER；无世界时状态保持CREATING_WORLD。
+- 首轮检查发现world专用提交漏导入WorldRepository；补齐值导入后类型和运行测试通过。
+- 2项真实SQLite测试覆盖完整Fake生成/细化/确认路径及无世界确认拒绝。
+- 最终 `pnpm check`：通过；Vitest 25个文件、196项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- AI只提供世界草稿，所有ID、锁定字段保护、存档状态和事务由本地程序控制。
+- 未实现M4-T02或任何后续任务。
