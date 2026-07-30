@@ -918,3 +918,39 @@
 - 每类任务有独立命名导出和注册项，不以单一宽松Schema冒充覆盖。
 - 所有顶层和主要嵌套对象使用strict；缺字段、错误枚举和意外字段不会静默进入输出。
 - 未实现Prompt、Fake Provider、输出修复或状态提交，不提前执行后续任务。
+
+## 2026-07-31 00:26 — M3-T03 建立Prompt目录与版本机制
+
+### 依赖与范围
+
+- 依赖 `M3-T02`：已完成并提交 `ba3d646`。
+- 仅建立Base规则、15类任务Prompt、Provider能力格式层和Prompt版本记录。
+- 不实现M3-T04 Fake Provider、M3-T05上下文构建、真实Provider或网络调用。
+
+### 计划验证
+
+- TASK_PROMPTS与AI_TASKS精确一致，所有任务有逻辑角色、版本和独立指令。
+- PROMPT_HISTORY独立记录v1，不随当前Prompt版本覆盖旧记录。
+- 输入在渲染前通过任务Schema；模型能力决定SYSTEM合并和结构化输出格式。
+- 扫描UI、application和Repository没有Prompt正文，根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- `packages/prompts` 建立src入口、exports，并依赖ai-core/contracts/Zod；离线安装下载0项。
+- BASE_RULES集中声明SQLite权威、只使用给定上下文、禁止修改锁定规则/属性/骰子、补丁仅为提案、内容边界、秘密禁入和纯JSON输出。
+- 15类TASK_PROMPTS逐项定义World Designer、Game Master、NPC Actor或Archivist角色、PromptVersion 1、输出Schema名和任务专属指令。
+- PROMPT_HISTORY对15类任务保留固定版本1初始记录；自审时从当前Prompt动态映射改为独立AI_TASKS+固定v1，未来升级不会丢失历史。
+- `formatTaskPrompt` 先使用对应输入Zod Schema解析unknown，再序列化已验证输入；非法输入不会形成Provider消息。
+- 支持system消息时输出SYSTEM Base/角色/任务指令和USER输入；不支持时合并为单个USER消息。
+- 支持JSON Schema时由任务输出Zod生成JSON Schema；否则依次降级为JSON_OBJECT或TEXT，不虚报模型能力。
+- JSON Schema转换从unknown递归验证为JsonValue；首轮类型检查发现只读数组联合收窄不足，增加显式JsonObject守卫，未用any或断言。
+- 6项测试覆盖完整Prompt/历史、Base安全规则、JSON Schema格式、system降级、JSON Mode、TEXT和输入拒绝。
+- 页面、windows/iOS、application和persistence扫描指定Prompt正文0命中。
+- 最终 `pnpm check`：通过；Vitest 18个文件、154项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-017` 记录Prompt集中、历史保留和能力降级原则。
+
+### 自审
+
+- Provider格式层只产生规范消息/响应格式，不导入厂商SDK或发送请求。
+- Prompt正文没有进入页面、Use Case或Repository。
+- 未执行M3-T04或后续任务。

@@ -2,5 +2,14 @@
   "name": "@ember-tavern/prompts",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ember-tavern/ai-core": "workspace:*",
+    "@ember-tavern/contracts": "workspace:*",
+    "zod": "^4.3.6"
+  }
 }

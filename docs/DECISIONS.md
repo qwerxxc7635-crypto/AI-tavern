@@ -429,3 +429,31 @@ Prompt、Fake Provider、输出解析和GenerationRecord必须按任务读取同
 ### 可逆性
 
 任务可在未来拆分或新增版本，并通过迁移/兼容解析保留旧GenerationRecord；结构与领域验证分层原则应保持。
+
+## DEC-017：Prompt集中注册并按模型能力降级格式
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第20.2、22.1至22.3节；`docs/TASKS.md` 的 `M3-T03`
+
+### 背景
+
+页面、Use Case或Repository中散落提示词会让同一任务出现不同规则和版本，也难以记录GenerationRecord实际使用的Prompt。模型对system消息、JSON Schema和JSON Mode的支持不同，若业务层自行拼接格式，会再次把Provider差异扩散到游戏逻辑。
+
+### 可选方案
+
+- 每个页面在调用模型前直接拼接提示词。
+- 每个Provider维护一套完整任务提示词。
+- 在prompts package集中Base规则、任务指令和版本历史，再按动态模型能力生成规范消息与响应格式。
+
+### 决定与理由
+
+采用集中目录与能力降级。15类任务各有当前Prompt定义、逻辑角色、输出Schema名和PromptVersion；独立的append-only历史基线保留旧版本记录。格式层先用任务Zod Schema验证输入，再组合Base规则与任务指令；支持system消息时拆分SYSTEM/USER，不支持时合并到USER；响应格式按JSON Schema、JSON Mode、TEXT顺序降级。
+
+### 影响
+
+UI、application和Repository不得保存Prompt正文或自行格式化Provider消息。Prompt更新必须新增历史条目并递增版本；不能用当前版本动态覆盖旧历史。能力降级只改变传输格式，不改变任务Schema、规则权限或“AI只提出状态补丁”的边界。
+
+### 可逆性
+
+Prompt文本和策略可以按版本演进，格式层也可新增流式或工具调用标准；集中注册、历史保留和业务层不散落提示词原则应保持。

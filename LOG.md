@@ -817,5 +817,40 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`ba3d646`。
 - Commit message：`feat(M3-T02): add versioned AI task schemas`
+
+## 2026-07-31 00:26 — M3-T03 建立Prompt目录与版本机制
+
+### 范围
+
+建立集中Prompt、版本历史和Provider能力格式层；不实现Fake/真实Provider或上下文构建。
+
+### 主要改动
+
+- prompts package新增Base权责/隐私/JSON规则和15类任务指令。
+- 每个任务记录逻辑角色、PromptVersion 1和输出Schema名称。
+- 独立PROMPT_HISTORY保留固定v1基线，供未来追加版本。
+- 格式层先验证任务输入，再按system消息、JSON Schema和JSON Mode能力降级。
+
+### 验证
+
+- 15类Prompt与历史精确覆盖AI_TASKS，版本均为1。
+- 支持system与不支持system的消息结构、三种响应格式和非法输入拒绝均通过。
+- 页面、application和Repository扫描未发现Prompt正文。
+- `pnpm check`：通过；Vitest 18个文件、154项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### Bug修复
+
+- 只读JSON数组类型收窄增加显式对象守卫，未使用断言。
+- 自审将历史从当前Prompt动态映射改为固定v1基线，避免未来升级覆盖旧记录。
+
+### 自审
+
+- 未调用模型、未实现M3-T04 Fake Provider。
+- Prompt只存在prompts package，UI和Repository不持有正文。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T03): centralize versioned prompts`

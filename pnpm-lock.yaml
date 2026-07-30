@@ -60,7 +60,17 @@ importers:
         specifier: workspace:*
         version: link:../domain
 
-  packages/prompts: {}
+  packages/prompts:
+    dependencies:
+      '@ember-tavern/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
+      '@ember-tavern/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      zod:
+        specifier: ^4.3.6
+        version: 4.4.3
 
   packages/test-fixtures: {}
 
