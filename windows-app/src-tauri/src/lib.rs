@@ -3,7 +3,8 @@
 #![forbid(unsafe_code)]
 
 use ember_native_bridge::{
-    CampaignStore, CampaignStoreError, CampaignSummary, WorldCreationSnapshot,
+    CampaignStore, CampaignStoreError, CampaignSummary, CharacterCompletionCommit,
+    CharacterCreationSnapshot, CharacterTraitGenerationCommit, WorldCreationSnapshot,
     WorldGenerationCommit, WorldManualUpdate,
 };
 use serde::Serialize;
@@ -100,6 +101,32 @@ fn world_confirm(
     store.confirm_world(&id).map_err(Into::into)
 }
 
+#[tauri::command]
+fn character_creation_get(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CharacterCreationSnapshot, CommandError> {
+    store.character_creation_snapshot(&id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn character_traits_commit(
+    command: CharacterTraitGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<CharacterCreationSnapshot, CommandError> {
+    store.commit_character_traits(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn character_completion_commit(
+    command: CharacterCompletionCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<CharacterCreationSnapshot, CommandError> {
+    store
+        .commit_character_completion(command)
+        .map_err(Into::into)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -116,7 +143,10 @@ pub fn run() {
             world_creation_get,
             world_generation_commit,
             world_draft_update,
-            world_confirm
+            world_confirm,
+            character_creation_get,
+            character_traits_commit,
+            character_completion_commit
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");

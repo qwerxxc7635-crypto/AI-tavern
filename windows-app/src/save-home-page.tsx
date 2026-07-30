@@ -70,7 +70,9 @@ export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePagePro
       const destination =
         continued.state === 'CREATING_WORLD' || continued.state === 'REVIEWING_WORLD'
           ? '/world'
-          : '/tavern';
+          : continued.state === 'CREATING_CHARACTER'
+            ? '/character/create'
+            : '/tavern';
       navigate(`${destination}?campaignId=${encodeURIComponent(continued.id)}`);
     } catch {
       setError('无法继续该存档。请返回列表后重试。');

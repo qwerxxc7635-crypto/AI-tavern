@@ -1478,3 +1478,35 @@
 - 页面状态仅用于未提交表单和展示；重新加载时世界、锁定和Campaign阶段均来自SQLite。
 - `DEC-029` 记录统一Provider执行与原生原子提交的跨运行时边界。
 - 未实现M5-T05或任何后续任务。
+
+## 2026-07-31 03:31 — M5-T05 实现车卡页面
+
+### 依赖与范围
+
+- 依赖 `M4-T02` 和 `M5-T04`：均已完成；上一任务M5-T04已提交 `ece3204`。
+- 仅实现分步车卡、属性分配、特质选择、背景与装备预览，以及完成后进入酒馆生成入口。
+- 不实现M5-T06酒馆内容、NPC/任务交互、真实Provider、通用SQL桥或后续页面功能。
+
+### 完成结果与验收
+
+- 新增独立 `/character/create` 流程；世界确认和CREATING_CHARACTER存档继续操作均进入该路由，其他Campaign阶段不冒充可创建状态。
+- 基础车卡覆盖姓名、可选性别/年龄、角色概念、四种固定职业原型与显示名、个人目标、故事偏好和内容边界。
+- 四项属性均限制为1至5且总和必须为10；页面展示实时分配总数，非法总数不能请求特质，TypeScript和Rust边界再次校验相同规则。
+- WindowsCharacterCreationService通过共享FakeAIProvider、Prompt、版本2任务Schema和validateAIOutput生成六个候选特质及完整背景；页面不直接调用Provider或拼接Prompt。
+- 特质阶段只能从当前SQLite持久化生成记录的六个候选中选择两个；候选ID由生成记录稳定派生，生成后关闭并重开数据库仍恢复完整草稿与候选。
+- Rust新增character_creation_get、character_traits_commit、character_completion_commit三个固定语义命令；拒绝未知字段、跨Campaign数据、非法阶段/属性、非候选特质、篡改的原始响应与验证结果，以及与车卡不一致的生成输入/上下文。
+- 完成操作在单个BEGIN IMMEDIATE事务中写入PlayerCharacter、程序分配ID和效果的初始Item、GenerationRecord与COMMITTED pending请求，并将Campaign推进到GENERATING_TAVERN。
+- 背景预览展示出生地、成长经历、冒险动机、秘密、重要人物、到达酒馆原因及装备效果；“进入酒馆生成流程”只导航到既有酒馆入口，没有实现M5-T06内容。
+- 6项新增前端测试覆盖真实Fake Provider服务、非法属性阻断、三段页面流程、六选二上限与重载恢复；现有存档/世界路由测试补充车卡路径。
+- 2项角色原生测试使用真实SQLite覆盖特质后重开恢复、完整角色与装备再次重开、非法属性、非候选特质及响应篡改无写入。
+- `pnpm --filter @ember-tavern/windows-app build`通过；Vite转换155个模块并生成独立character-creation-page chunk。
+- `pnpm --filter @ember-tavern/windows-app tauri build --no-bundle`通过；release应用实际启动，窗口标题为Ember Tavern、MainWindowHandle非零且Responding=True，烟测后进程已停止。
+- 最终 `pnpm check`：通过；Vitest 38个文件、225项通过，Node SQLite 7项通过；native-bridge Rust 8项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo workspace测试均通过。
+
+### 自审
+
+- SQLite是已生成特质、已完成角色、装备和Campaign阶段的唯一真实数据源；页面只保留未提交表单及当前展示状态。
+- AI结果在共享结构验证后仍由Rust复核业务规则、输入上下文和原始/验证输出一致性，不能直接修改游戏事实。
+- 本任务沿用 `DEC-029` 的统一Provider执行与受限原生原子提交边界，没有形成新的重大架构决定，因此未新增DEC。
+- M5-T05验收“完成后进入酒馆生成流程”已由组件流程、路由测试、生产构建和窗口启动烟测覆盖。
+- 未实现M5-T06或任何后续任务。

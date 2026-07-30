@@ -1201,5 +1201,22 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`ece3204`。
 - Commit message：`feat(M5-T04): create and confirm offline worlds`
+
+## 2026-07-31 03:31 — M5-T05 Windows车卡流程
+
+- 新增独立分步车卡页，覆盖基础资料、固定职业原型、四属性10点分配、故事偏好和内容边界。
+- WindowsCharacterCreationService通过共享Fake Provider、Prompt、任务Schema和输出验证生成六个特质候选、背景及装备描述。
+- 特质严格六选二；草稿和候选写入SQLite审计上下文，应用或数据库重开后可恢复选择进度。
+- Rust只开放三个固定角色创建命令，并复核Campaign阶段、属性、候选归属、生成输入/上下文及原始/验证输出一致性。
+- 完成事务原子写入角色、程序控制装备、生成审计与Campaign的GENERATING_TAVERN状态。
+- 世界确认及未完成车卡存档均进入新路由；完成按钮进入既有酒馆生成入口，不实现M5-T06酒馆业务。
+- `pnpm check`通过：Vitest 38个文件225项、Node SQLite 7项、native-bridge Rust 8项及全部类型、lint、格式和严格Clippy检查成功。
+- Windows生产构建、Tauri release无bundle构建和实际窗口启动响应烟测通过。
+- 未执行M5-T06。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T05): complete offline character creation`

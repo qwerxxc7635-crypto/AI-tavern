@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T04 实现世界创建与预览页面`
+- 最近完成任务：`M5-T05 实现车卡页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T04` 已验收，准备提交
-- 下一任务：`M5-T05 实现车卡页面`
+- 当前任务：`M5-T05` 已验收，准备提交
+- 下一任务：`M5-T06 实现酒馆页面`
 
 ## 架构摘要
 
@@ -45,16 +45,19 @@
 - 原生桥复用0001迁移并拒绝未来Schema；Rust和TypeScript边界都验证存档摘要，WebView不拥有SQL或数据库路径。
 - Windows世界创建服务继续使用共享Fake Provider、Prompt与任务Schema；Rust固定命令重新校验世界、锁定、引用和阶段后原子提交。
 - 世界页覆盖全部基础选项、可选构想、预览、手动编辑、九类字段锁定、局部/全部重生成和确认，确认后进入CREATING_CHARACTER。
+- Windows车卡服务继续使用共享Fake Provider、版本2 Prompt和任务Schema；Rust固定命令复核属性、候选特质、生成输入/上下文和原始/验证输出后原子提交。
+- 车卡页覆盖基础资料、四属性10点分配、六选二特质、重启恢复、背景和程序控制装备预览；完成后Campaign进入GENERATING_TAVERN并导航到酒馆生成入口。
 
 ## 最近成功验证
 
-- 世界创建9项定向前端测试和6项native-bridge Rust测试通过；实际Tauri窗口完成Fake生成与确认，数据库状态为CREATING_CHARACTER且临时数据清理无残留。
-- `pnpm check`通过：Vitest 36个文件、218项，Node SQLite 7项及native-bridge Rust 6项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
+- 车卡相关14项定向前端测试和8项native-bridge Rust测试通过；真实SQLite覆盖生成特质后重开恢复及完整角色再次重开。
+- `pnpm check`通过：Vitest 38个文件、225项，Node SQLite 7项及native-bridge Rust 8项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
+- Windows生产前端与Tauri release无bundle构建通过；release窗口标题正确、窗口句柄非零且响应。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M5-T04` 变更。
-4. 从 `M5-T05` 实现车卡页面；不要提前实现M5-T06酒馆页面。
+3. 完成并提交当前 `M5-T05` 变更。
+4. 从 `M5-T06` 实现酒馆页面；不要提前实现M5-T07 NPC聊天页面。

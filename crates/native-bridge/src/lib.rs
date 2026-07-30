@@ -2,7 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+mod character_creation;
 mod world_creation;
+pub use character_creation::*;
 pub use world_creation::*;
 
 use std::path::{Path, PathBuf};

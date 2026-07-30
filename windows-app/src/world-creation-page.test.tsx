@@ -62,7 +62,7 @@ function renderWorldPage(service: FakeWorldService) {
     <MemoryRouter initialEntries={['/world?campaignId=campaign-world']}>
       <Routes>
         <Route path="/world" element={<WorldCreationPage service={service} />} />
-        <Route path="/character" element={<p>进入车卡 campaign-world</p>} />
+        <Route path="/character/create" element={<p>进入车卡 campaign-world</p>} />
       </Routes>
     </MemoryRouter>,
   );

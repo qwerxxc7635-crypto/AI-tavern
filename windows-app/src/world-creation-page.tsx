@@ -138,7 +138,7 @@ export function WorldCreationPage({
             onClick={() =>
               void perform('confirm', async () => {
                 const confirmed = await service.confirm(campaignId);
-                navigate(`/character?campaignId=${encodeURIComponent(campaignId)}`);
+                navigate(`/character/create?campaignId=${encodeURIComponent(campaignId)}`);
                 return confirmed;
               })
             }
