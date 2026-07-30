@@ -527,5 +527,37 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`94ba77a`。
 - Commit message：`feat(M2-T02): create initial SQLite migration`
+
+## 2026-07-30 23:28 — M2-T03 实现Campaign Repository
+
+### 范围
+
+实现Campaign创建、读取、更新、归档和列表；使用最小SQLite端口保持平台可替换，不实现世界、角色或其他Repository。
+
+### 主要改动
+
+- 计划新增类型安全的Campaign Repository及公共导出。
+- 计划用Node 24 SQLite测试适配器执行真实文件数据库重连测试。
+
+### 验证
+
+- CRUD、排序、归档过滤、重复ID、缺失目标和非法持久化时间均有测试。
+- 关闭连接后重新打开同一文件数据库，Campaign完整读取成功。
+- `pnpm check`：通过；Vitest 11个文件、96项，Node迁移3项全部成功。
+
+### Bug修复
+
+- 严格类型检查拒绝原始数据库行的点号索引访问；改为显式键访问，未降低规则。
+
+### 自审
+
+- 生产Repository仅依赖最小SQLite端口，Node SQLite只存在于测试适配器。
+- 原始行按M1构造器和枚举显式验证，无 `any` 或未验证类型断言直出。
+- SQL全部参数化，归档复用Campaign状态机；未实现其他Repository。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T03): implement campaign repository`

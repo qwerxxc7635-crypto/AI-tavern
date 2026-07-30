@@ -289,3 +289,31 @@ JSON聚合可通过数据迁移拆分成表，或将低频子表合并回JSON；
 ### 可逆性
 
 迁移执行器可移植到Rust或平台原生层，但版本表结构、事务提交语义和已发布迁移不可改写原则应保持。
+
+## DEC-012：共享Repository依赖最小SQLite端口
+
+- 日期：2026-07-30
+- 状态：已采纳
+- 依据：`docs/spec.md` 第18.1、24.1节；`docs/TASKS.md` 的 `M2-T03`
+
+### 背景
+
+Windows和iOS各自拥有本地SQLite，但平台连接方式不同。若共享Repository直接导入Node SQLite、Tauri命令或iOS数据库库，领域持久化逻辑会绑定单一运行时，难以在另一平台复用和进行真实文件测试。
+
+### 可选方案
+
+- Repository直接依赖Node 24 `DatabaseSync`。
+- 每个平台各写一套完整Repository。
+- Repository只依赖prepare/run/get/all组成的最小同步SQLite端口，由平台或测试提供适配器。
+
+### 决定与理由
+
+采用最小SQLite端口。Repository拥有SQL、行映射和持久化错误语义；连接建立、文件路径和具体驱动由外部适配。当前测试用Node 24内置SQLite做薄适配并执行真实文件重连，不把Node类型泄漏到生产Repository接口。
+
+### 影响
+
+后续Repository复用同一端口；Windows/iOS原生桥只需实现该受限语义或提供等价适配。数据库读取结果一律视为 `unknown`，必须经过运行时验证后才能构造M1品牌类型，不能使用 `any` 或直接断言为领域对象。
+
+### 可逆性
+
+端口可扩展事务或批量能力，也可替换为异步版本；Repository SQL和行校验可迁移，平台隔离边界应保持。

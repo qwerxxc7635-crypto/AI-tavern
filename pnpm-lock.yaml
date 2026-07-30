@@ -11,6 +11,9 @@ importers:
       '@eslint/js':
         specifier: 10.0.1
         version: 10.0.1(eslint@10.8.0)
+      '@types/node':
+        specifier: 24.13.3
+        version: 24.13.3
       eslint:
         specifier: 10.8.0
         version: 10.8.0
@@ -25,7 +28,7 @@ importers:
         version: 8.65.0(eslint@10.8.0)(typescript@5.9.3)
       vitest:
         specifier: 4.0.18
-        version: 4.0.18(lightningcss@1.33.0)
+        version: 4.0.18(@types/node@24.13.3)(lightningcss@1.33.0)
 
   ios-app: {}
 
@@ -41,7 +44,11 @@ importers:
         specifier: workspace:*
         version: link:../contracts
 
-  packages/persistence: {}
+  packages/persistence:
+    dependencies:
+      '@ember-tavern/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/prompts: {}
 
@@ -426,6 +433,9 @@ packages:
 
   '@types/json-schema@7.0.15':
     resolution: {integrity: sha512-5+fP8P8MFNC+AyZCDxrB2pkZFPGzqQWUzpSeuuVLvm8VMcorNYavBqoFcxK8bQz4Qsbn4oUEEem4wDLfcysGHA==}
+
+  '@types/node@24.13.3':
+    resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
   '@typescript-eslint/eslint-plugin@8.65.0':
     resolution: {integrity: sha512-IEgob78X12rHpUmtcwFsXhZdVGJtwTVP8FiCLZkR6GlYVrl2PcuB+KhCE5BlVC/eQpQnu8WXRtkHZuPar+gCRA==}
@@ -921,6 +931,9 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  undici-types@7.18.2:
+    resolution: {integrity: sha512-AsuCzffGHJybSaRrmr5eHr81mwJU3kjw6M+uprWvCXiNeN9SOGwQ3Jn8jb8m3Z6izVgknn1R0FTCEAP2QrLY/w==}
+
   uri-js@4.4.1:
     resolution: {integrity: sha512-7rKUyy33Q1yc98pQ1DAmLtwX109F7TIfWlW1Ydo8Wl1ii1SeHieeh0HHfPeL2fMXK6z0s8ecKs9frCuLJvndBg==}
 
@@ -1238,6 +1251,10 @@ snapshots:
 
   '@types/json-schema@7.0.15': {}
 
+  '@types/node@24.13.3':
+    dependencies:
+      undici-types: 7.18.2
+
   '@typescript-eslint/eslint-plugin@8.65.0(@typescript-eslint/parser@8.65.0(eslint@10.8.0)(typescript@5.9.3))(eslint@10.8.0)(typescript@5.9.3)':
     dependencies:
       '@eslint-community/regexpp': 4.12.2
@@ -1338,13 +1355,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.1
 
-  '@vitest/mocker@4.0.18(vite@7.3.6(lightningcss@1.33.0))':
+  '@vitest/mocker@4.0.18(vite@7.3.6(@types/node@24.13.3)(lightningcss@1.33.0))':
     dependencies:
       '@vitest/spy': 4.0.18
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 7.3.6(lightningcss@1.33.0)
+      vite: 7.3.6(@types/node@24.13.3)(lightningcss@1.33.0)
 
   '@vitest/pretty-format@4.0.18':
     dependencies:
@@ -1759,11 +1776,13 @@ snapshots:
 
   typescript@5.9.3: {}
 
+  undici-types@7.18.2: {}
+
   uri-js@4.4.1:
     dependencies:
       punycode: 2.3.1
 
-  vite@7.3.6(lightningcss@1.33.0):
+  vite@7.3.6(@types/node@24.13.3)(lightningcss@1.33.0):
     dependencies:
       esbuild: 0.28.1
       fdir: 6.5.0(picomatch@4.0.5)
@@ -1772,13 +1791,14 @@ snapshots:
       rollup: 4.62.3
       tinyglobby: 0.2.17
     optionalDependencies:
+      '@types/node': 24.13.3
       fsevents: 2.3.3
       lightningcss: 1.33.0
 
-  vitest@4.0.18(lightningcss@1.33.0):
+  vitest@4.0.18(@types/node@24.13.3)(lightningcss@1.33.0):
     dependencies:
       '@vitest/expect': 4.0.18
-      '@vitest/mocker': 4.0.18(vite@7.3.6(lightningcss@1.33.0))
+      '@vitest/mocker': 4.0.18(vite@7.3.6(@types/node@24.13.3)(lightningcss@1.33.0))
       '@vitest/pretty-format': 4.0.18
       '@vitest/runner': 4.0.18
       '@vitest/snapshot': 4.0.18
@@ -1795,8 +1815,10 @@ snapshots:
       tinyexec: 1.2.4
       tinyglobby: 0.2.17
       tinyrainbow: 3.1.1
-      vite: 7.3.6(lightningcss@1.33.0)
+      vite: 7.3.6(@types/node@24.13.3)(lightningcss@1.33.0)
       why-is-node-running: 2.3.0
+    optionalDependencies:
+      '@types/node': 24.13.3
     transitivePeerDependencies:
       - jiti
       - less

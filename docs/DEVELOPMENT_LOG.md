@@ -596,3 +596,37 @@
 - 迁移失败会回滚DDL和版本写入；不存在记录了版本但只建一部分表的路径。
 - 仅新增迁移基础设施表，不创建规格之外的业务表。
 - 未实现Campaign或其他Repository，不提前执行 `M2-T03`。
+
+## 2026-07-30 23:28 — M2-T03 实现Campaign Repository（开始）
+
+### 依赖与范围
+
+- 依赖 `M2-T02`：已完成并提交 `94ba77a`。
+- 仅实现Campaign Repository及测试，不实现世界、角色、NPC或其他表的Repository。
+
+### 计划验证
+
+- 创建、读取、状态更新、归档、默认列表和包含归档列表。
+- 重复ID、缺失更新/归档和数据库非法枚举值显式报错。
+- 关闭SQLite连接后重新打开文件，数据仍存在。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- persistence package新增对contracts的workspace依赖、公共导出和最小 `SqliteDatabase`/Statement端口。
+- `CampaignRepository` 实现create、get、update、archive、list；默认列表排除归档，显式参数可包含归档。
+- 读取数据库行从 `unknown` 开始验证字符串、数字、Campaign状态、恢复状态、品牌ID、Schema版本和规范UTC时间；非法数据抛出 `PersistenceDataError`，不返回部分对象。
+- update拒绝不存在记录和修改 `createdAt`；archive复用Campaign状态机并在同一语句写入归档状态、更新时间和归档时间。
+- 真实SQLite测试覆盖CRUD、排序、归档过滤、重复ID、缺失目标、非法时间戳和空查询。
+- 重连验收：写入文件数据库后关闭连接，重新打开同一路径并再次应用幂等迁移，Campaign完整读取成功。
+- 增加精确版本 `@types/node 24.13.3` 仅供Node SQLite测试类型；pnpm安装复用本地缓存，下载0项。
+- 首轮类型检查发现原始行索引签名使用点号访问；改为显式键访问，保留 `noPropertyAccessFromIndexSignature`。
+- 最终 `pnpm check`：通过；Vitest 11个文件、96项通过，Node迁移3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-012` 记录平台无关SQLite端口。
+
+### 自审
+
+- Repository没有导入Node、Tauri、iOS或具体SQLite驱动，测试适配器不进入公共导出。
+- 所有SQL参数绑定，无字符串拼接实体数据；没有 `any`、非空断言或吞掉数据库错误。
+- Campaign仍由本地SQLite保存和恢复，列表不依赖内存缓存。
+- 未实现世界、角色或其他Repository，不提前执行 `M2-T04`。
