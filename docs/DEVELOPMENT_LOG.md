@@ -1235,3 +1235,27 @@
 - 捕获异常文本未进入SQLite；AI不能直接改关系或写记忆，全部经本地规则与事务。
 - 本任务延续DEC-019，无新增重大架构决定。
 - 未实现M4-T05或任何后续任务。
+
+## 2026-07-31 01:27 — M4-T05 实现任务用例
+
+### 依赖与范围
+
+- 依赖 `M4-T03`：已完成并提交 `322906f`；M4-T04也已完成并提交 `0842087`。
+- 仅实现GenerateQuest、AcceptQuest及任务查询/接受事务。
+- 不实现Adventure、奖励结算、页面或真实Provider。
+
+### 完成结果与验收
+
+- GenerateQuest从本地世界、酒馆、玩家角色、ACTIVE NPC和已有任务标题构建最小输入。
+- AI输出经Schema后继续验证8至12回合范围、关联NPC必须属于酒馆、关联事实必须存在于当前Campaign。
+- 生成任务固定从AVAILABLE开始，AI不能直接接受或激活任务；Quest与pending状态同事务提交。
+- QuestRepository新增按Campaign稳定排序查询。
+- AcceptQuest使用BEGIN IMMEDIATE在同一事务确认目标AVAILABLE且不存在其他ACCEPTED/ACTIVE主任务，再条件更新。
+- 真实SQLite测试连续生成两个AVAILABLE任务，接受第一个后第二个被拒绝并保持AVAILABLE；进行中主任务数量为1。
+- 最终 `pnpm check`：通过；Vitest 29个文件、201项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- AI仅生成任务叙事和结构建议；状态迁移与并发唯一性完全由本地程序和SQLite事务控制。
+- `DEC-022` 记录主任务串行接受边界。
+- 未实现M4-T06或任何后续任务。

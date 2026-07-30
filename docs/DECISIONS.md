@@ -565,3 +565,25 @@ GenerateNpcs的Schema与Prompt升级到版本2，与2名普通常驻和1名访�
 ### 可逆性
 
 未来可为传闻增加独立展示投影或查询Repository，也可扩展任务发布者选择规则；RUMOR的权威记录仍来自WorldFact，Quest创建任务边界不应回退。
+
+## DEC-022：主任务接受在SQLite写事务内串行判定
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第12.2、20、27节；`docs/TASKS.md` 的 `M4-T05`
+
+### 背景
+
+规格要求同一时间只有一个主冒险进行。若应用层先查询当前任务、再单独更新目标任务，两个并发接受操作都可能看到“没有进行中任务”并同时成功。AI生成结果也不能直接决定任务已接受或激活。
+
+### 决定与理由
+
+GenerateQuest只创建AVAILABLE任务，并验证发布者、关联NPC、关联世界事实和8至12回合范围。AcceptQuest使用 `BEGIN IMMEDIATE` 获取SQLite写锁，在同一事务内确认目标仍为AVAILABLE、当前存档不存在ACCEPTED或ACTIVE任务，再条件更新为ACCEPTED。任何条件失败均回滚且保留其他任务状态。
+
+### 影响
+
+UI不能通过直接更新Quest绕过接受用例。StartAdventure必须只从ACCEPTED任务开始，并在自己的事务中把它推进为ACTIVE。数据库索引支持按campaign/status检查，最终游戏事实仍由SQLite决定。
+
+### 可逆性
+
+未来可用部分唯一索引进一步强化约束，或支持显式支线任务类型；在模型增加相应字段和迁移前，单主任务串行接受规则保持不变。

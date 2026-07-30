@@ -1068,5 +1068,18 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`0842087`。
 - Commit message：`feat(M4-T04): persist limited-knowledge NPC dialogue`
+
+## 2026-07-31 01:27 — M4-T05 任务用例
+
+- 新增GenerateQuest、AcceptQuest稳定用例。
+- 生成任务验证本地NPC/事实引用和8–12回合范围，固定为AVAILABLE。
+- BEGIN IMMEDIATE事务确保单存档仅一个ACCEPTED/ACTIVE主任务。
+- `pnpm check`通过：Vitest 29文件201项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T06。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T05): generate and exclusively accept quests`

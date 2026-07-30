@@ -37,7 +37,11 @@ import {
   requireString,
   requireStringArray,
 } from './persistence-validation.js';
-import type { SqliteDatabase, SqliteRunResult } from './sqlite-port.js';
+import type {
+  SqliteDatabase,
+  SqliteRunResult,
+  TransactionalSqliteDatabase,
+} from './sqlite-port.js';
 
 const QUEST_RISKS = ['LOW', 'MODERATE', 'HIGH', 'EXTREME'] as const;
 const REWARD_TIERS = ['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY'] as const;
@@ -62,6 +66,72 @@ export class QuestRepository {
   public get(id: Quest['id']): Quest | null {
     const row = this.database.prepare('SELECT * FROM quests WHERE id = ?').get(id);
     return row === undefined ? null : mapQuest(row);
+  }
+
+  public listByCampaign(id: Quest['campaignId']): readonly Quest[] {
+    return Object.freeze(
+      this.database
+        .prepare(
+          `SELECT * FROM quests
+           WHERE campaign_id = ?
+           ORDER BY created_at, id`,
+        )
+        .all(id)
+        .map(mapQuest),
+    );
+  }
+
+  public acceptAsOnlyMain(
+    id: Quest['id'],
+    campaign: Quest['campaignId'],
+    at: Quest['updatedAt'],
+  ): Quest {
+    const database = requireTransactional(this.database);
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const quest = this.get(id);
+      if (quest === null || quest.campaignId !== campaign) {
+        throw new PersistenceDataError(`Quest not found in campaign: ${id}`);
+      }
+      if (quest.status !== 'AVAILABLE') {
+        throw new PersistenceDataError(`Only AVAILABLE quests can be accepted: ${id}`);
+      }
+      const active = database
+        .prepare(
+          `SELECT id FROM quests
+           WHERE campaign_id = ? AND status IN ('ACCEPTED', 'ACTIVE')
+           LIMIT 1`,
+        )
+        .get(campaign);
+      if (active !== undefined) {
+        throw new PersistenceDataError('Campaign already has an accepted or active main quest');
+      }
+      one(
+        database
+          .prepare(
+            `UPDATE quests
+             SET status = 'ACCEPTED', updated_at = ?
+             WHERE id = ? AND campaign_id = ? AND status = 'AVAILABLE'`,
+          )
+          .run(at, id, campaign),
+        `Quest changed while being accepted: ${id}`,
+      );
+      database.exec('COMMIT');
+      const accepted = this.get(id);
+      if (accepted === null) throw new PersistenceDataError(`Accepted quest not found: ${id}`);
+      return accepted;
+    } catch (error) {
+      try {
+        database.exec('ROLLBACK');
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Quest acceptance and rollback both failed',
+          { cause: rollbackError },
+        );
+      }
+      throw error;
+    }
   }
 
   public update(quest: Quest): void {
@@ -516,4 +586,11 @@ function one(result: SqliteRunResult, message: string): void {
   if (result.changes !== 1 && result.changes !== 1n) {
     throw new PersistenceDataError(message);
   }
+}
+
+function requireTransactional(database: SqliteDatabase): TransactionalSqliteDatabase {
+  if ('exec' in database && typeof database.exec === 'function') {
+    return database as TransactionalSqliteDatabase;
+  }
+  throw new PersistenceDataError('Quest acceptance requires a transactional SQLite database');
 }

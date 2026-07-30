@@ -21,6 +21,7 @@ import {
   type NpcProfile,
   type NpcRelationship,
   type PlayerCharacter,
+  type Quest,
   type Tavern,
   type TemporaryVisitor,
   type WorldBible,
@@ -43,6 +44,7 @@ import type { SqliteRunResult, TransactionalSqliteDatabase } from './sqlite-port
 import { applyTurnCommit, type TurnCommit } from './turn-transaction.js';
 import { WorldRepository } from './world-repository.js';
 import { PlayerCharacterRepository } from './player-character-repository.js';
+import { QuestRepository } from './quest-adventure-repository.js';
 import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 
 const TERMINAL_STATUSES = ['COMMITTED', 'CANCELLED'] as const;
@@ -548,6 +550,30 @@ export class PendingAiRequestRepository {
       return 'COMMITTED';
     } catch (error) {
       this.rollback(error, 'AI memory commit and rollback both failed');
+    }
+  }
+
+  public commitQuestOnce(
+    key: IdempotencyKey,
+    quest: Quest,
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, quest.campaignId);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (quest.status !== 'AVAILABLE') {
+        throw new PersistenceDataError('Generated quest must start as AVAILABLE');
+      }
+      new QuestRepository(this.database).create(quest);
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI quest commit and rollback both failed');
     }
   }
 

@@ -32,3 +32,5 @@ export type {
   NpcDialogueResult,
   TalkToNpcCommand,
 } from './npc-dialogue-use-cases.js';
+export { QuestUseCases } from './quest-use-cases.js';
+export type { GenerateQuestCommand, QuestGenerationRequest } from './quest-use-cases.js';
