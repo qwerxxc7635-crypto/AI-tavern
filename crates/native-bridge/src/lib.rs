@@ -3,8 +3,10 @@
 #![forbid(unsafe_code)]
 
 mod character_creation;
+mod tavern_initialization;
 mod world_creation;
 pub use character_creation::*;
+pub use tavern_initialization::*;
 pub use world_creation::*;
 
 use std::path::{Path, PathBuf};

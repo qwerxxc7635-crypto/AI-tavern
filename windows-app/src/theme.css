@@ -1162,6 +1162,398 @@ textarea:disabled {
   text-transform: uppercase;
 }
 
+.tavern-room {
+  min-height: calc(100vh - 5.2rem);
+  padding: clamp(1.25rem, 3vw, 3.5rem);
+  overflow-y: auto;
+  background:
+    radial-gradient(circle at 12% 0%, rgb(193 120 83 / 13%), transparent 24rem),
+    linear-gradient(135deg, transparent 70%, rgb(146 166 122 / 5%)), var(--night);
+}
+
+.tavern-room--loading {
+  display: grid;
+  align-content: center;
+  justify-items: start;
+}
+
+.tavern-room--loading h1 {
+  margin: 0.5rem 0;
+  font:
+    400 clamp(2rem, 5vw, 4rem) Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.tavern-room--loading > p:last-child {
+  color: var(--muted);
+}
+
+.hearth-loader {
+  width: 3rem;
+  height: 3.4rem;
+  display: grid;
+  place-items: end center;
+  margin-bottom: 1.5rem;
+  border: 2px solid var(--copper);
+  border-bottom: 0;
+  border-radius: 2rem 2rem 0 0;
+}
+
+.hearth-loader span {
+  width: 1rem;
+  height: 1.4rem;
+  margin-bottom: 0.25rem;
+  border-radius: 1rem;
+  background: var(--moss);
+  animation: hearth-pulse 1.2s ease-in-out infinite alternate;
+}
+
+.tavern-header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: clamp(2rem, 5vw, 4.5rem) 0 2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.tavern-header h1 {
+  margin: 0.4rem 0 0.5rem;
+  font:
+    400 clamp(3rem, 8vw, 7rem) / 0.88 Georgia,
+    'Times New Roman',
+    serif;
+  letter-spacing: -0.055em;
+}
+
+.tavern-header__position {
+  margin: 0;
+  color: var(--copper);
+  font-size: 0.8rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tavern-header__clock {
+  display: grid;
+  justify-items: end;
+  padding-bottom: 0.35rem;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.tavern-header__clock strong {
+  color: var(--moss);
+  font:
+    400 2.8rem Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.tavern-header__clock span {
+  font-size: 0.66rem;
+  letter-spacing: 0.14em;
+}
+
+.tavern-atmosphere {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(14rem, 0.8fr);
+  gap: 2rem;
+  padding: 2rem 0;
+}
+
+.tavern-atmosphere > p {
+  margin: 0;
+  color: var(--ink);
+  font:
+    400 clamp(1.15rem, 2.3vw, 1.7rem) / 1.55 Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.tavern-atmosphere > div {
+  display: grid;
+  align-content: start;
+  gap: 0.45rem;
+  padding-left: 1.2rem;
+  border-left: 2px solid var(--copper);
+}
+
+.tavern-atmosphere > div span,
+.tavern-atmosphere li {
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+.tavern-atmosphere > div strong {
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+
+.tavern-atmosphere ul {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tavern-atmosphere li {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid var(--line);
+}
+
+.tavern-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(18rem, 0.7fr);
+  gap: 1px;
+  background: var(--line);
+}
+
+.tavern-patrons,
+.tavern-sidebar > section,
+.clock-board {
+  background: var(--panel);
+}
+
+.tavern-patrons {
+  padding: clamp(1.25rem, 3vw, 2.3rem);
+}
+
+.section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-heading h2,
+.tavern-sidebar h2,
+.clock-board h2 {
+  margin: 0.2rem 0 0;
+  font:
+    400 1.7rem Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.section-heading > span {
+  color: var(--muted);
+  font-size: 0.7rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.patron-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.patron-card {
+  display: grid;
+  grid-template-columns: 2.7rem 1fr;
+  gap: 0.9rem;
+  padding: 1rem;
+  border: 0;
+  color: inherit;
+  background: var(--night-deep);
+  text-align: left;
+  cursor: pointer;
+}
+
+.patron-card--selected {
+  background: linear-gradient(135deg, rgb(193 120 83 / 18%), var(--panel-raised));
+  box-shadow: inset 0 0 0 1px var(--copper);
+}
+
+.patron-card__sigil {
+  width: 2.7rem;
+  height: 2.7rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--copper-dark);
+  border-radius: 50%;
+  color: var(--copper);
+  font-family: Georgia, 'Times New Roman', serif;
+}
+
+.patron-card__copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.patron-card__copy small {
+  color: var(--moss);
+  font-size: 0.62rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.patron-card__copy strong {
+  font:
+    400 1.05rem Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.patron-card__copy > span {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.selected-patron {
+  margin-top: 1px;
+  padding: 1.4rem;
+  border-top: 1px solid var(--line);
+  background: rgb(255 255 255 / 2%);
+}
+
+.selected-patron h3 {
+  margin: 0.2rem 0 0.8rem;
+  font:
+    400 1.5rem Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.selected-patron > p {
+  margin: 0.4rem 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.selected-patron > span {
+  display: inline-block;
+  margin-top: 0.8rem;
+  color: var(--copper);
+  font-size: 0.7rem;
+}
+
+.tavern-sidebar {
+  display: grid;
+  gap: 1px;
+  background: var(--line);
+}
+
+.tavern-sidebar > section {
+  padding: 1.6rem;
+}
+
+.rumor-board ol {
+  display: grid;
+  gap: 0;
+  margin: 1.2rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rumor-board li {
+  display: grid;
+  grid-template-columns: 2rem 1fr;
+  padding: 1rem 0;
+  border-top: 1px solid var(--line);
+}
+
+.rumor-board li > span {
+  color: var(--copper);
+  font:
+    400 1rem Georgia,
+    'Times New Roman',
+    serif;
+}
+
+.rumor-board li p {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+
+.rumor-board li small {
+  grid-column: 2;
+  margin-top: 0.4rem;
+  color: var(--muted);
+}
+
+.quest-door {
+  align-content: start;
+}
+
+.quest-door > p:not(.eyebrow) {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.6;
+}
+
+.quest-door .primary-action {
+  display: inline-flex;
+  margin-top: 0.8rem;
+  text-decoration: none;
+}
+
+.clock-board {
+  margin-top: 1px;
+  padding: clamp(1.25rem, 3vw, 2.3rem);
+}
+
+.clock-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  background: var(--line);
+}
+
+.clock-list article {
+  padding: 1.1rem;
+  background: var(--night-deep);
+}
+
+.clock-list article > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.8rem;
+}
+
+.clock-list article > div:first-child span {
+  color: var(--moss);
+}
+
+.clock-track {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.25rem;
+  margin: 1rem 0;
+}
+
+.clock-track span {
+  height: 0.32rem;
+  background: var(--line);
+}
+
+.clock-track .clock-track__filled {
+  background: var(--copper);
+}
+
+.clock-list article > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+@keyframes hearth-pulse {
+  to {
+    opacity: 0.55;
+    transform: scale(0.82) translateY(0.15rem);
+  }
+}
+
 @keyframes turn {
   to {
     transform: rotate(1turn);
@@ -1254,6 +1646,16 @@ textarea:disabled {
     grid-column: 1;
     justify-self: stretch;
   }
+
+  .tavern-atmosphere,
+  .tavern-grid,
+  .clock-list {
+    grid-template-columns: 1fr;
+  }
+
+  .patron-list {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1264,5 +1666,9 @@ textarea:disabled {
   .loading-glyph {
     animation: none;
     border-color: var(--moss);
+  }
+
+  .hearth-loader span {
+    animation: none;
   }
 }

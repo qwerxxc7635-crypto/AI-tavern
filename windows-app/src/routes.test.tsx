@@ -19,8 +19,14 @@ describe('Windows application shell', () => {
 
     expect(screen.getByRole('navigation', { name: '主导航' })).toBeTruthy();
     expect(WINDOWS_NAVIGATION).toHaveLength(6);
-    expect(await screen.findByRole('heading', { name: '酒馆' })).toBeTruthy();
-    expect(screen.getByText('共享协议 Schema v1')).toBeTruthy();
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: '先从存档首页选择一段旅程。' },
+        { timeout: 5_000 },
+      ),
+    ).toBeTruthy();
+    expect(screen.getByRole('link', { name: '酒馆' }).getAttribute('aria-current')).toBe('page');
 
     for (const { label } of WINDOWS_NAVIGATION.slice(1)) {
       fireEvent.click(screen.getByRole('link', { name: label }));

@@ -1218,5 +1218,22 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`7939093`。
 - Commit message：`feat(M5-T05): complete offline character creation`
+
+## 2026-07-31 03:50 — M5-T06 Windows酒馆页面
+
+- WindowsTavernService通过统一Fake Provider依次生成酒馆/老板和NPC/传闻，StrictMode并发初始化按Campaign合并为同一Promise。
+- Rust新增三个固定语义命令，复核阶段、生成输入/上下文、原始/验证输出、阵容、访客原因、传闻来源和跨Campaign引用。
+- 酒馆、老板、关系、有限认知、两名常驻、一名访客、三条传闻、生成审计及Campaign状态分两次原子提交；失败不留下部分阵容。
+- 传闻快照只返回陈述和来源NPC，不向页面暴露SQLite中的真实性。
+- 初始化事务从已验证的世界核心冲突、酒馆长期问题和剧情线索建立三个程序控制的0/6世界时钟。
+- 酒馆页展示描述、规则、长期问题、NPC/访客、传闻、任务入口和世界时钟；NPC可在页内选择，任务入口导航到既有任务路由。
+- 未实现NPC对话和任务列表/详情/接受，分别保留给M5-T07与M5-T08。
+- `pnpm check`通过：Vitest 40个文件229项、Node SQLite 7项、native-bridge Rust 10项及全部类型、lint、格式和严格Clippy检查成功。
+- Windows生产构建、Tauri release无bundle构建和实际窗口启动响应烟测通过。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T06): initialize and render offline tavern`

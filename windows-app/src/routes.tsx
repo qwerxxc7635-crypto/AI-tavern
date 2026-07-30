@@ -15,7 +15,9 @@ const CharacterCreationPage = lazy(() =>
     default: page,
   })),
 );
-const TavernPage = lazy(() => sectionPages().then(({ TavernPage: page }) => ({ default: page })));
+const TavernPage = lazy(() =>
+  import('./tavern-page.js').then(({ TavernPage: page }) => ({ default: page })),
+);
 const QuestsPage = lazy(() => sectionPages().then(({ QuestsPage: page }) => ({ default: page })));
 const AdventurePage = lazy(() =>
   sectionPages().then(({ AdventurePage: page }) => ({ default: page })),

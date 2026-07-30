@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T05 实现车卡页面`
+- 最近完成任务：`M5-T06 实现酒馆页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T05` 已验收，准备提交
-- 下一任务：`M5-T06 实现酒馆页面`
+- 当前任务：`M5-T06` 已验收，准备提交
+- 下一任务：`M5-T07 实现NPC聊天页面`
 
 ## 架构摘要
 
@@ -47,11 +47,15 @@
 - 世界页覆盖全部基础选项、可选构想、预览、手动编辑、九类字段锁定、局部/全部重生成和确认，确认后进入CREATING_CHARACTER。
 - Windows车卡服务继续使用共享Fake Provider、版本2 Prompt和任务Schema；Rust固定命令复核属性、候选特质、生成输入/上下文和原始/验证输出后原子提交。
 - 车卡页覆盖基础资料、四属性10点分配、六选二特质、重启恢复、背景和程序控制装备预览；完成后Campaign进入GENERATING_TAVERN并导航到酒馆生成入口。
+- Windows酒馆服务通过共享Fake Provider执行GENERATE_TAVERN与GENERATE_NPCS；按Campaign合并并发初始化以适配React StrictMode。
+- Rust固定命令分两次事务提交酒馆/老板和两常驻/一访客/三传闻，最终推进至TAVERN；传闻真实性不进入页面快照。
+- 初始事务从已验证核心冲突、酒馆问题和剧情线索建立三个程序控制0/6世界时钟；`DEC-030`记录该边界。
+- 酒馆页展示全部初始内容、NPC页内选择、任务入口和时钟；聊天与任务业务仍未实现。
 
 ## 最近成功验证
 
-- 车卡相关14项定向前端测试和8项native-bridge Rust测试通过；真实SQLite覆盖生成特质后重开恢复及完整角色再次重开。
-- `pnpm check`通过：Vitest 38个文件、225项，Node SQLite 7项及native-bridge Rust 8项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
+- 酒馆相关7项定向前端测试和10项native-bridge Rust测试通过；真实SQLite覆盖两阶段之间及完整初始化后的重开恢复。
+- `pnpm check`通过：Vitest 40个文件、229项，Node SQLite 7项及native-bridge Rust 10项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
 - Windows生产前端与Tauri release无bundle构建通过；release窗口标题正确、窗口句柄非零且响应。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
@@ -59,5 +63,5 @@
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M5-T05` 变更。
-4. 从 `M5-T06` 实现酒馆页面；不要提前实现M5-T07 NPC聊天页面。
+3. 完成并提交当前 `M5-T06` 变更。
+4. 从 `M5-T07` 实现NPC聊天页面；不要提前实现M5-T08任务页面。

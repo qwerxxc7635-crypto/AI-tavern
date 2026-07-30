@@ -1510,3 +1510,38 @@
 - 本任务沿用 `DEC-029` 的统一Provider执行与受限原生原子提交边界，没有形成新的重大架构决定，因此未新增DEC。
 - M5-T05验收“完成后进入酒馆生成流程”已由组件流程、路由测试、生产构建和窗口启动烟测覆盖。
 - 未实现M5-T06或任何后续任务。
+
+## 2026-07-31 03:50 — M5-T06 实现酒馆页面
+
+### 依赖与范围
+
+- 依赖 `M4-T03` 和 `M5-T05`：均已完成；上一任务M5-T05已提交 `7939093`。
+- 仅实现酒馆初始化与首页展示、NPC页内选择和任务入口导航。
+- 不实现M5-T07 NPC聊天、M5-T08任务生成/详情/接受、冒险、真实Provider或后续页面功能。
+
+### 完成结果与验收
+
+- WindowsTavernService在GENERATING_TAVERN阶段通过共享FakeAIProvider、Prompt、GENERATE_TAVERN/GENERATE_NPCS Schema和validateAIOutput依次生成酒馆/老板及初始阵容/传闻。
+- React StrictMode可能重复执行加载Effect；服务按Campaign缓存正在进行的初始化Promise，两个调用共享同一两段生成，不产生竞争提交或额外Provider请求。
+- Rust新增tavern_get、tavern_generation_commit、tavern_npcs_commit三个固定语义命令；WebView不能提交SQL、文件路径、生成时间、实体ID或传闻真实性。
+- 原生层把跨进程载荷视为不可信：拒绝未知字段，复核Campaign阶段、世界/角色/地点来源、生成输入与上下文、Prompt任务、原始/验证输出一致性、NPC唯一名称、两常驻一访客、访客原因及三条传闻来源。
+- 第一事务写入酒馆、老板、初始有限认知/零关系及生成审计；第二事务写入两名常驻、一名访客、三条传闻、关系/知识、世界时钟、生成审计并将Campaign推进至TAVERN。
+- 传闻真实性保存在SQLite detail_json供后续规则使用，但TavernSnapshot只返回陈述与来源NPC，页面无法直接看到真伪。
+- 规格要求每存档约三个世界时钟，而既有酒馆AI Schema不含时钟字段；第二事务从已验证的世界核心冲突、酒馆长期问题和首条剧情线索建立三个0/6时钟，阈值与单步推进继续由程序控制。
+- 酒馆页展示名称、位置、环境、特殊规则、长期问题、老板、两名常驻、一名访客、访客原因、三条传闻、任务告示板入口和三个世界时钟。
+- 点击NPC会更新页内选中态并展示其公开资料；任务入口携带Campaign ID导航到既有任务路由。聊天和任务业务明确保留给M5-T07/M5-T08。
+- 2项新增服务测试覆盖真实Fake Provider两段生成、Prompt版本、并发去重和已初始化快照不重复生成；2项页面测试覆盖初始化、全部展示项、隐藏传闻真伪、NPC选择和任务导航。
+- 2项新增Rust真实SQLite测试覆盖酒馆提交后重开继续、完整初始化后再次重开、4名NPC/3传闻/3时钟恢复、响应篡改、非法阵容及老板重名不产生部分写入。
+- 首轮全量并发测试发现延迟模块在默认等待窗口内仍处于Suspense，保留原断言并将显式异步等待上限设为5秒；随后全部通过。
+- 首轮严格Clippy发现布尔filter_map、参数过多和手写Option映射；改为filter+map、NpcInsert参数对象和Option::map后通过，未添加allow或降低规则。
+- `pnpm --filter @ember-tavern/windows-app build`通过；Vite转换157个模块并生成独立tavern-page chunk。
+- `pnpm --filter @ember-tavern/windows-app tauri build --no-bundle`通过；release应用实际启动，窗口标题为Ember Tavern、MainWindowHandle非零且Responding=True，烟测后进程已停止。
+- 最终 `pnpm check`：通过；Vitest 40个文件、229项通过，Node SQLite 7项通过；native-bridge Rust 10项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo workspace测试均通过。
+
+### 自审
+
+- SQLite是酒馆、NPC、关系、有限认知、访客、传闻、时钟和Campaign阶段的唯一真实数据源；页面只保留选中NPC这一展示状态。
+- AI输出经过共享结构验证和Rust业务复核后才在事务内写入，响应篡改、非法阵容或重名均保持正式状态不变。
+- `DEC-030` 记录无新增AI Schema情况下由程序从已验证事实建立初始时钟，以及传闻真实性不越过页面读取边界。
+- M5-T06验收“能够选择NPC或任务”已由页内NPC选择和携带Campaign ID的任务入口测试覆盖。
+- 未实现M5-T07或任何后续任务。
