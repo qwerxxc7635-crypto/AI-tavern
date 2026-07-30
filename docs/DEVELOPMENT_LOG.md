@@ -954,3 +954,35 @@
 - Provider格式层只产生规范消息/响应格式，不导入厂商SDK或发送请求。
 - Prompt正文没有进入页面、Use Case或Repository。
 - 未执行M3-T04或后续任务。
+
+## 2026-07-31 00:32 — M3-T04 实现FakeAIProvider
+
+### 依赖与范围
+
+- 依赖 `M3-T01`、`M3-T02`：均已完成；厂商无关协议提交为 `42e9330`，任务Schema提交为 `ba3d646`。
+- 仅实现覆盖15类首批AITask的确定性、无网络Fake Provider及测试数据。
+- 不实现M3-T05上下文构建、M3-T06输出解析/修复、M3-T07领域验证或M3-T08编排提交。
+
+### 计划验证
+
+- 每类输出在返回前和测试中均通过对应Zod输出Schema。
+- 相同请求重复调用得到相同规范响应，时间和模型信息稳定。
+- 禁止网络后生成世界、角色、酒馆、NPC、任务、冒险计划、8个回合、骰子结果和冒险摘要。
+- 禁用配置和未知模型显式失败；根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增 `FakeAIProvider`，实现统一 `AIProvider` 接口；公开唯一 `ember-fake-v1` 免费模型，不导入厂商SDK、不读取凭据、不发送网络请求。
+- `FAKE_TASK_OUTPUTS` 以完整 `Record<AITask, unknown>` 覆盖15类任务；任务新增或遗漏夹具会触发类型检查。
+- `generate` 按请求任务从注册表取得输出Schema并在返回前解析夹具，结构无效时不会伪装成功。
+- 响应保留原requestId，使用稳定providerRequestId、STOP结束原因、空用量字段和可注入时钟；默认时间固定以保证测试重复。
+- 禁用Provider配置返回明确连接失败并拒绝生成；未知模型抛出 `FakeAIProviderError`。
+- 20项专用测试覆盖模型能力、15类确定性Schema输出、夹具注册完整性、禁网完整冒险链、错误路径和注入时间。
+- 离线冒险链生成世界、两项角色特质、完整背景、酒馆、常驻与临时NPC、任务、计划、8个回合及骰子结果和最终摘要；网络替身调用次数为0。
+- 最终 `pnpm check`：通过；Vitest 19个文件、174项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 确定性内容是本任务要求的可验证测试数据，不创建真实Provider、网络客户端或API Key配置。
+- Provider只返回经结构Schema验证的JSON，不修改SQLite或任何游戏状态。
+- 未实现上下文构建、领域补丁验证、GenerationRecord或Orchestrator，不提前执行M3-T05及后续任务。

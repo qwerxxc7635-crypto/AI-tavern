@@ -852,5 +852,35 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`b6638ad`。
 - Commit message：`feat(M3-T03): centralize versioned prompts`
+
+## 2026-07-31 00:32 — M3-T04 实现FakeAIProvider
+
+### 范围
+
+实现统一AI协议下覆盖15类首批任务的确定性离线Provider；不实现上下文构建、解析修复、领域验证或编排提交。
+
+### 主要改动
+
+- 新增 `FakeAIProvider` 与显式错误类型，提供固定免费模型、连接检查和规范化响应。
+- 新增完整 `FAKE_TASK_OUTPUTS`，每项输出在返回前通过对应任务Zod Schema。
+- 相同请求得到相同内容、模型、结束原因和默认时间；可注入时钟用于调用侧测试。
+- 禁用配置和未知模型均显式失败，不读取凭据、不进行网络调用。
+
+### 验证
+
+- 15类输出逐项重复调用并通过各自Schema。
+- 禁网条件下生成世界、角色、酒馆、NPC、任务、冒险计划、8个回合、骰子结果和冒险摘要；网络调用0次。
+- 专用测试20项通过。
+- `pnpm check`：通过；Vitest 19个文件、174项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### 自审
+
+- Provider没有写入SQLite；结构有效输出仍须由后续领域验证和事务提交边界处理。
+- 未执行M3-T05或任何后续任务。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T04): implement deterministic fake AI provider`
