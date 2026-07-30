@@ -71,3 +71,46 @@
 - 未创建 `windows-app/`、`ios-app/`、`packages/`、`crates/` 或数据库目录。
 - 未实现应用功能、数据库业务表、AI 接口、页面或真实模型接入。
 - 未执行 `M0-T03` 或任何后续任务。
+
+## 2026-07-30 — M0-T02 Rust/Cargo 环境补齐与复验
+
+### 环境处理
+
+- 初检时 `rustup`、`rustc`、`cargo` 和 `winget` 均不可用。
+- winget 在当前环境及常见路径不可用，因此从 Rust 官方地址下载 `rustup-init.exe`。
+- 首次 `rustup-init.exe -y` 下载在超时后停滞；确认 partial 文件不再增长后终止该进程。
+- 使用已安装的官方 rustup，通过 `RUSTUP_USE_CURL=1` 恢复 stable 工具链安装并成功完成。
+- 已将 `C:\Users\PC\.cargo\bin` 写入当前用户 PATH；未安装无关软件。
+
+### 工具链版本
+
+- Rustup：`rustup 1.29.0 (28d1352db 2026-03-05)`。
+- Rustc：`rustc 1.97.1 (8bab26f4f 2026-07-14)`。
+- Cargo：`cargo 1.97.1 (c980f4866 2026-06-30)`。
+- 默认工具链：`stable-x86_64-pc-windows-msvc`。
+- 已安装目标：`x86_64-pc-windows-msvc`。
+
+### Cargo 复验结果
+
+- 未修改配置时执行 `cargo metadata --format-version 1`：失败，退出码 101。
+- 未修改配置时执行 `cargo test --workspace`：失败，退出码 101。
+- 两者均报告 `failed to load manifest for workspace member ...\crates\*`，因为 `crates/` 要到 `M0-T03` 才创建。
+- 依照最小修复原则临时验证 `members = []`：`cargo metadata` 仍失败，报告 `The manifest is virtual, and the workspace has no members`。
+- 临时修改已完全撤销，`Cargo.toml` 恢复为本轮开始时的 `members = ["crates/*"]`。
+- 未创建 crate、应用目录、根占位 package 或任何 `M0-T03` 内容。
+
+### 其他验证
+
+- `pnpm lint`：通过；当前无匹配子项目。
+- `pnpm test`：通过；当前无匹配子项目。
+- `pnpm typecheck`：通过；当前无匹配子项目。
+
+### 边界判断与状态
+
+- Cargo 1.97.1 的虚拟 workspace 必须至少包含一个真实 package。
+- `M0-T02` 要求空 workspace 通过 `cargo test --workspace`，但第一个真实 crate 按任务顺序属于 `M0-T03`。
+- 创建占位 crate 或提前创建 `crates/` 成员会违反任务边界和禁止伪实现规则，因此未执行。
+- 依据 `DEC-002`，`M0-T02` 的 Cargo 部分以根 virtual workspace 静态配置检查完成；根 `Cargo.toml` 保持提交 `96eabb7` 中的配置不变。
+- `cargo metadata --format-version 1` 和 `cargo test --workspace` 的动态验证延后至 `M0-T03` 创建首个真实 crate 后执行，且在两项验证成功前不得关闭 `M0-T03`。
+- 该处理只调整验证时机，不删除或降低 Cargo 验收标准。
+- `M0-T02` 已完成；`M0-T03` 未开始，未创建占位 crate、package 或应用目录。

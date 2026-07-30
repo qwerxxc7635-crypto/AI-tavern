@@ -66,14 +66,17 @@
 ## M0-T02 创建pnpm与Cargo Workspace
 
 - 优先级：P0
-- 状态：实现完成，验收受环境限制（2026-07-30：未安装 Cargo）
+- 状态：已完成（2026-07-30）
 - 依赖：M0-T01
 - 工作内容：
   - 创建根`package.json`；
   - 创建`pnpm-workspace.yaml`；
   - 创建根`Cargo.toml` workspace；
   - 添加统一lint、test、typecheck命令。
-- 验收：根目录可运行空的`pnpm lint`、`pnpm test`和`cargo test --workspace`。
+- 验收：
+  - 根目录可运行空的`pnpm lint`和`pnpm test`；
+  - 根`Cargo.toml`的virtual workspace配置通过静态检查；
+  - 原定的`cargo test --workspace`动态验收，以及用于确认成员识别的`cargo metadata --format-version 1`，延后至`M0-T03`创建首个真实crate后执行；验证要求未取消。
 
 ## M0-T03 创建项目目录骨架
 
@@ -92,7 +95,12 @@
   - `packages/test-fixtures/`；
   - `crates/native-bridge/`等原生模块目录；
   - `database/migrations/`。
-- 验收：所有workspace包可被根项目识别。
+- 验收：
+  - 所有workspace包可被根项目识别；
+  - 根Cargo workspace能识别首个真实crate；
+  - `cargo metadata --format-version 1`必须成功；
+  - `cargo test --workspace`必须成功；
+  - 上述Cargo动态验证成功前不得关闭`M0-T03`。
 
 ## M0-T04 建立代码质量检查
 

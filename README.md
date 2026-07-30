@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目目前已完成 `M0-T01`，并完成 `M0-T02` 的配置实现：pnpm workspace、Cargo workspace 与根级质量命令已经建立；Cargo 验收仍需在安装 Rust/Cargo 的环境中执行。尚未创建应用和共享包目录，也尚未实现任何游戏功能。
+项目目前已完成 `M0-T01` 和 `M0-T02`。pnpm 与 Cargo workspace 配置已经建立，Rust/Cargo 环境已经可用。Cargo 的 workspace 动态验证将在 `M0-T03` 创建首个真实 crate 后执行；当前尚未创建应用、共享包或 crate 目录，也尚未实现任何游戏功能。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
@@ -16,10 +16,9 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 pnpm lint
 pnpm test
 pnpm typecheck
-cargo test --workspace
 ```
 
-这些命令统一检查当前 workspace 成员。pnpm 命令在尚无子项目时会成功结束；Cargo 命令需要本机已安装 Rust/Cargo。本仓库不会自动开始 `M0-T03`。
+这些 pnpm 命令统一检查当前 workspace 成员，并在尚无子项目时成功结束。`cargo metadata --format-version 1` 和 `cargo test --workspace` 将在 `M0-T03` 创建首个真实 crate 后作为必需验收执行；当前不创建占位 crate，本仓库不会自动开始 `M0-T03`。
 
 ## 开发约定
 
