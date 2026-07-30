@@ -184,7 +184,7 @@ export const GenerateCharacterTraitsInputSchema = z
   })
   .strict();
 export const GenerateCharacterTraitsOutputSchema = z
-  .object({ traits: z.tuple([traitDraft, traitDraft]) })
+  .object({ traits: z.array(traitDraft).length(6) })
   .strict();
 
 export const CompleteCharacterBackgroundInputSchema = z
@@ -204,6 +204,10 @@ export const CompleteCharacterBackgroundOutputSchema = z
     secret: text,
     importantPerson: text,
     tavernArrivalReason: text,
+    initialEquipment: z
+      .array(z.object({ name: shortText, description: text }).strict())
+      .min(1)
+      .max(4),
   })
   .strict();
 

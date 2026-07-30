@@ -50,6 +50,10 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     traits: [
       { name: 'Keen Listener', description: 'Notices quiet changes in people and places.' },
       { name: 'Roadwise', description: 'Reads signs left by travelers and weather.' },
+      { name: 'Steady Hands', description: 'Keeps calm while working under pressure.' },
+      { name: 'Harborwise', description: 'Understands the customs of ports and sailors.' },
+      { name: 'Quiet Courage', description: 'Acts despite fear when others need help.' },
+      { name: 'Old Maps', description: 'Recognizes forgotten routes and obsolete landmarks.' },
     ],
   },
   COMPLETE_CHARACTER_BACKGROUND: {
@@ -59,6 +63,16 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     secret: 'Once followed a false beacon into the marsh.',
     importantPerson: 'A sibling who vanished near Ash Harbor.',
     tavernArrivalReason: 'Seeking the last caravan that saw the missing sibling.',
+    initialEquipment: [
+      {
+        name: 'Weathered Trail Compass',
+        description: 'A brass compass marked with old caravan routes.',
+      },
+      {
+        name: 'Waxed Travel Cloak',
+        description: 'A salt-stained cloak that turns rain and harbor spray.',
+      },
+    ],
   },
   GENERATE_TAVERN: {
     name: 'Ember Rest',

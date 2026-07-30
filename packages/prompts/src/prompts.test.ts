@@ -32,11 +32,17 @@ const worldInput = {
 describe('central prompt catalog', () => {
   it('has one versioned task prompt and history record for every AI task', () => {
     expect(Object.keys(TASK_PROMPTS)).toEqual(AI_TASKS);
-    expect(PROMPT_HISTORY.map(({ task }) => task)).toEqual(AI_TASKS);
+    expect(PROMPT_HISTORY.slice(0, AI_TASKS.length).map(({ task }) => task)).toEqual(AI_TASKS);
     for (const task of AI_TASKS) {
+      const expectedVersion = [
+        'GENERATE_CHARACTER_TRAITS',
+        'COMPLETE_CHARACTER_BACKGROUND',
+      ].includes(task)
+        ? 2
+        : 1;
       expect(TASK_PROMPTS[task]).toMatchObject({
         task,
-        version: 1,
+        version: expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }

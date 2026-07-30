@@ -1029,5 +1029,18 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`549727d`。
 - Commit message：`feat(M4-T01): add world creation use cases`
+
+## 2026-07-31 01:11 — M4-T02 车卡用例
+
+- 新增CreateCharacter、GenerateCharacterTraits、CompleteCharacterBackground稳定用例。
+- 特质和背景Prompt/Schema升级到v2，生成6候选与初始装备叙事。
+- 属性本地校验；完整角色、程序控制装备效果和存档状态同事务写入SQLite。
+- `pnpm check`通过：Vitest 26文件198项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T03。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T02): add character creation use cases`

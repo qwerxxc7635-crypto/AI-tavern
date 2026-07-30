@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M4-T01 实现新建存档和世界生成用例`
+- 最近完成任务：`M4-T02 实现车卡用例`
 - 已完成里程碑：M0、M1、M2、M3
-- 当前任务：`M4-T01` 已验收，准备提交
-- 下一任务：`M4-T02 实现车卡用例`
+- 当前任务：`M4-T02` 已验收，准备提交
+- 下一任务：`M4-T03 实现酒馆初始化用例`
 
 ## 架构摘要
 
@@ -25,16 +25,18 @@
 - AI状态补丁在本地事实工作视图上按顺序验证；任务/关系/时钟遵守固定规则，奖励须本地授权且效果由程序控制，事实只允许安全追加。
 - AITurnOrchestrator串联pending、SQLite上下文、Prompt、统一Provider、GenerationRecord、双层验证和幂等Turn事务；COMMITTED重放不再调用模型。
 - WorldCreationUseCases提供创建、生成、细化和确认世界；AI草稿映射本地ID，世界与存档状态同事务提交。
+- CharacterCreationUseCases验证本地车卡、生成6候选特质，并将完整背景、程序控制装备与状态同事务提交。
+- GENERATE_CHARACTER_TRAITS与COMPLETE_CHARACTER_BACKGROUND的Schema/Prompt为版本2。
 
 ## 最近成功验证
 
-- Fake Provider完整创建/细化/确认世界，锁定字段和本地ID保持测试通过。
-- `pnpm check`：通过；Vitest 196项、Node SQLite 7项通过。
+- Fake Provider完整车卡、6候选特质、背景装备落库及非法属性零写入测试通过。
+- `pnpm check`：通过；Vitest 198项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M4-T01` 变更。
-4. 从 `M4-T02` 实现CreateCharacter、GenerateCharacterTraits、CompleteCharacterBackground。
+3. 完成并提交当前 `M4-T02` 变更。
+4. 从 `M4-T03` 实现GenerateTavern、GenerateNpcs。

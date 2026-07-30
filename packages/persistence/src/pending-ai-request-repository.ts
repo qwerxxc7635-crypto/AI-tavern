@@ -13,10 +13,13 @@ import {
   type JsonValue,
   type PendingAiRequest,
   type Campaign,
+  type Item,
+  type PlayerCharacter,
   type WorldBible,
 } from '@ember-tavern/contracts';
 
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
+import { ItemRepository } from './conversation-item-clock-repository.js';
 import {
   parseJson,
   requireBoolean,
@@ -29,6 +32,7 @@ import {
 import type { SqliteRunResult, TransactionalSqliteDatabase } from './sqlite-port.js';
 import { applyTurnCommit, type TurnCommit } from './turn-transaction.js';
 import { WorldRepository } from './world-repository.js';
+import { PlayerCharacterRepository } from './player-character-repository.js';
 
 const TERMINAL_STATUSES = ['COMMITTED', 'CANCELLED'] as const;
 const SECRET_FIELD = /api.?key|authorization|bearer|access.?token|secret.?key/i;
@@ -297,6 +301,101 @@ export class PendingAiRequestRepository {
       }
       throw error;
     }
+  }
+
+  public commitContentOnce(
+    key: IdempotencyKey,
+    campaign: Campaign['id'],
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, campaign);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI content commit and rollback both failed');
+    }
+  }
+
+  public commitCharacterOnce(
+    key: IdempotencyKey,
+    campaign: Campaign,
+    character: PlayerCharacter,
+    items: readonly Item[],
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, campaign.id);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (
+        character.campaignId !== campaign.id ||
+        items.some(({ campaignId }) => campaignId !== campaign.id) ||
+        character.initialEquipment.some(
+          ({ itemId }) => !items.some((candidate) => candidate.id === itemId),
+        )
+      ) {
+        throw new PersistenceDataError('Character commit contains mismatched campaign or items');
+      }
+      new PlayerCharacterRepository(this.database).create(character);
+      const itemRepository = new ItemRepository(this.database);
+      for (const item of items) itemRepository.create(item, character.id);
+      new CampaignRepository(this.database).update(campaign);
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI character commit and rollback both failed');
+    }
+  }
+
+  private requireValidatingRequest(
+    key: IdempotencyKey,
+    campaign: Campaign['id'],
+  ): PendingAiRequest | null {
+    const request = this.getByIdempotencyKey(key);
+    if (request === null) {
+      throw new PersistenceDataError(`Pending AI request not found for idempotency key: ${key}`);
+    }
+    if (request.status === 'COMMITTED') return null;
+    if (request.status !== 'VALIDATING') {
+      throw new AiRequestTransitionError(request.id, request.status, 'COMMITTED');
+    }
+    if (request.turnId !== null || request.campaignId !== campaign) {
+      throw new PersistenceDataError('Pending AI request does not match the content commit');
+    }
+    return request;
+  }
+
+  private markCommitted(id: AiRequestId, at: IsoTimestamp): void {
+    one(
+      this.database
+        .prepare(
+          `UPDATE pending_ai_requests
+           SET status = 'COMMITTED', last_error_json = NULL, updated_at = ?
+           WHERE id = ? AND status = 'VALIDATING'`,
+        )
+        .run(at, id),
+      `Pending AI request changed during commit: ${id}`,
+    );
+  }
+
+  private rollback(error: unknown, message: string): never {
+    try {
+      this.database.exec('ROLLBACK');
+    } catch (rollbackError) {
+      throw new AggregateError([error, rollbackError], message, { cause: rollbackError });
+    }
+    throw error;
   }
 
   private require(id: AiRequestId): PendingAiRequest {

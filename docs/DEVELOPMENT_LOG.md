@@ -1162,3 +1162,28 @@
 
 - AI只提供世界草稿，所有ID、锁定字段保护、存档状态和事务由本地程序控制。
 - 未实现M4-T02或任何后续任务。
+
+## 2026-07-31 01:11 — M4-T02 实现车卡用例
+
+### 依赖与范围
+
+- 依赖 `M4-T01`：已完成并提交 `549727d`。
+- 仅实现CreateCharacter、GenerateCharacterTraits、CompleteCharacterBackground及所需的角色事务提交。
+- 不实现酒馆、NPC、页面或真实Provider。
+
+### 完成结果与验收
+
+- CreateCharacter验证Campaign状态、规范文本、年龄和四项属性；每项1至5且总和必须为10。
+- 未完成车卡保持为瞬时CharacterDraft，不向完整PlayerCharacter表写入空背景、假特质或占位装备。
+- 按规格将特质Schema与Prompt升级为版本2，Fake Provider返回6个候选，完成背景时严格选择2个不同特质。
+- 背景Schema与Prompt版本2新增1至4件初始装备的叙事名称和描述；AI不能指定奖励等级或机械效果。
+- 程序分配特质/物品ID、BASIC等级和效果；首件装备按职业主属性提供+1检定修正，其余为NONE。
+- 完整角色、装备所有权、Campaign的GENERATING_TAVERN状态和pending状态在同一SQLite事务提交。
+- 2项真实SQLite用例测试覆盖完整Fake车卡流程及非法属性零写入。
+- 最终 `pnpm check`：通过；Vitest 26个文件、198项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- SQLite仍是已提交游戏事实唯一来源；AI结果经过版本2结构验证后才由本地规则转换。
+- `DEC-020` 记录完整角色原子提交及草稿边界。
+- 未实现M4-T03或任何后续任务。

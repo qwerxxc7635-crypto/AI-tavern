@@ -7,3 +7,12 @@ export type {
   WorldGenerationRequest,
   WorldIdentityFactory,
 } from './world-creation-use-cases.js';
+export { CharacterCreationUseCases } from './character-creation-use-cases.js';
+export type {
+  CharacterDraft,
+  CharacterGenerationRequest,
+  CharacterIdentityFactory,
+  CompleteCharacterBackgroundCommand,
+  CreateCharacterCommand,
+  GenerateCharacterTraitsCommand,
+} from './character-creation-use-cases.js';

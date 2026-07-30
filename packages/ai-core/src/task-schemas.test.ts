@@ -106,6 +106,10 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       traits: [
         { name: 'Keen Listener', description: 'Notices quiet changes.' },
         { name: 'Roadwise', description: 'Reads signs left by travelers.' },
+        { name: 'Steady Hands', description: 'Works calmly under pressure.' },
+        { name: 'Harborwise', description: 'Understands ports and sailors.' },
+        { name: 'Quiet Courage', description: 'Acts despite fear.' },
+        { name: 'Old Maps', description: 'Recognizes forgotten routes.' },
       ],
     },
   },
@@ -127,6 +131,9 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       secret: 'Once followed the wrong beacon.',
       importantPerson: 'Her missing sibling.',
       tavernArrivalReason: 'Seeking the last caravan.',
+      initialEquipment: [
+        { name: 'Trail Compass', description: 'A compass marked with caravan routes.' },
+      ],
     },
   },
   GENERATE_TAVERN: {
@@ -369,6 +376,8 @@ describe('versioned AI task schemas', () => {
   it.each(AI_TASKS)('%s has a current version and accepts its own fixture', (task) => {
     const definition = AI_TASK_SCHEMAS[task];
     const expectedVersion = [
+      'GENERATE_CHARACTER_TRAITS',
+      'COMPLETE_CHARACTER_BACKGROUND',
       'NPC_REPLY',
       'GENERATE_ADVENTURE_TURN',
       'GENERATE_WORLD_EVENT',

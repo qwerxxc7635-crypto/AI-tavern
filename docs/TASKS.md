@@ -450,6 +450,7 @@
 ## M4-T02 实现车卡用例
 
 - 优先级：P0
+- 状态：已完成（2026-07-31）
 - 依赖：M4-T01
 - 用例：CreateCharacter、GenerateCharacterTraits、CompleteCharacterBackground。
 - 验收：属性分配合法，背景和装备写入本地。

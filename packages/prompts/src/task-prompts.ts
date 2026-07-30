@@ -11,12 +11,17 @@ export interface TaskPromptDefinition {
   readonly instruction: string;
 }
 
-const define = (task: AITask, role: AILogicalRole, instruction: string): TaskPromptDefinition =>
+const define = (
+  task: AITask,
+  role: AILogicalRole,
+  instruction: string,
+  version = 1,
+): TaskPromptDefinition =>
   Object.freeze({
     task,
-    version: promptVersion(1),
+    version: promptVersion(version),
     role,
-    outputSchemaName: `${task.toLowerCase()}_v1`,
+    outputSchemaName: `${task.toLowerCase()}_v${version}`,
     instruction,
   });
 
@@ -34,12 +39,14 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_CHARACTER_TRAITS: define(
     'GENERATE_CHARACTER_TRAITS',
     'WORLD_DESIGNER',
-    'Create exactly two distinctive narrative traits that fit the character concept, class, goal, and story preferences.',
+    'Create exactly six distinct narrative trait candidates that fit the character concept, class, goal, and story preferences. The player will choose exactly two.',
+    2,
   ),
   COMPLETE_CHARACTER_BACKGROUND: define(
     'COMPLETE_CHARACTER_BACKGROUND',
     'WORLD_DESIGNER',
-    'Complete a grounded character background that connects the existing concept, goal, and traits without changing them.',
+    'Complete a grounded character background that connects the existing concept, goal, and traits without changing them. Also provide one to four narrative initial equipment names and descriptions; the program assigns all mechanical effects.',
+    2,
   ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',

@@ -52,10 +52,12 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_CHARACTER_TRAITS: definition(
     GenerateCharacterTraitsInputSchema,
     GenerateCharacterTraitsOutputSchema,
+    2,
   ),
   COMPLETE_CHARACTER_BACKGROUND: definition(
     CompleteCharacterBackgroundInputSchema,
     CompleteCharacterBackgroundOutputSchema,
+    2,
   ),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema),
