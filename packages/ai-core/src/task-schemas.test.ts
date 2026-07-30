@@ -181,11 +181,20 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
   NPC_REPLY: {
     input: {
       worldSummary: world.summary,
-      npc,
+      currentRegion: world.currentRegion,
+      npc: {
+        ...npc,
+        appearance: 'Tall, with a red wool coat.',
+        secret: 'Knows an old tunnel.',
+        speechStyle: 'Measured and direct.',
+        currentStatus: 'ACTIVE',
+      },
       relationship: { trust: 1, closeness: 0, awe: 0, obligation: 0 },
       knownFacts: ['The cellar has an old door.'],
+      suspectedFacts: ['The lighthouse keeper used the tunnel.'],
       falseBeliefs: [],
       recentMessages: [{ role: 'PLAYER', content: 'What is below the cellar?' }],
+      longTermMemories: ['Mira previously helped close the harbor gate.'],
       playerMessage: 'Show me the door.',
     },
     output: {
@@ -235,11 +244,42 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
   GENERATE_ADVENTURE_TURN: {
     input: {
       adventureId: 'adventure-1',
-      objective: 'Restore the beacon.',
+      worldRules: world.powerRules,
+      playerCharacter: {
+        id: 'player-1',
+        name: 'Mira',
+        concept: 'Curious scout',
+        classDisplayName: 'Wayfinder',
+        attributes: { physique: 2, agility: 3, knowledge: 3, charisma: 2 },
+        traits: [
+          { name: 'Keen Listener', description: 'Notices quiet changes.' },
+          { name: 'Roadwise', description: 'Reads signs left by travelers.' },
+        ],
+        personalGoal: 'Find a lost sibling.',
+      },
+      quest: {
+        id: 'quest-1',
+        content: questContent,
+        status: 'ACTIVE',
+        risk: 'MODERATE',
+        rewardTier: 'NOTABLE',
+      },
+      adventurePlan: {
+        objective: 'Restore the beacon.',
+        risk: 'MODERATE',
+        expectedTurns: { min: 8, max: 12 },
+        coreScenes: ['Reach the lighthouse.'],
+        necessaryClues: ['Scorched Lens: Burned from within.'],
+        majorObstacles: ['A flooded causeway.'],
+        possibleEndings: ['The beacon is restored.'],
+        failureCost: questContent.failureCost,
+      },
       currentTurnNumber: 1,
       currentScene: 'The cellar door is sealed.',
+      longTermSummary: null,
       recentTurns: [],
       discoveredClues: [],
+      relatedNpcs: [npc],
       playerAction: 'Inspect the lock.',
     },
     output: adventureTurnOutput,
@@ -261,9 +301,17 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
   },
   GENERATE_WORLD_EVENT: {
     input: {
-      world,
       activeClocks: [{ id: 'clock-storm', name: 'Storm', current: 1, max: 6 }],
-      recentFacts: ['The beacon is dim.'],
+      factionStates: [
+        {
+          id: 'faction-lantern',
+          name: 'Lantern Guild',
+          goals: ['Restore the lighthouse.'],
+          relations: ['faction-reef NEUTRAL: Trade continues cautiously.'],
+        },
+      ],
+      recentImportantEvents: ['FACT_DISCOVERED: The beacon is dim.'],
+      currentChapter: 'The storm closes around Ash Harbor.',
     },
     output: {
       title: 'The tide turns',
@@ -318,9 +366,16 @@ describe('versioned AI task schemas', () => {
     );
   });
 
-  it.each(AI_TASKS)('%s has version 1 and accepts its own fixture', (task) => {
+  it.each(AI_TASKS)('%s has a current version and accepts its own fixture', (task) => {
     const definition = AI_TASK_SCHEMAS[task];
-    expect(definition.schemaVersion).toBe(1);
+    const expectedVersion = [
+      'NPC_REPLY',
+      'GENERATE_ADVENTURE_TURN',
+      'GENERATE_WORLD_EVENT',
+    ].includes(task)
+      ? 2
+      : 1;
+    expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);
   });

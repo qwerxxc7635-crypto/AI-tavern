@@ -882,5 +882,40 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`a6a7417`。
 - Commit message：`feat(M3-T04): implement deterministic fake AI provider`
+
+## 2026-07-31 00:39 — M3-T05 实现上下文构建器
+
+### 范围
+
+实现NPC、冒险、世界事件的最小相关上下文、长短期组合和预算裁剪；不实现AI输出验证或编排。
+
+### 主要改动
+
+- ai-core新增三类纯上下文构建器、Source/Result类型、默认预算和显式构建错误。
+- NPC按知识ID、目标消息/记忆和排除秘密集合过滤；冒险按Adventure/Quest关联过滤；世界事件按Campaign过滤。
+- 最近消息、记忆、回合和事件有独立窗口，总序列化字符预算超限时裁剪最旧可选内容。
+- 补齐规格第26节所需输入字段，三类受影响任务输入Schema升级到版本2。
+
+### 验证
+
+- 无关NPC秘密、消息、记忆和excluded事实均未进入NPC上下文。
+- 无关Adventure回合/线索及非Quest关联NPC未进入冒险上下文；长期摘要与最近回合同时保留。
+- 世界时钟和事件不会跨Campaign泄漏；三类结果均通过对应输入Schema。
+- `pnpm check`：通过；Vitest 20个文件、179项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### Bug修复
+
+- 测试夹具阵营ID改用品牌构造器。
+- 裁剪策略改为比较消息与记忆的最旧项大小，避免旧大记忆挤掉最新短消息。
+
+### 自审
+
+- 构建器不直接读写SQLite、不调用Provider、不持有唯一模型会话历史。
+- 未执行M3-T06或任何后续任务。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T05): build scoped AI contexts`

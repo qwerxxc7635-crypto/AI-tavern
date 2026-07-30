@@ -1,4 +1,20 @@
 export { AI_TASKS, PROVIDER_PRESET_KEYS, PROVIDER_TYPES } from './protocol.js';
+export {
+  buildAdventureTurnContext,
+  buildNpcDialogueContext,
+  buildWorldEventContext,
+  ContextBuildError,
+  DEFAULT_CONTEXT_BUDGET,
+} from './context-builder.js';
+export type {
+  AdventureContextSource,
+  AdventureTurnContext,
+  ContextBudget,
+  NpcDialogueContext,
+  NpcDialogueContextSource,
+  WorldEventContext,
+  WorldEventContextSource,
+} from './context-builder.js';
 export { FakeAIProvider, FakeAIProviderError } from './fake-ai-provider.js';
 export { FAKE_TASK_OUTPUTS } from './fake-task-outputs.js';
 export { AI_TASK_SCHEMAS, taskSchemas } from './task-schema-registry.js';

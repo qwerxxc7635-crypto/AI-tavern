@@ -35,13 +35,16 @@ import {
 } from './task-schemas.js';
 
 export interface AITaskSchemaDefinition {
-  readonly schemaVersion: 1;
+  readonly schemaVersion: 1 | 2;
   readonly input: z.ZodType;
   readonly output: z.ZodType;
 }
 
-const definition = (input: z.ZodType, output: z.ZodType): AITaskSchemaDefinition =>
-  Object.freeze({ schemaVersion: 1, input, output });
+const definition = (
+  input: z.ZodType,
+  output: z.ZodType,
+  schemaVersion: AITaskSchemaDefinition['schemaVersion'] = 1,
+): AITaskSchemaDefinition => Object.freeze({ schemaVersion, input, output });
 
 export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_WORLD: definition(GenerateWorldInputSchema, GenerateWorldOutputSchema),
@@ -56,7 +59,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   ),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema),
-  NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema),
+  NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 2),
   GENERATE_QUEST: definition(GenerateQuestInputSchema, GenerateQuestOutputSchema),
   GENERATE_ADVENTURE_PLAN: definition(
     GenerateAdventurePlanInputSchema,
@@ -65,9 +68,14 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_ADVENTURE_TURN: definition(
     GenerateAdventureTurnInputSchema,
     GenerateAdventureTurnOutputSchema,
+    2,
   ),
   RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema),
-  GENERATE_WORLD_EVENT: definition(GenerateWorldEventInputSchema, GenerateWorldEventOutputSchema),
+  GENERATE_WORLD_EVENT: definition(
+    GenerateWorldEventInputSchema,
+    GenerateWorldEventOutputSchema,
+    2,
+  ),
   SUMMARIZE_ADVENTURE: definition(SummarizeAdventureInputSchema, SummarizeAdventureOutputSchema),
   EXTRACT_MEMORIES: definition(ExtractMemoriesInputSchema, ExtractMemoriesOutputSchema),
   CHECK_CONSISTENCY: definition(CheckConsistencyInputSchema, CheckConsistencyOutputSchema),

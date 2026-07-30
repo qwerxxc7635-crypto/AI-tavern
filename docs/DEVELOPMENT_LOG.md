@@ -986,3 +986,39 @@
 - 确定性内容是本任务要求的可验证测试数据，不创建真实Provider、网络客户端或API Key配置。
 - Provider只返回经结构Schema验证的JSON，不修改SQLite或任何游戏状态。
 - 未实现上下文构建、领域补丁验证、GenerationRecord或Orchestrator，不提前执行M3-T05及后续任务。
+
+## 2026-07-31 00:39 — M3-T05 实现上下文构建器
+
+### 依赖与范围
+
+- 依赖 `M2-T03` 至 `M2-T06`、`M3-T02`：均已完成；上一任务Fake Provider已提交 `a6a7417`。
+- 仅实现NPC对话、冒险回合和世界事件的纯上下文构建、长短期组合、相关性过滤与字符预算裁剪。
+- 构建器接收由SQLite Repository恢复的领域快照，不直接查询或修改数据库；不实现输出验证、补丁验证或Orchestrator。
+
+### 计划验证
+
+- NPC只看到自身角色卡、知识集合、错误认知、关系、对话与长期记忆；排除无关NPC秘密和excludedSecretFact。
+- 冒险只包含同Adventure回合/线索、Quest关联NPC、世界规则、玩家、任务、隐藏计划和本次行动。
+- 世界事件只包含同Campaign时钟/事件、势力状态和当前剧情章。
+- 最近窗口与总字符预算均可配置；超预算优先裁剪最旧可选记录，核心字段超限显式失败。
+- 三类结果通过对应任务输入Schema；根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增三个纯构建函数及明确Source/Result/ContextBudget类型；默认预算24000字符、最近消息12条、长期记忆8条、冒险回合8条、事件10条。
+- NPC构建器核对NPC/知识/关系/Campaign归属，仅按知识ID解析同Campaign事实，并始终排除 `excludedSecretFactIds`；NPC消息只保留玩家和目标NPC，记忆只保留目标NPC。
+- NPC卡包含目标NPC自身秘密以支持角色扮演，但构建API不接收其他NPC卡；测试确认无关NPC秘密、消息、记忆及显式排除事实均不进入JSON。
+- 冒险构建器核对World、Player、Quest、Adventure归属，只保留同Adventure回合和已发现线索、Quest关联NPC；关联NPC使用不含secret的brief。
+- 冒险上下文组合长期摘要与最近回合，并包含世界规则、玩家角色、当前任务、隐藏计划、当前场景、线索和本次行动。
+- 世界事件构建器只保留同Campaign时钟和重要事件，并加入势力目标/关系和当前剧情章。
+- 预算循环从最旧可选记录开始裁剪；NPC在消息与记忆之间比较最旧项体积，避免旧大记忆挤掉最新短消息；核心内容单独超限时抛出 `ContextBuildError`。
+- 首轮类型检查仅发现测试阵营ID未使用品牌构造器；已修正。首轮预算测试进一步发现跨消息/记忆类别裁剪优先级问题，修正实现后通过。
+- 为符合规格第26节，`NPC_REPLY`、`GENERATE_ADVENTURE_TURN`、`GENERATE_WORLD_EVENT` 输入Schema按 `DEC-016` 升至版本2；输出Schema不变，既有Prompt与Fake Provider回归通过。
+- 5项专用测试覆盖秘密隔离、长短期组合/预算、冒险相关性、世界事件Campaign过滤和跨Campaign拒绝。
+- 最终 `pnpm check`：通过；Vitest 20个文件、179项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 上下文来自调用方提供的已恢复事实快照，模型会话不保存唯一历史；切换Provider后可从SQLite重新构建。
+- 构建结果仍需后续结构与领域验证；本任务没有接收AI输出或写游戏状态。
+- 未实现M3-T06或任何后续任务。

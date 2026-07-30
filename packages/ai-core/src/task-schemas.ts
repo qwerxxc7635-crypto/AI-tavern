@@ -74,6 +74,14 @@ const npcBrief = z
     currentMood: shortText,
   })
   .strict();
+const npcContextCard = npcBrief
+  .extend({
+    appearance: text,
+    secret: text,
+    speechStyle: text,
+    currentStatus: z.enum(['ACTIVE', 'ABSENT', 'LEFT', 'DECEASED']),
+  })
+  .strict();
 const relationship = z
   .object({
     trust: z.number().int().min(-5).max(5),
@@ -89,6 +97,45 @@ const turnRange = z
   .object({
     min: z.number().int().min(1).max(20),
     max: z.number().int().min(1).max(20),
+  })
+  .strict();
+const playerContext = z
+  .object({
+    id: identifier,
+    name: shortText,
+    concept: text,
+    classDisplayName: shortText,
+    attributes: z
+      .object({
+        physique: z.number().int().min(1).max(5),
+        agility: z.number().int().min(1).max(5),
+        knowledge: z.number().int().min(1).max(5),
+        charisma: z.number().int().min(1).max(5),
+      })
+      .strict(),
+    traits: z.array(traitDraft).length(2),
+    personalGoal: text,
+  })
+  .strict();
+const questContext = z
+  .object({
+    id: identifier,
+    content: questContent,
+    status: z.enum(['AVAILABLE', 'ACCEPTED', 'ACTIVE', 'COMPLETED', 'FAILED', 'ABANDONED']),
+    risk: questRisk,
+    rewardTier,
+  })
+  .strict();
+const adventurePlanContext = z
+  .object({
+    objective: text,
+    risk: questRisk,
+    expectedTurns: turnRange,
+    coreScenes: stringList.min(1).max(20),
+    necessaryClues: stringList.max(20),
+    majorObstacles: stringList.min(1).max(20),
+    possibleEndings: stringList.min(1).max(12),
+    failureCost: text,
   })
   .strict();
 const statePatchProposal = z
@@ -227,13 +274,16 @@ export const GenerateNpcsOutputSchema = z
 export const NpcReplyInputSchema = z
   .object({
     worldSummary: text,
-    npc: npcBrief,
+    currentRegion: shortText,
+    npc: npcContextCard,
     relationship,
     knownFacts: stringList,
+    suspectedFacts: stringList,
     falseBeliefs: stringList,
     recentMessages: z
       .array(z.object({ role: z.enum(['PLAYER', 'NPC']), content: text }).strict())
       .max(20),
+    longTermMemories: stringList,
     playerMessage: text,
   })
   .strict();
@@ -312,11 +362,16 @@ export const GenerateAdventurePlanOutputSchema = z
 export const GenerateAdventureTurnInputSchema = z
   .object({
     adventureId: identifier,
-    objective: text,
+    worldRules: stringList.min(1),
+    playerCharacter: playerContext,
+    quest: questContext,
+    adventurePlan: adventurePlanContext,
     currentTurnNumber: z.number().int().min(0),
     currentScene: text,
+    longTermSummary: text.nullable(),
     recentTurns: stringList.max(10),
     discoveredClues: stringList,
+    relatedNpcs: z.array(npcBrief).max(12),
     playerAction: text,
   })
   .strict();
@@ -359,7 +414,6 @@ export const ResolveDiceResultOutputSchema = z
 
 export const GenerateWorldEventInputSchema = z
   .object({
-    world: worldContext,
     activeClocks: z
       .array(
         z
@@ -372,7 +426,20 @@ export const GenerateWorldEventInputSchema = z
           .strict(),
       )
       .max(20),
-    recentFacts: stringList,
+    factionStates: z
+      .array(
+        z
+          .object({
+            id: identifier,
+            name: shortText,
+            goals: stringList,
+            relations: stringList,
+          })
+          .strict(),
+      )
+      .max(12),
+    recentImportantEvents: stringList,
+    currentChapter: text,
   })
   .strict();
 export const GenerateWorldEventOutputSchema = z

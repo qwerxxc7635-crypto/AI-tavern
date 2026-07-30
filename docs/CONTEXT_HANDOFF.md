@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M3-T04 实现FakeAIProvider`
+- 最近完成任务：`M3-T05 实现上下文构建器`
 - 已完成里程碑：M0、M1、M2
-- 当前任务：`M3-T04` 已验收，准备提交
-- 下一任务：`M3-T05 实现上下文构建器`
+- 当前任务：`M3-T05` 已验收，准备提交
+- 下一任务：`M3-T06 实现AI输出结构验证`
 
 ## 架构摘要
 
@@ -19,16 +19,18 @@
 - 15类AITask均有独立严格Zod输入/输出Schema和版本1注册项。
 - Prompt集中在prompts package，版本历史独立保留，并按模型能力格式化。
 - FakeAIProvider通过统一协议为15类任务返回确定性、Schema有效的离线JSON，不访问网络或游戏状态。
+- NPC、冒险和世界事件上下文从领域快照最小化构建，具备归属过滤、秘密隔离、长短期组合和字符预算裁剪。
+- NPC_REPLY、GENERATE_ADVENTURE_TURN、GENERATE_WORLD_EVENT输入Schema已升级到版本2以覆盖规格第26节。
 
 ## 最近成功验证
 
-- 15类Fake输出逐项重复调用和Schema验证通过；禁网完成8回合冒险生成链，网络调用0次。
-- `pnpm check`：通过；Vitest 174项、Node SQLite 7项通过。
+- 三类上下文Schema验证、秘密/相关性隔离和预算裁剪测试通过。
+- `pnpm check`：通过；Vitest 179项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M3-T04` 变更。
-4. 从 `M3-T05` 实现NPC对话、冒险、世界事件上下文以及预算裁剪。
+3. 完成并提交当前 `M3-T05` 变更。
+4. 从 `M3-T06` 实现Schema验证、错误定位和原始输出留存。

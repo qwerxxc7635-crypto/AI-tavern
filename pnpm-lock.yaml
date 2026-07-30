@@ -37,6 +37,9 @@ importers:
       '@ember-tavern/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ember-tavern/domain':
+        specifier: workspace:*
+        version: link:../domain
       zod:
         specifier: ^4.4.3
         version: 4.4.3

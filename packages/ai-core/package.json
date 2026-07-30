@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ember-tavern/contracts": "workspace:*",
+    "@ember-tavern/domain": "workspace:*",
     "zod": "^4.4.3"
   }
 }
