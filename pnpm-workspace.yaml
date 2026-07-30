@@ -2,3 +2,4 @@ packages:
   - "windows-app"
   - "ios-app"
   - "packages/*"
+storeDir: .local/cache/pnpm-store

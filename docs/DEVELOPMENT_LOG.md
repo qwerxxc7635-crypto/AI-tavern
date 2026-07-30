@@ -114,3 +114,27 @@
 - `cargo metadata --format-version 1` 和 `cargo test --workspace` 的动态验证延后至 `M0-T03` 创建首个真实 crate 后执行，且在两项验证成功前不得关闭 `M0-T03`。
 - 该处理只调整验证时机，不删除或降低 Cargo 验收标准。
 - `M0-T02` 已完成；`M0-T03` 未开始，未创建占位 crate、package 或应用目录。
+## 2026-07-30 22:18 — 自动开发启动基线
+
+### 输入与依赖
+
+- 用户授权从 `M0-T03` 起持续执行全部剩余任务；`M0-T01`、`M0-T02` 已完成，Git 工作树启动时干净。
+- 完整读取根 `AGENTS.md`、规格、任务、开发日志、决策、README，并确认没有子目录规则文件。
+
+### 修改文件
+
+- `.gitignore`：忽略 `.local/`。
+- `pnpm-workspace.yaml`：将 pnpm store 固定到 `.local/cache/pnpm-store`。
+- `LOG.md`：建立按任务追加的审计日志。
+- `docs/CONTEXT_HANDOFF.md`：建立可恢复上下文摘要。
+
+### 环境与验证
+
+- 建立 `.local/cache/{pnpm-store,cargo,npm,temp}`、`.local/{tools,downloads,build,reports}` 等本地目录，均被 Git 忽略。
+- 使用已有工具链验证：Node.js `v24.17.0`、pnpm `11.9.0`、Rustup `1.29.0`、Rustc/Cargo `1.97.1`。
+- 在 `CARGO_HOME` 和 `CARGO_TARGET_DIR` 指向项目 `.local/` 时，现有 `cargo.exe` 与 `rustc.exe` 仍可用。
+- 未下载依赖、未安装软件、未创建 crate、package 或应用功能。
+
+### 下一步
+
+- 从 `M0-T03` 创建目录骨架和首个真实 crate，并按 `DEC-002` 执行 Cargo workspace 动态验证。

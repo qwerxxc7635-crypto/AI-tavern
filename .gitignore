@@ -1,6 +1,7 @@
 # Dependencies and package-manager caches
 node_modules/
 .pnpm-store/
+.local/
 
 # JavaScript and frontend build output
 dist/
