@@ -38,7 +38,7 @@ export type CreateGenerationRecord = Pick<
 >;
 
 export interface CompleteGenerationRecord {
-  readonly rawResponseText: string;
+  readonly rawResponseText: string | null;
   readonly validatedOutput: JsonValue | null;
   readonly validationError: GenerationValidationError | null;
   readonly completedAt: IsoTimestamp;
@@ -79,6 +79,9 @@ export class GenerationRecordRepository {
       throw new PersistenceDataError(
         'GenerationRecord completion must contain exactly one validated output or validation error',
       );
+    }
+    if (hasOutput && completion.rawResponseText === null) {
+      throw new PersistenceDataError('Validated GenerationRecord output requires a raw response');
     }
     if (completion.validatedOutput !== null) {
       validateJsonForStorage(completion.validatedOutput, 'GenerationRecord.validatedOutput');

@@ -985,5 +985,36 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`5cadbb7`。
 - Commit message：`feat(M3-T07): validate AI domain state patches`
+
+## 2026-07-31 00:57 — M3-T08 实现AI Orchestrator
+
+### 范围
+
+串联AI冒险回合的pending、上下文、Provider、双层验证、GenerationRecord和幂等SQLite事务；不实现M4用例。
+
+### 主要改动
+
+- application新增 `AITurnOrchestrator` 和正式包入口。
+- 固定CREATED→CONTEXT_READY→SENDING→RECEIVED→VALIDATING→COMMITTED流程。
+- 动态模型能力驱动集中Prompt格式，统一Provider响应校验request/model。
+- 结构/领域失败分别留存，成功后才调用 `commitTurnOnce`；COMMITTED重放直接短路。
+- GenerationRecord支持传输失败时raw为空，但成功输出仍必须关联raw。
+
+### 验证
+
+- 真实SQLite从Repository重建上下文，Fake Provider完整提交场景、事实、事件和pending状态。
+- 同一幂等键二次执行返回ALREADY_COMMITTED，上下文只构建一次。
+- 传输失败记录pending/generation错误，raw为空，Turn与事件无部分变更。
+- `pnpm check`：通过；Vitest 24个文件、194项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### 自审
+
+- 不保存捕获异常原文，不调用厂商SDK或读取API Key。
+- 未执行M4-T01；`DEC-019` 记录编排顺序和幂等边界。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T08): orchestrate validated AI turn commits`

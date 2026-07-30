@@ -1097,3 +1097,43 @@
 - 验证器不接受任意Repository对象或SQL；结果仍需M3-T08分配ID/时间并在事务中提交。
 - AI不能通过额外payload字段修改属性或指定物品效果，不能覆盖锁定事实或越级发奖。
 - 未实现M3-T08或任何后续任务。
+
+## 2026-07-31 00:57 — M3-T08 实现AI Orchestrator
+
+### 依赖与范围
+
+- 依赖 `M2-T08`、`M3-T04` 至 `M3-T07`：均已完成；领域补丁验证已提交 `5cadbb7`。
+- 仅实现AI冒险回合编排：pending、上下文、Prompt、统一Provider、GenerationRecord、结构/领域验证和幂等事务提交。
+- 不实现M4页面用例、真实Provider、自动重试/修复或非回合生成流程。
+
+### 计划验证
+
+- 上下文从真实SQLite Repository重建并通过现有M3-T05构建器，不依赖模型会话。
+- Fake Provider响应经M3-T06结构验证与M3-T07领域验证后，通过M2-T08 `commitTurnOnce` 原子提交。
+- pending状态最终COMMITTED，GenerationRecord同时保留raw与validated output，回合/事实/事件可从SQLite读取。
+- 相同幂等键第二次执行不重建上下文、不调用Provider、不重复写入。
+- Provider传输失败保存pending和generation错误，raw保持null且回合/事件无部分变更。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- application package建立正式src入口并新增 `AITurnOrchestrator`、命令/生成选项类型和稳定 `AIOrchestrationError`。
+- Orchestrator创建或复用pending请求；仅CREATED可开始，COMMITTED直接返回ALREADY_COMMITTED。
+- `buildContext` 接收unknown并递归验证为有限、普通对象JsonValue后写入CONTEXT_READY；凭据字段仍由pending Repository拦截。
+- 从Provider模型列表取得动态能力，调用集中 `formatTaskPrompt`，构造厂商无关NormalizedAIRequest；请求与裁剪后context进入GenerationRecord。
+- Provider响应必须匹配requestId与modelName；成功依次推进SENDING、RECEIVED、VALIDATING，失败记录稳定PROVIDER_FAILURE而不保存异常原文。
+- 结构失败保存raw和结构错误；领域回调失败保存raw和定位后的领域错误；两者均不产生validated output或游戏提交。
+- 结构与领域全部通过后先记录validated output，再调用现有 `commitTurnOnce`；事务失败pending转FAILED，游戏事实由原事务回滚。
+- GenerationRecord完成接口扩展为失败时允许raw为null，成功validated output仍强制要求raw存在，符合数据模型的传输失败语义。
+- 成功集成测试在真实SQLite中创建Campaign、World、Player、Tavern/NPC、Quest、Adventure和待处理Turn；从Repository重建上下文后调用Fake Provider，最终原子写入AI场景、发展事实、玩家行动事件和COMMITTED状态。
+- 同一命令第二次返回ALREADY_COMMITTED，上下文构建调用次数仍为1；无重复回合、事实或事件。
+- 失败集成测试使用抛出传输错误的统一Provider，验证pending FAILED/retryable、GenerationRecord raw null/PROVIDER_FAILURE、原Turn未解决且事件列表为空。
+- 2项Orchestrator测试与3项GenerationRecord回归测试通过；离线安装复用缓存，下载0项。
+- 最终 `pnpm check`：通过；Vitest 24个文件、194项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-019` 记录pending主线、双层验证、原始响应留存和幂等提交顺序。
+
+### 自审
+
+- Orchestrator不接受厂商SDK类型，不读取API Key，不把捕获异常文本写入数据库或日志。
+- Fake输出只有在结构与领域验证后才转换为TurnCommit，最后仍由SQLite事务决定事实提交。
+- 未实现M4-T01或任何后续任务。

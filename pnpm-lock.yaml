@@ -44,7 +44,23 @@ importers:
         specifier: ^4.4.3
         version: 4.4.3
 
-  packages/application: {}
+  packages/application:
+    dependencies:
+      '@ember-tavern/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
+      '@ember-tavern/contracts':
+        specifier: workspace:*
+        version: link:../contracts
+      '@ember-tavern/domain':
+        specifier: workspace:*
+        version: link:../domain
+      '@ember-tavern/persistence':
+        specifier: workspace:*
+        version: link:../persistence
+      '@ember-tavern/prompts':
+        specifier: workspace:*
+        version: link:../prompts
 
   packages/contracts: {}
 

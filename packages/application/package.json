@@ -2,5 +2,16 @@
   "name": "@ember-tavern/application",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ember-tavern/ai-core": "workspace:*",
+    "@ember-tavern/contracts": "workspace:*",
+    "@ember-tavern/domain": "workspace:*",
+    "@ember-tavern/persistence": "workspace:*",
+    "@ember-tavern/prompts": "workspace:*"
+  }
 }

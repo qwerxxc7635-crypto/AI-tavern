@@ -1,0 +1,321 @@
+import {
+  validateAIOutput,
+  type AIProvider,
+  type AITask,
+  type NormalizedAIRequest,
+  type ProviderConfig,
+} from '@ember-tavern/ai-core';
+import {
+  type AiRequestError,
+  type AiRequestId,
+  type CampaignId,
+  type GenerationRecordId,
+  type IdempotencyKey,
+  type IsoTimestamp,
+  type JsonValue,
+  type ModelProfileId,
+  type TurnId,
+} from '@ember-tavern/contracts';
+import { DomainPatchValidationError } from '@ember-tavern/domain';
+import {
+  GenerationRecordRepository,
+  PendingAiRequestRepository,
+  type IdempotentCommitResult,
+  type TransactionalSqliteDatabase,
+  type TurnCommit,
+} from '@ember-tavern/persistence';
+import { formatTaskPrompt } from '@ember-tavern/prompts';
+
+export interface AITurnGenerationOptions {
+  readonly temperature: number;
+  readonly maxOutputTokens: number;
+  readonly timeoutMs: number;
+}
+
+export interface ExecuteAITurn {
+  readonly requestId: AiRequestId;
+  readonly generationRecordId: GenerationRecordId;
+  readonly campaignId: CampaignId;
+  readonly turnId: TurnId;
+  readonly idempotencyKey: IdempotencyKey;
+  readonly task: AITask;
+  readonly modelProfileId: ModelProfileId | null;
+  readonly modelName: string;
+  readonly input: JsonValue;
+  readonly generationOptions: AITurnGenerationOptions;
+  readonly buildContext: () => unknown | Promise<unknown>;
+  readonly validateDomainAndBuildCommit: (output: JsonValue) => TurnCommit | Promise<TurnCommit>;
+}
+
+export class AIOrchestrationError extends Error {
+  public constructor(
+    public readonly code: string,
+    message: string,
+    options?: ErrorOptions,
+  ) {
+    super(message, options);
+    this.name = 'AIOrchestrationError';
+  }
+}
+
+export class AITurnOrchestrator {
+  private readonly requests: PendingAiRequestRepository;
+  private readonly generations: GenerationRecordRepository;
+
+  public constructor(
+    database: TransactionalSqliteDatabase,
+    private readonly provider: AIProvider,
+    private readonly providerConfig: ProviderConfig,
+    private readonly now: () => IsoTimestamp,
+  ) {
+    this.requests = new PendingAiRequestRepository(database);
+    this.generations = new GenerationRecordRepository(database);
+  }
+
+  public async execute(command: ExecuteAITurn): Promise<IdempotentCommitResult> {
+    const pending = this.requests.createOrGet({
+      id: command.requestId,
+      campaignId: command.campaignId,
+      turnId: command.turnId,
+      idempotencyKey: command.idempotencyKey,
+      task: command.task,
+      modelProfileId: command.modelProfileId,
+      input: command.input,
+      createdAt: this.now(),
+    });
+    if (pending.status === 'COMMITTED') return 'ALREADY_COMMITTED';
+    if (pending.status !== 'CREATED') {
+      throw new AIOrchestrationError(
+        'REQUEST_NOT_READY',
+        `Pending AI request cannot start from ${pending.status}`,
+      );
+    }
+
+    let context: JsonValue;
+    try {
+      context = toJsonValue(await command.buildContext(), '$context');
+      this.requests.setContext(command.requestId, context, this.now());
+    } catch (error) {
+      this.failPending(command.requestId, {
+        code: 'CONTEXT_BUILD_FAILED',
+        message: 'AI context construction failed',
+        retryable: false,
+      });
+      throw new AIOrchestrationError('CONTEXT_BUILD_FAILED', 'AI context construction failed', {
+        cause: error,
+      });
+    }
+
+    let request: NormalizedAIRequest;
+    try {
+      const models = await this.provider.listModels();
+      const model = models.find(({ name }) => name === command.modelName);
+      if (model === undefined) {
+        throw new AIOrchestrationError(
+          'MODEL_NOT_FOUND',
+          `Configured model is unavailable: ${command.modelName}`,
+        );
+      }
+      const formatted = formatTaskPrompt(command.task, context, model.capabilities);
+      request = Object.freeze({
+        requestId: command.requestId,
+        task: command.task,
+        promptVersion: formatted.promptVersion,
+        modelName: command.modelName,
+        messages: formatted.messages,
+        responseFormat: formatted.responseFormat,
+        temperature: command.generationOptions.temperature,
+        maxOutputTokens: command.generationOptions.maxOutputTokens,
+        timeoutMs: command.generationOptions.timeoutMs,
+      });
+    } catch (error) {
+      this.failPending(command.requestId, {
+        code: error instanceof AIOrchestrationError ? error.code : 'PROMPT_BUILD_FAILED',
+        message: 'AI request preparation failed',
+        retryable: false,
+      });
+      if (error instanceof AIOrchestrationError) throw error;
+      throw new AIOrchestrationError('PROMPT_BUILD_FAILED', 'AI request preparation failed', {
+        cause: error,
+      });
+    }
+
+    this.generations.create({
+      id: command.generationRecordId,
+      campaignId: command.campaignId,
+      requestId: command.requestId,
+      task: command.task,
+      modelProfileId: command.modelProfileId,
+      promptVersion: request.promptVersion,
+      request: requestJson(request, context),
+      startedAt: this.now(),
+    });
+    this.requests.startAttempt(command.requestId, this.now());
+
+    let rawResponseText: string;
+    try {
+      const response = await this.provider.generate(request, this.providerConfig);
+      if (response.requestId !== command.requestId || response.modelName !== command.modelName) {
+        throw new AIOrchestrationError(
+          'PROVIDER_RESPONSE_MISMATCH',
+          'Provider response does not match the normalized request',
+        );
+      }
+      rawResponseText = response.content;
+      this.requests.markReceived(command.requestId, this.now());
+      this.requests.markValidating(command.requestId, this.now());
+    } catch (error) {
+      const validationError = generationError('PROVIDER_FAILURE', 'Provider request failed');
+      this.generations.complete(command.generationRecordId, {
+        rawResponseText: null,
+        validatedOutput: null,
+        validationError,
+        completedAt: this.now(),
+      });
+      this.failPending(command.requestId, {
+        code: 'PROVIDER_FAILURE',
+        message: 'Provider request failed',
+        retryable: true,
+      });
+      throw new AIOrchestrationError('PROVIDER_FAILURE', 'Provider request failed', {
+        cause: error,
+      });
+    }
+
+    const structural = validateAIOutput(command.task, rawResponseText);
+    if (!structural.ok) {
+      this.generations.complete(command.generationRecordId, {
+        rawResponseText,
+        validatedOutput: null,
+        validationError: structural.error,
+        completedAt: this.now(),
+      });
+      this.failPending(command.requestId, {
+        code: structural.error.code,
+        message: 'AI output structure validation failed',
+        retryable: true,
+      });
+      throw new AIOrchestrationError(
+        structural.error.code,
+        'AI output structure validation failed',
+      );
+    }
+
+    let commit: TurnCommit;
+    try {
+      commit = await command.validateDomainAndBuildCommit(structural.validatedOutput);
+    } catch (error) {
+      const validationError =
+        error instanceof DomainPatchValidationError
+          ? {
+              code: error.code,
+              issues: [
+                {
+                  path: [error.patchIndex, ...error.path],
+                  code: error.code,
+                  message: error.message,
+                },
+              ],
+            }
+          : generationError('DOMAIN_VALIDATION_FAILED', 'Domain validation failed');
+      this.generations.complete(command.generationRecordId, {
+        rawResponseText,
+        validatedOutput: null,
+        validationError,
+        completedAt: this.now(),
+      });
+      this.failPending(command.requestId, {
+        code: 'DOMAIN_VALIDATION_FAILED',
+        message: 'AI domain validation failed',
+        retryable: false,
+      });
+      throw new AIOrchestrationError('DOMAIN_VALIDATION_FAILED', 'AI domain validation failed', {
+        cause: error,
+      });
+    }
+
+    this.generations.complete(command.generationRecordId, {
+      rawResponseText,
+      validatedOutput: structural.validatedOutput,
+      validationError: null,
+      completedAt: this.now(),
+    });
+    try {
+      return this.requests.commitTurnOnce(command.idempotencyKey, commit, this.now());
+    } catch (error) {
+      this.failPending(command.requestId, {
+        code: 'COMMIT_FAILED',
+        message: 'Validated AI turn commit failed',
+        retryable: false,
+      });
+      throw new AIOrchestrationError('COMMIT_FAILED', 'Validated AI turn commit failed', {
+        cause: error,
+      });
+    }
+  }
+
+  private failPending(id: AiRequestId, error: AiRequestError): void {
+    this.requests.fail(id, error, this.now());
+  }
+}
+
+function requestJson(request: NormalizedAIRequest, context: JsonValue): JsonValue {
+  return Object.freeze({
+    requestId: request.requestId,
+    task: request.task,
+    promptVersion: request.promptVersion,
+    modelName: request.modelName,
+    messages: request.messages.map(({ role, content }) => ({ role, content })),
+    responseFormat:
+      request.responseFormat.kind === 'JSON_SCHEMA'
+        ? {
+            kind: request.responseFormat.kind,
+            name: request.responseFormat.name,
+            schema: request.responseFormat.schema,
+          }
+        : { kind: request.responseFormat.kind },
+    temperature: request.temperature,
+    maxOutputTokens: request.maxOutputTokens,
+    timeoutMs: request.timeoutMs,
+    context,
+  });
+}
+
+function generationError(code: string, message: string) {
+  return Object.freeze({
+    code,
+    issues: Object.freeze([
+      Object.freeze({
+        path: Object.freeze([]),
+        code,
+        message,
+      }),
+    ]),
+  });
+}
+
+function toJsonValue(value: unknown, path: string): JsonValue {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean' ||
+    (typeof value === 'number' && Number.isFinite(value))
+  ) {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return Object.freeze(value.map((entry, index) => toJsonValue(entry, `${path}[${index}]`)));
+  }
+  if (typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
+      throw new TypeError(`${path} must contain plain JSON objects`);
+    }
+    return Object.freeze(
+      Object.fromEntries(
+        Object.entries(value).map(([key, entry]) => [key, toJsonValue(entry, `${path}.${key}`)]),
+      ),
+    );
+  }
+  throw new TypeError(`${path} must contain only finite JSON values`);
+}
