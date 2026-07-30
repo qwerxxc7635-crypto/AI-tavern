@@ -21,7 +21,9 @@ const TavernPage = lazy(() =>
 const NpcDialoguePage = lazy(() =>
   import('./npc-dialogue-page.js').then(({ NpcDialoguePage: page }) => ({ default: page })),
 );
-const QuestsPage = lazy(() => sectionPages().then(({ QuestsPage: page }) => ({ default: page })));
+const QuestsPage = lazy(() =>
+  import('./quest-board-page.js').then(({ QuestBoardPage: page }) => ({ default: page })),
+);
 const AdventurePage = lazy(() =>
   sectionPages().then(({ AdventurePage: page }) => ({ default: page })),
 );

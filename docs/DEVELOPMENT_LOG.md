@@ -1578,3 +1578,39 @@
 - 本任务沿用 `DEC-029` 的统一Provider执行与受限原生原子提交边界，没有形成新的重大架构决定，因此未更新 `docs/DECISIONS.md`。
 - M5-T07验收“连续发送消息并在重启后恢复”由真实SQLite重开测试、服务连续生成测试、页面交互测试、全量门禁和release构建共同覆盖。
 - 未实现M5-T08或任何后续任务。
+
+## 2026-07-31 04:20 — M5-T08 实现任务页面
+
+### 依赖与范围
+
+- 依赖 `M4-T05` 和 `M5-T06`：均已完成；上一任务M5-T07已提交 `0ed0529`。
+- 仅实现任务列表、详情、离线初始任务生成、接受、风险、推荐属性和冒险准备入口。
+- 不实现M5-T09冒险三栏、冒险计划生成/启动、回合、骰子、结算、真实Provider或后续功能。
+
+### 完成结果与验收
+
+- WindowsQuestBoardService从SQLite读取任务告示；不足两条时通过统一FakeAIProvider、共享GENERATE_QUEST Schema、Prompt和validateAIOutput依次补足。
+- React StrictMode可能并发触发初始化；服务按Campaign缓存正在进行的初始化Promise，同一存档共享一条顺序生成链。
+- 原Fake任务结果引用固定npc-owner和npc-cartographer，与Windows原生分配的真实UUID不兼容；将可选relatedNpcIds改为空数组，发布者仍从当前SQLite酒馆NPC明确选择，未关闭引用归属验证。
+- Rust新增quest_board_get、quest_generation_commit、quest_accept三个固定语义命令；WebView不能提交SQL、数据库路径、Quest ID、时间、状态最终值或接受事务。
+- 原生层从SQLite重建当前世界、酒馆、角色概念、全部活跃酒馆NPC、发布者与最近20个任务标题，逐字段比对生成输入和审计上下文。
+- 任务输出再次校验内容、风险枚举、奖励枚举、1至4个推荐属性、8至12回合范围、NPC引用和世界事实引用；实体ID由Rust分配。
+- 生成事务原子写入AVAILABLE Quest、GenerationRecord和COMMITTED pending；篡改输入、非法长度或越界引用不会留下部分任务。
+- 接受事务只允许TAVERN阶段的AVAILABLE任务；同一Campaign已有ACCEPTED或ACTIVE主任务时拒绝第二项，重复接受同一任务保持幂等。
+- 页面展示任务列表、发布者、标题、摘要、状态、风险、目标、失败代价、8至12回合范围、奖励级别和推荐属性。
+- 接受成功后页面展示“进入冒险准备”链接，携带Campaign ID和Quest ID导航到既有冒险入口；不生成隐藏计划、不启动Campaign冒险状态，也不实现M5-T09 UI。
+- 1项服务测试覆盖真实Fake两任务生成、StrictMode并发合并、发布者轮换、最近标题上下文与接受；1项页面测试覆盖列表/详情/风险/属性、接受和准备路由。
+- 2项Rust真实SQLite测试覆盖两任务生成、中间数据库重开、只接受一个主任务、接受状态再次重开，以及篡改角色概念时零部分写入。
+- 首轮路由回归发现无Campaign时新任务页未保留原壳测试要求的“任务”一级标题；恢复该稳定可访问标题并保留引导说明后，原断言与新增业务断言均通过。
+- 首轮全量检查仅发现4个新增TypeScript文件不符合Prettier格式；使用同一规则格式化后完整重跑通过，没有关闭或降低检查。
+- `pnpm check`通过：Vitest 44个文件233项、Node SQLite 7项、native-bridge Rust 14项及全部类型、lint、格式和严格Clippy检查成功。
+- `pnpm --filter @ember-tavern/windows-app build`和`tauri build --no-bundle`通过；Vite转换161个模块并生成独立quest-board-page chunk。
+- release窗口实际启动，标题为Ember Tavern、MainWindowHandle非零且Responding=True，烟测后进程已停止。
+
+### 自审
+
+- SQLite是任务、发布者、状态和单主任务约束的唯一真实数据源；页面只保留当前选择、等待态和SQLite快照。
+- AI只生成任务内容和结构建议；Rust控制ID、发布者授权、引用范围、回合范围、初始状态和事务提交，接受操作完全不经过AI。
+- 本任务沿用 `DEC-029` 的统一Provider执行与受限原生原子提交边界，没有形成新的重大架构决定，因此未更新 `docs/DECISIONS.md`。
+- M5-T08验收“接受任务后可进入冒险准备”由页面路由测试、真实SQLite接受/重开测试、全量门禁、release构建和窗口烟测共同覆盖。
+- 未实现M5-T09或任何后续任务。

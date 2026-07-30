@@ -5,8 +5,9 @@
 use ember_native_bridge::{
     CampaignStore, CampaignStoreError, CampaignSummary, CharacterCompletionCommit,
     CharacterCreationSnapshot, CharacterTraitGenerationCommit, NpcDialogueCommit,
-    NpcDialogueSnapshot, NpcRosterGenerationCommit, TavernGenerationCommit, TavernSnapshot,
-    WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
+    TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
+    WorldManualUpdate,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -170,6 +171,33 @@ fn npc_dialogue_commit(
     store.commit_npc_dialogue(command).map_err(Into::into)
 }
 
+#[tauri::command]
+fn quest_board_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store.quest_board_snapshot(&campaign_id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_generation_commit(
+    command: QuestGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store.commit_quest_generation(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_accept(
+    campaign_id: String,
+    quest_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store
+        .accept_quest(&campaign_id, &quest_id)
+        .map_err(Into::into)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -194,7 +222,10 @@ pub fn run() {
             tavern_generation_commit,
             tavern_npcs_commit,
             npc_dialogue_get,
-            npc_dialogue_commit
+            npc_dialogue_commit,
+            quest_board_get,
+            quest_generation_commit,
+            quest_accept
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");

@@ -161,7 +161,7 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     recommendedAttributes: ['knowledge', 'agility'],
     expectedTurns: { min: 8, max: 12 },
     rewardTier: 'NOTABLE',
-    relatedNpcIds: ['npc-owner', 'npc-cartographer'],
+    relatedNpcIds: [],
     relatedFactIds: [],
   },
   GENERATE_ADVENTURE_PLAN: {

@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T07 实现NPC聊天页面`
+- 最近完成任务：`M5-T08 实现任务页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T07` 已验收，准备提交
-- 下一任务：`M5-T08 实现任务页面`
+- 当前任务：`M5-T08` 已验收，准备提交
+- 下一任务：`M5-T09 实现Windows冒险三栏页面`
 
 ## 架构摘要
 
@@ -53,11 +53,13 @@
 - 酒馆页展示全部初始内容、NPC页内选择、任务入口和时钟；任务业务仍未实现。
 - Windows NPC聊天通过统一Fake Provider生成，Rust从SQLite重建NPC有限认知上下文并复验后，原子提交会话、连续消息、心情、关系和生成审计。
 - NPC对话页展示重启恢复的历史、建议话题、自由输入和四维关系；NPC秘密与认知内部数据不进入页面展示。
+- Windows任务告示按Campaign从SQLite恢复；少于两条时通过统一Fake Provider生成，Rust复核当前世界、角色、酒馆、发布者、回合范围和引用后原子提交。
+- 任务页展示列表、详情、风险、推荐属性和状态；接受事务保证仅一个主任务，并将Campaign与Quest ID传入冒险准备入口。
 
 ## 最近成功验证
 
-- NPC聊天相关4项定向前端测试和12项native-bridge Rust测试通过；真实SQLite覆盖连续发送、中间重开恢复和篡改拒绝。
-- `pnpm check`通过：Vitest 42个文件、231项，Node SQLite 7项及native-bridge Rust 12项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
+- 任务相关5项定向前端测试和14项native-bridge Rust测试通过；真实SQLite覆盖两任务生成、中间重开、单主任务和篡改拒绝。
+- `pnpm check`通过：Vitest 44个文件、233项，Node SQLite 7项及native-bridge Rust 14项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
 - Windows生产前端与Tauri release无bundle构建通过；release窗口标题正确、窗口句柄非零且响应。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
@@ -65,5 +67,5 @@
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M5-T07` 变更。
-4. 从 `M5-T08` 实现任务页面；不要提前实现M5-T09冒险页面。
+3. 完成并提交当前 `M5-T08` 变更。
+4. 从 `M5-T09` 实现Windows冒险三栏页面；不要提前实现M5-T10设置页。

@@ -1250,5 +1250,21 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`0ed0529`。
 - Commit message：`feat(M5-T07): add persistent NPC dialogue`
+
+## 2026-07-31 04:20 — M5-T08 Windows任务页面
+
+- 任务告示从SQLite恢复列表；不足两条时通过统一Fake Provider与GENERATE_QUEST契约补足。
+- 删除Fake任务输出中的固定占位NPC引用，发布者改由当前SQLite酒馆NPC明确确定，实体引用校验保持严格。
+- 页面展示任务列表、发布者、详情、风险、推荐属性、预计回合、失败代价和奖励级别。
+- Rust固定语义命令重建世界、酒馆、角色、当前NPC和最近任务标题上下文，复核8至12回合与引用归属后原子提交。
+- 接受任务事务保证同一Campaign只有一个ACCEPTED/ACTIVE主任务；接受后可携带Campaign与Quest ID进入冒险准备入口。
+- 真实SQLite测试覆盖两任务、中间重开、单主任务限制、接受状态再次重开，以及上下文篡改零部分写入。
+- `pnpm check`通过：Vitest 44个文件233项、Node SQLite 7项、native-bridge Rust 14项；生产前端和Tauri release构建通过。
+- release窗口烟测通过并已停止；未实现M5-T09。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T08): add persistent quest board`
