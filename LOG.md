@@ -722,5 +722,36 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`c5a7333`。
 - Commit message：`feat(M2-T08): implement idempotent AI request lifecycle`
+
+## 2026-07-31 00:11 — M2-T09 实现数据库启动检查和迁移框架
+
+### 范围
+
+实现数据库版本检查、迁移执行、完整性检查和可显示失败结果；不实现快照恢复、备份轮换或M3 AI功能。
+
+### 主要改动
+
+- 迁移模块公开当前Schema版本和有序manifest，启动时验证版本连续性、名称和未来版本。
+- 新增 `prepareDatabaseFile`：现有数据库只在唯一工作副本上检查和迁移，成功后保留pre-migration原件再切换。
+- 启动前拒绝带journal/WAL/SHM侧文件的活跃数据库；迁移前后运行 `PRAGMA integrity_check`。
+- READY、MIGRATED和FAILED结果包含版本、备份路径或稳定错误码，供平台显示失败提示。
+
+### 验证
+
+- v0旧库保留自有数据并升级到v1，正式库完整性为ok，迁移前副本仍为原Schema。
+- 旧库结构与v1迁移冲突时返回失败，原文件SHA-256和数据逐字节不变。
+- Schema 99被明确拒绝为SCHEMA_TOO_NEW，损坏文件返回INTEGRITY_CHECK_FAILED且证据文件不变。
+- `pnpm check`：通过；Vitest 15个文件、112项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### 自审
+
+- 文件关闭、工作副本清理和原文件恢复失败都有独立错误，不吞掉异常。
+- 本任务只保留单次迁移前副本，不实现M7备份轮换或自动快照恢复。
+- M2全部任务完成，未提前执行M3-T01。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T09): add safe database startup migrations`

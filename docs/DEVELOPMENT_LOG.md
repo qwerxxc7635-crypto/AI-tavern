@@ -808,3 +808,41 @@
 - COMMITTED前任一写入失败会由同一事务回滚，请求不会提前进入终态。
 - Repository未保存API Key或Authorization，错误详情同样经过凭证字段扫描。
 - 未实现M2-T09或M3任务，不提前扩展AI厂商协议。
+
+## 2026-07-31 00:11 — M2-T09 实现数据库启动检查和迁移框架
+
+### 依赖与范围
+
+- 依赖 `M2-T02`：已完成；最近完成的pending AI生命周期已提交 `c5a7333`。
+- 仅实现数据库启动版本检查、迁移执行、完整性检查、失败结果和原文件保护。
+- 不实现M7快照恢复中心、完整备份轮换或任何M3 AI协议。
+
+### 计划验证
+
+- 已关闭的v0 SQLite文件在工作副本上升级，保留旧数据并生成迁移前原件。
+- 迁移SQL与旧Schema冲突时，失败结果明确且原数据库字节完全不变。
+- 高于应用支持版本的数据库拒绝打开；损坏数据库保留原文件。
+- 迁移前后执行SQLite完整性检查，根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- `migrations.mjs` 公开只读migrationManifest和currentSchemaVersion，版本记录必须从1连续匹配已知名称；未知未来版本明确返回SCHEMA_TOO_NEW。
+- 新增公共 `prepareDatabaseFile` 启动入口及类型声明，结果分为READY、MIGRATED和FAILED；成功结果包含前后版本与可选备份路径，失败包含稳定错误码、消息和原件保留状态。
+- 新数据库直接应用迁移并检查完整性；创建失败会关闭连接、删除不完整新文件并报告不存在可保留原件。
+- 现有数据库先检查journal、WAL、SHM侧文件；存在任一侧文件时返回ACTIVE_DATABASE，不复制可能未合并的数据。
+- 关闭的现有数据库复制到UUID工作文件，仅在副本上运行迁移前完整性、Schema历史/兼容性、迁移和迁移后完整性检查。
+- 全部成功后原数据库重命名为唯一pre-migration文件，工作副本切换到正式路径；切换失败优先恢复原路径，恢复也失败时保留聚合错误和原件所在路径信息。
+- 任意检查或迁移失败会关闭工作连接并删除工作文件；关闭和清理自身失败分别返回DATABASE_CLOSE_FAILED和CLEANUP_FAILED，不静默吞掉。
+- 文件级升级测试从包含legacy_notes数据的v0库升级到v1：原数据仍可读取、版本表为v1、完整性为ok，pre-migration副本仍无版本表且保留旧数据。
+- 文件级失败测试使用与v1冲突的旧campaigns表触发真实DDL失败；正式路径文件SHA-256前后一致，旧行可重新打开读取。
+- 版本测试构造Schema 99并验证SCHEMA_TOO_NEW及文件哈希不变；损坏文件验证INTEGRITY_CHECK_FAILED和证据字节不变。
+- 局部检查后自审补充损坏文件专用错误码、rollback journal检测、非静默关闭/清理错误及准确originalPreserved语义。
+- 最终 `pnpm check`：通过；Vitest 15个文件、112项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-014` 记录写时复制迁移与失败保留原件原则。
+
+### 自审
+
+- “失败不覆盖原数据库”通过真实文件哈希验证，不仅检查SQL事务回滚。
+- 启动服务不打开原数据库做探测；版本与完整性检查均发生在工作副本。
+- pre-migration文件不自动轮换或恢复，避免提前执行M7-T05/M7-T06。
+- 未执行M3-T01或任何AI Provider工作。

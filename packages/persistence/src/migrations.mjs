@@ -9,6 +9,11 @@ const migrations = [
   },
 ];
 
+export const migrationManifest = Object.freeze(
+  migrations.map(({ version, name }) => Object.freeze({ version, name })),
+);
+export const currentSchemaVersion = migrations.at(-1)?.version ?? 0;
+
 export async function applyMigrations(database) {
   database.exec('PRAGMA foreign_keys = ON');
   database.exec(`

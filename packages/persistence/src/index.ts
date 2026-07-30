@@ -3,6 +3,8 @@ export {
   CampaignRepository,
   PersistenceDataError,
 } from './campaign-repository.js';
+export { DatabaseStartupError, prepareDatabaseFile } from './database-startup.mjs';
+export type { DatabaseStartupFailureCode, DatabaseStartupResult } from './database-startup.mjs';
 export { GameEventRepository } from './game-event-repository.js';
 export {
   ConversationRepository,
