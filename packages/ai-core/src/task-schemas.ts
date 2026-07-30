@@ -472,7 +472,11 @@ export const SummarizeAdventureInputSchema = z
   .object({
     questTitle: shortText,
     turnSummaries: stringList.min(1).max(100),
-    ending: text.nullable(),
+    ending: z.enum(['SUCCESS', 'PARTIAL_SUCCESS', 'FAILURE']),
+    discoveredClues: stringList,
+    relatedNpcs: z
+      .array(z.object({ id: identifier, name: shortText, currentMood: shortText }).strict())
+      .max(12),
   })
   .strict();
 export const SummarizeAdventureOutputSchema = z
@@ -480,6 +484,35 @@ export const SummarizeAdventureOutputSchema = z
     summary: text,
     keyDecisions: stringList.max(20),
     unresolvedThreads: stringList.max(20),
+    nextDirections: stringList.max(10),
+    npcUpdates: z
+      .array(
+        z
+          .object({
+            npcId: identifier,
+            currentMood: shortText,
+            relationshipPatch: z
+              .object({
+                trust: z.number().int().min(-1).max(1).optional(),
+                closeness: z.number().int().min(-1).max(1).optional(),
+                awe: z.number().int().min(-1).max(1).optional(),
+                obligation: z.number().int().min(-1).max(1).optional(),
+              })
+              .strict()
+              .refine((patch) => Object.keys(patch).length > 0, {
+                message: 'relationshipPatch must change at least one dimension',
+              }),
+          })
+          .strict(),
+      )
+      .max(12),
+    tavernChange: z
+      .object({
+        kind: z.enum(['TROPHY', 'MENU', 'DAMAGE', 'DECORATION', 'LAYOUT', 'OTHER']),
+        description: text,
+      })
+      .strict(),
+    statePatchProposals: z.array(statePatchProposal).max(20),
   })
   .strict();
 

@@ -1108,5 +1108,20 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`2eaa001`。
 - Commit message：`feat(M4-T07): resolve local-dice adventure turns`
+
+## 2026-07-31 02:01 — M4-T08 冒险结算用例
+
+- 新增SummarizeAdventure、AdvanceWorldClocks、FinishAdventure稳定用例。
+- 摘要与世界事件先通过统一Provider、Schema和本地规则验证，不提前写入游戏事实。
+- 最终SQLite事务同步更新任务、NPC心情/关系、酒馆变化、奖励、世界事实/时钟、AdventureEnding档案、事件、pending和Campaign状态。
+- 冒险档案关联回合/骰子、参与NPC、物品、世界事实、酒馆变化及两条GenerationRecord，可从SQLite恢复。
+- 成功与失败结算测试均通过；失败分支不创建未授权奖励，重复Finish返回同一档案。
+- `pnpm check`通过：Vitest 32文件205项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T09。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T08): atomically settle adventures`

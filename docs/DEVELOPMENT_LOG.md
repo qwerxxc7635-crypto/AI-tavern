@@ -1309,3 +1309,29 @@
 - AI不生成骰点、不直接写游戏状态；所有输出经过Schema与本地业务规则后才进入SQLite事务。
 - `DEC-024` 记录分阶段回合、不可变本地骰点与线索引用边界。
 - 未实现M4-T08或任何后续任务。
+
+## 2026-07-31 02:01 — M4-T08 实现冒险结算用例
+
+### 依赖与范围
+
+- 依赖 `M4-T07`：已完成并提交 `2eaa001`。
+- 仅实现SummarizeAdventure、AdvanceWorldClocks、FinishAdventure及结算档案/事务所需扩展。
+- 不实现重生成、快照回退、Windows页面或真实Provider。
+
+### 完成结果与验收
+
+- SUMMARIZE_ADVENTURE Schema/Prompt升级为版本2，摘要输出包含关键选择、未决方向、相关NPC心情/单步关系建议、酒馆变化及受限状态补丁。
+- GENERATE_WORLD_EVENT Prompt与既有版本2 Schema对齐，从本地世界、时钟和事件构建上下文；时钟引用必须存在、唯一且每次只推进1。
+- 两次生成只持久化GenerationRecord并停留在VALIDATING；任务、NPC、酒馆、世界、奖励和Campaign在FinishAdventure前均保持不变。
+- FinishAdventure把摘要建议与世界事件转换为统一领域补丁，按ACTIVE任务→COMPLETED/FAILED、关系单步变化、程序授权奖励、追加事实和时钟规则整批验证。
+- AdventureSettlementRepository在BEGIN IMMEDIATE事务内同步提交NPC心情/关系、TavernChange、奖励物品及归属、WorldFact、WorldClock、Quest、AdventureEnding、GameEvent、两条pending状态和Campaign ADVENTURE→SETTLEMENT→TAVERN。
+- AdventureEnding扩展为可恢复档案索引，保存关键选择、未决方向、未发现线索、参与NPC、奖励/世界事实/酒馆变化ID和两条GenerationRecord ID；返回档案包含回合、骰子、物品、世界变化及模型/Prompt版本。
+- 2项真实SQLite测试覆盖SUCCESS完整奖励结算、FAILURE无奖励结算、中间阶段无部分游戏事实、事件审计及幂等Finish。
+- 首轮全量检查准确发现SUMMARIZE_ADVENTURE测试中的旧版本期望；更新为版本2后重新执行全量门禁通过，未关闭或降低检查。
+- 最终 `pnpm check`：通过；Vitest 32个文件、205项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- AI只提出叙事和补丁；Outcome、奖励效果、实体ID、状态迁移、引用范围、变化幅度和事务提交均由本地程序控制。
+- `DEC-025` 记录“验证草案后单事务结算”和ending_json档案索引方案。
+- 未实现M4-T09或任何后续任务。

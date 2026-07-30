@@ -38,6 +38,8 @@ describe('central prompt catalog', () => {
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
         'GENERATE_NPCS',
+        'GENERATE_WORLD_EVENT',
+        'SUMMARIZE_ADVENTURE',
       ].includes(task)
         ? 2
         : 1;

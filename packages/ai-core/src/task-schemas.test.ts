@@ -348,12 +348,34 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     input: {
       questTitle: 'The Fading Beacon',
       turnSummaries: ['Mira opened the cellar door.'],
-      ending: null,
+      ending: 'SUCCESS',
+      discoveredClues: ['Scorched Lens'],
+      relatedNpcs: [{ id: 'npc-owner', name: 'Ilyra Venn', currentMood: 'Concerned' }],
     },
     output: {
       summary: 'Mira found a tunnel leading toward the lighthouse.',
       keyDecisions: ['Opened the cellar door.'],
       unresolvedThreads: ['Where the tunnel ends.'],
+      nextDirections: ['Follow the tunnel.'],
+      npcUpdates: [
+        {
+          npcId: 'npc-owner',
+          currentMood: 'Relieved',
+          relationshipPatch: { trust: 1 },
+        },
+      ],
+      tavernChange: {
+        kind: 'TROPHY',
+        description: 'A scorched lens shard hangs above the hearth.',
+      },
+      statePatchProposals: [
+        {
+          kind: 'QUEST',
+          targetId: 'quest-beacon',
+          rationale: 'The objective is complete.',
+          payload: { status: 'COMPLETED' },
+        },
+      ],
     },
   },
   EXTRACT_MEMORIES: {
@@ -399,6 +421,7 @@ describe('versioned AI task schemas', () => {
       'NPC_REPLY',
       'GENERATE_ADVENTURE_TURN',
       'GENERATE_WORLD_EVENT',
+      'SUMMARIZE_ADVENTURE',
     ].includes(task)
       ? 2
       : 1;

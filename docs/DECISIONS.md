@@ -635,3 +635,27 @@ Provider失败时已提交的玩家行动仍可从SQLite恢复并重试；检定
 ### 可逆性
 
 未来可以增加重掷授权、消耗品或更细的状态修正来源，但必须通过显式本地规则生成新的审计事件，不能覆盖既有DiceResult。线索匹配可演进为稳定引用ID，但模型不能绕过隐藏计划或直接写发现状态。
+
+## DEC-025：结算生成先形成验证草案，所有游戏事实由单一事务落库
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第14至16、20至22、27节；`docs/TASKS.md` 的 `M4-T08`
+
+### 背景
+
+冒险结算同时影响任务、NPC、酒馆、奖励、世界事实、世界时钟、冒险档案、事件和Campaign状态，并需要两个AI任务分别生成摘要与世界事件。如果任一生成完成后立即写入部分实体，第二次生成失败、程序退出或业务验证失败都会留下“已推进时钟但尚未结算”之类的不一致状态。既有22表数据模型没有独立档案表，但adventures.ending_json可保存结构化结局索引，其他明细已有权威表和来源关系。
+
+### 决定与理由
+
+SUMMARIZE_ADVENTURE和GENERATE_WORLD_EVENT只保存原始响应、结构验证结果并让pending停留在VALIDATING，不直接修改游戏事实。FinishAdventure从SQLite读取两条GenerationRecord，把任务、关系、奖励、事实和时钟建议组成单一补丁序列，以当前Quest、Relationship、WorldBible、WorldClock和本地RewardAuthorization整批验证。Outcome由本地调用方选择；奖励效果由注入的本地策略提供，AI只能建议叙事内容和不超过任务等级的奖励级别。
+
+验证通过后，AdventureSettlementRepository用BEGIN IMMEDIATE一次提交NPC心情/关系、TavernChange、奖励及归属、WorldFact、WorldClock、Quest、AdventureEnding、审计事件、两条pending COMMITTED以及Campaign ADVENTURE→SETTLEMENT→TAVERN。AdventureEnding的ending_json保存摘要、关键选择、未决方向、未发现线索和相关实体ID，并引用摘要/世界事件GenerationRecord；档案查询从这些SQLite事实重新组装回合、骰子、参与NPC、物品、世界变化与模型/Prompt版本，不新增重复档案表。
+
+### 影响
+
+结算前可以安全重试生成而不产生部分游戏变化；结算成功后重复Finish只返回同一档案。任务结果必须与本地Outcome一致，关系每维最多变化1，时钟每次最多推进1，失败结局不能生成奖励。所有关联ID由程序分配或验证，AI不能覆盖既有事实、指定装备效果或越权引用NPC/时钟。
+
+### 可逆性
+
+未来若档案查询量或跨版本导出需要独立物化表，可从AdventureEnding引用和现有事实表迁移生成，而不改变其权威来源。结算步骤可增加新的显式本地补丁种类，但“先完整验证、后单事务提交、生成记录不等于游戏事实”的边界必须保持。

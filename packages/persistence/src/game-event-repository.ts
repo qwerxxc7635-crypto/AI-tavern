@@ -7,6 +7,7 @@ import {
   clueId,
   createNpcRelationship,
   gameEventId,
+  generationRecordId,
   isoTimestamp,
   itemId,
   npcId,
@@ -14,6 +15,7 @@ import {
   questId,
   schemaVersion,
   tavernId,
+  tavernChangeId,
   turnId,
   worldClockId,
   worldFactId,
@@ -31,6 +33,7 @@ import {
   requireNumber,
   requireRecord,
   requireString,
+  requireStringArray,
 } from './persistence-validation.js';
 import type { SqliteDatabase } from './sqlite-port.js';
 
@@ -228,10 +231,46 @@ function eventForType(
             adventureId: adventureId(requireString(ending['adventureId'], 'ending.adventureId')),
             outcome: requireEnum(OUTCOMES, ending['outcome'], 'ending.outcome'),
             summary: requireString(ending['summary'], 'ending.summary'),
+            keyDecisions: requireStringArray(ending['keyDecisions'], 'ending.keyDecisions'),
+            unresolvedThreads: requireStringArray(
+              ending['unresolvedThreads'],
+              'ending.unresolvedThreads',
+            ),
+            nextDirections: requireStringArray(ending['nextDirections'], 'ending.nextDirections'),
             unresolvedClueIds: Object.freeze(
               requireArray(ending['unresolvedClueIds'], 'ending.unresolvedClueIds').map(
                 (entry, index) =>
                   clueId(requireString(entry, `ending.unresolvedClueIds[${index}]`)),
+              ),
+            ),
+            participantNpcIds: Object.freeze(
+              requireArray(ending['participantNpcIds'], 'ending.participantNpcIds').map(
+                (entry, index) => npcId(requireString(entry, `ending.participantNpcIds[${index}]`)),
+              ),
+            ),
+            acquiredItemIds: Object.freeze(
+              requireArray(ending['acquiredItemIds'], 'ending.acquiredItemIds').map(
+                (entry, index) => itemId(requireString(entry, `ending.acquiredItemIds[${index}]`)),
+              ),
+            ),
+            worldFactIds: Object.freeze(
+              requireArray(ending['worldFactIds'], 'ending.worldFactIds').map((entry, index) =>
+                worldFactId(requireString(entry, `ending.worldFactIds[${index}]`)),
+              ),
+            ),
+            tavernChangeId: tavernChangeId(
+              requireString(ending['tavernChangeId'], 'ending.tavernChangeId'),
+            ),
+            summaryGenerationRecordId: generationRecordId(
+              requireString(
+                ending['summaryGenerationRecordId'],
+                'ending.summaryGenerationRecordId',
+              ),
+            ),
+            worldEventGenerationRecordId: generationRecordId(
+              requireString(
+                ending['worldEventGenerationRecordId'],
+                'ending.worldEventGenerationRecordId',
               ),
             ),
             completedAt: isoTimestamp(requireString(ending['completedAt'], 'ending.completedAt')),

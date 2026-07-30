@@ -88,11 +88,13 @@ export const TASK_PROMPTS = Object.freeze({
     'GENERATE_WORLD_EVENT',
     'WORLD_DESIGNER',
     'Create one world event consistent with known facts. Clock advances are proposals of exactly one step.',
+    2,
   ),
   SUMMARIZE_ADVENTURE: define(
     'SUMMARIZE_ADVENTURE',
     'ARCHIVIST',
-    'Compress the supplied adventure history into durable facts, key decisions, and unresolved threads without inventing events.',
+    'Compress the supplied adventure history without inventing events. Propose only related NPC mood and one-step relationship changes, one visible tavern consequence, the required quest outcome, and at most one narrative item reward; all state changes remain subject to local validation.',
+    2,
   ),
   EXTRACT_MEMORIES: define(
     'EXTRACT_MEMORIES',

@@ -7,10 +7,12 @@ import {
   campaignId,
   checkRequestId,
   clueId,
+  generationRecordId,
   isoTimestamp,
   itemId,
   npcId,
   questId,
+  tavernChangeId,
   turnId,
   worldFactId,
   transitionAdventureState,
@@ -682,9 +684,42 @@ function parseEnding(value: unknown): AdventureEnding {
     adventureId: adventureId(requireString(row['adventureId'], 'AdventureEnding.adventureId')),
     outcome: requireEnum(ADVENTURE_OUTCOMES, row['outcome'], 'AdventureEnding.outcome'),
     summary: requireString(row['summary'], 'AdventureEnding.summary'),
+    keyDecisions: requireStringArray(row['keyDecisions'], 'AdventureEnding.keyDecisions'),
+    unresolvedThreads: requireStringArray(
+      row['unresolvedThreads'],
+      'AdventureEnding.unresolvedThreads',
+    ),
+    nextDirections: requireStringArray(row['nextDirections'], 'AdventureEnding.nextDirections'),
     unresolvedClueIds: Object.freeze(
       requireArray(row['unresolvedClueIds'], 'AdventureEnding.unresolvedClueIds').map((id, index) =>
         clueId(requireString(id, `AdventureEnding.unresolvedClueIds[${index}]`)),
+      ),
+    ),
+    participantNpcIds: Object.freeze(
+      requireArray(row['participantNpcIds'], 'AdventureEnding.participantNpcIds').map((id, index) =>
+        npcId(requireString(id, `AdventureEnding.participantNpcIds[${index}]`)),
+      ),
+    ),
+    acquiredItemIds: Object.freeze(
+      requireArray(row['acquiredItemIds'], 'AdventureEnding.acquiredItemIds').map((id, index) =>
+        itemId(requireString(id, `AdventureEnding.acquiredItemIds[${index}]`)),
+      ),
+    ),
+    worldFactIds: Object.freeze(
+      requireArray(row['worldFactIds'], 'AdventureEnding.worldFactIds').map((id, index) =>
+        worldFactId(requireString(id, `AdventureEnding.worldFactIds[${index}]`)),
+      ),
+    ),
+    tavernChangeId: tavernChangeId(
+      requireString(row['tavernChangeId'], 'AdventureEnding.tavernChangeId'),
+    ),
+    summaryGenerationRecordId: generationRecordId(
+      requireString(row['summaryGenerationRecordId'], 'AdventureEnding.summaryGenerationRecordId'),
+    ),
+    worldEventGenerationRecordId: generationRecordId(
+      requireString(
+        row['worldEventGenerationRecordId'],
+        'AdventureEnding.worldEventGenerationRecordId',
       ),
     ),
     completedAt: isoTimestamp(requireString(row['completedAt'], 'AdventureEnding.completedAt')),

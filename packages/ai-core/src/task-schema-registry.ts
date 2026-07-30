@@ -78,7 +78,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
     GenerateWorldEventOutputSchema,
     2,
   ),
-  SUMMARIZE_ADVENTURE: definition(SummarizeAdventureInputSchema, SummarizeAdventureOutputSchema),
+  SUMMARIZE_ADVENTURE: definition(SummarizeAdventureInputSchema, SummarizeAdventureOutputSchema, 2),
   EXTRACT_MEMORIES: definition(ExtractMemoriesInputSchema, ExtractMemoriesOutputSchema),
   CHECK_CONSISTENCY: definition(CheckConsistencyInputSchema, CheckConsistencyOutputSchema),
 } satisfies Readonly<Record<AITask, AITaskSchemaDefinition>>);

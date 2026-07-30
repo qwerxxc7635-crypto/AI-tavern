@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M4-T07 实现冒险回合用例`
+- 最近完成任务：`M4-T08 实现冒险结算用例`
 - 已完成里程碑：M0、M1、M2、M3
-- 当前任务：`M4-T07` 已验收，准备提交
-- 下一任务：`M4-T08 实现冒险结算用例`
+- 当前任务：`M4-T08` 已验收，准备提交
+- 下一任务：`M4-T09 实现重生成和回退用例`
 
 ## 架构摘要
 
@@ -34,16 +34,18 @@
 - AdventureStartUseCases保存PREPARING隐藏计划与线索，只返回公开状态；启动事务同步推进Adventure、Quest和Campaign。
 - AdventureTurnUseCases先持久化玩家行动，再通过统一编排判断是否需要检定；检定由本地D20、角色属性、装备与状态修正计算并记录不可变结果，AI只生成后续叙事。
 - 回合、线索、受验证状态补丁和事件在SQLite事务边界提交；无需检定和需要检定的回合均遵守Adventure状态机。
+- AdventureSettlementUseCases先生成并验证冒险摘要与世界事件，不提前改变游戏事实；FinishAdventure将任务结果、NPC心情/关系、酒馆变化、程序授权奖励、世界事实/时钟、档案、事件、pending状态和Campaign返回酒馆一次性提交。
+- AdventureEnding的ending_json保存关键选择、未决方向、未发现线索、参与NPC、奖励/世界事实/酒馆变化ID以及摘要/世界事件GenerationRecord引用；完整档案可从SQLite重新组装。
 
 ## 最近成功验证
 
-- 无检定回合与需要检定回合的真实SQLite集成测试通过；本地骰点含属性与装备修正，骰点叙事阶段不改变结果。
-- `pnpm check`：通过；Vitest 203项、Node SQLite 7项通过。
+- 成功与失败结算的真实SQLite集成测试通过；成功奖励由本地策略决定效果，失败不生成未授权奖励，结算可幂等重放。
+- `pnpm check`：通过；Vitest 205项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M4-T07` 变更。
-4. 从 `M4-T08` 实现FinishAdventure、AdvanceWorldClocks、SummarizeAdventure。
+3. 完成并提交当前 `M4-T08` 变更。
+4. 从 `M4-T09` 实现保留输入重生成、切换Provider重生成和回退快照。

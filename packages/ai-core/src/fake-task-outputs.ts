@@ -220,6 +220,43 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     summary: 'The party opened the cellar passage and found a route toward the lighthouse.',
     keyDecisions: ['Trusted Ilyra.', 'Opened the cellar door.'],
     unresolvedThreads: ['Who damaged the beacon lens?'],
+    nextDirections: ['Ask the Lantern Guild who last serviced the lens.'],
+    npcUpdates: [
+      {
+        npcId: 'npc-owner',
+        currentMood: 'Relieved',
+        relationshipPatch: { trust: 1 },
+      },
+    ],
+    tavernChange: {
+      kind: 'TROPHY',
+      description: 'A scorched shard of the restored beacon lens hangs above the hearth.',
+    },
+    statePatchProposals: [
+      {
+        kind: 'QUEST',
+        targetId: 'quest-beacon',
+        rationale: 'The beacon objective was completed.',
+        payload: { status: 'COMPLETED' },
+      },
+      {
+        kind: 'RELATIONSHIP',
+        targetId: 'npc-owner',
+        rationale: 'Ilyra trusts the player after the beacon rescue.',
+        payload: { trust: 1 },
+      },
+      {
+        kind: 'ITEM_REWARD',
+        targetId: null,
+        rationale: 'The completed quest grants its authorized reward.',
+        payload: {
+          questId: 'quest-beacon',
+          name: 'Stormglass Compass',
+          description: 'A brass compass fitted with a sliver of stormglass.',
+          rewardTier: 'NOTABLE',
+        },
+      },
+    ],
   },
   EXTRACT_MEMORIES: {
     memories: [

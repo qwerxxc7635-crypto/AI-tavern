@@ -47,3 +47,14 @@ export type {
   RollCheckCommand,
   SubmitPlayerActionCommand,
 } from './adventure-turn-use-cases.js';
+export { AdventureSettlementUseCases } from './adventure-settlement-use-cases.js';
+export type {
+  AdvanceWorldClocksCommand,
+  AdventureArchive,
+  AdventureSettlementIdentityFactory,
+  AdventureSettlementPolicy,
+  FinishAdventureCommand,
+  SettlementGenerationRequest,
+  SettlementGenerationUse,
+  SummarizeAdventureCommand,
+} from './adventure-settlement-use-cases.js';

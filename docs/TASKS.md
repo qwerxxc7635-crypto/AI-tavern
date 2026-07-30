@@ -498,6 +498,7 @@
 ## M4-T08 实现冒险结算用例
 
 - 优先级：P0
+- 状态：已完成（2026-07-31）
 - 依赖：M4-T07
 - 用例：FinishAdventure、AdvanceWorldClocks、SummarizeAdventure。
 - 验收：冒险结果更新NPC、酒馆、世界和档案，然后返回酒馆。

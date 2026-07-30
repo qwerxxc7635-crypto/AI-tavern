@@ -32,4 +32,15 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Generate three attributed tavern rumors together with the initial NPC roster.',
   }),
+  Object.freeze({
+    task: 'SUMMARIZE_ADVENTURE',
+    version: promptVersion(2),
+    change:
+      'Include locally validated settlement proposals, tavern consequences, and next directions.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_WORLD_EVENT',
+    version: promptVersion(2),
+    change: 'Build settlement world events from filtered clocks, factions, and recent events.',
+  }),
 ]);

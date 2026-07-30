@@ -3,6 +3,12 @@ export {
   CampaignRepository,
   PersistenceDataError,
 } from './campaign-repository.js';
+export { AdventureSettlementRepository } from './adventure-settlement-repository.js';
+export type {
+  AdventureSettlementCommit,
+  SettlementCommitResult,
+  SettlementNpcUpdate,
+} from './adventure-settlement-repository.js';
 export { DatabaseStartupError, prepareDatabaseFile } from './database-startup.mjs';
 export type { DatabaseStartupFailureCode, DatabaseStartupResult } from './database-startup.mjs';
 export { GameEventRepository } from './game-event-repository.js';

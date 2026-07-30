@@ -5,11 +5,14 @@ import type {
   CampaignId,
   CheckRequestId,
   ClueId,
+  GenerationRecordId,
   IsoTimestamp,
   ItemId,
   NpcId,
   QuestId,
+  TavernChangeId,
   TurnId,
+  WorldFactId,
 } from './foundation.js';
 import type { QuestRisk } from './quest.js';
 
@@ -130,6 +133,15 @@ export interface AdventureEnding {
   readonly adventureId: AdventureId;
   readonly outcome: AdventureOutcome;
   readonly summary: string;
+  readonly keyDecisions: readonly string[];
+  readonly unresolvedThreads: readonly string[];
+  readonly nextDirections: readonly string[];
   readonly unresolvedClueIds: readonly ClueId[];
+  readonly participantNpcIds: readonly NpcId[];
+  readonly acquiredItemIds: readonly ItemId[];
+  readonly worldFactIds: readonly WorldFactId[];
+  readonly tavernChangeId: TavernChangeId;
+  readonly summaryGenerationRecordId: GenerationRecordId;
+  readonly worldEventGenerationRecordId: GenerationRecordId;
   readonly completedAt: IsoTimestamp;
 }
