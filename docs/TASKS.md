@@ -286,6 +286,7 @@
 ## M2-T04 实现世界与角色Repository
 
 - 优先级：P0
+- 状态：已完成（2026-07-30）
 - 依赖：M2-T02
 - 工作内容：WorldBible、WorldFact、PlayerCharacter的读写。
 - 测试：锁定字段和JSON字段可正确恢复。

@@ -3,6 +3,11 @@ export {
   CampaignRepository,
   PersistenceDataError,
 } from './campaign-repository.js';
+export {
+  PlayerCharacterNotFoundError,
+  PlayerCharacterRepository,
+} from './player-character-repository.js';
+export { WorldRepository } from './world-repository.js';
 export type {
   SqliteDatabase,
   SqliteRunResult,

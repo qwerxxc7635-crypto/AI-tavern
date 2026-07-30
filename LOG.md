@@ -559,5 +559,38 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`1dc0289`。
 - Commit message：`feat(M2-T03): implement campaign repository`
+
+## 2026-07-30 23:34 — M2-T04 实现世界与角色Repository
+
+### 范围
+
+实现WorldBible、WorldFact和PlayerCharacter读写；不实现酒馆、NPC、任务或冒险Repository。
+
+### 主要改动
+
+- 计划新增受验证JSON解码工具、世界Repository和角色Repository。
+- 计划用真实SQLite完整往返锁定字段、判别事实和角色JSON聚合。
+
+### 验证
+
+- WorldBible全部JSON与锁定字段精确恢复，未知锁定字段被拒绝。
+- 六条WorldFact覆盖五类及发展事实替代链，重复事实ID被拒绝。
+- PlayerCharacter属性、边界、两个特质、背景和装备引用精确恢复并可更新。
+- `pnpm check`：通过；Vitest 12个文件、101项，Node迁移3项全部成功。
+
+### Bug修复
+
+- 严格类型检查发现测试按数字索引的fixture可能不存在；改为按ID查找并显式处理缺失分支。
+
+### 自审
+
+- JSON从unknown逐字段验证，未知枚举和错误结构不会进入领域对象。
+- WorldFact仅追加，WorldBible和角色保护创建身份字段。
+- 未实现M2-T05及后续Repository。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T04): implement world and character repositories`

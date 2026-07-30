@@ -630,3 +630,36 @@
 - 所有SQL参数绑定，无字符串拼接实体数据；没有 `any`、非空断言或吞掉数据库错误。
 - Campaign仍由本地SQLite保存和恢复，列表不依赖内存缓存。
 - 未实现世界、角色或其他Repository，不提前执行 `M2-T04`。
+
+## 2026-07-30 23:34 — M2-T04 实现世界与角色Repository（开始）
+
+### 依赖与范围
+
+- 依赖 `M2-T02`：已完成；前序Campaign Repository已提交 `1dc0289`。
+- 仅实现WorldBible、WorldFact和PlayerCharacter读写，不实现M2-T05或后续表。
+
+### 计划验证
+
+- WorldBible锁定字段、Faction、Location及全部JSON数组完整往返。
+- 五类WorldFact类别专属字段和发展事实替代链完整往返。
+- PlayerCharacter内容边界、属性、两个特质、背景和装备引用完整往返。
+- 缺失数据返回null/空列表，非法持久化JSON显式拒绝。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增共享持久化验证工具，从unknown解析对象、数组、JSON、枚举、字符串、数字和布尔值，错误统一为 `PersistenceDataError`。
+- `WorldRepository` 实现WorldBible保存/读取、WorldFact追加/读取/列表；WorldBible更新保护原始创建时间，WorldFact ID重复写入由主键拒绝。
+- WorldBible恢复完整校验powerRules、Faction关系、Location层级、禁止内容、故事线索和 `WorldBibleLockableField`；未知锁定字段不进入领域对象。
+- WorldFact恢复五类判别联合：锁定规则、发展事实、临时叙事、传闻和错误认知；替代链通过真实外键及品牌ID恢复。
+- `PlayerCharacterRepository` 实现创建、读取和更新，保护CampaignId与createdAt；完整验证四项属性总和、恰好两个特质、内容边界、背景和装备引用。
+- 真实SQLite测试5项通过：WorldBible JSON/锁定字段保存和更新、六条事实覆盖五类及替代链、未知锁定字段拒绝、角色完整往返更新、错误特质结构拒绝。
+- 首轮类型检查发现测试数组索引可能为undefined；改为按ID查找并显式处理缺失fixture，未使用非空断言。
+- 最终 `pnpm check`：通过；Vitest 12个文件、101项通过，Node迁移3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 所有JSON读取均先解析和逐字段验证，未把 `JSON.parse` 结果直接断言为领域类型。
+- WorldFact为追加式写入，没有提供覆盖历史事实的方法；发展事实链保留。
+- 所有SQL使用参数绑定；返回数组和主要聚合被冻结。
+- 未实现酒馆、NPC、任务、冒险或对话Repository，不提前执行 `M2-T05`。
