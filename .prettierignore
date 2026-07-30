@@ -1,0 +1,14 @@
+.local/
+.pnpm-store/
+node_modules/
+target/
+dist/
+build/
+coverage/
+Cargo.lock
+pnpm-lock.yaml
+AGENTS.md
+LOG.md
+README.md
+docs/
+database/migrations/README.md

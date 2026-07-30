@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "windows-app/**/*.ts",
+    "windows-app/**/*.tsx",
+    "ios-app/**/*.ts",
+    "ios-app/**/*.tsx",
+    "packages/**/*.ts",
+    "packages/**/*.tsx",
+    "scripts/**/*.ts",
+    "vitest.config.ts"
+  ],
+  "exclude": ["node_modules", ".local", "dist", "build", "coverage", "target"]
+}

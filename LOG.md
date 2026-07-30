@@ -72,5 +72,49 @@
 
 ### Git
 
-- Commit hash：本条所在提交，完成后由 `git log` 确认。
+- Commit hash：`ecef89c`。
 - Commit message：`chore(M0-T03): create initial workspace structure`
+
+## 2026-07-30 22:25 — M0-T04 建立代码质量检查
+
+### 范围
+
+建立 TypeScript 严格模式、ESLint、Prettier、Vitest 基线、Rust fmt/Clippy 和基础 CI；不实现领域或应用功能。
+
+### 主要改动
+
+- 计划更新根 `package.json` 与锁文件，添加固定版本的质量工具。
+- 计划新增 TypeScript、ESLint、Prettier、Rust 格式和 GitHub Actions CI 配置。
+- 计划让 `native-bridge` 继承根 workspace Rust lint。
+
+### 决策
+
+- 根级工具统一检查全部 package，避免当前骨架阶段复制十套相同配置。
+- TypeScript 编译选项启用严格与额外边界检查；具体包可在后续任务继承。
+- 测试命令在尚无业务测试时允许 0 测试成功，但后续业务逻辑任务必须添加真实测试。
+
+### 验证
+
+- `pnpm install --frozen-lockfile`、`pnpm peers check`：通过。
+- `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`：通过。
+- 刷新已有 Cargo PATH 后，组合命令 `pnpm check`：通过。
+- Rust fmt、严格 Clippy、workspace test 与 metadata：通过。
+- CI 必需命令静态核对通过；远端 GitHub Actions 尚未触发。
+
+### Bug修复
+
+- 最新 TypeScript 7.0.2 超出 ESLint peer 范围，固定为 5.9.3。
+- Vitest 4.1.10 带来传递 peer 冲突，固定为 4.0.18。
+- pnpm 阻止 esbuild 构建脚本，仅批准该依赖后成功安装。
+- 当前 PowerShell 未刷新已有 Cargo PATH，补入 `%USERPROFILE%\.cargo\bin` 后原 `pnpm check` 完整通过。
+
+### 自审
+
+- 严格类型、零 warning lint、格式和 Rust lint 均为失败即阻断。
+- 质量配置不扫描或改写需求、日志、缓存和构建产物。
+- M0 里程碑搜索未发现生产占位实现或敏感信息。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`chore(M0-T04): establish code quality checks`

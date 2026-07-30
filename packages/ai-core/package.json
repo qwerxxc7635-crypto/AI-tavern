@@ -1,6 +1,6 @@
 {
-    "name":  "@ember-tavern/ai-core",
-    "version":  "0.1.0",
-    "private":  true,
-    "type":  "module"
+  "name": "@ember-tavern/ai-core",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module"
 }

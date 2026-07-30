@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目目前已完成 `M0-T01` 至 `M0-T03`。pnpm workspace 已识别 Windows、iOS 和八个共享 package，Cargo workspace 已识别首个真实 `ember-native-bridge` crate；当前仅完成工程骨架，尚未实现游戏功能。
+项目准备里程碑 M0 已完成。pnpm workspace 已识别 Windows、iOS 和八个共享 package，Cargo workspace 已识别 `ember-native-bridge`；严格 TypeScript、ESLint、Prettier、Vitest、Rust fmt/Clippy 和基础 CI 已建立。当前尚未实现游戏功能。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
@@ -13,9 +13,15 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 当前阶段没有可启动的应用。需要 Node.js、pnpm 和 Rust/Cargo；在仓库根目录可运行：
 
 ```powershell
+pnpm format:check
 pnpm lint
-pnpm test
 pnpm typecheck
+pnpm test
+pnpm rust:fmt
+pnpm rust:clippy
+pnpm rust:test
+# 或一次执行全部质量门：
+pnpm check
 ```
 
 这些 pnpm 命令统一检查当前 workspace 成员。Cargo workspace 可通过以下命令验证：
@@ -38,6 +44,7 @@ $env:PNPM_STORE_DIR = "$ProjectRoot\.local\cache\pnpm-store"
 $env:npm_config_cache = "$ProjectRoot\.local\cache\npm"
 $env:CARGO_HOME = "$ProjectRoot\.local\cache\cargo"
 $env:CARGO_TARGET_DIR = "$ProjectRoot\.local\build\cargo-target"
+$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
 $env:TEMP = "$ProjectRoot\.local\cache\temp"
 $env:TMP = $env:TEMP
 ```

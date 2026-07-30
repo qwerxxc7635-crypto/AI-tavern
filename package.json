@@ -4,8 +4,22 @@
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
-    "lint": "pnpm --recursive --if-present run lint",
-    "test": "pnpm --recursive --if-present run test",
-    "typecheck": "pnpm --recursive --if-present run typecheck"
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "lint": "eslint . --max-warnings 0",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "rust:fmt": "cargo fmt --all -- --check",
+    "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
+    "rust:test": "cargo test --workspace",
+    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm rust:fmt && pnpm rust:clippy && pnpm rust:test"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.8.0",
+    "prettier": "3.9.6",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.65.0",
+    "vitest": "4.0.18"
   }
 }

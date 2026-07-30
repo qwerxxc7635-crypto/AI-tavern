@@ -183,3 +183,59 @@
 - `native-bridge` 是可编译的真实 crate，只声明原生边界和禁止 unsafe，不包含占位返回值或未来功能。
 - 未创建其他无实现目的的 Rust crate；未初始化 React、Tauri、数据库迁移或应用功能。
 - `M0-T03` 验收通过并标记完成；下一任务为 `M0-T04`。
+
+## 2026-07-30 22:25 — M0-T04 建立代码质量检查（开始）
+
+### 输入任务与依赖
+
+- 依赖 `M0-T02`：已完成；`M0-T03` 也已完成并通过 workspace 动态验收。
+
+### 本轮范围与计划文件
+
+- 更新 `package.json`、`pnpm-lock.yaml`、根 Cargo lint 配置和 `crates/native-bridge/Cargo.toml`。
+- 新增 `tsconfig.base.json`、`tsconfig.json`、ESLint、Prettier、Rustfmt 与基础 CI 配置。
+- 更新任务状态、README、审计日志与上下文交接。
+
+### 计划验证
+
+- `pnpm install --frozen-lockfile`、`pnpm format:check`、`pnpm lint`、`pnpm test`、`pnpm typecheck`。
+- `cargo fmt --all -- --check`、严格 Clippy、`cargo test --workspace`、Cargo metadata。
+
+### 明确不处理
+
+- 不定义 M1 领域类型，不初始化 React/Tauri，不新增数据库或 AI 功能。
+
+### 完成结果与验收
+
+- 安装并精确锁定 `@eslint/js 10.0.1`、`eslint 10.8.0`、`prettier 3.9.6`、`typescript 5.9.3`、`typescript-eslint 8.65.0`、`vitest 4.0.18`；下载与 store 均位于 `.local/cache/pnpm-store`。
+- 首次解析到 TypeScript 7.0.2，超出 `typescript-eslint` 的 `<6.1.0` peer 范围；改为兼容的 5.9.3 后 `pnpm peers check` 通过。
+- Vitest 4.1.10 的传递 WASM peer 存在冲突；改为 4.0.18 后冲突消失。
+- pnpm 供应链保护拦截 esbuild 构建脚本；在 `pnpm-workspace.yaml` 中仅允许 `esbuild` 构建后安装成功，没有放宽其他依赖脚本权限。
+- `pnpm install --frozen-lockfile` 与 `pnpm peers check`：通过。
+- 刷新已有 Cargo PATH 后，根组合质量门 `pnpm check`：通过。
+- `pnpm format:check`：通过。
+- `pnpm lint`：通过，零 warning。
+- `pnpm typecheck`：通过，严格 TypeScript 配置生效。
+- `pnpm test`：通过；当前无业务测试文件，Vitest 按配置返回 0 测试成功。
+- `cargo fmt --all -- --check`：通过。
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings`：通过。
+- `cargo test --workspace` 与 Cargo metadata：通过。
+
+### CI 验收
+
+- `.github/workflows/ci.yml` 在 Windows runner 上配置冻结依赖安装、格式、lint、类型、TypeScript 测试、Rust fmt、Clippy 和 Rust 测试。
+- 本地逐项运行了 CI 中的全部质量命令并通过；GitHub 托管执行需仓库推送后由外部服务触发，当前未伪造远端运行结果。
+
+### 自审与里程碑 M0 Review
+
+- TypeScript 严格选项包含未检查索引、精确可选属性、隐式 override、switch fallthrough 和 catch unknown 等边界检查。
+- ESLint 对 TypeScript 使用 project service，并将 warning 上限设为 0；Prettier 排除需求、日志和锁文件，避免自动改写验收文档。
+- Rust workspace lint 禁止 unsafe 并启用 Clippy `all`，成员显式继承。
+- 搜索 TODO、FIXME、HACK、TEMP、placeholder、dummy、未实现宏、panic 和 console.log；命中仅为文档术语或忽略规则，没有生产占位实现。
+- M0 全部任务验收通过，工作区成员与质量命令可从根项目统一执行。
+- 检查 C 盘常见 npm、pnpm 与 Cargo registry 缓存位置：本轮开始后新增文件数均为 0；依赖实际写入项目 `.local`。
+### 组合命令环境修复
+
+- 首次执行 `pnpm check` 时，TypeScript 检查全部通过，但 Rust 阶段报告 `cargo is not recognized`。
+- 根因是当前 Codex PowerShell 在 Rust 安装前启动，进程 PATH 未刷新；Cargo 本体已存在且单独用绝对路径验证通过。
+- 将已有 `%USERPROFILE%\.cargo\bin` 加入当前进程 PATH 后重跑原组合命令；未硬编码项目脚本、未跳过 Rust 检查。
