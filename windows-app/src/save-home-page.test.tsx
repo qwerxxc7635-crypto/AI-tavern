@@ -54,6 +54,14 @@ describe('save home page', () => {
     expect(gateway.continueCalls).toEqual(['campaign-existing']);
   });
 
+  it('returns unfinished world campaigns to the world creation route', async () => {
+    const gateway = new FakeCampaignGateway([{ ...EXISTING_CAMPAIGN, state: 'REVIEWING_WORLD' }]);
+    renderSaveHome(gateway);
+
+    fireEvent.click(await screen.findByRole('button', { name: '继续' }));
+    expect(await screen.findByText('继续构筑 campaign-existing')).toBeTruthy();
+  });
+
   it('reloads campaigns from the persistence gateway after a simulated application restart', async () => {
     const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
     const firstRun = renderSaveHome(gateway);
@@ -72,6 +80,7 @@ function renderSaveHome(gateway: CampaignGateway) {
       <Routes>
         <Route path="/saves" element={<SaveHomePage gateway={gateway} />} />
         <Route path="/tavern" element={<CampaignRouteEcho />} />
+        <Route path="/world" element={<WorldRouteEcho />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -81,6 +90,12 @@ function CampaignRouteEcho() {
   const location = useLocation();
   const id = new URLSearchParams(location.search).get('campaignId');
   return <p>已进入 {id ?? '未选择'}</p>;
+}
+
+function WorldRouteEcho() {
+  const location = useLocation();
+  const id = new URLSearchParams(location.search).get('campaignId');
+  return <p>继续构筑 {id ?? '未选择'}</p>;
 }
 
 class FakeCampaignGateway implements CampaignGateway {

@@ -67,7 +67,11 @@ export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePagePro
     setBusyId(campaign.id);
     try {
       const continued = await gateway.continueCampaign(campaign.id);
-      navigate(`/tavern?campaignId=${encodeURIComponent(continued.id)}`);
+      const destination =
+        continued.state === 'CREATING_WORLD' || continued.state === 'REVIEWING_WORLD'
+          ? '/world'
+          : '/tavern';
+      navigate(`${destination}?campaignId=${encodeURIComponent(continued.id)}`);
     } catch {
       setError('无法继续该存档。请返回列表后重试。');
       setBusyId(null);

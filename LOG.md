@@ -1184,5 +1184,22 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`b885202`。
 - Commit message：`feat(M5-T03): add persistent save home`
+
+## 2026-07-31 03:12 — M5-T04 Windows世界创建与预览
+
+- 基础表单覆盖规格中的世界类型、氛围、魔法、规模、黑暗程度、内容许可、排除内容和可选自由构想。
+- WindowsWorldCreationService通过共享Fake Provider、Prompt和任务Schema执行生成/细化，不在页面或Rust写死模型结果。
+- 世界圣经支持预览、手动编辑、九类字段锁定、自然语言局部修改、全部重生成和确认。
+- Rust固定语义命令重新校验跨进程世界、引用、锁定、阶段和验证输出一致性，并原子提交WorldBible、Campaign、GenerationRecord和pending。
+- 新增前端服务/页面测试及Rust真实SQLite测试；篡改验证输出或修改锁定字段均不会写入。
+- 生产前端和Tauri release构建通过；实际窗口完成基础选项Fake生成和确认，Campaign进入CREATING_CHARACTER。
+- 临时端到端测试存档及子记录已级联清理，残留0。
+- `pnpm check`通过：Vitest 36个文件218项、Node SQLite 7项、native-bridge Rust 6项及全部类型、lint、格式检查成功。
+- 未执行M5-T05。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T04): create and confirm offline worlds`

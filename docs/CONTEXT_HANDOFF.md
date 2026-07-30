@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T03 实现存档首页`
+- 最近完成任务：`M5-T04 实现世界创建与预览页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T03` 已验收，准备提交
-- 下一任务：`M5-T04 实现世界创建与预览页面`
+- 当前任务：`M5-T04` 已验收，准备提交
+- 下一任务：`M5-T05 实现车卡页面`
 
 ## 架构摘要
 
@@ -43,16 +43,18 @@
 - Windows AppShell包含侧栏、上下文标题栏、离线状态、统一加载态和错误边界；六个规定入口通过延迟路由模块导航。
 - Windows存档首页通过四个受限Tauri命令访问系统应用数据目录中的SQLite；页面可新建、继续、归档并显示最后游玩时间。
 - 原生桥复用0001迁移并拒绝未来Schema；Rust和TypeScript边界都验证存档摘要，WebView不拥有SQL或数据库路径。
+- Windows世界创建服务继续使用共享Fake Provider、Prompt与任务Schema；Rust固定命令重新校验世界、锁定、引用和阶段后原子提交。
+- 世界页覆盖全部基础选项、可选构想、预览、手动编辑、九类字段锁定、局部/全部重生成和确认，确认后进入CREATING_CHARACTER。
 
 ## 最近成功验证
 
-- Windows存档页7项前端/原生定向测试通过；真实SQLite两次重连后仍能列出存档，Tauri release窗口实际启动并创建平台数据库。
-- `pnpm check`通过：Vitest 34个文件、213项，Node SQLite 7项及Rust 3项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
+- 世界创建9项定向前端测试和6项native-bridge Rust测试通过；实际Tauri窗口完成Fake生成与确认，数据库状态为CREATING_CHARACTER且临时数据清理无残留。
+- `pnpm check`通过：Vitest 36个文件、218项，Node SQLite 7项及native-bridge Rust 6项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M5-T03` 变更。
-4. 从 `M5-T04` 实现世界创建与预览页面；不要提前实现M5-T05车卡页面。
+3. 完成并提交当前 `M5-T04` 变更。
+4. 从 `M5-T05` 实现车卡页面；不要提前实现M5-T06酒馆页面。

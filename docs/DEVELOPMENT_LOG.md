@@ -1449,3 +1449,32 @@
 - 原生边界未开放任意SQL、文件或网络能力；没有API Key或模型调用。
 - `DEC-028` 记录受限存档命令、平台数据库路径、双边响应验证和共享迁移来源。
 - 未实现M5-T04或任何后续任务。
+
+## 2026-07-31 03:12 — M5-T04 实现世界创建与预览页面
+
+### 依赖与范围
+
+- 依赖 `M4-T01` 和 `M5-T02`：均已完成；上一任务M5-T03已提交 `b885202`。
+- 仅实现世界基础选项、可选构想、Fake生成、预览、手动编辑、字段锁定、局部/全部重生成和确认。
+- 不实现M5-T05车卡、真实Provider、通用SQL桥、恢复中心或后续页面功能。
+
+### 完成结果与验收
+
+- WindowsWorldCreationService调用共享FakeAIProvider、Prompt格式层、GENERATE_WORLD/REFINE_WORLD Schema和validateAIOutput；页面不直接调用Provider或拼接任务提示词。
+- 基础表单覆盖世界类型、故事氛围、魔法程度、世界规模、黑暗程度、四类内容许可、不希望出现的内容和可选自由构想；无自由构想时仍由基础选项形成合法输入。
+- 预览页展示完整世界圣经、主要势力、地点和剧情线索；九个协议允许字段可手动修改和锁定，锁定字段在局部重生成中保持不变。
+- 局部修改先保存当前编辑和锁定，再通过REFINE_WORLD生成；全部重生成显式清除锁定后走同一统一Provider/Schema路径，不写死页面结果。
+- Rust增加world_creation_get、world_generation_commit、world_draft_update、world_confirm四个固定语义命令，不向WebView暴露SQL、文件路径或生成时间。
+- 原生提交拒绝未知字段，校验文本范围、唯一势力/地点、父地点和势力引用、Campaign状态、Prompt版本、幂等键与锁定值；validatedOutput世界必须和待提交WorldBible完全一致。
+- 世界、Campaign、GenerationRecord和COMMITTED pending请求在单一BEGIN IMMEDIATE事务落库；确认只在REVIEWING_WORLD且世界存在时推进至CREATING_CHARACTER。
+- 3项新增Rust测试覆盖真实SQLite重开恢复、确认、锁定字段拒绝和验证输出篡改拒绝；4项新增前端测试使用真实Fake Provider覆盖生成/细化服务及页面生成、锁定、局部修改和确认；存档路由补充REVIEWING_WORLD返回世界页测试。
+- Windows生产构建通过，Vite转换153个模块并生成独立world-creation-page chunk；Tauri release无bundle构建通过，实际窗口启动并响应。
+- 实际窗口键盘烟测完成“继续存档→基础选项生成→确认”：SQLite中世界圣经和COMMITTED请求各1条，Campaign最终为CREATING_CHARACTER；所有临时测试Campaign及其子记录已级联清理，残留0。
+- 最终 `pnpm check`：通过；Vitest 36个文件、218项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo workspace测试均通过。
+
+### 自审
+
+- AI输出经过共享结构验证和Rust业务/结构复核后才进入SQLite；输出与提交世界不一致会整笔拒绝。
+- 页面状态仅用于未提交表单和展示；重新加载时世界、锁定和Campaign阶段均来自SQLite。
+- `DEC-029` 记录统一Provider执行与原生原子提交的跨运行时边界。
+- 未实现M5-T05或任何后续任务。

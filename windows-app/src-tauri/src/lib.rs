@@ -2,7 +2,10 @@
 
 #![forbid(unsafe_code)]
 
-use ember_native_bridge::{CampaignStore, CampaignStoreError, CampaignSummary};
+use ember_native_bridge::{
+    CampaignStore, CampaignStoreError, CampaignSummary, WorldCreationSnapshot,
+    WorldGenerationCommit, WorldManualUpdate,
+};
 use serde::Serialize;
 use tauri::{Manager, State};
 
@@ -23,6 +26,10 @@ impl From<CampaignStoreError> for CommandError {
             CampaignStoreError::AlreadyArchived => Self {
                 code: "CAMPAIGN_ARCHIVED",
                 message: "该存档已经归档。",
+            },
+            CampaignStoreError::InvalidState => Self {
+                code: "CAMPAIGN_STATE_INVALID",
+                message: "当前存档阶段不允许执行该操作。",
             },
             CampaignStoreError::InvalidData | CampaignStoreError::IncompatibleSchema => Self {
                 code: "CAMPAIGN_DATA_INVALID",
@@ -61,6 +68,38 @@ fn campaign_archive(id: String, store: State<'_, CampaignStore>) -> Result<(), C
     store.archive_campaign(&id).map_err(Into::into)
 }
 
+#[tauri::command]
+fn world_creation_get(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldCreationSnapshot, CommandError> {
+    store.world_creation_snapshot(&id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_generation_commit(
+    command: WorldGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldCreationSnapshot, CommandError> {
+    store.commit_world_generation(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_draft_update(
+    command: WorldManualUpdate,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldCreationSnapshot, CommandError> {
+    store.update_world_draft(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_confirm(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldCreationSnapshot, CommandError> {
+    store.confirm_world(&id).map_err(Into::into)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -73,7 +112,11 @@ pub fn run() {
             campaign_list,
             campaign_create,
             campaign_continue,
-            campaign_archive
+            campaign_archive,
+            world_creation_get,
+            world_generation_commit,
+            world_draft_update,
+            world_confirm
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");

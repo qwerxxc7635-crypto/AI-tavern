@@ -101,9 +101,15 @@ importers:
 
   windows-app:
     dependencies:
+      '@ember-tavern/ai-core':
+        specifier: workspace:*
+        version: link:../packages/ai-core
       '@ember-tavern/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
+      '@ember-tavern/prompts':
+        specifier: workspace:*
+        version: link:../packages/prompts
       '@tauri-apps/api':
         specifier: ^2.10.1
         version: 2.11.1

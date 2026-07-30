@@ -10,7 +10,9 @@
     "tauri": "tauri"
   },
   "dependencies": {
+    "@ember-tavern/ai-core": "workspace:*",
     "@ember-tavern/contracts": "workspace:*",
+    "@ember-tavern/prompts": "workspace:*",
     "@tauri-apps/api": "^2.10.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

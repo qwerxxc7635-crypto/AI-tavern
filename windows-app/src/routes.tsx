@@ -7,6 +7,9 @@ const sectionPages = () => import('./section-pages.js');
 const SaveHomePage = lazy(() =>
   import('./save-home-page.js').then(({ SaveHomePage: page }) => ({ default: page })),
 );
+const WorldCreationPage = lazy(() =>
+  import('./world-creation-page.js').then(({ WorldCreationPage: page }) => ({ default: page })),
+);
 const TavernPage = lazy(() => sectionPages().then(({ TavernPage: page }) => ({ default: page })));
 const QuestsPage = lazy(() => sectionPages().then(({ QuestsPage: page }) => ({ default: page })));
 const AdventurePage = lazy(() =>
@@ -41,6 +44,16 @@ export function AppRoutes() {
           <AppErrorBoundary>
             <Suspense fallback={<AppLoading />}>
               <SaveHomePage />
+            </Suspense>
+          </AppErrorBoundary>
+        }
+      />
+      <Route
+        path="world"
+        element={
+          <AppErrorBoundary>
+            <Suspense fallback={<AppLoading />}>
+              <WorldCreationPage />
             </Suspense>
           </AppErrorBoundary>
         }

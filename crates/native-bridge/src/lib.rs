@@ -2,6 +2,9 @@
 
 #![forbid(unsafe_code)]
 
+mod world_creation;
+pub use world_creation::*;
+
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
@@ -48,6 +51,8 @@ pub enum CampaignStoreError {
     AlreadyArchived,
     #[error("stored campaign data is invalid")]
     InvalidData,
+    #[error("campaign is not in the required state")]
+    InvalidState,
     #[error("database schema is incompatible")]
     IncompatibleSchema,
     #[error("the current time could not be represented")]
@@ -61,7 +66,7 @@ pub enum CampaignStoreError {
 /// Owns a platform database path without exposing SQL or file access to the WebView.
 #[derive(Debug, Clone)]
 pub struct CampaignStore {
-    database_path: PathBuf,
+    pub(crate) database_path: PathBuf,
 }
 
 impl CampaignStore {
@@ -128,7 +133,7 @@ impl CampaignStore {
         }
     }
 
-    fn connect(&self) -> Result<Connection, CampaignStoreError> {
+    pub(crate) fn connect(&self) -> Result<Connection, CampaignStoreError> {
         let connection = Connection::open(&self.database_path)?;
         connection.busy_timeout(Duration::from_secs(5))?;
         connection.execute_batch("PRAGMA foreign_keys = ON")?;
@@ -259,14 +264,14 @@ fn validate_campaign(campaign: CampaignSummary) -> Result<CampaignSummary, Campa
     Ok(campaign)
 }
 
-fn validate_id(id: &str) -> Result<(), CampaignStoreError> {
+pub(crate) fn validate_id(id: &str) -> Result<(), CampaignStoreError> {
     if id.is_empty() || id.trim() != id {
         return Err(CampaignStoreError::InvalidData);
     }
     Ok(())
 }
 
-fn validate_timestamp(value: &str) -> Result<(), CampaignStoreError> {
+pub(crate) fn validate_timestamp(value: &str) -> Result<(), CampaignStoreError> {
     let parsed =
         OffsetDateTime::parse(value, &Rfc3339).map_err(|_| CampaignStoreError::InvalidData)?;
     let canonical = parsed
@@ -279,7 +284,7 @@ fn validate_timestamp(value: &str) -> Result<(), CampaignStoreError> {
     }
 }
 
-fn current_timestamp() -> Result<String, CampaignStoreError> {
+pub(crate) fn current_timestamp() -> Result<String, CampaignStoreError> {
     OffsetDateTime::now_utc()
         .format(TIMESTAMP_FORMAT)
         .map_err(|_| CampaignStoreError::InvalidSystemTime)

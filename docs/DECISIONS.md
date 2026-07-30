@@ -731,3 +731,27 @@ SQLite仍是存档唯一真实数据源，应用关闭、WebView重建或模型�
 ### 可逆性
 
 未来可在保持命令语义与测试的前提下，把Rust实现替换为能够承载共享Repository端口的适配机制；数据库路径所有权、未知响应验证和不暴露任意SQL的边界不得撤销。
+
+## DEC-029：Windows世界生成分离统一Provider执行与原子原生提交
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第4、7、18、20、24、25、31节；`docs/TASKS.md` 的 `M5-T04`；`DEC-012`、`DEC-028`
+
+### 背景
+
+现有 `WorldCreationUseCases` 使用同步最小SQLite端口并已在Node真实数据库中验收，但Tauri WebView不能直接打开Windows应用数据目录中的SQLite，也不能获得通用SQL命令。把Fake输出写死在Rust会绕过统一AI适配层；把AI草稿直接交给数据库又会让未经业务验证的数据成为游戏事实。
+
+### 决定与理由
+
+Windows世界创建服务在TypeScript侧继续使用共享 `FakeAIProvider`、Prompt目录、任务Schema和 `validateAIOutput`。页面只调用稳定服务，不直接拼接Prompt、调用Tauri命令或写数据库。成功输出连同规范请求、原始响应和结构验证结果交给固定语义的 `world_generation_commit`；原生层不执行模型生成。
+
+Rust提交层把跨进程输入视为不可信数据：拒绝未知字段，重新校验文本范围、势力和地点引用、Campaign阶段、幂等键、Prompt版本、锁定字段，并要求 `validatedOutput` 中的世界与待提交世界逐字段相等。通过后，WorldBible、Campaign状态、GenerationRecord和已提交pending请求在一个 `BEGIN IMMEDIATE` 事务中写入。手动更新、世界读取和确认分别使用受限命令，不开放SQL或数据库路径。
+
+### 影响
+
+模型仍是可替换内容生成器，SQLite仍是唯一游戏事实源。Fake Provider执行或Schema验证失败时不会修改正式世界；跨语言载荷即使被篡改，也不能改变锁定字段或提交与验证结果不同的世界。Windows原生桥承担平台连接和最终事务防线，页面刷新后只能从SQLite恢复预览。
+
+### 可逆性
+
+未来可让共享用例直接运行在支持异步平台端口的宿主中，或把固定命令实现替换为其他受限适配；统一Provider/Prompt/Schema、原生最终校验、事务提交和不暴露通用SQL的边界必须保持。
