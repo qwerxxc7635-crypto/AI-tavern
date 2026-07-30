@@ -1058,3 +1058,42 @@
 - 验证成功仅表示JSON结构符合当前任务Schema，不能直接修改SQLite游戏事实；业务验证仍由M3-T07负责。
 - 原始响应与验证结果分列保存，失败输出不会进入validated_output_json。
 - 未实现M3-T07或任何后续任务。
+
+## 2026-07-31 00:51 — M3-T07 实现Domain状态补丁验证器
+
+### 依赖与范围
+
+- 依赖 `M1-T08`、`M1-T09`、`M3-T06`：均已完成；结构验证与原始输出留存已提交 `1579b3c`。
+- 仅实现AI提出的QUEST、RELATIONSHIP、ITEM_REWARD、FACT和CLOCK补丁的纯领域验证。
+- 不读取或写入SQLite，不创建Repository实体ID，不实现Orchestrator、pending请求流程或事务提交。
+
+### 计划验证
+
+- 合法批次可按“任务完成→授权奖励”顺序验证，并产出五类已验证领域补丁。
+- 玩家属性补丁和奖励payload中的属性/效果字段显式拒绝。
+- WorldFact只允许target为null的追加发展事实，LOCKED_RULE或指定已有target拒绝。
+- 奖励必须引用已完成且本地授权的任务，等级不得超过任务等级，效果只来自本地授权。
+- 非法任务跃迁、关系单次变化超过1、时钟推进超过1均拒绝。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- domain新增 `validateDomainStatePatches`、验证上下文、五类已验证补丁联合及带code/index/path的 `DomainPatchValidationError`。
+- 验证器从同Campaign Quest和Clock、本地Relationship、WorldBible及RewardAuthorization建立工作视图，逐项验证；前序合法补丁会更新批次视图。
+- Quest固定允许AVAILABLE→ACCEPTED、ACCEPTED→ACTIVE/ABANDONED、ACTIVE→COMPLETED/FAILED/ABANDONED；终态不可再迁移。
+- Relationship复用 `applyRelationshipPatch`，每个维度单次绝对变化不超过1且最终保持-5至5；空补丁同样拒绝。
+- Clock复用 `advanceWorldClock`，每个补丁必须精确推进1且不能超过max，保留触发阶段。
+- ITEM_REWARD要求target为null、任务已完成且存在本地授权；BASIC/NOTABLE/RARE/LEGENDARY按等级比较，禁止超过Quest.rewardTier。
+- 奖励payload仅允许questId、name、description、rewardTier；AI提供attribute/effect等额外字段会被拒绝，最终效果来自本地RewardAuthorization。
+- FACT要求target为null并默认追加DEVELOPING_FACT；指定已有target或声明LOCKED_RULE拒绝，当前不以宽松JSON冒充其他事实类别支持。
+- PLAYER_ATTRIBUTE、ATTRIBUTES和所有未知kind显式拒绝；普通对象入口校验原型并复制为安全字典。
+- 首轮检查发现品牌构造器误放在type-only import导致运行时缺失，以及unknown对象收窄不足；拆分值导入并增加普通对象校验后通过。
+- 5项测试覆盖五类合法顺序批次及属性、锁定规则、越级奖励、任务跃迁、关系和时钟失败路径。
+- 最终 `pnpm check`：通过；Vitest 23个文件、192项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-018` 记录顺序式本地验证、奖励授权和程序控制效果边界。
+
+### 自审
+
+- 验证器不接受任意Repository对象或SQL；结果仍需M3-T08分配ID/时间并在事务中提交。
+- AI不能通过额外payload字段修改属性或指定物品效果，不能覆盖锁定事实或越级发奖。
+- 未实现M3-T08或任何后续任务。

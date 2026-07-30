@@ -951,5 +951,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`1579b3c`。
 - Commit message：`feat(M3-T06): validate and retain AI outputs`
+
+## 2026-07-31 00:51 — M3-T07 实现Domain状态补丁验证器
+
+### 范围
+
+实现任务、关系、奖励、事实和时钟的本地领域验证；不实现Orchestrator或数据库提交。
+
+### 主要改动
+
+- domain新增顺序式批量补丁验证器、上下文/结果联合及定位错误。
+- Quest按状态机前进；关系与时钟复用M1规则。
+- 奖励要求已完成任务、本地授权且不越级，物品效果只来自程序授权。
+- Fact只允许追加发展事实；锁定规则、已有target、属性变更和未知补丁均拒绝。
+
+### 验证
+
+- 五类合法补丁在同一批次按顺序通过，任务完成后奖励授权生效。
+- 玩家属性、锁定规则、越级奖励、跳级任务、关系+2和时钟+2全部拒绝。
+- `pnpm check`：通过；Vitest 23个文件、192项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### Bug修复
+
+- 品牌ID构造器从type-only import移至值导入，避免运行时擦除。
+- unknown对象入口增加普通对象原型校验和安全字典复制。
+
+### 自审
+
+- 已验证补丁仍非数据库命令；未执行M3-T08。
+- `DEC-018` 记录本地顺序验证与奖励授权边界。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T07): validate AI domain state patches`

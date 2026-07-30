@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M3-T06 实现AI输出结构验证`
+- 最近完成任务：`M3-T07 实现Domain状态补丁验证器`
 - 已完成里程碑：M0、M1、M2
-- 当前任务：`M3-T06` 已验收，准备提交
-- 下一任务：`M3-T07 实现Domain状态补丁验证器`
+- 当前任务：`M3-T07` 已验收，准备提交
+- 下一任务：`M3-T08 实现AI Orchestrator`
 
 ## 架构摘要
 
@@ -22,16 +22,17 @@
 - NPC、冒险和世界事件上下文从领域快照最小化构建，具备归属过滤、秘密隔离、长短期组合和字符预算裁剪。
 - NPC_REPLY、GENERATE_ADVENTURE_TURN、GENERATE_WORLD_EVENT输入Schema已升级到版本2以覆盖规格第26节。
 - AI输出先按任务Schema解析并返回可定位错误；原始响应、结构结果或错误分别留存在generation_records，且记录只能完成一次。
+- AI状态补丁在本地事实工作视图上按顺序验证；任务/关系/时钟遵守固定规则，奖励须本地授权且效果由程序控制，事实只允许安全追加。
 
 ## 最近成功验证
 
-- 缺字段、错误枚举、越界值和非法JSON均被定位拒绝；成功/失败生成记录SQLite测试通过。
-- `pnpm check`：通过；Vitest 187项、Node SQLite 7项通过。
+- 五类合法领域补丁批次通过；属性、锁定规则、越级奖励、跳级任务、关系和时钟越界均拒绝。
+- `pnpm check`：通过；Vitest 192项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M3-T06` 变更。
-4. 从 `M3-T07` 验证AI提出的任务、关系、奖励、事实和时钟状态补丁。
+3. 完成并提交当前 `M3-T07` 变更。
+4. 从 `M3-T08` 串联pending请求、上下文、Fake Provider、结构/领域验证、GenerationRecord与SQLite事务提交。
