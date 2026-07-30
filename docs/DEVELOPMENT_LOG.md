@@ -528,3 +528,37 @@
 - `GAME_EVENT_TYPES` 与测试fixture顺序逐项相等，确保规格列出的事件类型没有漏项。
 - 类型收窄测试确认 `DICE_ROLLED` 只能访问骰子payload；所有fixture均验证公共审计元数据。
 - 未实现事件表、事件仓储、SQLite事务或事件发布用例；这些属于M2及后续任务。
+
+## 2026-07-30 23:16 — M2-T01 设计SQLite ER模型（开始）
+
+### 依赖与范围
+
+- 依赖M1全部任务：已完成，最近提交为 `07abde7`。
+- 仅输出数据模型文档；不创建 `0001_initial.sql`、数据库连接或Repository。
+
+### 计划验证
+
+- 规格第24.2节的22张核心表逐项覆盖。
+- 每张表明确字段、主键、外键和索引；所有JSON列说明结构与校验要求。
+- API Key和令牌明确禁止写入数据库。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增 `docs/data-model.md`，定义规格第24.2节全部22张核心表的字段、类型、主键、外键、删除策略、索引和JSON列。
+- ER图覆盖Campaign与世界、角色、酒馆/NPC、任务/冒险、对话、审计、AI请求、快照和模型配置的主要关系。
+- 明确48个去重JSON列名及其协议边界；迁移必须为JSON文本添加 `json_valid`，Repository必须验证内部结构和同Campaign引用。
+- Campaign删除级联游戏内容，产品正常流程使用归档；Provider/模型配置为设备级数据，不随Campaign删除。
+- 一次回合的消息、任务、关系、世界事实和事件必须在同一SQLite事务中提交。
+- `provider_configs` 只允许 `credential_ref` 和非秘密选项，明确禁止API Key、Authorization头和令牌入库。
+- 静态覆盖脚本：预期22张、实际22张，缺失0、额外0；所有外键目标均位于核心表清单。
+- 自检修正初稿将核心表误计为23张的问题；同时将传输失败场景的 `raw_response_text` 改为可空。
+- `pnpm check`：通过；10个测试文件、92个测试全部成功，TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-010` 记录规范列与受验证JSON的持久化边界。
+
+### 自审
+
+- 未创建 `database/`、迁移SQL、业务表实现、Repository或数据库依赖。
+- Faction、Location、Clue、NpcMemory等非核心独立表对象均明确映射到父实体JSON，没有静默遗漏。
+- 骰子结果位于 `adventure_turns.dice_result_json`，对话与消息独立持久化，模型切换后可从本地历史恢复。
+- M2-T02迁移要求已明确，但没有提前执行该任务。

@@ -464,5 +464,34 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`07abde7`。
 - Commit message：`feat(M1-T10): define game event protocol`
+
+## 2026-07-30 23:16 — M2-T01 设计SQLite ER模型
+
+### 范围
+
+依据规格核心表和M1协议设计SQLite ER模型文档；不创建迁移、数据库目录或Repository。
+
+### 主要改动
+
+- 计划新增 `docs/data-model.md`，明确22张核心表的字段、主外键、索引和JSON列。
+- 计划显式记录未单独列为核心表的嵌套实体如何持久化，以及API Key禁止入库的边界。
+
+### 验证
+
+- 静态脚本：规格核心表预期22张、实际22张，缺失0、额外0；外键目标全部有效；识别48个去重JSON列名。
+- 初稿核心表计数从错误的23修正为22；传输前失败的生成记录允许原始响应为空。
+- `pnpm check`：通过；10个测试文件、92个测试全部成功。
+
+### 自审
+
+- 22张表均明确字段、PK/FK、索引和JSON边界，未创建规格之外的业务表。
+- 嵌套协议对象的JSON归属、Repository校验责任和未来规范化路径已说明。
+- API Key、令牌和Authorization头明确禁止入库；只保存安全存储引用。
+- 未创建迁移、数据库目录、Repository或运行时依赖。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`docs(M2-T01): design SQLite data model`
