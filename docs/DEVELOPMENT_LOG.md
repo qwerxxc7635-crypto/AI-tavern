@@ -732,3 +732,39 @@
 - 骰子结果作为AdventureTurn JSON持久化，读取时校验固定难度和成功布尔值。
 - 所有实体数据使用SQL参数绑定，JSON从unknown逐字段验证。
 - 未实现GameEvent、GenerationRecord、PendingRequest或快照Repository，不提前执行M2-T07。
+
+## 2026-07-30 23:57 — M2-T07 实现事务型回合提交
+
+### 依赖与范围
+
+- 依赖 `M2-T03` 至 `M2-T06`：全部完成；M2-T06已提交 `adba910`。
+- 仅实现玩家输入、已验证AI输出、状态补丁和GameEvent的单SQLite事务提交。
+- 不实现pending AI请求、Provider、快照或恢复中心。
+
+### 计划验证
+
+- 完整回合必须含玩家输入、非空AI场景输出、已解决时间和匹配的PLAYER_ACTION_SUBMITTED事件。
+- 同一事务更新Adventure、追加Turn、应用Quest/NPC关系/WorldFact补丁并追加GameEvent。
+- 在事务末尾模拟事件主键冲突，确认所有前序写入回滚且无部分数据残留。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增 `GameEventRepository`：全部12类事件按判别字段逐项验证payload后追加，读取时同样从unknown重新验证；不提供更新或覆盖历史的API。
+- 新增 `TurnTransaction`：使用 `BEGIN IMMEDIATE`、`COMMIT` 和异常时 `ROLLBACK`，原子提交Adventure、AdventureTurn、Quest/NPC关系/WorldFact补丁及GameEvent。
+- 事务命令校验Adventure/Turn/Campaign归属、回合号、玩家输入、已解决时间、非空场景输出，并要求匹配本回合及输入内容的玩家行动事件。
+- NPC关系补丁在事务内读取NPC和PlayerCharacter的Campaign归属，禁止跨存档绑定；Quest、WorldFact和事件同样限制在命令Campaign。
+- SQLite公共端口保持原有最小读写接口，新增独立 `TransactionalSqliteDatabase` 仅补充事务所需 `exec`。
+- 成功测试在真实SQLite中同时保存玩家输入、AI场景、任务状态、NPC关系、世界事实和事件，并经Repository读取核对。
+- 回滚测试先写入Adventure和Turn、再应用状态补丁，最后用重复GameEvent主键制造失败；验证新Turn不存在、Adventure回合号和Quest状态保持原值、关系不存在且历史事件不变。
+- 首轮局部测试发现异步迁移漏 `await`、连接清理顺序和旧属性枚举夹具问题；均修正测试基础设施，没有修改产品约束。
+- 首轮全量测试发现关系归属校验为读取Campaign而反序列化完整测试角色；改为最小列查询，使校验职责与读取范围一致。
+- 两轮Lint要求聚合错误显式保留正确捕获错误的 `cause`；按规则修正，未关闭或放宽Lint。
+- 最终 `pnpm check`：通过；Vitest 15个文件、110项通过，Node迁移3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 事务服务不接收任意SQL状态补丁，只接受明确的Quest、NPC关系和WorldFact领域补丁。
+- 已验证AI场景作为完整Turn的一部分保存；原始模型输出不能直接写入游戏状态。
+- 故障注入位于事务末端，确实覆盖此前多表写入的回滚，不是事务开始前失败。
+- 未实现pending_ai_requests或后续任务内容，不提前执行M2-T08。

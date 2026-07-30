@@ -654,5 +654,41 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`adba910`。
 - Commit message：`feat(M2-T06): implement adventure persistence repositories`
+
+## 2026-07-30 23:57 — M2-T07 实现事务型回合提交
+
+### 范围
+
+实现玩家输入、已验证AI输出、状态补丁和GameEvent的单事务提交；不实现pending AI请求或后续恢复功能。
+
+### 主要改动
+
+- 新增 `GameEventRepository`，写入前和读取后均按事件判别字段逐项验证payload。
+- 新增 `TurnTransaction`，原子更新Adventure、追加完整Turn、应用Quest/NPC关系/WorldFact补丁并追加事件。
+- SQLite端口只增加事务所需的 `exec` 能力，并以独立 `TransactionalSqliteDatabase` 接口表达。
+
+### 验证
+
+- 成功路径同时保存玩家自由输入、AI场景文本、任务状态、NPC关系、世界事实和玩家行动事件。
+- 故障路径在末尾用重复GameEvent主键触发失败，验证Turn、Adventure、Quest和NPC关系均无部分残留。
+- 校验事件与回合输入一致、所有写入属于同一Campaign，并拒绝空场景或未完成回合。
+- `pnpm check`：通过；Vitest 15个文件、110项，Node迁移3项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### Bug修复
+
+- 初始测试夹具漏等异步迁移并未关闭SQLite连接；补齐 `await` 和连接清理。
+- 全量测试发现关系归属检查不应反序列化完整角色；收窄为只读取双方 `campaign_id`。
+- 聚合回滚错误按Lint规则保留当前捕获错误的 `cause`，未关闭错误保真规则。
+
+### 自审
+
+- AI输出以已经通过上游结构与业务校验的完整AdventureTurn进入持久化事务，本层不会接收原始模型文本直接修改状态。
+- GameEvent只有追加接口，无更新或覆盖接口；JSON读取从unknown验证。
+- 未实现pending_ai_requests，不提前执行M2-T08。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T07): add transactional turn commits`

@@ -13,3 +13,7 @@ export interface SqliteStatement {
 export interface SqliteDatabase {
   prepare(sql: string): SqliteStatement;
 }
+
+export interface TransactionalSqliteDatabase extends SqliteDatabase {
+  exec(sql: string): void;
+}
