@@ -14,6 +14,7 @@ import {
   playerCharacterId,
   promptVersion,
   questId,
+  rumorId,
   schemaVersion,
   tavernChangeId,
   tavernId,
@@ -40,6 +41,7 @@ describe('opaque identifiers', () => {
     expect(tavernId('tavern-1')).toBe('tavern-1');
     expect(tavernChangeId('change-1')).toBe('change-1');
     expect(npcMemoryId('memory-1')).toBe('memory-1');
+    expect(rumorId('rumor-1')).toBe('rumor-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {

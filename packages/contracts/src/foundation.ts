@@ -18,6 +18,7 @@ export type ItemId = Branded<string, 'ItemId'>;
 export type TavernId = Branded<string, 'TavernId'>;
 export type TavernChangeId = Branded<string, 'TavernChangeId'>;
 export type NpcMemoryId = Branded<string, 'NpcMemoryId'>;
+export type RumorId = Branded<string, 'RumorId'>;
 export type IsoTimestamp = Branded<string, 'IsoTimestamp'>;
 export type SchemaVersion = Branded<number, 'SchemaVersion'>;
 export type PromptVersion = Branded<number, 'PromptVersion'>;
@@ -49,6 +50,7 @@ export const itemId = (value: string): ItemId => createId(value, 'ItemId');
 export const tavernId = (value: string): TavernId => createId(value, 'TavernId');
 export const tavernChangeId = (value: string): TavernChangeId => createId(value, 'TavernChangeId');
 export const npcMemoryId = (value: string): NpcMemoryId => createId(value, 'NpcMemoryId');
+export const rumorId = (value: string): RumorId => createId(value, 'RumorId');
 
 export function isoTimestamp(value: string): IsoTimestamp {
   requireCanonicalText(value, 'IsoTimestamp');

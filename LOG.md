@@ -300,5 +300,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`8c49d4f`。
 - Commit message：`feat(M1-T05): define tavern and npc contracts`
+
+## 2026-07-30 22:56 — M1-T06 定义传闻、任务和物品协议
+
+### 范围
+
+定义 Rumor、Quest、QuestStatus、Item、ItemEffect 和 RewardTier；不实现任务用例或奖励提交。
+
+### 主要改动
+
+- 计划新增 quest/item 协议、Rumor ID 和结构测试。
+- 计划更新 contracts 出口、任务状态、日志、决策与交接。
+
+### 决策
+
+- AI创作字段嵌套在 `content`，程序控制状态、风险、推荐属性、等级和效果。
+- 物品效果采用判别联合，不从名称或描述推断规则。
+- 传闻公开文本与隐藏真实性分离。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：6 个文件、49 个测试通过，任务/物品新增 3 项。
+- 完整任务、隐藏传闻真实性和文本/效果分离均有覆盖。
+
+### 自审
+
+- AI文本只在 `content`，规则字段为封闭枚举或判别联合。
+- 所有关系使用 brand ID，未新增依赖。
+- 未实现任务用例、奖励提交、持久化或 M1-T07。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T06): define quest and item contracts`

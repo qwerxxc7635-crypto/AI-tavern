@@ -1,3 +1,17 @@
+export { QUEST_STATUSES } from './quest.js';
+export type {
+  Item,
+  ItemContent,
+  ItemEffect,
+  Quest,
+  QuestContent,
+  QuestRisk,
+  QuestStatus,
+  RewardTier,
+  Rumor,
+  RumorContent,
+  RumorTruthStatus,
+} from './quest.js';
 export { RelationshipValueError, createNpcKnowledge, createNpcRelationship } from './tavern.js';
 export type {
   NpcKnowledge,
@@ -77,6 +91,7 @@ export {
   playerCharacterId,
   promptVersion,
   questId,
+  rumorId,
   schemaVersion,
   tavernChangeId,
   tavernId,
@@ -98,6 +113,7 @@ export type {
   PlayerCharacterId,
   PromptVersion,
   QuestId,
+  RumorId,
   SchemaVersion,
   TavernChangeId,
   TavernId,
