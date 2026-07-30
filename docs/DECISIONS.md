@@ -587,3 +587,27 @@ UI不能通过直接更新Quest绕过接受用例。StartAdventure必须只从AC
 ### 可逆性
 
 未来可用部分唯一索引进一步强化约束，或支持显式支线任务类型；在模型增加相应字段和迁移前，单主任务串行接受规则保持不变。
+
+## DEC-023：冒险隐藏骨架只通过受限公开投影离开应用层
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第13.2、20、26.2节；`docs/TASKS.md` 的 `M4-T06`
+
+### 背景
+
+冒险计划必须完整保存在本地以约束后续回合，但玩家不能直接看到核心场景、必要线索、阻碍和可能结局。若GenerateAdventurePlan直接返回Adventure实体，UI即使无意也能读取隐藏字段；若不保存计划，后续模型回合又无法保持一致。
+
+### 决定与理由
+
+GenerateAdventurePlan将完整AdventurePlan和Clue写入SQLite，状态为PREPARING；本地验证风险和回合范围与已接受任务一致，至少包含3条核心线索和2个结局。应用层对调用方只返回 `AdventureStartState`，包含adventureId、questId、state与currentTurnNumber，不暴露plan或clues。
+
+StartAdventure在SQLite写事务内把Adventure从PREPARING推进到SCENE、Quest从ACCEPTED推进到ACTIVE、Campaign从TAVERN推进到ADVENTURE。后续冒险上下文构建器可以在应用内部读取隐藏骨架，但页面不得直接访问AdventureRepository。
+
+### 影响
+
+隐藏并不依赖UI自律，而由用例返回类型形成边界。调试、导出和存档仍可保存完整事实，但玩家展示层必须使用公开投影。任何计划生成失败都不会推进Quest或Campaign。
+
+### 可逆性
+
+公开投影可增加不泄密的进度字段；计划结构可版本化扩展。完整计划只在受信应用内部读取的原则保持不变。

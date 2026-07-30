@@ -1259,3 +1259,28 @@
 - AI仅生成任务叙事和结构建议；状态迁移与并发唯一性完全由本地程序和SQLite事务控制。
 - `DEC-022` 记录主任务串行接受边界。
 - 未实现M4-T06或任何后续任务。
+
+## 2026-07-31 01:33 — M4-T06 实现冒险开始用例
+
+### 依赖与范围
+
+- 依赖 `M4-T05`：已完成并提交 `0864822`。
+- 仅实现GenerateAdventurePlan、StartAdventure和计划/启动事务。
+- 不实现玩家行动、骰子、冒险回合、结算或页面。
+
+### 完成结果与验收
+
+- GenerateAdventurePlan只接受TAVERN状态中的ACCEPTED任务，从本地世界、角色、任务及其关联事实构建输入。
+- AI输出必须保持任务风险与8至12回合范围，且至少包含3条核心线索和2个可能结局。
+- 程序分配ClueId，完整AdventurePlan与Clue以PREPARING状态和pending一起原子写入SQLite。
+- 用例公开返回 `AdventureStartState`，不含plan、clues、核心场景、阻碍或结局。
+- StartAdventure使用BEGIN IMMEDIATE事务同步推进Adventure PREPARING→SCENE、Quest ACCEPTED→ACTIVE、Campaign TAVERN→ADVENTURE。
+- Fake Provider计划补齐3条核心线索，仍保持确定性与Schema有效。
+- 真实SQLite测试验证隐藏计划/线索存在、公开结果不含plan，以及三实体状态同步推进。
+- 最终 `pnpm check`：通过；Vitest 30个文件、202项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- AI不能启动冒险或直接改变任务/Campaign状态；公开类型阻断隐藏骨架泄露。
+- `DEC-023` 记录隐藏数据投影边界。
+- 未实现M4-T07或任何后续任务。

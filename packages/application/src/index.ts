@@ -34,3 +34,9 @@ export type {
 } from './npc-dialogue-use-cases.js';
 export { QuestUseCases } from './quest-use-cases.js';
 export type { GenerateQuestCommand, QuestGenerationRequest } from './quest-use-cases.js';
+export { AdventureStartUseCases } from './adventure-start-use-cases.js';
+export type {
+  AdventureIdentityFactory,
+  AdventureStartState,
+  GenerateAdventurePlanCommand,
+} from './adventure-start-use-cases.js';

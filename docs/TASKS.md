@@ -482,6 +482,7 @@
 ## M4-T06 实现冒险开始用例
 
 - 优先级：P0
+- 状态：已完成（2026-07-31）
 - 依赖：M4-T05
 - 用例：StartAdventure、GenerateAdventurePlan。
 - 验收：隐藏骨架保存本地但不直接展示给玩家。

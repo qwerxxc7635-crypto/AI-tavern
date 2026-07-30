@@ -175,6 +175,16 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
         description: 'The beacon lens was burned from inside.',
         isCore: true,
       },
+      {
+        title: 'Tide Ledger',
+        description: 'The flooding follows a deliberate release schedule.',
+        isCore: true,
+      },
+      {
+        title: 'Keeper Signet',
+        description: 'The missing keeper sealed the lower chamber personally.',
+        isCore: true,
+      },
     ],
     majorObstacles: ['A rusted lock.', 'A flooded tunnel.', 'The approaching storm.'],
     possibleEndings: ['The beacon is restored.', 'The harbor evacuates before the storm.'],

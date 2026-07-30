@@ -1081,5 +1081,18 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`0864822`。
 - Commit message：`feat(M4-T05): generate and exclusively accept quests`
+
+## 2026-07-31 01:33 — M4-T06 冒险开始用例
+
+- 新增GenerateAdventurePlan、StartAdventure稳定用例。
+- 完整隐藏骨架和3条核心线索写入SQLite，对外仅返回公开启动状态。
+- 启动事务同步推进Adventure、Quest与Campaign。
+- `pnpm check`通过：Vitest 30文件202项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T07。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T06): prepare and start hidden adventures`

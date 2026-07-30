@@ -7,6 +7,8 @@ import {
   modelProfileId,
   turnId,
   type AiRequestError,
+  type Adventure,
+  type Clue,
   type AiRequestId,
   type IdempotencyKey,
   type IsoTimestamp,
@@ -45,6 +47,7 @@ import { applyTurnCommit, type TurnCommit } from './turn-transaction.js';
 import { WorldRepository } from './world-repository.js';
 import { PlayerCharacterRepository } from './player-character-repository.js';
 import { QuestRepository } from './quest-adventure-repository.js';
+import { AdventureRepository } from './quest-adventure-repository.js';
 import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 
 const TERMINAL_STATUSES = ['COMMITTED', 'CANCELLED'] as const;
@@ -574,6 +577,35 @@ export class PendingAiRequestRepository {
       return 'COMMITTED';
     } catch (error) {
       this.rollback(error, 'AI quest commit and rollback both failed');
+    }
+  }
+
+  public commitAdventurePlanOnce(
+    key: IdempotencyKey,
+    adventure: Adventure,
+    clues: readonly Clue[],
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, adventure.campaignId);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (
+        adventure.state !== 'PREPARING' ||
+        clues.some(({ adventureId: owner }) => owner !== adventure.id) ||
+        adventure.plan.adventureId !== adventure.id
+      ) {
+        throw new PersistenceDataError('Adventure plan commit contains mismatched records');
+      }
+      new AdventureRepository(this.database).create(adventure, clues);
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI adventure plan commit and rollback both failed');
     }
   }
 

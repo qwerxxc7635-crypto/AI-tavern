@@ -13,6 +13,8 @@ import {
   questId,
   turnId,
   worldFactId,
+  transitionAdventureState,
+  transitionCampaign,
   type Adventure,
   type AdventureEnding,
   type AdventurePlan,
@@ -25,7 +27,7 @@ import {
   type Quest,
 } from '@ember-tavern/contracts';
 
-import { PersistenceDataError } from './campaign-repository.js';
+import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
 import {
   parseJson,
   requireArray,
@@ -200,6 +202,56 @@ export class AdventureRepository {
   public get(id: Adventure['id']): Adventure | null {
     const row = this.database.prepare('SELECT * FROM adventures WHERE id = ?').get(id);
     return row === undefined ? null : mapAdventure(row);
+  }
+
+  public startPrepared(
+    id: Adventure['id'],
+    campaignIdValue: Adventure['campaignId'],
+    at: Adventure['updatedAt'],
+  ): Adventure {
+    const database = requireTransactional(this.database);
+    database.exec('BEGIN IMMEDIATE');
+    try {
+      const adventure = this.get(id);
+      if (
+        adventure === null ||
+        adventure.campaignId !== campaignIdValue ||
+        adventure.state !== 'PREPARING'
+      ) {
+        throw new PersistenceDataError(`Prepared adventure not found: ${id}`);
+      }
+      const quests = new QuestRepository(database);
+      const quest = quests.get(adventure.questId);
+      if (quest === null || quest.campaignId !== campaignIdValue || quest.status !== 'ACCEPTED') {
+        throw new PersistenceDataError('Adventure requires its accepted quest');
+      }
+      const campaigns = new CampaignRepository(database);
+      const campaign = campaigns.get(campaignIdValue);
+      if (campaign === null || campaign.state !== 'TAVERN') {
+        throw new PersistenceDataError('Adventure can only start from TAVERN state');
+      }
+      const started = Object.freeze({
+        ...adventure,
+        state: transitionAdventureState(adventure.state, 'SCENE'),
+        updatedAt: at,
+      });
+      this.update(started);
+      quests.update(Object.freeze({ ...quest, status: 'ACTIVE', updatedAt: at }));
+      campaigns.update(transitionCampaign(campaign, 'ADVENTURE', at));
+      database.exec('COMMIT');
+      return started;
+    } catch (error) {
+      try {
+        database.exec('ROLLBACK');
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Adventure start and rollback both failed',
+          { cause: rollbackError },
+        );
+      }
+      throw error;
+    }
   }
 
   public update(adventure: Adventure): void {
