@@ -14,7 +14,10 @@ import {
   type PendingAiRequest,
   type Campaign,
   type Item,
+  type Conversation,
+  type Message,
   type NpcKnowledge,
+  type NpcMemory,
   type NpcProfile,
   type NpcRelationship,
   type PlayerCharacter,
@@ -26,6 +29,7 @@ import {
 
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
 import { ItemRepository } from './conversation-item-clock-repository.js';
+import { ConversationRepository } from './conversation-item-clock-repository.js';
 import {
   parseJson,
   requireBoolean,
@@ -456,6 +460,94 @@ export class PendingAiRequestRepository {
       return 'COMMITTED';
     } catch (error) {
       this.rollback(error, 'AI NPC roster commit and rollback both failed');
+    }
+  }
+
+  public commitNpcReplyOnce(
+    key: IdempotencyKey,
+    conversation: Conversation,
+    playerMessage: Message,
+    npcMessage: Message,
+    npc: NpcProfile,
+    relationship: NpcRelationship,
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, conversation.campaignId);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (
+        conversation.kind !== 'NPC' ||
+        conversation.npcId !== npc.id ||
+        npc.campaignId !== conversation.campaignId ||
+        relationship.npcId !== npc.id ||
+        playerMessage.conversationId !== conversation.id ||
+        playerMessage.role !== 'PLAYER' ||
+        npcMessage.conversationId !== conversation.id ||
+        npcMessage.role !== 'NPC' ||
+        npcMessage.speakerNpcId !== npc.id ||
+        npcMessage.sequenceNumber !== playerMessage.sequenceNumber + 1
+      ) {
+        throw new PersistenceDataError('NPC reply commit contains mismatched records');
+      }
+      const conversations = new ConversationRepository(this.database);
+      const existing = conversations.get(conversation.id);
+      if (existing === null) conversations.create(conversation);
+      else if (
+        existing.campaignId !== conversation.campaignId ||
+        existing.kind !== conversation.kind ||
+        existing.npcId !== conversation.npcId
+      ) {
+        throw new PersistenceDataError('Conversation identity cannot change');
+      }
+      conversations.addMessage(playerMessage);
+      conversations.addMessage(npcMessage);
+      one(
+        this.database
+          .prepare('UPDATE conversations SET updated_at = ? WHERE id = ?')
+          .run(at, conversation.id),
+        `Conversation not found: ${conversation.id}`,
+      );
+      const npcs = new NpcRepository(this.database);
+      npcs.update(npc);
+      npcs.saveRelationship(relationship, at);
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI NPC reply commit and rollback both failed');
+    }
+  }
+
+  public commitMemoriesOnce(
+    key: IdempotencyKey,
+    campaign: Campaign['id'],
+    memories: readonly NpcMemory[],
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, campaign);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      const npcs = new NpcRepository(this.database);
+      for (const memory of memories) {
+        const npc = npcs.get(memory.npcId);
+        if (npc === null || npc.campaignId !== campaign) {
+          throw new PersistenceDataError('NPC memory belongs to another campaign');
+        }
+        npcs.appendMemory(memory);
+      }
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI memory commit and rollback both failed');
     }
   }
 

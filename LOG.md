@@ -1055,5 +1055,18 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`322906f`。
 - Commit message：`feat(M4-T03): initialize tavern roster and rumors`
+
+## 2026-07-31 01:23 — M4-T04 NPC对话用例
+
+- 新增TalkToNpc、ExtractMemories稳定用例。
+- 对话上下文仅含NPC自身认知、关系、消息与记忆；本地验证关系变化。
+- 对话消息/情绪/关系与记忆分别幂等原子写入SQLite。
+- `pnpm check`通过：Vitest 28文件200项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T05。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T04): persist limited-knowledge NPC dialogue`

@@ -1211,3 +1211,27 @@
 - AI只生成叙事草稿和隐藏真伪建议，所有ID、归属、人数规则、认知和事务由本地程序控制。
 - `DEC-021` 记录传闻事实与M4-T05任务边界。
 - 未实现M4-T04、M4-T05或任何后续任务。
+
+## 2026-07-31 01:23 — M4-T04 实现NPC对话用例
+
+### 依赖与范围
+
+- 依赖 `M4-T03`：已完成并提交 `322906f`。
+- 仅实现TalkToNpc、ExtractMemories及其幂等SQLite提交。
+- 不实现Quest、冒险、页面或真实Provider。
+
+### 完成结果与验收
+
+- TalkToNpc仅在TAVERN状态且NPC为ACTIVE时工作，从SQLite读取世界、NPC角色卡、该NPC认知、关系、历史消息和长期记忆。
+- 复用buildNpcDialogueContext过滤非本NPC消息与excludedSecretFactIds，并执行上下文预算裁剪。
+- NPC_REPLY经统一Provider、GenerationRecord与结构验证后，本地应用单回合关系变化规则。
+- Conversation、玩家消息、NPC消息、NPC情绪、关系和pending状态在同一事务提交；消息序号连续且NPC消息关联GenerationRecord。
+- ExtractMemories从已保存对话构建转录，验证AI返回的sourceTurnIds属于调用方允许集合，再原子追加NpcMemory。
+- 真实文件数据库测试覆盖首次对话、关闭重开、继续第二次对话、4条连续消息、已知事实可见、排除秘密不可见及记忆恢复。
+- 最终 `pnpm check`：通过；Vitest 28个文件、200项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 捕获异常文本未进入SQLite；AI不能直接改关系或写记忆，全部经本地规则与事务。
+- 本任务延续DEC-019，无新增重大架构决定。
+- 未实现M4-T05或任何后续任务。

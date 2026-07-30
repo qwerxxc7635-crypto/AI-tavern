@@ -24,3 +24,11 @@ export type {
   TavernIdentityFactory,
   TavernInitialization,
 } from './tavern-initialization-use-cases.js';
+export { NpcDialogueUseCases } from './npc-dialogue-use-cases.js';
+export type {
+  DialogueGenerationRequest,
+  DialogueIdentityFactory,
+  ExtractMemoriesCommand,
+  NpcDialogueResult,
+  TalkToNpcCommand,
+} from './npc-dialogue-use-cases.js';
