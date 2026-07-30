@@ -49,6 +49,9 @@ importers:
       '@ember-tavern/contracts':
         specifier: workspace:*
         version: link:../contracts
+      '@ember-tavern/domain':
+        specifier: workspace:*
+        version: link:../domain
 
   packages/prompts: {}
 

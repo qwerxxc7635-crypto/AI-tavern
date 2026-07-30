@@ -697,3 +697,38 @@
 - 老板生成环使用明确两阶段API，没有写死空老板或关闭外键。
 - 关系读取复用 `createNpcRelationship` 的-5至5校验；知识复用 `createNpcKnowledge`。
 - 未实现Quest、Adventure、Conversation等M2-T06内容。
+
+## 2026-07-30 23:47 — M2-T06 实现任务、冒险与对话Repository（开始）
+
+### 依赖与范围
+
+- 依赖 `M2-T02`：已完成；酒馆/NPC Repository已提交 `1dcc3ac`。
+- 仅实现Quest、Adventure、Turn、Conversation、Message、Item、Clock及必要共享ID。
+
+### 计划验证
+
+- 任务规则字段与AI内容、AdventurePlan/Clue/Ending、完整Turn JSON精确往返。
+- 对话消息稳定序号、物品效果和世界时钟阶段精确往返。
+- 写入完整冒险回合后关闭连接，重开同一数据库并恢复所有字段。
+- 非法JSON/枚举和重复顺序被拒绝。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增ConversationId、MessageId、GenerationRecordId品牌类型，以及Conversation/Message最小共享协议。
+- persistence声明domain workspace依赖以复用M1 WorldClock协议；离线安装下载0项。
+- `QuestRepository` 实现创建、读取、更新，规则字段和AI内容分别序列化并逐字段恢复。
+- `AdventureRepository` 实现Adventure创建/读取/更新、Clue保存、Ending结算、Turn追加/读取/列表；PlayerAction四分支、CheckRequest和DiceResult均严格解码。
+- `ConversationRepository` 验证NPC/ADVENTURE/SYSTEM作用域，消息按唯一正序号追加和恢复，NPC角色必须带匹配speaker。
+- `ItemRepository` 保存程序控制ItemEffect、持有人和来源冒险；`WorldClockRepository`保存范围、唯一阶段阈值并支持更新/列表。
+- 真实SQLite重连测试写入完整任务、冒险计划、核心线索、含检定和骰子的回合、两条消息、物品和时钟；关闭连接后重新打开全部精确恢复。
+- 重复冒险回合序号和消息序号由唯一约束拒绝；Quest状态、AdventureEnding和时钟更新有覆盖。
+- 首轮Lint发现 `playerCharacterId` 仅用于类型表达式；改为type-only import，未放宽规则。
+- 最终 `pnpm check`：通过；Vitest 14个文件、108项通过，Node迁移3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 冒险恢复完全来自重开的SQLite连接，不依赖测试内存对象或模型会话。
+- 骰子结果作为AdventureTurn JSON持久化，读取时校验固定难度和成功布尔值。
+- 所有实体数据使用SQL参数绑定，JSON从unknown逐字段验证。
+- 未实现GameEvent、GenerationRecord、PendingRequest或快照Repository，不提前执行M2-T07。

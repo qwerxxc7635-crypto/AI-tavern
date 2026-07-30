@@ -302,6 +302,7 @@
 ## M2-T06 实现任务、冒险与对话Repository
 
 - 优先级：P0
+- 状态：已完成（2026-07-30）
 - 依赖：M2-T02
 - 工作内容：Quest、Adventure、Turn、Conversation、Message、Item、Clock。
 - 测试：完整冒险回合可关闭应用后恢复。

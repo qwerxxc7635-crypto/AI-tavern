@@ -9,10 +9,13 @@ import {
   characterTraitId,
   factionId,
   gameEventId,
+  conversationId,
+  generationRecordId,
   compatibleEnum,
   isoTimestamp,
   itemId,
   locationId,
+  messageId,
   npcId,
   npcMemoryId,
   playerCharacterId,
@@ -52,6 +55,9 @@ describe('opaque identifiers', () => {
     expect(actionOptionId('option-1')).toBe('option-1');
     expect(worldClockId('clock-1')).toBe('clock-1');
     expect(gameEventId('event-1')).toBe('event-1');
+    expect(conversationId('conversation-1')).toBe('conversation-1');
+    expect(messageId('message-1')).toBe('message-1');
+    expect(generationRecordId('generation-1')).toBe('generation-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {

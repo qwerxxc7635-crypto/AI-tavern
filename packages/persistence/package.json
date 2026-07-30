@@ -8,6 +8,7 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@ember-tavern/contracts": "workspace:*"
+    "@ember-tavern/contracts": "workspace:*",
+    "@ember-tavern/domain": "workspace:*"
   }
 }

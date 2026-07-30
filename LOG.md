@@ -621,5 +621,38 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`1dcc3ac`。
 - Commit message：`feat(M2-T05): implement tavern and npc repositories`
+
+## 2026-07-30 23:47 — M2-T06 实现任务、冒险与对话Repository
+
+### 范围
+
+实现Quest、Adventure、Turn、Conversation、Message、Item和Clock持久化；不实现GameEvent或AI请求Repository。
+
+### 主要改动
+
+- 计划补齐Conversation/Message所需品牌ID与最小协议。
+- 计划实现任务、冒险聚合、消息流、物品和世界时钟的受验证读写。
+
+### 验证
+
+- 完整冒险回合含行动、检定和骰子结果，关闭并重开SQLite后精确恢复。
+- 任务、隐藏计划、线索、消息流、物品效果和时钟阶段完整往返。
+- 重复回合号和消息序号被唯一约束拒绝。
+- `pnpm check`：通过；Vitest 14个文件、108项，Node迁移3项全部成功。
+
+### Bug修复
+
+- Lint发现仅用于类型表达式的 `playerCharacterId` 是值导入；改为type-only import。
+
+### 自审
+
+- Conversation作用域和NPC speaker语义有双层验证。
+- AdventureTurn从重开SQLite恢复，不依赖模型历史或UI状态。
+- 未实现M2-T07事件与AI生命周期Repository。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T06): implement adventure persistence repositories`
