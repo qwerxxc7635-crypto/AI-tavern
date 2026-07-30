@@ -227,5 +227,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`494634e`。
 - Commit message：`feat(M1-T03): define world contracts`
+
+## 2026-07-30 22:49 — M1-T04 定义玩家角色协议
+
+### 范围
+
+定义角色、固定职业原型、四属性分配、特质、目标、背景、内容边界和初始装备引用；不定义物品效果。
+
+### 主要改动
+
+- 计划新增 character 协议、角色/物品 ID 和属性规则测试。
+- 计划更新 contracts 出口、任务状态、日志与交接。
+
+### 决策
+
+- 底层职业原型固定，AI 包装名存为独立 displayName，不能改变规则定位。
+- 属性构造器要求四项整数 1 至 5 且总和 10。
+- 已选特质使用长度为 2 的元组表达。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：4 个文件、38 个测试通过，角色新增 9 项。
+- 属性边界、总点数、不可变性和完整角色协议均有覆盖。
+
+### 自审
+
+- 固定规则原型与 AI 展示名分离。
+- 实体引用均为 brand ID，装备只做引用，不提前定义效果。
+- 未实现角色生成用例、数据库或 M1-T05。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T04): define player character contracts`

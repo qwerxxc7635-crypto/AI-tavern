@@ -12,6 +12,9 @@ export type TurnId = Branded<string, 'TurnId'>;
 export type FactionId = Branded<string, 'FactionId'>;
 export type LocationId = Branded<string, 'LocationId'>;
 export type WorldFactId = Branded<string, 'WorldFactId'>;
+export type PlayerCharacterId = Branded<string, 'PlayerCharacterId'>;
+export type CharacterTraitId = Branded<string, 'CharacterTraitId'>;
+export type ItemId = Branded<string, 'ItemId'>;
 export type IsoTimestamp = Branded<string, 'IsoTimestamp'>;
 export type SchemaVersion = Branded<number, 'SchemaVersion'>;
 export type PromptVersion = Branded<number, 'PromptVersion'>;
@@ -35,6 +38,11 @@ export const turnId = (value: string): TurnId => createId(value, 'TurnId');
 export const factionId = (value: string): FactionId => createId(value, 'FactionId');
 export const locationId = (value: string): LocationId => createId(value, 'LocationId');
 export const worldFactId = (value: string): WorldFactId => createId(value, 'WorldFactId');
+export const playerCharacterId = (value: string): PlayerCharacterId =>
+  createId(value, 'PlayerCharacterId');
+export const characterTraitId = (value: string): CharacterTraitId =>
+  createId(value, 'CharacterTraitId');
+export const itemId = (value: string): ItemId => createId(value, 'ItemId');
 
 export function isoTimestamp(value: string): IsoTimestamp {
   requireCanonicalText(value, 'IsoTimestamp');

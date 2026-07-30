@@ -3,11 +3,14 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   adventureId,
   campaignId,
+  characterTraitId,
   factionId,
   compatibleEnum,
   isoTimestamp,
+  itemId,
   locationId,
   npcId,
+  playerCharacterId,
   promptVersion,
   questId,
   schemaVersion,
@@ -28,6 +31,9 @@ describe('opaque identifiers', () => {
     expect(factionId('faction-1')).toBe('faction-1');
     expect(locationId('location-1')).toBe('location-1');
     expect(worldFactId('fact-1')).toBe('fact-1');
+    expect(playerCharacterId('character-1')).toBe('character-1');
+    expect(characterTraitId('trait-1')).toBe('trait-1');
+    expect(itemId('item-1')).toBe('item-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {

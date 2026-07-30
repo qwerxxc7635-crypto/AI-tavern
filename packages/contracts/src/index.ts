@@ -1,3 +1,20 @@
+export {
+  CHARACTER_ATTRIBUTE_NAMES,
+  CLASS_ARCHETYPES,
+  AttributeAllocationError,
+  createPlayerAttributes,
+} from './character.js';
+export type {
+  CharacterAttributeName,
+  CharacterBackground,
+  CharacterTrait,
+  ClassArchetype,
+  ContentBoundaries,
+  InitialEquipmentReference,
+  PlayerAttributes,
+  PlayerAttributesInput,
+  PlayerCharacter,
+} from './character.js';
 export { WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
 export type {
   DevelopingFact,
@@ -36,9 +53,12 @@ export {
   campaignId,
   compatibleEnum,
   factionId,
+  characterTraitId,
   isoTimestamp,
   locationId,
+  itemId,
   npcId,
+  playerCharacterId,
   promptVersion,
   questId,
   schemaVersion,
@@ -51,9 +71,12 @@ export type {
   CampaignId,
   CompatibleEnum,
   FactionId,
+  CharacterTraitId,
   IsoTimestamp,
   LocationId,
+  ItemId,
   NpcId,
+  PlayerCharacterId,
   PromptVersion,
   QuestId,
   SchemaVersion,

@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目准备里程碑 M0 已完成。pnpm workspace 已识别 Windows、iOS 和八个共享 package，Cargo workspace 已识别 `ember-native-bridge`；严格 TypeScript、ESLint、Prettier、Vitest、Rust fmt/Clippy 和基础 CI 已建立。当前已完成共享基础协议、Campaign 生命周期状态机，以及世界圣经、势力、地点和世界事实协议；角色、其他游戏规则、数据库和应用功能仍未实现。
+项目准备里程碑 M0 已完成。pnpm workspace 已识别 Windows、iOS 和八个共享 package，Cargo workspace 已识别 `ember-native-bridge`；严格 TypeScript、ESLint、Prettier、Vitest、Rust fmt/Clippy 和基础 CI 已建立。当前已完成共享基础协议、Campaign 状态机、世界协议和玩家角色协议；NPC、任务、冒险及其规则、数据库和应用功能仍未实现。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
