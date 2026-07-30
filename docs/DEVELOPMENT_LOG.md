@@ -32,3 +32,42 @@
 - 未创建 pnpm 或 Cargo workspace。
 - 未执行 `M0-T02` 或任何后续任务。
 - 未实现游戏功能、真实模型接入或 iOS 客户端。
+
+## 2026-07-30 — M0-T02 创建 pnpm 与 Cargo Workspace
+
+### 范围
+
+- 创建私有根 `package.json`，统一编排 workspace 的 `lint`、`test` 和 `typecheck`。
+- 创建 `pnpm-workspace.yaml`，声明后续 Windows、iOS 和共享包路径，但不提前创建这些目录。
+- 创建虚拟根 `Cargo.toml`，以 `crates/*` 作为后续原生 crate 成员模式并使用 resolver 2。
+- 生成最小 `pnpm-lock.yaml`，固定当前无依赖根 workspace。
+- 更新 README 的环境要求和根命令说明。
+
+### 实现选择
+
+- 根 pnpm 命令使用递归 `--if-present` 编排：当前无子项目时成功结束，后续成员创建真实脚本后自动纳入。
+- 未添加 ESLint、Vitest、TypeScript 或 Rust 依赖；这些属于后续质量与具体包任务。
+- 未产生需要写入 `docs/DECISIONS.md` 的重大架构决定。
+
+### 验证
+
+- `pnpm install --frozen-lockfile`：通过。
+- `pnpm lint`：通过；当前无匹配子项目。
+- `pnpm test`：通过；当前无匹配子项目。
+- `pnpm typecheck`：通过；当前无匹配子项目。
+- Node 配置断言：通过；根包为 private，三个脚本与预期一致。
+- `pnpm --recursive list --depth -1`：通过；识别私有根 workspace。
+- `cargo test --workspace`：未通过；当前环境未安装 Cargo，命令返回 `CommandNotFoundException`。
+
+### 验收状态
+
+- pnpm 根级 lint：通过。
+- pnpm 根级 test：通过。
+- Cargo workspace 文件：已创建；`cargo test --workspace` 因缺少工具链尚未验证。
+- 因 Cargo 验收未完成，任务标记为“实现完成，验收受环境限制”，不能据此自动开始 `M0-T03`。
+
+### 明确未执行
+
+- 未创建 `windows-app/`、`ios-app/`、`packages/`、`crates/` 或数据库目录。
+- 未实现应用功能、数据库业务表、AI 接口、页面或真实模型接入。
+- 未执行 `M0-T03` 或任何后续任务。

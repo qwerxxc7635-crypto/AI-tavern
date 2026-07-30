@@ -66,6 +66,7 @@
 ## M0-T02 创建pnpm与Cargo Workspace
 
 - 优先级：P0
+- 状态：实现完成，验收受环境限制（2026-07-30：未安装 Cargo）
 - 依赖：M0-T01
 - 工作内容：
   - 创建根`package.json`；

@@ -4,13 +4,22 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目目前仅完成 `M0-T01`：Git 仓库与基础开发规范初始化。尚未创建 pnpm/Cargo workspace，也尚未实现任何游戏功能。
+项目目前已完成 `M0-T01`，并完成 `M0-T02` 的配置实现：pnpm workspace、Cargo workspace 与根级质量命令已经建立；Cargo 验收仍需在安装 Rust/Cargo 的环境中执行。尚未创建应用和共享包目录，也尚未实现任何游戏功能。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
 ## 启动说明
 
-当前阶段没有可运行应用或构建命令。请先阅读上述规格与任务文档；开发环境和统一命令将在后续明确执行 `M0-T02` 时建立。本仓库不会自动开始该任务。
+当前阶段没有可启动的应用。需要 Node.js、pnpm 和 Rust/Cargo；在仓库根目录可运行：
+
+```powershell
+pnpm lint
+pnpm test
+pnpm typecheck
+cargo test --workspace
+```
+
+这些命令统一检查当前 workspace 成员。pnpm 命令在尚无子项目时会成功结束；Cargo 命令需要本机已安装 Rust/Cargo。本仓库不会自动开始 `M0-T03`。
 
 ## 开发约定
 
