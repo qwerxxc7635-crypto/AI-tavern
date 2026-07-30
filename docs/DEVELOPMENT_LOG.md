@@ -663,3 +663,37 @@
 - WorldFact为追加式写入，没有提供覆盖历史事实的方法；发展事实链保留。
 - 所有SQL使用参数绑定；返回数组和主要聚合被冻结。
 - 未实现酒馆、NPC、任务、冒险或对话Repository，不提前执行 `M2-T05`。
+
+## 2026-07-30 23:41 — M2-T05 实现酒馆、NPC和关系Repository（开始）
+
+### 依赖与范围
+
+- 依赖 `M2-T02`：已完成；世界与角色Repository已提交 `bf80e75`。
+- 仅实现Tavern、Npc、Knowledge、Relationship、Memory及同表聚合，不实现M2-T06。
+
+### 计划验证
+
+- 酒馆先建立父行，NPC写入后绑定老板；正式读取不接受未绑定老板。
+- OWNER和RESIDENT动态组成常驻列表，TEMPORARY_VISITOR动态组成访客列表。
+- 两个NPC知识、错误认知、关系和记忆分别写入并独立恢复。
+- 酒馆变化与临时访客信息完整恢复，非法JSON显式拒绝。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- `TavernRepository` 实现两阶段创建、老板绑定、正式读取、更新、酒馆变化追加/列表；未绑定老板的中间行不能恢复为正式Tavern。
+- OWNER与RESIDENT从NPC表动态组成常驻列表，TEMPORARY_VISITOR组成访客列表，不重复保存派生ID数组。
+- `NpcRepository` 实现资料创建/读取/更新、临时访客信息、知识、四维关系和追加式记忆。
+- NPC更新保护CampaignId、TavernId、residency和createdAt；Tavern更新保护CampaignId、LocationId和createdAt。
+- 两个NPC分别写入不同已知事实、怀疑、错误认知和秘密排除列表，读取互不包含对方事实；缺失知识返回null。
+- 两个NPC的关系和记忆分别往返；记忆重复ID被拒绝，读取时验证嵌入npcId与所属NPC一致。
+- 临时访客详情必须与profile的NPC/Tavern ID和居留类型匹配；错误组合在写入前拒绝。
+- 酒馆变化、访客详情、NPC记忆和知识JSON均从unknown逐字段验证，错误结构不会进入领域对象。
+- 最终 `pnpm check`：通过；Vitest 13个文件、105项通过，Node迁移3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 验收“多个NPC知识互不污染”有独立事实集合和反向不包含断言，不依赖内存对象。
+- 老板生成环使用明确两阶段API，没有写死空老板或关闭外键。
+- 关系读取复用 `createNpcRelationship` 的-5至5校验；知识复用 `createNpcKnowledge`。
+- 未实现Quest、Adventure、Conversation等M2-T06内容。

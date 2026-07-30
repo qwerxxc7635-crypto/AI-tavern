@@ -7,6 +7,7 @@ export {
   PlayerCharacterNotFoundError,
   PlayerCharacterRepository,
 } from './player-character-repository.js';
+export { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 export { WorldRepository } from './world-repository.js';
 export type {
   SqliteDatabase,

@@ -592,5 +592,34 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`bf80e75`。
 - Commit message：`feat(M2-T04): implement world and character repositories`
+
+## 2026-07-30 23:41 — M2-T05 实现酒馆、NPC和关系Repository
+
+### 范围
+
+实现Tavern、Npc、Knowledge、Relationship、Memory及临时访客/酒馆变化持久化；不实现任务和冒险Repository。
+
+### 主要改动
+
+- 计划实现酒馆生成环的两阶段写入、NPC资料与访客信息、知识/关系upsert和追加式记忆。
+- 计划从NPC表动态恢复常驻与访客列表，避免重复状态源。
+
+### 验证
+
+- 两个NPC知识、错误认知、关系和记忆独立往返，无交叉污染。
+- 老板绑定、动态常驻/访客列表、临时访客、酒馆变化和资料更新完整恢复。
+- `pnpm check`：通过；Vitest 13个文件、105项，Node迁移3项全部成功。
+
+### 自审
+
+- Tavern生成环采用父行→NPC→老板绑定的明确流程，未关闭外键。
+- JSON从unknown验证，嵌入记忆/访客ID必须匹配所属NPC。
+- Tavern/NPC身份字段不可更新，四维关系复用领域范围校验。
+- 未实现M2-T06任务、冒险与对话Repository。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T05): implement tavern and npc repositories`

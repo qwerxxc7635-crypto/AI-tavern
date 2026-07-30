@@ -294,6 +294,7 @@
 ## M2-T05 实现酒馆、NPC和关系Repository
 
 - 优先级：P0
+- 状态：已完成（2026-07-30）
 - 依赖：M2-T02
 - 工作内容：Tavern、Npc、Knowledge、Relationship、Memory。
 - 测试：多个NPC知识互不污染。
