@@ -149,7 +149,12 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
                   {selectedNpc.visitReason}
                 </p>
               )}
-              <span>已选择该 NPC · 对话将在下一阶段开放</span>
+              <Link
+                className="primary-action"
+                to={`/npc?campaignId=${encodeURIComponent(campaignId)}&npcId=${encodeURIComponent(selectedNpc.id)}`}
+              >
+                开始交谈
+              </Link>
             </article>
           )}
         </section>

@@ -1545,3 +1545,36 @@
 - `DEC-030` 记录无新增AI Schema情况下由程序从已验证事实建立初始时钟，以及传闻真实性不越过页面读取边界。
 - M5-T06验收“能够选择NPC或任务”已由页内NPC选择和携带Campaign ID的任务入口测试覆盖。
 - 未实现M5-T07或任何后续任务。
+
+## 2026-07-31 04:06 — M5-T07 实现NPC聊天页面
+
+### 依赖与范围
+
+- 依赖 `M4-T04` 和 `M5-T06`：均已完成；上一任务M5-T06已提交 `336aa5f`。
+- 仅实现酒馆NPC对话入口、历史消息、自由输入、建议话题、关系状态和重启恢复。
+- 不实现M5-T08任务列表/详情/接受、NPC长期记忆提取、冒险页面、真实Provider或后续功能。
+
+### 完成结果与验收
+
+- 酒馆选中NPC后可携带Campaign ID与NPC ID进入独立对话路由；对话页保留应用壳并提供返回酒馆入口。
+- 页面展示NPC公开身份、外观、性格、当前心情、四维关系、完整已保存消息和最近一次回复的建议话题；不展示NPC秘密或认知内部数据。
+- WindowsNpcDialogueService通过统一FakeAIProvider、共享NPC_REPLY Schema、Prompt和validateAIOutput生成回复；页面不直接拼接Prompt或写入游戏事实。
+- Rust新增npc_dialogue_get和npc_dialogue_commit两个固定语义命令，WebView不能提交SQL、数据库路径、会话ID、消息ID、序号、关系最终值或NPC最终心情。
+- 原生层在BEGIN IMMEDIATE事务内从SQLite重建世界、NPC自身资料、有限认知、关系、最近12条消息和最近8条长期记忆组成的上下文，并与跨进程生成输入逐字段比对。
+- 原始响应必须等于结构验证结果；回复、心情、建议话题和关系建议再次经过Rust业务校验，关系单次变化限于-1至1且最终保持-5至5。
+- 首次发送由原生层分配会话与消息ID；玩家消息、NPC消息、GenerationRecord、COMMITTED pending、心情、关系和会话时间一次性提交，失败不留下部分对话。
+- 读取快照通过NPC消息关联的最新GenerationRecord恢复建议话题；应用或数据库重开后继续使用原会话和连续序号。
+- 1项服务测试覆盖两次真实Fake生成并确认第二次上下文包含前一轮；1项页面测试覆盖历史、建议话题、自由输入和关系刷新；酒馆测试覆盖Campaign/NPC身份传递。
+- 2项Rust真实SQLite测试覆盖两次连续发送、中间数据库重开、消息序号1至4、关系累加、建议话题恢复，以及篡改有限认知时零部分写入。
+- 首轮全量检查仅发现新增页面不符合Prettier格式；执行同一Prettier规则格式化后重跑全部门禁通过，没有关闭或降低检查。
+- `pnpm check`通过：Vitest 42个文件231项、Node SQLite 7项、native-bridge Rust 12项及全部类型、lint、格式和严格Clippy检查成功。
+- `pnpm --filter @ember-tavern/windows-app build`通过；Vite转换159个模块并生成独立npc-dialogue-page chunk。
+- `pnpm --filter @ember-tavern/windows-app tauri build --no-bundle`通过；release窗口实际启动，标题为Ember Tavern、MainWindowHandle非零且Responding=True，烟测后进程已停止。
+
+### 自审
+
+- SQLite是会话、消息、关系和NPC心情的唯一真实数据源；页面只保留输入草稿、等待态和当前SQLite快照。
+- AI输出在共享结构验证后仍须通过Rust重建上下文和业务规则验证，不能直接决定ID、序号、最终关系值或提交边界。
+- 本任务沿用 `DEC-029` 的统一Provider执行与受限原生原子提交边界，没有形成新的重大架构决定，因此未更新 `docs/DECISIONS.md`。
+- M5-T07验收“连续发送消息并在重启后恢复”由真实SQLite重开测试、服务连续生成测试、页面交互测试、全量门禁和release构建共同覆盖。
+- 未实现M5-T08或任何后续任务。

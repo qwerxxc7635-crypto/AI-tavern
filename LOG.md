@@ -1235,5 +1235,20 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`336aa5f`。
 - Commit message：`feat(M5-T06): initialize and render offline tavern`
+
+## 2026-07-31 04:06 — M5-T07 Windows NPC聊天页面
+
+- 酒馆NPC选择可进入独立对话路由，并保留Campaign与NPC作用域。
+- 对话页展示SQLite恢复的历史、自由输入、建议话题、NPC公开资料、心情和四维关系。
+- Windows服务通过统一Fake Provider、Prompt与NPC_REPLY Schema生成；Rust重建有限认知上下文并逐字段复验。
+- 玩家/NPC消息、会话、生成审计、心情与关系在单个SQLite事务中提交，ID与连续序号由原生程序分配。
+- 真实SQLite测试覆盖连续两轮、中间重开恢复、建议话题与关系恢复，以及上下文篡改零部分写入。
+- `pnpm check`通过：Vitest 42个文件231项、Node SQLite 7项、native-bridge Rust 12项；生产前端和Tauri release构建通过。
+- release窗口烟测通过并已停止；未实现M5-T08。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T07): add persistent NPC dialogue`

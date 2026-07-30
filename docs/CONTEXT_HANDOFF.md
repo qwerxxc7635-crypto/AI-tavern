@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T06 实现酒馆页面`
+- 最近完成任务：`M5-T07 实现NPC聊天页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T06` 已验收，准备提交
-- 下一任务：`M5-T07 实现NPC聊天页面`
+- 当前任务：`M5-T07` 已验收，准备提交
+- 下一任务：`M5-T08 实现任务页面`
 
 ## 架构摘要
 
@@ -50,12 +50,14 @@
 - Windows酒馆服务通过共享Fake Provider执行GENERATE_TAVERN与GENERATE_NPCS；按Campaign合并并发初始化以适配React StrictMode。
 - Rust固定命令分两次事务提交酒馆/老板和两常驻/一访客/三传闻，最终推进至TAVERN；传闻真实性不进入页面快照。
 - 初始事务从已验证核心冲突、酒馆问题和剧情线索建立三个程序控制0/6世界时钟；`DEC-030`记录该边界。
-- 酒馆页展示全部初始内容、NPC页内选择、任务入口和时钟；聊天与任务业务仍未实现。
+- 酒馆页展示全部初始内容、NPC页内选择、任务入口和时钟；任务业务仍未实现。
+- Windows NPC聊天通过统一Fake Provider生成，Rust从SQLite重建NPC有限认知上下文并复验后，原子提交会话、连续消息、心情、关系和生成审计。
+- NPC对话页展示重启恢复的历史、建议话题、自由输入和四维关系；NPC秘密与认知内部数据不进入页面展示。
 
 ## 最近成功验证
 
-- 酒馆相关7项定向前端测试和10项native-bridge Rust测试通过；真实SQLite覆盖两阶段之间及完整初始化后的重开恢复。
-- `pnpm check`通过：Vitest 40个文件、229项，Node SQLite 7项及native-bridge Rust 10项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
+- NPC聊天相关4项定向前端测试和12项native-bridge Rust测试通过；真实SQLite覆盖连续发送、中间重开恢复和篡改拒绝。
+- `pnpm check`通过：Vitest 42个文件、231项，Node SQLite 7项及native-bridge Rust 12项均通过；TypeScript、ESLint、Prettier、Rust fmt和严格Clippy通过。
 - Windows生产前端与Tauri release无bundle构建通过；release窗口标题正确、窗口句柄非零且响应。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
@@ -63,5 +65,5 @@
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M5-T06` 变更。
-4. 从 `M5-T07` 实现NPC聊天页面；不要提前实现M5-T08任务页面。
+3. 完成并提交当前 `M5-T07` 变更。
+4. 从 `M5-T08` 实现任务页面；不要提前实现M5-T09冒险页面。

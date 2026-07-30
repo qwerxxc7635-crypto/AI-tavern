@@ -18,6 +18,9 @@ const CharacterCreationPage = lazy(() =>
 const TavernPage = lazy(() =>
   import('./tavern-page.js').then(({ TavernPage: page }) => ({ default: page })),
 );
+const NpcDialoguePage = lazy(() =>
+  import('./npc-dialogue-page.js').then(({ NpcDialoguePage: page }) => ({ default: page })),
+);
 const QuestsPage = lazy(() => sectionPages().then(({ QuestsPage: page }) => ({ default: page })));
 const AdventurePage = lazy(() =>
   sectionPages().then(({ AdventurePage: page }) => ({ default: page })),
@@ -77,6 +80,7 @@ export function AppRoutes() {
       />
       <Route element={<AppShell />}>
         <Route path="tavern" element={<TavernPage />} />
+        <Route path="npc" element={<NpcDialoguePage />} />
         <Route path="quests" element={<QuestsPage />} />
         <Route path="adventure" element={<AdventurePage />} />
         <Route path="character" element={<CharacterPage />} />
@@ -90,7 +94,9 @@ export function AppRoutes() {
 
 export function AppShell() {
   const location = useLocation();
-  const current = WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname);
+  const current =
+    WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname) ??
+    (location.pathname === '/npc' ? { label: 'NPC 对话' } : undefined);
   const campaignId = new URLSearchParams(location.search).get('campaignId');
 
   return (

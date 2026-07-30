@@ -22,7 +22,7 @@ describe('tavern page', () => {
     expect(service.initializeCalls).toEqual(['campaign-tavern']);
   });
 
-  it('selects an NPC locally and enters the existing task route without implementing either feature', async () => {
+  it('selects an NPC and carries both campaign and NPC identity into dialogue', async () => {
     const service = new FakeTavernService(finalSnapshot(), finalSnapshot());
     renderTavern(service);
 
@@ -30,8 +30,11 @@ describe('tavern page', () => {
     fireEvent.click(visitor);
     expect(visitor.getAttribute('aria-pressed')).toBe('true');
     expect(screen.getByText('Waiting for the causeway.')).toBeTruthy();
-    expect(screen.getByText('已选择该 NPC · 对话将在下一阶段开放')).toBeTruthy();
+    fireEvent.click(screen.getByRole('link', { name: '开始交谈' }));
+    expect(await screen.findByText('NPC 对话 npc-visitor campaign-tavern')).toBeTruthy();
 
+    renderTavern(service);
+    await screen.findByRole('heading', { name: 'Ember Rest' });
     fireEvent.click(screen.getByRole('link', { name: '选择任务入口' }));
     expect(await screen.findByText('任务入口 campaign-tavern')).toBeTruthy();
   });
@@ -43,8 +46,19 @@ function renderTavern(service: FakeTavernService) {
       <Routes>
         <Route path="/tavern" element={<TavernPage service={service} />} />
         <Route path="/quests" element={<QuestRouteEcho />} />
+        <Route path="/npc" element={<DialogueRouteEcho />} />
       </Routes>
     </MemoryRouter>,
+  );
+}
+
+function DialogueRouteEcho() {
+  const location = useLocation();
+  const search = new URLSearchParams(location.search);
+  return (
+    <p>
+      NPC 对话 {search.get('npcId')} {search.get('campaignId')}
+    </p>
   );
 }
 
