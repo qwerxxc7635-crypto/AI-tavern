@@ -27,4 +27,9 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Generate narrative initial equipment while local rules retain mechanical authority.',
   }),
+  Object.freeze({
+    task: 'GENERATE_NPCS',
+    version: promptVersion(2),
+    change: 'Generate three attributed tavern rumors together with the initial NPC roster.',
+  }),
 ]);

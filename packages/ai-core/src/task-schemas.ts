@@ -272,6 +272,17 @@ export const GenerateNpcsOutputSchema = z
       )
       .min(1)
       .max(8),
+    rumors: z
+      .array(
+        z
+          .object({
+            statement: text,
+            sourceNpcName: shortText,
+            veracity: z.enum(['UNKNOWN', 'TRUE', 'PARTIAL', 'FALSE']),
+          })
+          .strict(),
+      )
+      .length(3),
   })
   .strict();
 

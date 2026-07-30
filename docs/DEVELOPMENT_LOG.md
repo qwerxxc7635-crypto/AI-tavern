@@ -1187,3 +1187,27 @@
 - SQLite仍是已提交游戏事实唯一来源；AI结果经过版本2结构验证后才由本地规则转换。
 - `DEC-020` 记录完整角色原子提交及草稿边界。
 - 未实现M4-T03或任何后续任务。
+
+## 2026-07-31 01:18 — M4-T03 实现酒馆初始化用例
+
+### 依赖与范围
+
+- 依赖 `M4-T02`：已完成并提交 `f4772c3`。
+- 仅实现GenerateTavern、GenerateNpcs、初始传闻与持久化任务发布入口。
+- 不实现对话、实际Quest生成、冒险或页面。
+
+### 完成结果与验收
+
+- GenerateTavern从本地WorldBible和PlayerCharacter构建最小输入，经Fake/统一Provider和结构验证后创建酒馆与老板。
+- GenerateNpcs Schema/Prompt升级到版本2，要求2名普通常驻、1名临时访客和3条具名来源传闻。
+- 本地业务验证人数、居留类型、姓名唯一、访客原因及传闻来源，不接受不完整初始阵容。
+- 酒馆与老板在第一事务提交；其余NPC、访客信息、零值关系、有限认知、3条RUMOR WorldFact、Campaign的TAVERN状态在第二事务提交。
+- Tavern恢复结果包含老板在内3名常驻与1名访客；3名ACTIVE常驻ID作为后续GenerateQuest发布入口，不提前创建Quest。
+- 1项真实SQLite集成测试覆盖完整Fake初始化、传闻来源认知、关系、访客和状态。
+- 最终 `pnpm check`：通过；Vitest 27个文件、199项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- AI只生成叙事草稿和隐藏真伪建议，所有ID、归属、人数规则、认知和事务由本地程序控制。
+- `DEC-021` 记录传闻事实与M4-T05任务边界。
+- 未实现M4-T04、M4-T05或任何后续任务。

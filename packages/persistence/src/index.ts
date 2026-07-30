@@ -28,6 +28,7 @@ export {
 export type {
   CreatePendingAiRequest,
   IdempotentCommitResult,
+  NpcInitializationRecord,
 } from './pending-ai-request-repository.js';
 export { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 export { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';

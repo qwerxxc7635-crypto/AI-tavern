@@ -60,7 +60,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
     2,
   ),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
-  GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema),
+  GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 2),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 2),
   GENERATE_QUEST: definition(GenerateQuestInputSchema, GenerateQuestOutputSchema),
   GENERATE_ADVENTURE_PLAN: definition(

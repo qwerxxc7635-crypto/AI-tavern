@@ -183,6 +183,23 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
           visitReason: null,
         },
       ],
+      rumors: [
+        {
+          statement: 'A warm light moves beneath the cellar.',
+          sourceNpcName: 'Tomas',
+          veracity: 'TRUE',
+        },
+        {
+          statement: 'The guild pays for tunnel maps.',
+          sourceNpcName: 'Tomas',
+          veracity: 'PARTIAL',
+        },
+        {
+          statement: 'A courier crossed the flooded causeway.',
+          sourceNpcName: 'Tomas',
+          veracity: 'UNKNOWN',
+        },
+      ],
     },
   },
   NPC_REPLY: {
@@ -378,6 +395,7 @@ describe('versioned AI task schemas', () => {
     const expectedVersion = [
       'GENERATE_CHARACTER_TRAITS',
       'COMPLETE_CHARACTER_BACKGROUND',
+      'GENERATE_NPCS',
       'NPC_REPLY',
       'GENERATE_ADVENTURE_TURN',
       'GENERATE_WORLD_EVENT',

@@ -16,3 +16,11 @@ export type {
   CreateCharacterCommand,
   GenerateCharacterTraitsCommand,
 } from './character-creation-use-cases.js';
+export { TavernInitializationUseCases } from './tavern-initialization-use-cases.js';
+export type {
+  GenerateNpcsCommand,
+  GenerateTavernCommand,
+  TavernGenerationRequest,
+  TavernIdentityFactory,
+  TavernInitialization,
+} from './tavern-initialization-use-cases.js';

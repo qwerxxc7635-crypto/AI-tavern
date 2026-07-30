@@ -1042,5 +1042,18 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`f4772c3`。
 - Commit message：`feat(M4-T02): add character creation use cases`
+
+## 2026-07-31 01:18 — M4-T03 酒馆初始化用例
+
+- 新增GenerateTavern、GenerateNpcs稳定用例及两阶段幂等事务。
+- 生成老板、2名常驻、1名访客与3条本地RUMOR事实；初始化有限认知和关系。
+- 常驻NPC提供后续任务入口，但不提前创建M4-T05的Quest。
+- `pnpm check`通过：Vitest 27文件199项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M4-T04。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M4-T03): initialize tavern roster and rumors`

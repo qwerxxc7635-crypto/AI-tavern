@@ -106,6 +106,18 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
         visitReason: null,
       },
       {
+        residency: 'RESIDENT',
+        name: 'Nessa Vale',
+        identity: 'Harbor herbalist',
+        appearance: 'A green coat hung with small labeled pouches.',
+        personality: 'Warm, direct, and difficult to surprise.',
+        goal: 'Learn why marsh plants are blooming out of season.',
+        secret: 'Keeps a sample that glows with the same light as the cellar.',
+        speechStyle: 'Short practical advice followed by dry humor.',
+        currentMood: 'Watchful',
+        visitReason: null,
+      },
+      {
         residency: 'TEMPORARY_VISITOR',
         name: 'Sera Holt',
         identity: 'Storm courier',
@@ -116,6 +128,23 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
         speechStyle: 'Quick sentences and nautical idioms.',
         currentMood: 'Urgent',
         visitReason: 'Waiting for the causeway to reopen.',
+      },
+    ],
+    rumors: [
+      {
+        statement: 'A warm light moves beneath the old cellar after midnight.',
+        sourceNpcName: 'Tomas Reed',
+        veracity: 'TRUE',
+      },
+      {
+        statement: 'The Lantern Guild pays in silver for maps of the sealed tunnels.',
+        sourceNpcName: 'Nessa Vale',
+        veracity: 'PARTIAL',
+      },
+      {
+        statement: 'The storm courier crossed the flooded causeway alone.',
+        sourceNpcName: 'Sera Holt',
+        veracity: 'UNKNOWN',
       },
     ],
   },

@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M4-T02 实现车卡用例`
+- 最近完成任务：`M4-T03 实现酒馆初始化用例`
 - 已完成里程碑：M0、M1、M2、M3
-- 当前任务：`M4-T02` 已验收，准备提交
-- 下一任务：`M4-T03 实现酒馆初始化用例`
+- 当前任务：`M4-T03` 已验收，准备提交
+- 下一任务：`M4-T04 实现NPC对话用例`
 
 ## 架构摘要
 
@@ -27,16 +27,18 @@
 - WorldCreationUseCases提供创建、生成、细化和确认世界；AI草稿映射本地ID，世界与存档状态同事务提交。
 - CharacterCreationUseCases验证本地车卡、生成6候选特质，并将完整背景、程序控制装备与状态同事务提交。
 - GENERATE_CHARACTER_TRAITS与COMPLETE_CHARACTER_BACKGROUND的Schema/Prompt为版本2。
+- TavernInitializationUseCases生成酒馆、老板、2名常驻、1名访客和3条RUMOR，并初始化有限认知与关系。
+- GENERATE_NPCS的Schema/Prompt为版本2；常驻NPC是任务入口，实际Quest仍由M4-T05创建。
 
 ## 最近成功验证
 
-- Fake Provider完整车卡、6候选特质、背景装备落库及非法属性零写入测试通过。
-- `pnpm check`：通过；Vitest 198项、Node SQLite 7项通过。
+- Fake Provider完整酒馆阵容、传闻、有限认知、关系与TAVERN状态测试通过。
+- `pnpm check`：通过；Vitest 199项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M4-T02` 变更。
-4. 从 `M4-T03` 实现GenerateTavern、GenerateNpcs。
+3. 完成并提交当前 `M4-T03` 变更。
+4. 从 `M4-T04` 实现TalkToNpc、ExtractMemories。

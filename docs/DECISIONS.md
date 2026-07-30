@@ -541,3 +541,27 @@ CreateCharacter只产生经过本地规则验证的瞬时 `CharacterDraft`，不
 ### 可逆性
 
 未来若产品明确要求跨重启恢复车卡草稿，可新增有独立语义和迁移的草稿模型；不得放宽完整PlayerCharacter约束或用空值占位。初始装备规则可以在程序控制下版本化，但AI只提供叙事内容的边界保持不变。
+
+## DEC-021：初始传闻使用WorldFact，任务入口与Quest创建分阶段
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第9至12、20、27节；`docs/TASKS.md` 的 `M4-T03`、`M4-T05`
+
+### 背景
+
+M4-T03要求酒馆初始化包含传闻和任务入口，而M4-T05才负责GenerateQuest与AcceptQuest。若初始化阶段直接创建Quest，会提前执行后续任务；若只把传闻留在AI审计记录，SQLite游戏事实又无法在重启后恢复。领域模型已将真假未定信息定义为RUMOR WorldFact。
+
+### 决定与理由
+
+GenerateNpcs的Schema与Prompt升级到版本2，与2名普通常驻和1名访客一起生成恰好3条具名来源、隐藏真实性的传闻。程序验证人数、居留类型、姓名唯一性、访客原因和传闻来源后，为传闻分配WorldFactId并作为RUMOR写入SQLite；来源NPC的初始认知只包含自己发布的传闻。
+
+本任务的“任务入口”由老板和2名ACTIVE常驻NPC的持久化ID表示，它们可供后续GenerateQuest选择为发布者。本阶段不创建Quest行；实际两个AVAILABLE任务和单主任务约束仍完整保留给M4-T05。
+
+### 影响
+
+酒馆初始化完成后，Tavern可恢复3名常驻NPC（含老板）、1名访客、关系、有限认知和3条传闻。页面不得从GenerationRecord直接读取传闻作为事实，也不得在M4-T05前假设Quest已存在。
+
+### 可逆性
+
+未来可为传闻增加独立展示投影或查询Repository，也可扩展任务发布者选择规则；RUMOR的权威记录仍来自WorldFact，Quest创建任务边界不应回退。

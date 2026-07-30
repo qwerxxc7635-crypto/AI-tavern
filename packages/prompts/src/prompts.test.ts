@@ -37,6 +37,7 @@ describe('central prompt catalog', () => {
       const expectedVersion = [
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
+        'GENERATE_NPCS',
       ].includes(task)
         ? 2
         : 1;

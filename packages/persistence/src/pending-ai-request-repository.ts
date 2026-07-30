@@ -14,8 +14,14 @@ import {
   type PendingAiRequest,
   type Campaign,
   type Item,
+  type NpcKnowledge,
+  type NpcProfile,
+  type NpcRelationship,
   type PlayerCharacter,
+  type Tavern,
+  type TemporaryVisitor,
   type WorldBible,
+  type WorldFact,
 } from '@ember-tavern/contracts';
 
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
@@ -33,6 +39,7 @@ import type { SqliteRunResult, TransactionalSqliteDatabase } from './sqlite-port
 import { applyTurnCommit, type TurnCommit } from './turn-transaction.js';
 import { WorldRepository } from './world-repository.js';
 import { PlayerCharacterRepository } from './player-character-repository.js';
+import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 
 const TERMINAL_STATUSES = ['COMMITTED', 'CANCELLED'] as const;
 const SECRET_FIELD = /api.?key|authorization|bearer|access.?token|secret.?key/i;
@@ -49,6 +56,13 @@ export interface CreatePendingAiRequest {
 }
 
 export type IdempotentCommitResult = 'COMMITTED' | 'ALREADY_COMMITTED';
+
+export interface NpcInitializationRecord {
+  readonly profile: NpcProfile;
+  readonly visitor: TemporaryVisitor | null;
+  readonly knowledge: NpcKnowledge;
+  readonly relationship: NpcRelationship;
+}
 
 export class IdempotencyConflictError extends PersistenceDataError {
   public constructor(key: IdempotencyKey) {
@@ -355,6 +369,93 @@ export class PendingAiRequestRepository {
       return 'COMMITTED';
     } catch (error) {
       this.rollback(error, 'AI character commit and rollback both failed');
+    }
+  }
+
+  public commitTavernOnce(
+    key: IdempotencyKey,
+    campaign: Campaign['id'],
+    tavern: Tavern,
+    owner: NpcInitializationRecord,
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, campaign);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (
+        tavern.campaignId !== campaign ||
+        tavern.ownerNpcId !== owner.profile.id ||
+        owner.profile.campaignId !== campaign ||
+        owner.profile.tavernId !== tavern.id ||
+        owner.profile.residency !== 'OWNER' ||
+        owner.visitor !== null ||
+        owner.knowledge.npcId !== owner.profile.id ||
+        owner.relationship.npcId !== owner.profile.id
+      ) {
+        throw new PersistenceDataError('Tavern owner commit contains mismatched records');
+      }
+      const taverns = new TavernRepository(this.database);
+      const npcs = new NpcRepository(this.database);
+      taverns.create(tavern);
+      npcs.create(owner.profile);
+      taverns.assignOwner(tavern.id, owner.profile.id);
+      npcs.saveKnowledge(owner.knowledge, at);
+      npcs.saveRelationship(owner.relationship, at);
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI tavern commit and rollback both failed');
+    }
+  }
+
+  public commitNpcRosterOnce(
+    key: IdempotencyKey,
+    campaign: Campaign,
+    tavern: Tavern['id'],
+    records: readonly NpcInitializationRecord[],
+    rumors: readonly WorldFact[],
+    at: IsoTimestamp,
+  ): IdempotentCommitResult {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const request = this.requireValidatingRequest(key, campaign.id);
+      if (request === null) {
+        this.database.exec('COMMIT');
+        return 'ALREADY_COMMITTED';
+      }
+      if (
+        records.some(
+          ({ profile, visitor, knowledge, relationship }) =>
+            profile.campaignId !== campaign.id ||
+            profile.tavernId !== tavern ||
+            profile.residency === 'OWNER' ||
+            knowledge.npcId !== profile.id ||
+            relationship.npcId !== profile.id ||
+            (visitor !== null && (visitor.npcId !== profile.id || visitor.tavernId !== tavern)),
+        ) ||
+        rumors.some((fact) => fact.campaignId !== campaign.id || fact.kind !== 'RUMOR')
+      ) {
+        throw new PersistenceDataError('NPC roster commit contains mismatched records');
+      }
+      const npcs = new NpcRepository(this.database);
+      for (const record of records) {
+        npcs.create(record.profile, record.visitor);
+        npcs.saveKnowledge(record.knowledge, at);
+        npcs.saveRelationship(record.relationship, at);
+      }
+      const worlds = new WorldRepository(this.database);
+      for (const rumor of rumors) worlds.addFact(rumor);
+      new CampaignRepository(this.database).update(campaign);
+      this.markCommitted(request.id, at);
+      this.database.exec('COMMIT');
+      return 'COMMITTED';
+    } catch (error) {
+      this.rollback(error, 'AI NPC roster commit and rollback both failed');
     }
   }
 
