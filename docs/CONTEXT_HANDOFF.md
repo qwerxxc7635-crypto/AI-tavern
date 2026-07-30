@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M4-T09 实现重生成和回退用例`
+- 最近完成任务：`M5-T01 初始化Windows Tauri应用`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M4-T09` 已验收，准备提交
-- 下一任务：`M5-T01 初始化Windows Tauri应用`
+- 当前任务：`M5-T01` 已验收，准备提交
+- 下一任务：`M5-T02 实现Windows应用壳和导航`
 
 ## 架构摘要
 
@@ -38,16 +38,18 @@
 - AdventureEnding的ending_json保存关键选择、未决方向、未发现线索、参与NPC、奖励/世界事实/酒馆变化ID以及摘要/世界事件GenerationRecord引用；完整档案可从SQLite重新组装。
 - 玩家行动写入后创建TURN_INPUT AUTO快照；SnapshotRepository以规范JSON、SHA-256和SQLite事务恢复Campaign有效游戏状态，保留独立AI审计并限制最近10个AUTO快照。
 - RegenerationUseCases支持自由故事和规则限次模式，按Campaign策略与跨厂商披露控制Provider切换；失败恢复安全快照，成功从输入基线替换旧AI游戏结果。
+- Windows React/Vite/Tauri入口已加入pnpm/Cargo workspace；HashRouter、基础主题和最小core:default capability可运行。
+- Windows启动页在运行时读取共享contracts Schema版本；无SQL、文件、HTTP、密钥或业务原生命令。
 
 ## 最近成功验证
 
-- 重生成真实SQLite集成测试覆盖披露拒绝、Provider失败恢复、Provider切换、旧/新事实互斥、规则限次和最新快照回退。
-- `pnpm check`：通过；Vitest 206项、Node SQLite 7项通过。
+- Windows前端生产构建、Tauri release无bundle构建和真实窗口启动通过；窗口标题Ember Tavern且进程响应。
+- `pnpm check`：通过；Vitest 208项、Node SQLite 7项通过。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M4-T09` 变更。
-4. 从 `M5-T01` 初始化Windows Tauri应用；不要提前实现M5-T02导航。
+3. 完成并提交当前 `M5-T01` 变更。
+4. 从 `M5-T02` 实现Windows应用壳和导航；不要提前实现M5-T03存档功能。

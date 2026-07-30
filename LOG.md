@@ -1138,5 +1138,20 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`4774f1d`。
 - Commit message：`feat(M4-T09): regenerate turns from SQLite snapshots`
+
+## 2026-07-31 02:28 — M5-T01 Windows Tauri初始化
+
+- 初始化独立Windows React 19、Vite 7、Tauri 2工程，并加入pnpm/Cargo workspace。
+- HashRouter提供最小启动与not-found路由；启动页运行时读取共享contracts的Schema版本。
+- 基础主题采用拱形炉门视觉，包含响应式布局、键盘焦点和reduced-motion处理。
+- Tauri只授予core:default capability，不开放SQL、文件、HTTP或密钥命令。
+- 前端生产构建、Cargo check和Tauri release无bundle构建通过，实际开发窗口标题为Ember Tavern且进程响应。
+- `pnpm check`通过：Vitest 33文件208项、Node SQLite 7项及全部TS/ESLint/Prettier/Rust检查成功。
+- 未执行M5-T02。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T01): initialize Windows Tauri shell`

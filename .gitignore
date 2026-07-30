@@ -12,6 +12,7 @@ coverage/
 # Rust and Tauri build output
 target/
 **/target/
+windows-app/src-tauri/gen/
 
 # Local environment and secrets
 .env

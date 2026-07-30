@@ -4,13 +4,25 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2 和AI基础设施里程碑 M3 已完成。应用层已支持使用Fake Provider创建世界、完成车卡、初始化酒馆、进行可恢复NPC对话、管理单主任务、运行本地D20冒险回合、原子结算冒险，以及基于SQLite快照保留玩家输入重生成、切换Provider和回退；真实Provider及后续产品页面仍未实现。
+项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2、AI基础设施里程碑 M3 和应用用例里程碑 M4 已完成。Windows Tauri 2客户端可启动并加载React/Vite入口、基础路由、主题和共享协议；真实Provider及业务页面仍未实现。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
 ## 启动说明
 
-当前阶段没有可启动的应用。需要 Node.js、pnpm 和 Rust/Cargo；在仓库根目录可运行：
+需要 Node.js、pnpm、Rust/Cargo、Microsoft C++ Build Tools 和WebView2。设置下文的本地缓存环境变量后，可从仓库根目录启动Windows开发窗口：
+
+```powershell
+pnpm --filter @ember-tavern/windows-app tauri dev
+```
+
+构建不含安装器的Windows可执行文件：
+
+```powershell
+pnpm --filter @ember-tavern/windows-app tauri build --no-bundle
+```
+
+仓库质量检查命令：
 
 ```powershell
 pnpm format:check
@@ -31,7 +43,7 @@ cargo metadata --format-version 1
 cargo test --workspace
 ```
 
-当前没有可启动的应用；React、Tauri 和游戏UI尚未实现。
+当前启动页只验证桌面运行时、基础路由、主题和共享包连接；导航与游戏UI从M5-T02开始实现。
 
 ## 本地开发缓存
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Ember Tavern">
+  <rect width="512" height="512" rx="112" fill="#101821" />
+  <path
+    d="M132 390V256c0-78 56-142 124-142s124 64 124 142v134"
+    fill="none"
+    stroke="#C17853"
+    stroke-width="30"
+    stroke-linecap="round"
+  />
+  <path
+    d="M256 350c-42 0-72-29-72-67 0-44 40-65 59-104 6 27 25 39 40 59 14 18 25 36 25 57 0 31-22 55-52 55Z"
+    fill="#92A67A"
+  />
+  <path d="M126 390h260" fill="none" stroke="#E8EDF0" stroke-width="24" stroke-linecap="round" />
+</svg>

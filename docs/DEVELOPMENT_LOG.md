@@ -1363,3 +1363,32 @@
 - AI调用仍经过统一Provider接口、结构Schema和领域补丁验证，快照层不接触密钥。
 - `DEC-026` 记录Campaign逻辑快照、审计保留及重生成失败恢复边界。
 - 未实现M5-T01或任何后续任务。
+
+## 2026-07-31 02:28 — M5-T01 初始化Windows Tauri应用
+
+### 依赖与范围
+
+- 依赖 `M0-T03`：已完成；M4里程碑也已全部完成并以 `4774f1d` 结束。
+- 仅初始化Windows React、Vite、Tauri、基础路由、基础主题和共享包访问。
+- 不实现M5-T02导航壳、业务页面、SQLite桌面适配、原生命令或真实Provider。
+
+### 完成结果与验收
+
+- windows-app成为独立pnpm项目，固定使用React 19.2.8、React Router 7.18.2、Vite 7.2.4和Tauri CLI 2.11.4；无peer依赖问题。
+- 根Cargo workspace加入windows-app/src-tauri；Tauri Rust crate使用Tauri 2.11.5，Windows资源使用可复现SVG源和官方工具生成的ICO。
+- HashRouter提供 `/` 启动入口和稳定not-found回退，避免打包后的路由依赖外部服务器；未提前创建业务导航。
+- 启动页直接调用 `@ember-tavern/contracts` 的schemaVersion并显示Schema v1，证明Windows前端能访问共享包。
+- 基础主题使用深蓝黑、氧化铜和苔绿token及拱形炉门构图；支持窄窗口、可见键盘焦点和prefers-reduced-motion。
+- Tauri配置只为main窗口启用core:default capability；没有暴露SQL、任意文件、HTTP、密钥或未要求的原生命令。
+- `pnpm --filter @ember-tavern/windows-app build`通过；Vite输出52个模块。
+- `cargo check -p ember-tavern-windows`通过；`pnpm --filter @ember-tavern/windows-app tauri build --no-bundle`通过并生成8,636,416字节release EXE。
+- `tauri dev`实际启动 `ember-tavern-windows.exe`，MainWindowTitle为Ember Tavern、MainWindowHandle非零且Responding=True；验收后已清理应用、WebView、Vite和Cargo子进程，1420端口释放。
+- 首轮Cargo检查准确发现Windows资源缺少icon.ico；补齐可复现图标后通过。全量门禁又发现Tauri schema和Vite dist生成物被格式/lint误检，改为仅忽略可再生目录后通过，没有降低源码检查。
+- 最终 `pnpm check`：通过；Vitest 33个文件、208项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- UI只保存展示状态，没有引入游戏事实缓存；SQLite权威边界未改变。
+- frontend-design技能将视觉限定为单一启动状态和一个拱形炉门识别元素，避免提前实现导航壳。
+- `DEC-027` 记录HashRouter、最小Tauri capability和可复现Windows资源边界。
+- 未实现M5-T02或任何后续任务。

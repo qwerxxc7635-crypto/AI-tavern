@@ -683,3 +683,27 @@ GenerationRecord可同时保留旧、新响应作为审计，但它们不直接�
 ### 可逆性
 
 后续可把逻辑快照替换为原生SQLite备份或版本化增量快照，只要保持校验、Campaign隔离、事务恢复、审计独立和失败回滚语义。规则模式上限可在设置模型确定后迁入SQLite配置，不改变现有计数与拒绝边界。
+
+## DEC-027：Windows入口使用HashRouter与最小Tauri capability
+
+- 日期：2026-07-31
+- 状态：已采纳
+- 依据：`docs/spec.md` 第17至19、31节；`docs/TASKS.md` 的 `M5-T01`
+
+### 背景
+
+Windows客户端需要同时支持Vite开发服务器和Tauri打包后的本地静态资源。Browser history路由在没有服务端回退规则的本地包中刷新深层路径可能失败。Tauri 2 capability如果在骨架阶段授予过多权限，也会提前形成任意文件、网络或原生命令边界。
+
+### 决定与理由
+
+Windows前端使用HashRouter，M5-T01只注册启动入口和not-found回退；M5-T02再在同一路由边界增加导航目标。启动页直接运行共享contracts的schemaVersion函数，形成共享包访问的可执行验收，而不是只依赖静态依赖声明。
+
+Tauri只创建main窗口并授予 `core:default`，不注册业务命令或文件、HTTP、SQL、密钥权限。Windows图标保留SVG源，并用Tauri官方工具生成ICO；Tauri自动生成的schema与Vite dist作为可再生构建输出忽略，手写配置和capability继续经过格式与lint检查。
+
+### 影响
+
+所有前端路由URL带hash，但不依赖外部Web服务器即可恢复。页面不能直接访问任意原生资源；后续命令必须在对应任务中按规格第31节逐项增加。Windows src-tauri作为根Cargo workspace真实成员参与fmt、Clippy和test。
+
+### 可逆性
+
+若未来Tauri自定义协议提供可靠history回退，可在路由测试覆盖后迁移BrowserRouter。Capability可按高层命令逐项扩展，但禁止一次性授予宽泛文件或网络权限。
