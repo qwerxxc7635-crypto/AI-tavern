@@ -1,3 +1,11 @@
+export { GAME_EVENT_TYPES } from './game-event.js';
+export type {
+  GameEvent,
+  GameEventOf,
+  GameEventPayloads,
+  GameEventType,
+  ModelSelectionRef,
+} from './game-event.js';
 export {
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
@@ -104,6 +112,7 @@ export {
   clueId,
   compatibleEnum,
   factionId,
+  gameEventId,
   characterTraitId,
   isoTimestamp,
   locationId,
@@ -130,6 +139,7 @@ export type {
   ClueId,
   CompatibleEnum,
   FactionId,
+  GameEventId,
   CharacterTraitId,
   IsoTimestamp,
   LocationId,

@@ -436,5 +436,33 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`e23c07a`。
 - Commit message：`feat(M1-T09): implement relationship and clock rules`
+
+## 2026-07-30 23:10 — M1-T10 定义GameEvent事件协议
+
+### 范围
+
+定义规格事件日志列出的关键事件、精确payload和公共审计元数据；不实现事件存储、SQLite迁移或发布用例。
+
+### 主要改动
+
+- 计划新增GameEvent ID、事件判别联合和全部事件payload。
+- 计划添加类型收窄、完整事件列表和公共元数据测试。
+
+### 验证
+
+- 首轮门禁发现测试使用非空断言；改为显式缺失分支后通过，未调整Lint规则。
+- `pnpm check`：通过；10个测试文件、92个测试全部成功。
+- 规格第28.3节的12类事件全部有fixture；世界、角色、骰子、关系、任务和冒险验收类别均已覆盖。
+
+### 自审
+
+- `type` 与payload通过映射判别联合关联，不接受通用JSON或 `any`。
+- 公共信封包含不透明事件ID、CampaignId、SchemaVersion和规范UTC时间。
+- 未创建数据库表、仓储、事务或应用发布逻辑。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T10): define game event protocol`

@@ -8,6 +8,7 @@ import {
   clueId,
   characterTraitId,
   factionId,
+  gameEventId,
   compatibleEnum,
   isoTimestamp,
   itemId,
@@ -50,6 +51,7 @@ describe('opaque identifiers', () => {
     expect(clueId('clue-1')).toBe('clue-1');
     expect(actionOptionId('option-1')).toBe('option-1');
     expect(worldClockId('clock-1')).toBe('clock-1');
+    expect(gameEventId('event-1')).toBe('event-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {
