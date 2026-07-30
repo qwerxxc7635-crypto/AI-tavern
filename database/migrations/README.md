@@ -1,3 +1,5 @@
 # Database migrations
 
-Versioned SQLite migrations live in this directory. The initial schema is intentionally deferred to `M2-T02`; no migration is defined during the M0 project-skeleton task.
+Versioned SQLite migrations live in this directory and are applied in numeric order by the persistence migration runner. A migration version is recorded only after its SQL commits successfully; an already recorded version is skipped on later startups.
+
+- `0001_initial.sql`: v0.1 core schema defined by `docs/data-model.md`.

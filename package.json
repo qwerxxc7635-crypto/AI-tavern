@@ -7,7 +7,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run --passWithNoTests",
+    "test": "vitest run --passWithNoTests && node --test packages/persistence/src/*.test.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",

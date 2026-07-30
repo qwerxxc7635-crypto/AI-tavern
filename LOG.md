@@ -493,5 +493,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`b239e59`。
 - Commit message：`docs(M2-T01): design SQLite data model`
+
+## 2026-07-30 23:22 — M2-T02 创建首版数据库迁移
+
+### 范围
+
+创建 `0001_initial.sql`、最小迁移执行器和真实SQLite迁移测试；不实现Campaign或其他Repository。
+
+### 主要改动
+
+- 计划按 `docs/data-model.md` 创建22张核心表、迁移记录表、约束和索引。
+- 计划使用Node 24内置SQLite在 `.local/` 临时目录验证首次迁移和重复启动。
+
+### 验证
+
+- 新数据库一次迁移成功，规格22张核心表名称精确匹配，版本1已记录。
+- 第二次执行跳过已记录版本，表数和版本记录均不重复。
+- 非法JSON、越界时钟和缺失外键被拒绝；Provider列不存在秘密字段。
+- `pnpm check`：通过；Vitest 92项、Node SQLite迁移测试3项全部成功。
+
+### Bug修复
+
+- Node SQLite返回null-prototype查询行，首次深比较虽字段相同仍失败；测试改为复制字段后比较。
+- ESLint发现JavaScript `URL` 未显式导入；从 `node:url` 导入，保留严格 `no-undef`。
+
+### 自审
+
+- 业务DDL和版本记录同事务，失败回滚；重复启动按版本跳过，不吞掉错误。
+- 迁移创建22张规格核心表和1张基础设施版本表，没有额外业务表。
+- 未实现任何Repository或后续业务逻辑。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M2-T02): create initial SQLite migration`

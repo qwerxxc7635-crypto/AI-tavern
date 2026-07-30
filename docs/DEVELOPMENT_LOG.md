@@ -562,3 +562,37 @@
 - Faction、Location、Clue、NpcMemory等非核心独立表对象均明确映射到父实体JSON，没有静默遗漏。
 - 骰子结果位于 `adventure_turns.dice_result_json`，对话与消息独立持久化，模型切换后可从本地历史恢复。
 - M2-T02迁移要求已明确，但没有提前执行该任务。
+
+## 2026-07-30 23:22 — M2-T02 创建首版数据库迁移（开始）
+
+### 依赖与范围
+
+- 依赖 `M2-T01`：已完成并提交 `b239e59`。
+- 仅创建首版SQL、迁移执行器与迁移测试；不实现任何Repository。
+
+### 计划验证
+
+- 在真实临时SQLite文件上执行 `0001_initial.sql`。
+- 首次执行后核对22张核心表、迁移版本、外键和关键约束。
+- 在同一数据库重复运行迁移，确认不重复建表或记录版本。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- 新增 `database/migrations/0001_initial.sql`，创建 `docs/data-model.md` 定义的22张核心表、全部索引、外键、枚举/范围约束和JSON有效性约束。
+- 新增最小迁移执行器：启用外键、维护 `schema_migrations`、按版本跳过已应用迁移，并将DDL与版本写入放在同一 `BEGIN IMMEDIATE` 事务。
+- 新增真实文件型SQLite测试，临时数据库位于项目 `.local/cache/temp`，测试结束后删除。
+- 首次迁移测试：22张核心表名称精确匹配，外键已启用，版本记录数等于迁移数。
+- 重复启动测试：第二次执行不重放DDL，仍只有版本1的一条原始记录，业务表和版本表总数不变。
+- 约束测试：非法JSON、越界世界时钟和缺失Campaign外键均被SQLite拒绝；Provider列扫描确认没有API Key、Authorization或Token字段。
+- 首轮测试唯一失败来自Node SQLite查询行使用null-prototype对象；改为复制行字段后比较，未更改迁移行为。
+- 首轮完整Lint另发现JavaScript中未显式导入全局 `URL`；改为从 `node:url` 导入，未关闭 `no-undef`。
+- 最终 `pnpm check`：通过；Vitest 10个文件、92项通过，Node SQLite 3项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+- `DEC-011` 记录版本化事务迁移策略。
+
+### 自审
+
+- SQL未使用 `CREATE TABLE IF NOT EXISTS` 掩盖业务表重放；幂等性来自成功版本记录。
+- 迁移失败会回滚DDL和版本写入；不存在记录了版本但只建一部分表的路径。
+- 仅新增迁移基础设施表，不创建规格之外的业务表。
+- 未实现Campaign或其他Repository，不提前执行 `M2-T03`。
