@@ -261,5 +261,44 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`7712124`。
 - Commit message：`feat(M1-T04): define player character contracts`
+
+## 2026-07-30 22:52 — M1-T05 定义酒馆与 NPC 协议
+
+### 范围
+
+定义酒馆、变化、NPC资料、认知、四维关系、记忆和临时访客协议；不定义传闻、任务或对话用例。
+
+### 主要改动
+
+- 计划新增 tavern/NPC 协议、实体 ID、关系和知识构造器及测试。
+- 计划更新 contracts 出口、任务状态、日志与交接。
+
+### 决策
+
+- NPC知识按 NPC 独立记录已知、怀疑、错误认知和明确不可知事实。
+- 四维关系均由程序构造器限制在 -5 至 5。
+- 临时访客引用 NPC资料，不复制角色卡。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：5 个文件、46 个测试通过，酒馆/NPC新增 8 项。
+- 关系边界、越界拒绝、知识隔离和完整协议均有覆盖。
+
+### Bug修复
+
+- ESLint 拒绝无新增成员的继承接口，改为明确类型别名。
+- 自审将关系第三维从 `fear` 修正为符合“敬畏”的 `awe`。
+
+### 自审
+
+- NPC知识按角色复制并冻结，关系四维由程序限制。
+- 访客引用资料而不复制，实体关系均用 brand ID。
+- 未实现传闻、任务、持久化或聊天用例。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T05): define tavern and npc contracts`

@@ -10,10 +10,13 @@ import {
   itemId,
   locationId,
   npcId,
+  npcMemoryId,
   playerCharacterId,
   promptVersion,
   questId,
   schemaVersion,
+  tavernChangeId,
+  tavernId,
   timestampFromDate,
   turnId,
   worldFactId,
@@ -34,6 +37,9 @@ describe('opaque identifiers', () => {
     expect(playerCharacterId('character-1')).toBe('character-1');
     expect(characterTraitId('trait-1')).toBe('trait-1');
     expect(itemId('item-1')).toBe('item-1');
+    expect(tavernId('tavern-1')).toBe('tavern-1');
+    expect(tavernChangeId('change-1')).toBe('change-1');
+    expect(npcMemoryId('memory-1')).toBe('memory-1');
   });
 
   it.each(['', ' ', ' campaign-1', 'campaign-1 '])('rejects non-canonical ID %j', (value) => {
