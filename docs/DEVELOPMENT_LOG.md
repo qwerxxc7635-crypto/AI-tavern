@@ -1022,3 +1022,39 @@
 - 上下文来自调用方提供的已恢复事实快照，模型会话不保存唯一历史；切换Provider后可从SQLite重新构建。
 - 构建结果仍需后续结构与领域验证；本任务没有接收AI输出或写游戏状态。
 - 未实现M3-T06或任何后续任务。
+
+## 2026-07-31 00:45 — M3-T06 实现AI输出结构验证
+
+### 依赖与范围
+
+- 依赖 `M3-T02`：已完成；上一任务上下文构建器已提交 `30057b8`。
+- 仅实现逐任务JSON/Schema结构验证、稳定错误定位，以及 `generation_records` 原始响应和验证结果持久化。
+- 不判断任务进度、关系、奖励、事实或时钟补丁的业务合法性，不提交游戏状态，不实现结构修复重试。
+
+### 计划验证
+
+- 有效Fake输出解析为有限JsonValue并保留逐字原始文本。
+- 非法JSON、缺字段、错误枚举和嵌套越界值分别失败，错误包含稳定code和完整path。
+- 成功与失败结果分别写入既有generation_records列，关闭并重开SQLite后原始文本与结果精确恢复。
+- 完成记录必须在validated output和validation error之间二选一，禁止重复完成和请求中凭据字段。
+- 根 `pnpm check` 全量回归。
+
+### 完成结果与验收
+
+- ai-core新增 `validateAIOutput`，按AITask从唯一 `AI_TASK_SCHEMAS` 注册表读取当前Schema和版本。
+- 解析失败返回 `INVALID_JSON` 和根路径；Zod失败返回 `SCHEMA_VALIDATION_FAILED`，逐项保留字符串/数字路径、Zod code和消息。
+- 验证成功结果递归转换并冻结为有限JsonValue；NaN、Infinity、undefined、函数或非JSON对象不能成为验证结果。
+- 成功/失败判别联合都原样携带 `rawResponseText`；结构验证不会清洗、重排或用解析后JSON替代原始文本。
+- contracts新增GenerationRecord、GenerationValidationError和Issue协议，字段与既有数据模型一致。
+- `GenerationRecordRepository` 实现创建、一次性完成和读取；创建时raw/output/error/completed均为空，完成时必须在output/error之间严格二选一。
+- Repository将规范请求、原始返回、结构结果/错误分别存入既有列；请求JSON沿用敏感字段拦截，禁止API Key、Authorization、Bearer、access token和secret key字段。
+- 读取时逐字段恢复品牌ID、时间、JsonValue和错误路径，并拒绝“已完成但无结果/双结果”或“未完成但含完成数据”的损坏行。
+- 5项验证器测试覆盖原始文本、非法JSON、缺字段、错误枚举和嵌套越界路径；3项真实SQLite测试覆盖成功重连、失败记录和生命周期/凭据保护。
+- 首轮全仓lint只发现缺字段测试的解构变量未使用；改为显式JSON记录副本删除字段，未关闭规则。
+- 最终 `pnpm check`：通过；Vitest 22个文件、187项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 验证成功仅表示JSON结构符合当前任务Schema，不能直接修改SQLite游戏事实；业务验证仍由M3-T07负责。
+- 原始响应与验证结果分列保存，失败输出不会进入validated_output_json。
+- 未实现M3-T07或任何后续任务。

@@ -6,6 +6,11 @@ export {
 export { DatabaseStartupError, prepareDatabaseFile } from './database-startup.mjs';
 export type { DatabaseStartupFailureCode, DatabaseStartupResult } from './database-startup.mjs';
 export { GameEventRepository } from './game-event-repository.js';
+export { GenerationRecordRepository } from './generation-record-repository.js';
+export type {
+  CompleteGenerationRecord,
+  CreateGenerationRecord,
+} from './generation-record-repository.js';
 export {
   ConversationRepository,
   ItemRepository,

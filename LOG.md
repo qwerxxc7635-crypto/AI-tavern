@@ -917,5 +917,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`30057b8`。
 - Commit message：`feat(M3-T05): build scoped AI contexts`
+
+## 2026-07-31 00:45 — M3-T06 实现AI输出结构验证
+
+### 范围
+
+实现AI原始JSON的任务Schema验证、错误定位与generation_records留存；不做领域补丁合法性判断。
+
+### 主要改动
+
+- ai-core新增逐任务结构验证器和成功/失败判别联合。
+- 非法JSON、Schema错误均返回稳定code、字段path和消息，原始文本逐字保留。
+- contracts新增GenerationRecord及验证错误协议。
+- persistence新增GenerationRecordRepository，分列保存请求、raw、validated output和validation error，并限制一次性完成。
+
+### 验证
+
+- 缺字段、错误枚举和嵌套越界值均拒绝且路径准确。
+- 成功和失败记录都经真实SQLite关闭/重连或读取验证；失败raw不进入validated output。
+- 双结果、无结果、重复完成和含凭据字段请求均拒绝。
+- `pnpm check`：通过；Vitest 22个文件、187项，Node SQLite 7项全部成功；TypeScript、ESLint、Prettier及Rust全套检查通过。
+
+### Bug修复
+
+- lint发现缺字段夹具的解构变量未使用，改为显式JSON副本删除字段，未放宽规则。
+
+### 自审
+
+- 结构通过不代表状态补丁可提交；未执行M3-T07。
+- 原始响应不写日志，只存既有SQLite审计列。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M3-T06): validate and retain AI outputs`

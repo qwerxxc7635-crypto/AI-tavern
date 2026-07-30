@@ -1,4 +1,9 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
+export type {
+  GenerationRecord,
+  GenerationValidationError,
+  GenerationValidationIssue,
+} from './generation-record.js';
 export { GAME_EVENT_TYPES } from './game-event.js';
 export type {
   GameEvent,

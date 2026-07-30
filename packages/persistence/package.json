@@ -10,5 +10,8 @@
   "dependencies": {
     "@ember-tavern/contracts": "workspace:*",
     "@ember-tavern/domain": "workspace:*"
+  },
+  "devDependencies": {
+    "@ember-tavern/ai-core": "workspace:*"
   }
 }

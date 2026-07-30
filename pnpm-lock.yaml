@@ -62,6 +62,10 @@ importers:
       '@ember-tavern/domain':
         specifier: workspace:*
         version: link:../domain
+    devDependencies:
+      '@ember-tavern/ai-core':
+        specifier: workspace:*
+        version: link:../ai-core
 
   packages/prompts:
     dependencies:
