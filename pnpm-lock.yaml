@@ -35,7 +35,11 @@ importers:
 
   packages/contracts: {}
 
-  packages/domain: {}
+  packages/domain:
+    dependencies:
+      '@ember-tavern/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   packages/persistence: {}
 

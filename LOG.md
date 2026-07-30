@@ -368,5 +368,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`10c4ee6`。
 - Commit message：`feat(M1-T07): define adventure contracts`
+
+## 2026-07-30 23:01 — M1-T08 实现 D20 规则引擎
+
+### 范围
+
+在 domain 包实现可注入随机源的D20检定、属性/装备/状态修正和四档难度；不实现 UI 或原生骰子服务。
+
+### 主要改动
+
+- 计划配置 domain 对 contracts 的 workspace依赖。
+- 计划新增D20引擎、输入校验和固定随机源测试。
+
+### 决策
+
+- 随机源通过最小接口注入，领域规则不直接依赖 Math.random或平台API。
+- 非法骰面、属性和修正直接拒绝，不静默截断。
+- 返回 contracts 定义的 DiceResult。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：8个文件、71个测试通过，D20新增13项。
+- 四档难度、成功/失败边界、骰面边界、修正和非法输入均有覆盖。
+
+### 自审
+
+- 领域层只依赖最小随机源接口，不调用平台或AI。
+- 输入拒绝非法值，结果冻结并可审计。
+- 未实现原生随机服务、用例、持久化或M1-T09。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T08): implement d20 rule engine`

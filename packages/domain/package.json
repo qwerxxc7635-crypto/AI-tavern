@@ -2,5 +2,12 @@
   "name": "@ember-tavern/domain",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@ember-tavern/contracts": "workspace:*"
+  }
 }
