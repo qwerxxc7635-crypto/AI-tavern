@@ -1,4 +1,21 @@
 export {
+  CAMPAIGN_ACTIVE_STATES,
+  CAMPAIGN_EXCEPTION_STATES,
+  CAMPAIGN_NORMAL_TRANSITIONS,
+  CampaignTransitionError,
+  createCampaign,
+  isCampaignActiveState,
+  isCampaignExceptionState,
+  transitionCampaign,
+} from './campaign.js';
+export type {
+  Campaign,
+  CampaignActiveState,
+  CampaignExceptionState,
+  CampaignState,
+  CreateCampaignInput,
+} from './campaign.js';
+export {
   adventureId,
   campaignId,
   compatibleEnum,

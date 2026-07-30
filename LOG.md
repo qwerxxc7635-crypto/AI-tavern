@@ -155,5 +155,43 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`855c93f`。
 - Commit message：`feat(M1-T01): define foundational contract types`
+
+## 2026-07-30 22:42 — M1-T02 定义 Campaign 与状态机协议
+
+### 范围
+
+定义 Campaign 结构、正常与异常状态、合法迁移和恢复约束；不定义世界、角色或持久化。
+
+### 主要改动
+
+- 计划新增 Campaign 协议、迁移实现和状态机测试。
+- 计划更新 contracts 出口、任务状态、日志与交接文档。
+
+### 决策
+
+- 异常状态保存原正常阶段，恢复只能回到该阶段，禁止任意跳转。
+- `ARCHIVED` 是终态；归档不等于异常恢复。
+- 状态迁移返回新 Campaign，不原地修改输入。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：2 个文件、25 个测试通过，其中 Campaign 新增 10 项。
+- 完整正常流程、重新生成、异常恢复、归档和非法迁移均有覆盖。
+
+### Bug修复
+
+- 严格类型检查发现测试时间数组动态索引可能越界；增加显式 RangeError，未使用非空断言绕过。
+
+### 自审
+
+- 异常只能恢复被中断阶段，归档是终态，时间不能倒退。
+- 迁移返回新对象，不原地修改 Campaign。
+- 未提前实现世界协议、持久化或应用用例。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T02): define campaign state machine`

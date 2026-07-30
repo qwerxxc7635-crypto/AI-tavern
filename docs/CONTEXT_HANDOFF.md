@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近提交：`M1-T01` 完成提交（以 `git log -1` 为准）
-- 已完成里程碑：M0 项目准备；M1 已完成 `M1-T01`
-- 当前任务：`M1-T01` 已验收，准备提交
-- 下一任务：`M1-T02 定义 Campaign 与状态机协议`
+- 最近提交：`M1-T02` 完成提交（以 `git log -1` 为准）
+- 已完成里程碑：M0 项目准备；M1 已完成 `M1-T01`、`M1-T02`
+- 当前任务：`M1-T02` 已验收，准备提交
+- 下一任务：`M1-T03 定义世界圣经与世界事实协议`
 
 ## 架构摘要
 
@@ -15,11 +15,14 @@
 - Windows 离线纵向切片优先；真实 Provider 和 iOS 全面适配按任务依赖推进。
 - pnpm 根 workspace 识别两个应用与八个共享 package；Cargo 根 workspace 识别 `ember-native-bridge`。
 - 根质量门统一执行 Prettier、ESLint、严格 TypeScript、Vitest、Rust fmt、Clippy 和测试。
+- Campaign 状态机以不可变迁移工作；异常状态保存 `resumeState`，归档为终态。
 
 ## 关键决策
 
 - `DEC-001`：酒馆老板计入三名常驻 NPC。
-- `DEC-002`：Cargo 动态验证延后到首个真实 crate 创建后，已在 `M0-T03` 完成。`n- `DEC-003`：基础协议使用 brand ID、canonical UTC、正整数版本和保留未知枚举值。
+- `DEC-002`：Cargo 动态验证延后到首个真实 crate 创建后，已在 `M0-T03` 完成。
+- `DEC-003`：基础协议使用 brand ID、canonical UTC、正整数版本和保留未知枚举值。
+- `DEC-004`：Campaign 异常状态保存并限制恢复阶段。
 
 ## 环境与限制
 
@@ -32,15 +35,14 @@
 
 ## 最近成功验证
 
-- `pnpm install --frozen-lockfile` 与 `pnpm peers check`。
-- `pnpm format:check`、`pnpm lint`、`pnpm typecheck`、`pnpm test`。
-- `cargo fmt --all -- --check`、严格 Clippy、`cargo test --workspace`、Cargo metadata。
-- M0 里程碑范围与占位/敏感信息扫描。
+- `pnpm check`：通过。
+- Vitest：2 个文件、25 个测试通过。
+- Rust fmt、严格 Clippy、workspace test 通过。
 
 ## 恢复步骤
 
 1. 完整读取仓库规则、规格、任务、日志、决策、README、`LOG.md` 和本文件。
 2. 检查 Git 状态与最近提交。
 3. 设置 `.local/` 下的 pnpm、npm、Cargo、TEMP、TMP 和构建路径。
-4. 从 `M1-T02` 定义 Campaign 结构、合法状态迁移与异常状态。
+4. 从 `M1-T03` 定义 WorldBible、Faction、Location、WorldFact 与事实分类。
 5. 新增业务逻辑必须添加真实测试，通过根质量门后独立提交并继续。
