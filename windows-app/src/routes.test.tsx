@@ -1,27 +1,56 @@
-import { renderToStaticMarkup } from 'react-dom/server';
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { AppRoutes } from './routes.js';
+import { AppLoading, AppRoutes, WINDOWS_NAVIGATION } from './routes.js';
+import { AppErrorBoundary } from './ui-states.js';
 
-describe('Windows application routes', () => {
-  it('renders the launch route with a value imported from shared contracts', () => {
-    const html = render('/');
+afterEach(cleanup);
 
-    expect(html).toContain('Ember Tavern');
-    expect(html).toContain('Schema v1');
-    expect(html).toContain('桌面运行时');
+describe('Windows application shell', () => {
+  it('navigates all six required sections through the shared shell', async () => {
+    render(
+      <MemoryRouter initialEntries={['/tavern']}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('navigation', { name: '主导航' })).toBeTruthy();
+    expect(WINDOWS_NAVIGATION).toHaveLength(6);
+    expect(await screen.findByRole('heading', { name: '酒馆' })).toBeTruthy();
+    expect(screen.getByText('共享协议 Schema v1')).toBeTruthy();
+
+    for (const { label } of WINDOWS_NAVIGATION.slice(1)) {
+      fireEvent.click(screen.getByRole('link', { name: label }));
+      expect(await screen.findByRole('heading', { name: label })).toBeTruthy();
+      expect(screen.getByRole('link', { name: label }).getAttribute('aria-current')).toBe('page');
+    }
   });
 
-  it('renders a stable not-found route', () => {
-    expect(render('/missing')).toContain('这条路还没有点灯');
+  it('renders the loading state with accessible progress semantics', () => {
+    render(<AppLoading />);
+
+    expect(screen.getByText('正在整理桌面…')).toBeTruthy();
+    expect(screen.getByRole('main').getAttribute('aria-busy')).toBe('true');
+  });
+
+  it('contains failures without exposing the raw exception text', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    render(
+      <AppErrorBoundary>
+        <BrokenPage />
+      </AppErrorBoundary>,
+    );
+
+    expect(screen.getByRole('alert')).toBeTruthy();
+    expect(screen.getByText('这个页面暂时无法打开。')).toBeTruthy();
+    expect(screen.queryByText('private failure detail')).toBeNull();
+    consoleError.mockRestore();
   });
 });
 
-function render(path: string): string {
-  return renderToStaticMarkup(
-    <MemoryRouter initialEntries={[path]}>
-      <AppRoutes />
-    </MemoryRouter>,
-  );
+function BrokenPage(): never {
+  throw new Error('private failure detail');
 }

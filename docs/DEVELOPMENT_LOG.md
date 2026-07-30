@@ -1392,3 +1392,31 @@
 - frontend-design技能将视觉限定为单一启动状态和一个拱形炉门识别元素，避免提前实现导航壳。
 - `DEC-027` 记录HashRouter、最小Tauri capability和可复现Windows资源边界。
 - 未实现M5-T02或任何后续任务。
+
+## 2026-07-31 02:35 — M5-T02 实现Windows应用壳和导航
+
+### 依赖与范围
+
+- 依赖 `M5-T01`：已完成并提交 `7593c2b`。
+- 仅实现侧栏、标题栏、加载状态、错误边界和六个规定页面的可导航骨架。
+- 不实现M5-T03存档首页、数据库连接、业务按钮、AI调用或后续页面功能。
+
+### 完成结果与验收
+
+- AppShell提供固定侧栏、品牌标记、离线状态和随路由变化的标题栏；窄窗口收起文字但保留全部导航入口。
+- WINDOWS_NAVIGATION集中定义酒馆、任务、冒险、角色、档案和设置六个路由；根路由重定向到酒馆，未知路径提供固定回退。
+- 六个页面使用延迟加载的独立模块并明确标注尚未启用业务功能；酒馆骨架继续运行共享contracts的Schema版本验证。
+- Suspense统一使用AppLoading，包含aria-live、aria-busy和reduced-motion静态降级。
+- 路由内容由AppErrorBoundary隔离；失败只显示开发者固定的恢复说明，不暴露原始异常文本、不吞掉数据库操作且切换路径会重建边界。
+- 3项jsdom组件测试逐一点击并验证六个活动路由、加载态可访问语义，以及错误边界不显示私有异常文本。
+- `pnpm --filter @ember-tavern/windows-app build`通过；Vite构建55个模块并生成独立section-pages chunk。
+- `tauri dev`再次实际启动Windows窗口，MainWindowTitle为Ember Tavern、MainWindowHandle非零且Responding=True；验收后所有子进程清理且1420端口释放。
+- 首轮全量检查发现空的componentDidCatch参数违反严格unused规则；移除非必要钩子后重跑全部通过，未调整规则。
+- 最终 `pnpm check`：通过；Vitest 33个文件、209项通过，Node SQLite 7项通过；TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和Cargo测试均通过。
+
+### 自审
+
+- 页面只展示固定空状态，不读取、缓存或伪造游戏事实。
+- 错误边界不写日志或存档，不会把异常文本泄露到UI；原生日志能力留给对应任务。
+- 沿用 `DEC-027` 的HashRouter和最小Tauri capability，没有产生新的重大架构决定。
+- 未实现M5-T03或任何后续任务。

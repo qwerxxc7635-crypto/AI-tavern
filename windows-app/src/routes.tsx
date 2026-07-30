@@ -1,46 +1,120 @@
-import { schemaVersion } from '@ember-tavern/contracts';
-import { Route, Routes } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
+import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
-const sharedSchema = schemaVersion(1);
+import { AppErrorBoundary } from './ui-states.js';
+
+const sectionPages = () => import('./section-pages.js');
+const TavernPage = lazy(() => sectionPages().then(({ TavernPage: page }) => ({ default: page })));
+const QuestsPage = lazy(() => sectionPages().then(({ QuestsPage: page }) => ({ default: page })));
+const AdventurePage = lazy(() =>
+  sectionPages().then(({ AdventurePage: page }) => ({ default: page })),
+);
+const CharacterPage = lazy(() =>
+  sectionPages().then(({ CharacterPage: page }) => ({ default: page })),
+);
+const ArchivesPage = lazy(() =>
+  sectionPages().then(({ ArchivesPage: page }) => ({ default: page })),
+);
+const SettingsPage = lazy(() =>
+  sectionPages().then(({ SettingsPage: page }) => ({ default: page })),
+);
+
+export const WINDOWS_NAVIGATION = [
+  { path: '/tavern', label: '酒馆', marker: 'T' },
+  { path: '/quests', label: '任务', marker: 'Q' },
+  { path: '/adventure', label: '冒险', marker: 'A' },
+  { path: '/character', label: '角色', marker: 'C' },
+  { path: '/archives', label: '档案', marker: 'R' },
+  { path: '/settings', label: '设置', marker: 'S' },
+] as const;
 
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<LaunchScreen />} />
-      <Route path="*" element={<RouteNotFound />} />
+      <Route element={<AppShell />}>
+        <Route index element={<Navigate to="/tavern" replace />} />
+        <Route path="tavern" element={<TavernPage />} />
+        <Route path="quests" element={<QuestsPage />} />
+        <Route path="adventure" element={<AdventurePage />} />
+        <Route path="character" element={<CharacterPage />} />
+        <Route path="archives" element={<ArchivesPage />} />
+        <Route path="settings" element={<SettingsPage />} />
+        <Route path="*" element={<RouteNotFound />} />
+      </Route>
     </Routes>
   );
 }
 
-function LaunchScreen() {
+export function AppShell() {
+  const location = useLocation();
+  const current = WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname);
+
   return (
-    <main className="launch-screen">
-      <section className="hearth" aria-labelledby="app-title">
-        <div className="hearth__glow" aria-hidden="true" />
-        <p className="eyebrow">Windows offline client</p>
-        <h1 id="app-title">Ember Tavern</h1>
-        <p className="subtitle">炉火已点燃，故事正在本地等候。</p>
-        <dl className="readiness" aria-label="应用启动状态">
+    <div className="app-frame">
+      <aside className="sidebar">
+        <div className="brand">
+          <span className="brand__mark" aria-hidden="true">
+            <span />
+          </span>
           <div>
-            <dt>桌面运行时</dt>
-            <dd>Ready</dd>
+            <p>Ember Tavern</p>
+            <span>炉火酒馆</span>
           </div>
+        </div>
+        <nav className="navigation" aria-label="主导航">
+          {WINDOWS_NAVIGATION.map(({ path, label, marker }) => (
+            <NavLink key={path} to={path}>
+              <span className="navigation__marker" aria-hidden="true">
+                {marker}
+              </span>
+              <span>{label}</span>
+            </NavLink>
+          ))}
+        </nav>
+        <p className="sidebar__status">
+          <span aria-hidden="true" />
+          本地离线
+        </p>
+      </aside>
+
+      <div className="workspace">
+        <header className="titlebar">
           <div>
-            <dt>共享协议</dt>
-            <dd>Schema v{sharedSchema}</dd>
+            <p className="eyebrow">Current room</p>
+            <p className="titlebar__title">{current?.label ?? '未知路径'}</p>
           </div>
-        </dl>
-      </section>
+          <p className="titlebar__mode">Local session</p>
+        </header>
+        <AppErrorBoundary key={location.pathname}>
+          <Suspense fallback={<AppLoading />}>
+            <Outlet />
+          </Suspense>
+        </AppErrorBoundary>
+      </div>
+    </div>
+  );
+}
+
+export function AppLoading() {
+  return (
+    <main className="system-state" aria-live="polite" aria-busy="true">
+      <span className="loading-glyph" aria-hidden="true" />
+      <p className="eyebrow">Preparing room</p>
+      <h1>正在整理桌面…</h1>
+      <p>本地内容加载完成后会自动继续。</p>
     </main>
   );
 }
 
 function RouteNotFound() {
   return (
-    <main className="route-message">
+    <main className="system-state">
       <p className="eyebrow">Route unavailable</p>
       <h1>这条路还没有点灯。</h1>
-      <a href="#/">返回炉火旁</a>
+      <p>返回酒馆，继续查看当前可用内容。</p>
+      <NavLink className="text-link" to="/tavern">
+        返回酒馆
+      </NavLink>
     </main>
   );
 }

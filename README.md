@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2、AI基础设施里程碑 M3 和应用用例里程碑 M4 已完成。Windows Tauri 2客户端可启动并加载React/Vite入口、基础路由、主题和共享协议；真实Provider及业务页面仍未实现。
+项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2、AI基础设施里程碑 M3 和应用用例里程碑 M4 已完成。Windows Tauri 2客户端可启动，应用壳可在酒馆、任务、冒险、角色、档案和设置间导航，并具备统一加载态与错误边界；真实Provider及业务页面仍未实现。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
@@ -43,7 +43,7 @@ cargo metadata --format-version 1
 cargo test --workspace
 ```
 
-当前启动页只验证桌面运行时、基础路由、主题和共享包连接；导航与游戏UI从M5-T02开始实现。
+当前六个入口是明确标注的页面骨架；存档首页与其他业务UI从M5-T03开始逐项实现。
 
 ## 本地开发缓存
 

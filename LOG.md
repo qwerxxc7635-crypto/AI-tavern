@@ -1153,5 +1153,20 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`7593c2b`。
 - Commit message：`feat(M5-T01): initialize Windows Tauri shell`
+
+## 2026-07-31 02:35 — M5-T02 Windows应用壳和导航
+
+- 新增固定侧栏和上下文标题栏，延续炉门与账册主题。
+- 酒馆、任务、冒险、角色、档案、设置六个入口均可导航并显示活动态。
+- 页面模块延迟加载，统一Suspense加载态具备可访问进度语义。
+- 路由级错误边界使用固定系统文案，不显示原始异常或修改游戏数据。
+- 3项jsdom组件测试覆盖六路导航、加载态和错误隔离。
+- 前端生产构建与Tauri实际窗口烟测通过；`pnpm check`通过，Vitest 33文件209项。
+- 未执行M5-T03。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M5-T02): add Windows shell navigation`
