@@ -193,5 +193,39 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`2e128c6`。
 - Commit message：`feat(M1-T02): define campaign state machine`
+
+## 2026-07-30 22:46 — M1-T03 定义世界圣经与世界事实协议
+
+### 范围
+
+定义 WorldBible、Faction、Location 和五类 WorldFact，支持生成结果与后续世界变化；不实现生成用例或持久化。
+
+### 主要改动
+
+- 计划新增 world 协议、实体 ID 和协议测试。
+- 计划更新 contracts 出口、任务状态、日志与交接。
+
+### 决策
+
+- 世界事实采用判别联合，锁定规则与发展/临时/认知类事实在类型层可区分。
+- 发展事实通过 `supersedesFactId` 形成可追溯演进，不覆盖旧事实。
+- 传闻保留真实性状态；错误认知记录认知该事实的 NPC ID。
+
+### 验证
+
+- `pnpm check`：通过。
+- Vitest：3 个文件、29 个测试通过，世界协议新增 4 项。
+- 完整 WorldBible、ID 隔离、五类事实与演进链均有覆盖。
+
+### 自审
+
+- 所有实体引用使用 brand ID，事实分类可由程序判别。
+- 发展事实追加而非覆盖，锁定规则有独立类别。
+- 未实现 AI、持久化、UI 或 M1-T04。
+
+### Git
+
+- Commit hash：待提交。
+- Commit message：`feat(M1-T03): define world contracts`

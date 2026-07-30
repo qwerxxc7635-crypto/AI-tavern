@@ -1,3 +1,19 @@
+export { WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
+export type {
+  DevelopingFact,
+  Faction,
+  FactionDisposition,
+  FactionRelation,
+  FalseBeliefFact,
+  Location,
+  LockedRuleFact,
+  RumorFact,
+  RumorVeracity,
+  TemporaryNarrativeFact,
+  WorldBible,
+  WorldBibleLockableField,
+  WorldFact,
+} from './world.js';
 export {
   CAMPAIGN_ACTIVE_STATES,
   CAMPAIGN_EXCEPTION_STATES,
@@ -19,22 +35,28 @@ export {
   adventureId,
   campaignId,
   compatibleEnum,
+  factionId,
   isoTimestamp,
+  locationId,
   npcId,
   promptVersion,
   questId,
   schemaVersion,
   timestampFromDate,
   turnId,
+  worldFactId,
 } from './foundation.js';
 export type {
   AdventureId,
   CampaignId,
   CompatibleEnum,
+  FactionId,
   IsoTimestamp,
+  LocationId,
   NpcId,
   PromptVersion,
   QuestId,
   SchemaVersion,
   TurnId,
+  WorldFactId,
 } from './foundation.js';

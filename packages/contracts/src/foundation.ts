@@ -9,6 +9,9 @@ export type NpcId = Branded<string, 'NpcId'>;
 export type QuestId = Branded<string, 'QuestId'>;
 export type AdventureId = Branded<string, 'AdventureId'>;
 export type TurnId = Branded<string, 'TurnId'>;
+export type FactionId = Branded<string, 'FactionId'>;
+export type LocationId = Branded<string, 'LocationId'>;
+export type WorldFactId = Branded<string, 'WorldFactId'>;
 export type IsoTimestamp = Branded<string, 'IsoTimestamp'>;
 export type SchemaVersion = Branded<number, 'SchemaVersion'>;
 export type PromptVersion = Branded<number, 'PromptVersion'>;
@@ -29,6 +32,9 @@ export const npcId = (value: string): NpcId => createId(value, 'NpcId');
 export const questId = (value: string): QuestId => createId(value, 'QuestId');
 export const adventureId = (value: string): AdventureId => createId(value, 'AdventureId');
 export const turnId = (value: string): TurnId => createId(value, 'TurnId');
+export const factionId = (value: string): FactionId => createId(value, 'FactionId');
+export const locationId = (value: string): LocationId => createId(value, 'LocationId');
+export const worldFactId = (value: string): WorldFactId => createId(value, 'WorldFactId');
 
 export function isoTimestamp(value: string): IsoTimestamp {
   requireCanonicalText(value, 'IsoTimestamp');
