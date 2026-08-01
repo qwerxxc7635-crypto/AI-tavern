@@ -17,6 +17,7 @@ import { PersistenceDataError } from './campaign-repository.js';
 import { ItemRepository } from './conversation-item-clock-repository.js';
 import { GameEventRepository } from './game-event-repository.js';
 import { requireRecord, requireString } from './persistence-validation.js';
+import { SnapshotRepository, type CreateSnapshot } from './snapshot-repository.js';
 import { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 import { NpcRepository } from './tavern-npc-repository.js';
 import type { TransactionalSqliteDatabase } from './sqlite-port.js';
@@ -44,6 +45,7 @@ export interface TurnCommit {
   readonly clues?: readonly Clue[];
   readonly statePatches: readonly TurnStatePatch[];
   readonly events: readonly GameEvent[];
+  readonly automaticSnapshot?: CreateSnapshot;
 }
 
 export class TurnTransaction {
@@ -101,6 +103,15 @@ export function applyTurnCommit(database: TransactionalSqliteDatabase, command: 
 
   const events = new GameEventRepository(database);
   for (const event of command.events) events.append(event);
+  if (command.automaticSnapshot !== undefined) {
+    if (
+      command.automaticSnapshot.campaignId !== command.campaignId ||
+      command.automaticSnapshot.kind !== 'AUTO'
+    ) {
+      throw new PersistenceDataError('Turn automatic snapshot must match the campaign and kind');
+    }
+    new SnapshotRepository(database).createInCurrentTransaction(command.automaticSnapshot);
+  }
 }
 
 function validateCommand(command: TurnCommit, isNewTurn: boolean): void {

@@ -127,7 +127,7 @@ export class RegenerationUseCases {
   }
 
   public rollbackLatestSnapshot(campaign: CampaignId): SaveSnapshot {
-    const latest = this.snapshots.findLatest(campaign);
+    const latest = this.snapshots.findLatestAutoByReasonPrefix(campaign, 'BEFORE_REGENERATION:');
     if (latest === null) {
       throw new AIOrchestrationError('SNAPSHOT_NOT_FOUND', 'Campaign has no snapshot to restore');
     }

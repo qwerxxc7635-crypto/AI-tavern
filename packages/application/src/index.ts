@@ -44,7 +44,11 @@ export type {
   AdventureStartState,
   GenerateAdventurePlanCommand,
 } from './adventure-start-use-cases.js';
-export { AdventureTurnUseCases, turnInputSnapshotReason } from './adventure-turn-use-cases.js';
+export {
+  AdventureTurnUseCases,
+  completedTurnSnapshotReason,
+  turnInputSnapshotReason,
+} from './adventure-turn-use-cases.js';
 export type {
   AdventureTurnIdentityFactory,
   ResolveAdventureTurnCommand,

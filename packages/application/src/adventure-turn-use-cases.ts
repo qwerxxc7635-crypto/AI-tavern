@@ -46,6 +46,7 @@ import {
   SnapshotRepository,
   WorldClockRepository,
   WorldRepository,
+  type CreateSnapshot,
   type TransactionalSqliteDatabase,
   type TurnCommit,
   type TurnStatePatch,
@@ -63,6 +64,7 @@ export interface AdventureTurnIdentityFactory {
   event(turnId: TurnId, kind: 'ACTION' | 'DICE'): GameEventId;
   fact(turnId: TurnId, phase: 'ACTION' | 'DICE', index: number): WorldFactId;
   snapshot(turnId: TurnId): SnapshotId;
+  completedSnapshot(requestId: AiRequestId): SnapshotId;
 }
 
 export interface SubmitPlayerActionCommand {
@@ -181,6 +183,31 @@ export class AdventureTurnUseCases {
       );
     }
     return this.requireTurn(turn.id, adventure.id);
+  }
+
+  public restoreLatestCompleteTurn(campaign: CampaignId, adventureId: AdventureId): AdventureTurn {
+    const snapshot = this.snapshots.findLatestAutoByReasonPrefix(
+      campaign,
+      completedTurnSnapshotPrefix(adventureId),
+    );
+    if (snapshot === null) {
+      throw new AIOrchestrationError(
+        'COMPLETE_TURN_SNAPSHOT_NOT_FOUND',
+        'Adventure has no complete turn snapshot to restore',
+      );
+    }
+    this.snapshots.restore(snapshot.id);
+    const adventure = this.requireAdventure(adventureId, campaign);
+    const turn = this.adventures
+      .listTurns(adventure.id)
+      .find((candidate) => candidate.turnNumber === adventure.currentTurnNumber);
+    if (turn === undefined || turn.playerAction === null || turn.resolvedAt === null) {
+      throw new AIOrchestrationError(
+        'COMPLETE_TURN_SNAPSHOT_INVALID',
+        'Restored snapshot does not end at a complete adventure turn',
+      );
+    }
+    return turn;
   }
 
   public async resolveAdventureTurn(command: ResolveAdventureTurnCommand): Promise<AdventureTurn> {
@@ -404,6 +431,9 @@ export class AdventureTurnUseCases {
       clues,
       statePatches: this.statePatches(command, output.statePatchProposals, 'ACTION', timestamp),
       events: [this.actionEvent(command.campaignId, adventure.id, nextTurn, timestamp)],
+      ...(nextTurn.resolvedAt === null
+        ? {}
+        : { automaticSnapshot: this.completedSnapshot(command, adventure.id, turn.id, timestamp) }),
     };
   }
 
@@ -429,6 +459,23 @@ export class AdventureTurnUseCases {
       }),
       statePatches: this.statePatches(command, output.statePatchProposals, 'DICE', timestamp),
       events: [],
+      automaticSnapshot: this.completedSnapshot(command, adventure.id, turn.id, timestamp),
+    };
+  }
+
+  private completedSnapshot(
+    command: ResolveAdventureTurnCommand,
+    adventureId: AdventureId,
+    turnId: TurnId,
+    createdAt: IsoTimestamp,
+  ): CreateSnapshot {
+    return {
+      id: this.identities.completedSnapshot(command.requestId),
+      campaignId: command.campaignId,
+      kind: 'AUTO',
+      reason: completedTurnSnapshotReason(adventureId, turnId),
+      schemaVersion: schemaVersion(1),
+      createdAt,
     };
   }
 
@@ -564,6 +611,14 @@ export class AdventureTurnUseCases {
 
 export function turnInputSnapshotReason(turn: TurnId): string {
   return `TURN_INPUT:${turn}`;
+}
+
+export function completedTurnSnapshotReason(adventure: AdventureId, turn: TurnId): string {
+  return `${completedTurnSnapshotPrefix(adventure)}${turn}`;
+}
+
+function completedTurnSnapshotPrefix(adventure: AdventureId): string {
+  return `AFTER_COMPLETE_TURN:${adventure}:`;
 }
 
 function generation(command: ResolveAdventureTurnCommand) {

@@ -46,6 +46,7 @@ import {
   NpcRepository,
   PlayerCharacterRepository,
   QuestRepository,
+  SnapshotRepository,
   TavernRepository,
   WorldRepository,
   type SqliteStatement,
@@ -88,6 +89,7 @@ const identities: AdventureTurnIdentityFactory = {
   event: (turn, kind) => gameEventId(`event:${turn}:${kind}`),
   fact: (turn, phase, index) => worldFactId(`fact:${turn}:${phase}:${index}`),
   snapshot: (turn) => snapshotId(`snapshot:${turn}`),
+  completedSnapshot: (request) => snapshotId(`snapshot:completed:${request}`),
 };
 
 afterEach(async () => {
@@ -193,6 +195,49 @@ describe('AdventureTurnUseCases', () => {
         'DICE_ROLLED',
         'PLAYER_ACTION_SUBMITTED',
       ]);
+
+      const incompleteTurnId = turnId('turn-after-latest-complete');
+      noCheck.submitPlayerAction({
+        campaignId: campaignKey,
+        adventureId: adventureKey,
+        turnId: incompleteTurnId,
+        currentScene: resolved.sceneText,
+        action: { kind: 'FREEFORM', text: 'Step into the next chamber.' },
+      });
+      expect(new AdventureRepository(sqlite).getTurn(incompleteTurnId)).not.toBeNull();
+
+      const restored = noCheck.restoreLatestCompleteTurn(campaignKey, adventureKey);
+      expect(restored.id).toBe(secondTurnId);
+      expect(restored.resolvedAt).toBe(at);
+      expect(new AdventureRepository(sqlite).getTurn(incompleteTurnId)).toBeNull();
+      expect(new AdventureRepository(sqlite).get(adventureKey)?.currentTurnNumber).toBe(2);
+
+      const snapshots = new SnapshotRepository(sqlite);
+      for (let index = 1; index <= 12; index += 1) {
+        snapshots.create({
+          id: snapshotId(`snapshot:rotation:${index}`),
+          campaignId: campaignKey,
+          kind: 'AUTO',
+          reason: `ROTATION_TEST:${index}`,
+          schemaVersion: schemaVersion(1),
+          createdAt: at,
+        });
+      }
+      const rotated = snapshots.list(campaignKey, 'AUTO');
+      expect(rotated).toHaveLength(10);
+      expect(rotated[0]?.id).toBe(snapshotId('snapshot:rotation:12'));
+      expect(rotated.at(-1)?.id).toBe(snapshotId('snapshot:rotation:3'));
+      expect(
+        snapshots.create({
+          id: snapshotId('snapshot:rotation:12'),
+          campaignId: campaignKey,
+          kind: 'AUTO',
+          reason: 'ROTATION_TEST:12',
+          schemaVersion: schemaVersion(1),
+          createdAt: at,
+        }),
+      ).toEqual(rotated[0]);
+      expect(snapshots.list(campaignKey, 'AUTO')).toHaveLength(10);
     } finally {
       database.close();
     }
@@ -337,6 +382,48 @@ describe('AdventureTurnUseCases', () => {
       expect(
         new WorldRepository(sqlite).listFacts(campaignKey).map(({ statement }) => statement),
       ).toEqual(['Old result.']);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('rolls back the complete turn when its automatic snapshot cannot commit', async () => {
+    const database = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seedCampaign(sqlite);
+      seedModelProfile(sqlite, config, 'profile-fake');
+      const turns = useCases(sqlite, noCheckProvider(), 10);
+      const turn = turnId('turn-snapshot-conflict');
+      const command = resolveCommand(turn, 'snapshot-conflict');
+      turns.submitPlayerAction({
+        campaignId: campaignKey,
+        adventureId: adventureKey,
+        turnId: turn,
+        currentScene: 'The complete turn must remain atomic with its snapshot.',
+        action: { kind: 'FREEFORM', text: 'Open the marked door.' },
+      });
+      new SnapshotRepository(sqlite).create({
+        id: identities.completedSnapshot(command.requestId),
+        campaignId: campaignKey,
+        kind: 'AUTO',
+        reason: 'CONFLICTING_SNAPSHOT',
+        schemaVersion: schemaVersion(1),
+        createdAt: at,
+      });
+
+      await expect(turns.resolveAdventureTurn(command)).rejects.toMatchObject({
+        code: 'COMMIT_FAILED',
+      });
+      expect(new AdventureRepository(sqlite).getTurn(turn)).toMatchObject({
+        sceneText: 'The complete turn must remain atomic with its snapshot.',
+        resolvedAt: null,
+      });
+      expect(new AdventureRepository(sqlite).get(adventureKey)).toMatchObject({
+        state: 'WAITING_FOR_PLAYER',
+        currentTurnNumber: 0,
+      });
+      expect(new GameEventRepository(sqlite).list(campaignKey)).toEqual([]);
     } finally {
       database.close();
     }

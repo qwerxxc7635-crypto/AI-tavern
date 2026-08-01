@@ -380,7 +380,7 @@ erDiagram
 | `checksum_sha256` | TEXT | payload校验和 |
 | `created_at` | TEXT | 创建时间 |
 
-索引：`idx_save_snapshots_campaign_time(campaign_id, created_at DESC)`、`idx_save_snapshots_campaign_kind(campaign_id, kind, created_at DESC)`。保留数量由备份服务执行，不通过触发器静默删除。
+索引：`idx_save_snapshots_campaign_time(campaign_id, created_at DESC)`、`idx_save_snapshots_campaign_kind(campaign_id, kind, created_at DESC)`。AUTO快照由Repository在同一事务中保留最近10个，不通过触发器静默删除；完整冒险回合使用`AFTER_COMPLETE_TURN:<adventureId>:<turnId>`原因，可与回合状态原子提交和定向恢复。
 
 ### 4.5 `provider_configs`
 

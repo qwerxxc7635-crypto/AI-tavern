@@ -27,7 +27,7 @@ interface SnapshotPayload {
   readonly tables: Readonly<Record<SnapshotTable, readonly StoredRow[]>>;
 }
 
-interface CreateSnapshot {
+export interface CreateSnapshot {
   readonly id: SnapshotId;
   readonly campaignId: CampaignId;
   readonly kind: SnapshotKind;
@@ -101,7 +101,36 @@ export class SnapshotRepository {
   public constructor(private readonly database: TransactionalSqliteDatabase) {}
 
   public create(input: CreateSnapshot): SaveSnapshot {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const snapshot = this.createInCurrentTransaction(input);
+      this.database.exec('COMMIT');
+      return snapshot;
+    } catch (error) {
+      try {
+        this.database.exec('ROLLBACK');
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Snapshot create and rollback both failed',
+          {
+            cause: rollbackError,
+          },
+        );
+      }
+      throw error;
+    }
+  }
+
+  public createInCurrentTransaction(input: CreateSnapshot): SaveSnapshot {
     requireReason(input.reason);
+    const existing = this.get(input.id);
+    if (existing !== null) {
+      if (!sameSnapshotIdentity(existing, input)) {
+        throw new PersistenceDataError(`Snapshot ID is already in use: ${input.id}`);
+      }
+      return existing;
+    }
     const payload = this.capturePayload(input.campaignId);
     const bytes = new TextEncoder().encode(canonicalJson(payload));
     const checksum = sha256(bytes);
@@ -153,6 +182,43 @@ export class SnapshotRepository {
             )
             .get(campaign, reason);
     return row === undefined ? null : mapSnapshot(row);
+  }
+
+  public findLatestAutoByReasonPrefix(
+    campaign: CampaignId,
+    reasonPrefix: string,
+  ): SaveSnapshot | null {
+    requireReason(reasonPrefix);
+    const row = this.database
+      .prepare(
+        `SELECT id, campaign_id, kind, reason, schema_version, checksum_sha256, created_at
+         FROM save_snapshots
+         WHERE campaign_id = ? AND kind = 'AUTO'
+           AND substr(reason, 1, length(?)) = ?
+         ORDER BY created_at DESC, rowid DESC LIMIT 1`,
+      )
+      .get(campaign, reasonPrefix, reasonPrefix);
+    return row === undefined ? null : mapSnapshot(row);
+  }
+
+  public list(campaign: CampaignId, kind?: SnapshotKind): readonly SaveSnapshot[] {
+    const rows =
+      kind === undefined
+        ? this.database
+            .prepare(
+              `SELECT id, campaign_id, kind, reason, schema_version, checksum_sha256, created_at
+               FROM save_snapshots WHERE campaign_id = ?
+               ORDER BY created_at DESC, rowid DESC`,
+            )
+            .all(campaign)
+        : this.database
+            .prepare(
+              `SELECT id, campaign_id, kind, reason, schema_version, checksum_sha256, created_at
+               FROM save_snapshots WHERE campaign_id = ? AND kind = ?
+               ORDER BY created_at DESC, rowid DESC`,
+            )
+            .all(campaign, kind);
+    return Object.freeze(rows.map(mapSnapshot));
   }
 
   public restore(id: SnapshotId): SaveSnapshot {
@@ -362,6 +428,17 @@ function requireReason(value: string): void {
   if (value.length === 0 || value.trim() !== value) {
     throw new PersistenceDataError('Snapshot reason must be non-empty canonical text');
   }
+}
+
+function sameSnapshotIdentity(existing: SaveSnapshot, input: CreateSnapshot): boolean {
+  return (
+    existing.id === input.id &&
+    existing.campaignId === input.campaignId &&
+    existing.kind === input.kind &&
+    existing.reason === input.reason &&
+    existing.schemaVersion === input.schemaVersion &&
+    existing.createdAt === input.createdAt
+  );
 }
 
 function sqlColumn(value: string): string {
