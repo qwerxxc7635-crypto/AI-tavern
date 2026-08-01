@@ -5,6 +5,7 @@ import {
   validateAIOutput,
   type AIProvider,
   type AITask,
+  type ModelCapabilities,
   type NormalizedAIRequest,
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
@@ -28,7 +29,7 @@ import {
   type TransactionalSqliteDatabase,
   type TurnCommit,
 } from '@ember-tavern/persistence';
-import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { formatTaskPrompt, type FormattedTaskPrompt } from '@ember-tavern/prompts';
 
 export interface AITurnGenerationOptions {
   readonly temperature: number;
@@ -49,9 +50,14 @@ export interface ExecuteAITurn {
   readonly modelProfileId: ModelProfileId | null;
   readonly modelName: string;
   readonly requireSelectedModelProfile?: boolean;
+  readonly repairSourceRequestId?: AiRequestId;
   readonly input: JsonValue;
   readonly generationOptions: AITurnGenerationOptions;
   readonly buildContext: () => unknown | Promise<unknown>;
+  readonly formatPrompt?: (
+    context: JsonValue,
+    capabilities: ModelCapabilities,
+  ) => FormattedTaskPrompt;
   readonly validateDomainAndBuildCommit: (output: JsonValue) => TurnCommit | Promise<TurnCommit>;
 }
 
@@ -163,7 +169,9 @@ export class AITurnOrchestrator {
         );
       }
       selectedModelProfileId = selectedProfile.id;
-      const formatted = formatTaskPrompt(command.task, context, decision.model.capabilities);
+      const formatted =
+        command.formatPrompt?.(context, decision.model.capabilities) ??
+        formatTaskPrompt(command.task, context, decision.model.capabilities);
       request = Object.freeze({
         requestId: command.requestId,
         task: command.task,
@@ -194,7 +202,7 @@ export class AITurnOrchestrator {
       task: command.task,
       modelProfileId: selectedModelProfileId,
       promptVersion: request.promptVersion,
-      request: requestJson(request, context),
+      request: requestJson(request, context, command.repairSourceRequestId),
       startedAt: this.now(),
     });
     this.requests.startAttempt(command.requestId, this.now());
@@ -307,7 +315,11 @@ export class AITurnOrchestrator {
   }
 }
 
-function requestJson(request: NormalizedAIRequest, context: JsonValue): JsonValue {
+function requestJson(
+  request: NormalizedAIRequest,
+  context: JsonValue,
+  repairSourceRequestId: AiRequestId | undefined,
+): JsonValue {
   return Object.freeze({
     requestId: request.requestId,
     task: request.task,
@@ -326,6 +338,7 @@ function requestJson(request: NormalizedAIRequest, context: JsonValue): JsonValu
     maxOutputTokens: request.maxOutputTokens,
     timeoutMs: request.timeoutMs,
     context,
+    ...(repairSourceRequestId === undefined ? {} : { repairSourceRequestId }),
   });
 }
 

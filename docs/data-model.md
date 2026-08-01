@@ -338,7 +338,7 @@ erDiagram
 | `task` | TEXT | AITask |
 | `model_profile_id` | TEXT NULL FK → model_profiles.id ON DELETE SET NULL | 实际模型 |
 | `prompt_version` | INTEGER CHECK >= 1 | 提示词版本 |
-| `request_json` | TEXT JSON | 规范化请求和裁剪后上下文 |
+| `request_json` | TEXT JSON | 规范化请求和裁剪后上下文；结构修复请求含`repairSourceRequestId` |
 | `raw_response_text` | TEXT NULL | 原始返回；传输阶段失败时为空 |
 | `validated_output_json` | TEXT NULL JSON | 通过结构验证的结果 |
 | `validation_error_json` | TEXT NULL JSON | 结构/业务错误详情 |

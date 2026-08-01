@@ -119,6 +119,22 @@ export class GenerationRecordRepository {
       .get(requestId);
     return row === undefined ? null : mapRecord(row);
   }
+
+  public getRepairBySourceRequestId(
+    sourceRequestId: GenerationRecord['requestId'],
+  ): GenerationRecord | null {
+    const rows = this.database
+      .prepare(
+        `SELECT * FROM generation_records
+         WHERE json_extract(request_json, '$.repairSourceRequestId') = ?
+         ORDER BY started_at, id`,
+      )
+      .all(sourceRequestId);
+    if (rows.length > 1) {
+      throw new PersistenceDataError('A source request cannot have multiple structure repairs');
+    }
+    return rows[0] === undefined ? null : mapRecord(rows[0]);
+  }
 }
 
 function mapRecord(value: unknown): GenerationRecord {

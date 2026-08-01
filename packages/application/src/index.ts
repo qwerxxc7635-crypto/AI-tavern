@@ -2,6 +2,8 @@ export { AIOrchestrationError, AITurnOrchestrator } from './ai-turn-orchestrator
 export type { AITurnGenerationOptions, ExecuteAITurn } from './ai-turn-orchestrator.js';
 export { AIRequestRecoveryUseCases } from './ai-request-recovery-use-cases.js';
 export type { RecoverAITurnCommand } from './ai-request-recovery-use-cases.js';
+export { StructuredOutputRepairUseCases } from './structured-output-repair-use-cases.js';
+export type { RepairStructuredTurnOutputCommand } from './structured-output-repair-use-cases.js';
 export { WorldCreationUseCases } from './world-creation-use-cases.js';
 export type {
   GenerateWorldCommand,

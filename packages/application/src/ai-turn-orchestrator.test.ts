@@ -62,7 +62,11 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { applyMigrations } from '../../persistence/src/migrations.mjs';
-import { AIRequestRecoveryUseCases, AITurnOrchestrator } from './index.js';
+import {
+  AIRequestRecoveryUseCases,
+  AITurnOrchestrator,
+  StructuredOutputRepairUseCases,
+} from './index.js';
 
 const directories: string[] = [];
 const campaignKey = campaignId('campaign-orchestrator');
@@ -347,6 +351,158 @@ describe('AITurnOrchestrator', () => {
         status: 'FAILED',
         lastError: { code: 'NO_MODEL_CANDIDATE', retryable: false },
       });
+    } finally {
+      database.close();
+    }
+  });
+
+  it('repairs invalid structured output once with the original model and the same context', async () => {
+    const { database } = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seed(sqlite);
+      const fake = new FakeAIProvider(() => at);
+      let callCount = 0;
+      const generate = vi.fn(async (request, config) => {
+        const response = await fake.generate(request, config);
+        callCount += 1;
+        return callCount === 1 ? { ...response, content: '{"sceneText":' } : response;
+      });
+      const orchestrator = new AITurnOrchestrator(
+        sqlite,
+        {
+          id: fake.id,
+          listModels: () => fake.listModels(),
+          testConnection: (config) => fake.testConnection(config),
+          generate,
+        },
+        providerConfig,
+        () => at,
+      );
+      const sourceCommand = executeCommand(sqlite, () => contextFromSqlite(sqlite));
+      await expect(orchestrator.execute(sourceCommand)).rejects.toMatchObject({
+        code: 'INVALID_OUTPUT',
+      });
+
+      const repair = new StructuredOutputRepairUseCases(sqlite, orchestrator, providerConfig);
+      const repairCommand = {
+        sourceRequestId: sourceCommand.requestId,
+        requestId: aiRequestId('request-orchestrator-repair'),
+        generationRecordId: generationRecordId('generation-orchestrator-repair'),
+        idempotencyKey: idempotencyKey('campaign-orchestrator:turn-1:repair'),
+        task: sourceCommand.task,
+        generationOptions: sourceCommand.generationOptions,
+        validateDomainAndBuildCommit: (output: unknown) => commitFromOutput(sqlite, output),
+      };
+
+      await expect(repair.repairTurn(repairCommand)).resolves.toBe('COMMITTED');
+      await expect(repair.repairTurn(repairCommand)).resolves.toBe('ALREADY_COMMITTED');
+      expect(generate).toHaveBeenCalledTimes(2);
+      const repairRequest = generate.mock.calls[1]?.[0];
+      expect(repairRequest?.modelName).toBe('ember-fake-v1');
+      expect(repairRequest?.messages.at(-2)).toEqual({
+        role: 'ASSISTANT',
+        content: '{"sceneText":',
+      });
+      expect(repairRequest?.messages.at(-1)?.content).toMatch(/JSON only/);
+
+      const requests = new PendingAiRequestRepository(sqlite);
+      const source = requests.get(sourceCommand.requestId);
+      expect(source).toMatchObject({ status: 'FAILED', lastError: { code: 'INVALID_OUTPUT' } });
+      expect(requests.get(repairCommand.requestId)).toMatchObject({
+        status: 'COMMITTED',
+        input: source?.input,
+        context: source?.context,
+      });
+      const generations = new GenerationRecordRepository(sqlite);
+      expect(generations.get(sourceCommand.generationRecordId)).toMatchObject({
+        rawResponseText: '{"sceneText":',
+        validatedOutput: null,
+        validationError: { code: 'INVALID_JSON' },
+      });
+      expect(generations.get(repairCommand.generationRecordId)).toMatchObject({
+        modelProfileId: modelProfileId('profile-fake'),
+        request: {
+          context: source?.context,
+          repairSourceRequestId: sourceCommand.requestId,
+        },
+        validationError: null,
+      });
+      expect(new GameEventRepository(sqlite).list(campaignKey)).toHaveLength(1);
+
+      await expect(
+        repair.repairTurn({
+          ...repairCommand,
+          requestId: aiRequestId('request-orchestrator-second-repair'),
+          generationRecordId: generationRecordId('generation-orchestrator-second-repair'),
+          idempotencyKey: idempotencyKey('campaign-orchestrator:turn-1:second-repair'),
+        }),
+      ).rejects.toMatchObject({ code: 'STRUCTURE_REPAIR_ALREADY_ATTEMPTED' });
+    } finally {
+      database.close();
+    }
+  });
+
+  it('keeps both invalid outputs and commits no game state when strict repair also fails', async () => {
+    const { database } = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seed(sqlite);
+      const fake = new FakeAIProvider(() => at);
+      let callCount = 0;
+      const orchestrator = new AITurnOrchestrator(
+        sqlite,
+        {
+          id: fake.id,
+          listModels: () => fake.listModels(),
+          testConnection: (config) => fake.testConnection(config),
+          async generate(request, config) {
+            const response = await fake.generate(request, config);
+            callCount += 1;
+            return { ...response, content: callCount === 1 ? '{"first":' : '{"repair":' };
+          },
+        },
+        providerConfig,
+        () => at,
+      );
+      const sourceCommand = executeCommand(sqlite, () => contextFromSqlite(sqlite));
+      await expect(orchestrator.execute(sourceCommand)).rejects.toMatchObject({
+        code: 'INVALID_OUTPUT',
+      });
+      const repairCommand = {
+        sourceRequestId: sourceCommand.requestId,
+        requestId: aiRequestId('request-orchestrator-failed-repair'),
+        generationRecordId: generationRecordId('generation-orchestrator-failed-repair'),
+        idempotencyKey: idempotencyKey('campaign-orchestrator:turn-1:failed-repair'),
+        task: sourceCommand.task,
+        generationOptions: sourceCommand.generationOptions,
+        validateDomainAndBuildCommit: (output: unknown) => commitFromOutput(sqlite, output),
+      };
+
+      await expect(
+        new StructuredOutputRepairUseCases(sqlite, orchestrator, providerConfig).repairTurn(
+          repairCommand,
+        ),
+      ).rejects.toMatchObject({ code: 'INVALID_OUTPUT' });
+
+      const requests = new PendingAiRequestRepository(sqlite);
+      expect(requests.get(sourceCommand.requestId)).toMatchObject({ status: 'FAILED' });
+      expect(requests.get(repairCommand.requestId)).toMatchObject({ status: 'FAILED' });
+      const generations = new GenerationRecordRepository(sqlite);
+      expect(generations.get(sourceCommand.generationRecordId)).toMatchObject({
+        rawResponseText: '{"first":',
+        validationError: { code: 'INVALID_JSON' },
+      });
+      expect(generations.get(repairCommand.generationRecordId)).toMatchObject({
+        rawResponseText: '{"repair":',
+        validationError: { code: 'INVALID_JSON' },
+      });
+      expect(new AdventureRepository(sqlite).getTurn(turnKey)).toMatchObject({
+        sceneText: 'The cellar door is sealed.',
+        resolvedAt: null,
+      });
+      expect(new WorldRepository(sqlite).getFact(worldFactId('fact-orchestrated'))).toBeNull();
+      expect(new GameEventRepository(sqlite).list(campaignKey)).toEqual([]);
     } finally {
       database.close();
     }

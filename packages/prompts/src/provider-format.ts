@@ -18,6 +18,15 @@ export interface FormattedTaskPrompt {
   readonly responseFormat: NormalizedResponseFormat;
 }
 
+export interface StructuralRepairError {
+  readonly code: string;
+  readonly issues: readonly {
+    readonly path: readonly (string | number)[];
+    readonly code: string;
+    readonly message: string;
+  }[];
+}
+
 export function formatTaskPrompt(
   task: AITask,
   input: unknown,
@@ -43,6 +52,31 @@ export function formatTaskPrompt(
     promptVersion: definition.version,
     messages: Object.freeze(messages),
     responseFormat: responseFormat(definition.outputSchemaName, schemas.output, capabilities),
+  });
+}
+
+export function formatOutputRepairPrompt(
+  task: AITask,
+  input: unknown,
+  invalidOutput: string,
+  error: StructuralRepairError,
+  capabilities: ModelCapabilities,
+): FormattedTaskPrompt {
+  const base = formatTaskPrompt(task, input, capabilities);
+  const instruction = [
+    'The previous response failed local structure validation.',
+    'Repair that response into exactly one JSON value matching the requested schema.',
+    'Preserve the original meaning. Do not add new story facts, state changes, or player actions.',
+    'Return JSON only: no Markdown fences, commentary, apology, or explanation.',
+    `Validation errors: ${JSON.stringify(error)}`,
+  ].join('\n');
+  return Object.freeze({
+    ...base,
+    messages: Object.freeze([
+      ...base.messages,
+      { role: 'ASSISTANT', content: invalidOutput } satisfies NormalizedMessage,
+      { role: 'USER', content: instruction } satisfies NormalizedMessage,
+    ]),
   });
 }
 

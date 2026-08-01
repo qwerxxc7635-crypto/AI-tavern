@@ -2,7 +2,13 @@ import { AI_TASKS, type ModelCapabilities } from '@ember-tavern/ai-core';
 import { isoTimestamp } from '@ember-tavern/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { BASE_RULES, PROMPT_HISTORY, TASK_PROMPTS, formatTaskPrompt } from './index.js';
+import {
+  BASE_RULES,
+  PROMPT_HISTORY,
+  TASK_PROMPTS,
+  formatOutputRepairPrompt,
+  formatTaskPrompt,
+} from './index.js';
 
 const checkedAt = isoTimestamp('2026-07-31T00:25:00.000Z');
 const capabilities: ModelCapabilities = {
@@ -99,5 +105,25 @@ describe('provider-neutral prompt formatting', () => {
 
   it('rejects task input before rendering a provider prompt', () => {
     expect(() => formatTaskPrompt('GENERATE_WORLD', { concept: '' }, capabilities)).toThrow();
+  });
+
+  it('asks the original model for JSON-only repair while preserving the invalid output', () => {
+    const formatted = formatOutputRepairPrompt(
+      'GENERATE_WORLD',
+      worldInput,
+      '{"name":',
+      {
+        code: 'INVALID_JSON',
+        issues: [{ path: [], code: 'invalid_json', message: 'Response is not valid JSON' }],
+      },
+      capabilities,
+    );
+
+    expect(formatted.messages.at(-2)).toEqual({ role: 'ASSISTANT', content: '{"name":' });
+    expect(formatted.messages.at(-1)).toMatchObject({ role: 'USER' });
+    expect(formatted.messages.at(-1)?.content).toMatch(/JSON only/);
+    expect(formatted.messages.at(-1)?.content).toMatch(/Do not add new story facts/);
+    expect(formatted.messages.at(-1)?.content).toContain('INVALID_JSON');
+    expect(formatted.responseFormat.kind).toBe('JSON_SCHEMA');
   });
 });
