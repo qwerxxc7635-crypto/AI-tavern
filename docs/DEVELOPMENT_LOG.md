@@ -2206,3 +2206,22 @@
 
 - M10-T01达到状态机、骰子、关系、时钟和补丁验证的正常、边界、非法输入、隔离、不可变与错误定位约定覆盖范围。
 - 下一任务为M10-T02完成正式启用Provider的统一合同测试。
+
+## 2026-08-01 — M10-T02 完成Provider Contract Test
+
+### 覆盖范围
+
+- 以Windows设置页和Tauri `provider_probe`真实可选项为准，正式启用Provider为DeepSeek、Qwen、OpenRouter、Ollama和自定义兼容服务；通用OpenAI-Compatible配置是共享适配器，不作为独立可选Provider重复计数。
+- 新增一套由5个独立测试共同调用的统一合同：模型发现、连接测试、Text生成、JSON Object生成、请求路径与消息角色、Token/结束原因归一化、429稳定错误分类、畸形JSON拒绝，以及JsonSchema不支持时的传输前拒绝。
+- 保留各Provider已有专项测试，继续覆盖预设元数据、中文世界/对话/任务、OpenRouter免费模型选择、Ollama无凭据行为，以及自定义Header与安全校验。
+
+### 验证
+
+- `cargo test -p ember-provider-openai-compatible`通过15项测试，其中5项为正式启用Provider的同一合同矩阵；所有请求仅发送到测试进程的本地临时TCP服务，没有访问真实Provider或产生费用。
+- 目标crate严格Clippy、全仓格式和差异空白检查通过。
+- `pnpm check`通过56个Vitest文件334项、10项Node SQLite和54项Rust测试；格式、lint、类型检查及严格Clippy通过。Windows前端生产build转换177个模块，NSIS Release复建成功。
+
+### 结论
+
+- M10-T02验收通过：每个正式启用Provider均通过同一测试集合，且共享适配器的结构和业务错误边界未被绕过。
+- 下一任务为M10-T03完成Windows端到端测试。

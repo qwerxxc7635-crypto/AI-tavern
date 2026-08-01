@@ -107,6 +107,156 @@ fn normalized(response_format: ResponseFormat) -> NormalizedRequest {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum EnabledProviderContract {
+    DeepSeek,
+    Qwen,
+    OpenRouter,
+    Ollama,
+    Custom,
+}
+
+impl EnabledProviderContract {
+    fn config(self, base_url: &str) -> OpenAiCompatibleConfig {
+        match self {
+            Self::DeepSeek => DeepSeekPreset::config_for_contract_test(base_url).unwrap(),
+            Self::Qwen => QwenPreset::config_for_contract_test(base_url).unwrap(),
+            Self::OpenRouter => OpenRouterPreset::config_for_contract_test(base_url).unwrap(),
+            Self::Ollama => OllamaPreset::config_for_contract_test(base_url).unwrap(),
+            Self::Custom => {
+                CustomCompatibleConfig::new(base_url, "contract-model", None, Vec::new())
+                    .unwrap()
+                    .provider_config()
+                    .clone()
+            }
+        }
+    }
+}
+
+async fn run_enabled_provider_contract(case: EnabledProviderContract) {
+    let models = r#"{"data":[{"id":"contract-model","owned_by":"contract"}]}"#;
+    let text_completion = r#"{"id":"contract-text","model":"contract-model","choices":[{"message":{"content":"Contract text response."},"finish_reason":"stop"}],"usage":{"prompt_tokens":9,"completion_tokens":3,"total_tokens":12}}"#;
+    let json_completion = r#"{"id":"contract-json","model":"contract-model","choices":[{"message":{"content":"{\"status\":\"ok\"}"},"finish_reason":"length"}]}"#;
+    let (base_url, captured) = server(vec![
+        (200, models),
+        (200, models),
+        (200, text_completion),
+        (200, json_completion),
+        (429, "{}"),
+        (200, "not-json"),
+    ])
+    .await;
+    let config = case.config(&base_url);
+    let provider = OpenAiCompatibleProvider::new().unwrap();
+
+    let listed = provider
+        .list_models(&config, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(listed.len(), 1, "{case:?} must normalize the model list");
+    assert_eq!(listed[0].name, "contract-model");
+    assert!(matches!(
+        provider
+            .test_connection(&config, CancellationToken::new())
+            .await,
+        ConnectionTestResult::Success { .. }
+    ));
+
+    let text = provider
+        .generate(
+            &config,
+            &normalized(ResponseFormat::Text),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(text.content, "Contract text response.");
+    assert_eq!(text.finish_reason, FinishReason::Stop);
+    assert_eq!(text.usage.input_tokens, Some(9));
+
+    let json = provider
+        .generate(
+            &config,
+            &normalized(ResponseFormat::JsonObject),
+            CancellationToken::new(),
+        )
+        .await
+        .unwrap();
+    assert_eq!(json.content, r#"{"status":"ok"}"#);
+    assert_eq!(json.finish_reason, FinishReason::Length);
+    assert_eq!(json.usage, TokenUsage::unknown());
+
+    assert_eq!(
+        provider
+            .list_models(&config, CancellationToken::new())
+            .await,
+        Err(ProviderError::RateLimited),
+        "{case:?} must use the shared stable error vocabulary"
+    );
+    assert_eq!(
+        provider
+            .list_models(&config, CancellationToken::new())
+            .await,
+        Err(ProviderError::InvalidResponse),
+        "{case:?} must reject malformed provider responses"
+    );
+    assert_eq!(
+        provider
+            .generate(
+                &config,
+                &normalized(ResponseFormat::JsonSchema),
+                CancellationToken::new(),
+            )
+            .await,
+        Err(ProviderError::Unsupported),
+        "{case:?} must reject unsupported response formats before transport"
+    );
+
+    let requests = captured.lock().await;
+    assert_eq!(requests.len(), 6);
+    assert!(String::from_utf8_lossy(&requests[0].head).starts_with("GET /v1/models "));
+    assert!(String::from_utf8_lossy(&requests[1].head).starts_with("GET /v1/models "));
+    assert!(String::from_utf8_lossy(&requests[2].head).starts_with("POST /v1/chat/completions "));
+    assert!(String::from_utf8_lossy(&requests[3].head).starts_with("POST /v1/chat/completions "));
+    let text_body: Value = serde_json::from_slice(&requests[2].body).unwrap();
+    let json_body: Value = serde_json::from_slice(&requests[3].body).unwrap();
+    assert_eq!(text_body["model"], "ember-model");
+    assert!(text_body.get("response_format").is_none());
+    assert_eq!(json_body["response_format"]["type"], "json_object");
+    assert_eq!(json_body["messages"][0]["role"], "system");
+    assert_eq!(json_body["messages"][1]["role"], "user");
+}
+
+macro_rules! enabled_provider_contract_test {
+    ($test_name:ident, $case:expr) => {
+        #[tokio::test]
+        async fn $test_name() {
+            run_enabled_provider_contract($case).await;
+        }
+    };
+}
+
+enabled_provider_contract_test!(
+    deepseek_passes_unified_provider_contract,
+    EnabledProviderContract::DeepSeek
+);
+enabled_provider_contract_test!(
+    qwen_passes_unified_provider_contract,
+    EnabledProviderContract::Qwen
+);
+enabled_provider_contract_test!(
+    openrouter_passes_unified_provider_contract,
+    EnabledProviderContract::OpenRouter
+);
+enabled_provider_contract_test!(
+    ollama_passes_unified_provider_contract,
+    EnabledProviderContract::Ollama
+);
+enabled_provider_contract_test!(
+    custom_passes_unified_provider_contract,
+    EnabledProviderContract::Custom
+);
+
 #[cfg(target_os = "windows")]
 #[tokio::test]
 async fn contract_generates_text_with_an_os_stored_credential() {

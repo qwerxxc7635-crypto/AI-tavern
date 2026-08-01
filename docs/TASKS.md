@@ -895,6 +895,7 @@
 
 ## M10-T02 完成Provider Contract Test
 
+- 状态：已完成（2026-08-01）
 - 优先级：P0
 - Windows v0.1分类：P0（正式启用Provider的统一合同发布门）
 - 依赖：M6全部任务
