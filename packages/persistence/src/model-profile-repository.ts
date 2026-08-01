@@ -32,6 +32,8 @@ export interface RegisteredModelCapabilities {
 export interface RegisteredModelProfile {
   readonly id: ModelProfileId;
   readonly providerConfigId: string;
+  readonly providerPresetKey: string;
+  readonly providerType: string;
   readonly modelName: string;
   readonly displayName: string;
   readonly capabilities: RegisteredModelCapabilities;
@@ -48,6 +50,7 @@ export class ModelProfileRepository {
       this.database
         .prepare(
           `SELECT m.id, m.provider_config_id, m.model_name, m.display_name,
+                  p.preset_key, p.provider_type,
                   m.capabilities_json, m.capabilities_checked_at
            FROM model_profiles m
            JOIN provider_configs p ON p.id = m.provider_config_id
@@ -58,6 +61,38 @@ export class ModelProfileRepository {
         .map(mapProfile)
         .filter((profile): profile is RegisteredModelProfile => profile !== null),
     );
+  }
+
+  public getEnabled(id: ModelProfileId): RegisteredModelProfile | null {
+    return this.getById(id, true);
+  }
+
+  public get(id: ModelProfileId): RegisteredModelProfile | null {
+    return this.getById(id, false);
+  }
+
+  public getConfiguredFallback(): RegisteredModelProfile | null {
+    const row = this.database
+      .prepare("SELECT value_json FROM app_settings WHERE key = 'fallback_model_profile_id'")
+      .get();
+    if (row === undefined) return null;
+    const value = requireRecord(row, 'Fallback model setting row')['value_json'];
+    const id = modelProfileId(requireString(parseJson(value, 'value_json'), 'fallback model ID'));
+    return this.getEnabled(id);
+  }
+
+  private getById(id: ModelProfileId, requireEnabled: boolean): RegisteredModelProfile | null {
+    const row = this.database
+      .prepare(
+        `SELECT m.id, m.provider_config_id, m.model_name, m.display_name,
+                p.preset_key, p.provider_type,
+                m.capabilities_json, m.capabilities_checked_at
+         FROM model_profiles m
+         JOIN provider_configs p ON p.id = m.provider_config_id
+         WHERE m.id = ?${requireEnabled ? ' AND m.enabled = 1 AND p.enabled = 1' : ''}`,
+      )
+      .get(id);
+    return row === undefined ? null : mapProfile(row);
   }
 }
 
@@ -83,6 +118,8 @@ function mapProfile(value: unknown): RegisteredModelProfile | null {
     return Object.freeze({
       id: modelProfileId(requireString(row['id'], 'id')),
       providerConfigId: requireString(row['provider_config_id'], 'provider_config_id'),
+      providerPresetKey: requireString(row['preset_key'], 'preset_key'),
+      providerType: requireString(row['provider_type'], 'provider_type'),
       modelName: requireString(row['model_name'], 'model_name'),
       displayName: requireString(row['display_name'], 'display_name'),
       capabilities,

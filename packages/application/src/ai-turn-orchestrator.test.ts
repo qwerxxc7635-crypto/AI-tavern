@@ -7,6 +7,7 @@ import {
   buildAdventureTurnContext,
   FakeAIProvider,
   GenerateAdventureTurnOutputSchema,
+  StandardAIError,
   type AIProvider,
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
@@ -61,7 +62,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { applyMigrations } from '../../persistence/src/migrations.mjs';
-import { AITurnOrchestrator } from './index.js';
+import { AIRequestRecoveryUseCases, AITurnOrchestrator } from './index.js';
 
 const directories: string[] = [];
 const campaignKey = campaignId('campaign-orchestrator');
@@ -189,6 +190,127 @@ describe('AITurnOrchestrator', () => {
         resolvedAt: null,
       });
       expect(new GameEventRepository(sqlite).list(campaignKey)).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('switches providers after quota exhaustion and commits the same persisted turn context once', async () => {
+    const { database } = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seed(sqlite);
+      const fake = new FakeAIProvider(() => at);
+      const failingProvider: AIProvider = {
+        id: 'quota-provider',
+        listModels: () => fake.listModels(),
+        testConnection: (config) => fake.testConnection(config),
+        async generate() {
+          throw new StandardAIError('QUOTA_EXCEEDED');
+        },
+      };
+      const sourceOrchestrator = new AITurnOrchestrator(
+        sqlite,
+        failingProvider,
+        providerConfig,
+        () => at,
+      );
+      const sourceCommand = executeCommand(sqlite, () => contextFromSqlite(sqlite));
+
+      await expect(sourceOrchestrator.execute(sourceCommand)).rejects.toMatchObject({
+        code: 'QUOTA_EXCEEDED',
+      });
+      expect(new AdventureRepository(sqlite).getTurn(turnKey)).toMatchObject({
+        sceneText: 'The cellar door is sealed.',
+        resolvedAt: null,
+      });
+
+      const targetProviderConfig: ProviderConfig = {
+        ...providerConfig,
+        id: 'fallback-provider',
+        providerType: 'OPENAI_COMPATIBLE',
+        presetKey: 'deepseek',
+        displayName: 'Fallback Provider',
+      };
+      seedFallbackProfile(sqlite, targetProviderConfig);
+      const targetGenerate = vi.fn((request, config) => fake.generate(request, config));
+      const targetOrchestrator = new AITurnOrchestrator(
+        sqlite,
+        {
+          id: 'fallback-provider-adapter',
+          listModels: () => fake.listModels(),
+          testConnection: (config) => fake.testConnection(config),
+          generate: targetGenerate,
+        },
+        targetProviderConfig,
+        () => at,
+      );
+      const recovery = new AIRequestRecoveryUseCases(
+        sqlite,
+        targetOrchestrator,
+        targetProviderConfig,
+        () => at,
+      );
+      const recoveryCommand = {
+        sourceRequestId: sourceCommand.requestId,
+        requestId: aiRequestId('request-orchestrator-fallback'),
+        generationRecordId: generationRecordId('generation-orchestrator-fallback'),
+        idempotencyKey: idempotencyKey('campaign-orchestrator:turn-1:fallback'),
+        task: sourceCommand.task,
+        targetModelProfileId: modelProfileId('profile-fallback'),
+        targetModelName: 'ember-fake-v1',
+        selection: 'CONFIGURED_FALLBACK' as const,
+        crossProviderDisclosureAccepted: false,
+        modelSwitchedEventId: gameEventId('event-model-switched'),
+        generationOptions: sourceCommand.generationOptions,
+        validateDomainAndBuildCommit: (output: unknown) => commitFromOutput(sqlite, output),
+      };
+
+      await expect(recovery.recoverTurn(recoveryCommand)).rejects.toMatchObject({
+        code: 'CROSS_PROVIDER_DISCLOSURE_REQUIRED',
+      });
+      expect(new PendingAiRequestRepository(sqlite).get(recoveryCommand.requestId)).toBeNull();
+
+      const approved = { ...recoveryCommand, crossProviderDisclosureAccepted: true };
+      await expect(recovery.recoverTurn(approved)).resolves.toBe('COMMITTED');
+      await expect(recovery.recoverTurn(approved)).resolves.toBe('ALREADY_COMMITTED');
+
+      expect(targetGenerate).toHaveBeenCalledTimes(1);
+      const requests = new PendingAiRequestRepository(sqlite);
+      const source = requests.get(sourceCommand.requestId);
+      const recovered = requests.get(recoveryCommand.requestId);
+      expect(source).toMatchObject({
+        status: 'FAILED',
+        lastError: { code: 'QUOTA_EXCEEDED' },
+      });
+      expect(recovered).toMatchObject({
+        status: 'COMMITTED',
+        input: source?.input,
+        context: source?.context,
+        attemptCount: 1,
+      });
+      expect(
+        new GenerationRecordRepository(sqlite).get(recoveryCommand.generationRecordId),
+      ).toMatchObject({
+        modelProfileId: modelProfileId('profile-fallback'),
+        request: { context: source?.context },
+      });
+      expect(new AdventureRepository(sqlite).getTurn(turnKey)).toMatchObject({
+        sceneText: 'Warm light leaks through the old cellar lock as the storm shakes the shutters.',
+        resolvedAt: at,
+      });
+      expect(new WorldRepository(sqlite).getFact(worldFactId('fact-orchestrated'))).not.toBeNull();
+      const events = new GameEventRepository(sqlite).list(campaignKey);
+      expect(events.map(({ type }) => type).sort()).toEqual([
+        'MODEL_SWITCHED',
+        'PLAYER_ACTION_SUBMITTED',
+      ]);
+      expect(events.find(({ type }) => type === 'MODEL_SWITCHED')).toMatchObject({
+        payload: {
+          previous: { providerKey: 'custom', modelName: 'ember-fake-v1' },
+          current: { providerKey: 'deepseek', modelName: 'ember-fake-v1' },
+        },
+      });
     } finally {
       database.close();
     }
@@ -402,6 +524,48 @@ function seed(database: TransactionalSqliteDatabase): void {
   const adventures = new AdventureRepository(database);
   adventures.create(adventure());
   adventures.addTurn(pendingTurn());
+}
+
+function seedFallbackProfile(database: TransactionalSqliteDatabase, config: ProviderConfig): void {
+  database
+    .prepare(
+      `INSERT INTO provider_configs (
+         id, provider_type, preset_key, display_name, base_url, credential_ref,
+         options_json, enabled, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, NULL, NULL, '{}', 1, ?, ?)`,
+    )
+    .run(config.id, config.providerType, config.presetKey, config.displayName, at, at);
+  database
+    .prepare(
+      `INSERT INTO model_profiles (
+         id, provider_config_id, model_name, display_name, capabilities_json,
+         task_options_json, enabled, capabilities_checked_at, created_at, updated_at
+       ) VALUES ('profile-fallback', ?, 'ember-fake-v1', 'Ember Fake Fallback', ?, '{}', 1, ?, ?, ?)`,
+    )
+    .run(
+      config.id,
+      JSON.stringify({
+        text: true,
+        streaming: false,
+        systemMessages: true,
+        jsonMode: false,
+        jsonSchema: false,
+        toolCalling: false,
+        reasoning: false,
+        contextWindowTokens: 32768,
+        costStatus: 'FREE',
+        checkedAt: at,
+      }),
+      at,
+      at,
+      at,
+    );
+  database
+    .prepare(
+      `INSERT INTO app_settings (key, value_json, updated_at)
+       VALUES ('fallback_model_profile_id', ?, ?)`,
+    )
+    .run(JSON.stringify('profile-fallback'), at);
 }
 
 function world(): WorldBible {

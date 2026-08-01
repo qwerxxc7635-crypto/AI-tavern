@@ -112,6 +112,13 @@ export class GenerationRecordRepository {
     const row = this.database.prepare('SELECT * FROM generation_records WHERE id = ?').get(id);
     return row === undefined ? null : mapRecord(row);
   }
+
+  public getByRequestId(requestId: GenerationRecord['requestId']): GenerationRecord | null {
+    const row = this.database
+      .prepare('SELECT * FROM generation_records WHERE request_id = ?')
+      .get(requestId);
+    return row === undefined ? null : mapRecord(row);
+  }
 }
 
 function mapRecord(value: unknown): GenerationRecord {

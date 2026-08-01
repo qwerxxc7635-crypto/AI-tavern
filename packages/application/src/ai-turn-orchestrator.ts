@@ -48,6 +48,7 @@ export interface ExecuteAITurn {
   readonly task: AITask;
   readonly modelProfileId: ModelProfileId | null;
   readonly modelName: string;
+  readonly requireSelectedModelProfile?: boolean;
   readonly input: JsonValue;
   readonly generationOptions: AITurnGenerationOptions;
   readonly buildContext: () => unknown | Promise<unknown>;
@@ -118,7 +119,10 @@ export class AITurnOrchestrator {
     let request: NormalizedAIRequest;
     let selectedModelProfileId: ModelProfileId;
     try {
-      const profiles = this.modelProfiles.listEnabled(this.providerConfig.id);
+      const enabledProfiles = this.modelProfiles.listEnabled(this.providerConfig.id);
+      const profiles = command.requireSelectedModelProfile
+        ? enabledProfiles.filter((profile) => profile.id === command.modelProfileId)
+        : enabledProfiles;
       const ordered = [...profiles].sort((left, right) => {
         const leftPreferred =
           left.id === command.modelProfileId || left.modelName === command.modelName;
