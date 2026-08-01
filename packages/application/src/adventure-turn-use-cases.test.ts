@@ -102,6 +102,7 @@ describe('AdventureTurnUseCases', () => {
     try {
       const sqlite = adaptDatabase(database);
       seedCampaign(sqlite);
+      seedModelProfile(sqlite, config, 'profile-fake');
       const checked = useCases(sqlite, new FakeAIProvider(() => at), 7);
       const firstTurnId = turnId('turn-check');
 
@@ -202,6 +203,7 @@ describe('AdventureTurnUseCases', () => {
     try {
       const sqlite = adaptDatabase(database);
       seedCampaign(sqlite);
+      seedModelProfile(sqlite, config, 'profile-fake');
       const turn = turnId('turn-regenerate');
       const originalTurns = useCases(
         sqlite,
@@ -227,6 +229,7 @@ describe('AdventureTurnUseCases', () => {
         presetKey: 'openrouter',
         displayName: 'Other Fake',
       };
+      seedModelProfile(sqlite, targetConfig, 'profile-other');
       const targetTurns = new AdventureTurnUseCases(
         sqlite,
         factProvider('New result.', 'The new path opens.'),
@@ -462,6 +465,55 @@ function seedCampaign(database: TransactionalSqliteDatabase): void {
   new QuestRepository(database).create(quest());
   new AdventureRepository(database).create(adventure(), clues());
   new ItemRepository(database).create(item(), characterKey);
+}
+
+function seedModelProfile(
+  database: TransactionalSqliteDatabase,
+  provider: ProviderConfig,
+  profileId: string,
+): void {
+  database
+    .prepare(
+      `INSERT INTO provider_configs (
+         id, provider_type, preset_key, display_name, base_url, credential_ref,
+         options_json, enabled, created_at, updated_at
+       ) VALUES (?, ?, ?, ?, ?, NULL, '{}', 1, ?, ?)`,
+    )
+    .run(
+      provider.id,
+      provider.providerType,
+      provider.presetKey,
+      provider.displayName,
+      provider.baseUrl,
+      at,
+      at,
+    );
+  database
+    .prepare(
+      `INSERT INTO model_profiles (
+         id, provider_config_id, model_name, display_name, capabilities_json,
+         task_options_json, enabled, capabilities_checked_at, created_at, updated_at
+       ) VALUES (?, ?, 'ember-fake-v1', 'Ember Fake v1', ?, '{}', 1, ?, ?, ?)`,
+    )
+    .run(
+      profileId,
+      provider.id,
+      JSON.stringify({
+        text: true,
+        streaming: false,
+        systemMessages: true,
+        jsonMode: true,
+        jsonSchema: true,
+        toolCalling: false,
+        reasoning: false,
+        contextWindowTokens: 32768,
+        costStatus: 'FREE',
+        checkedAt: at,
+      }),
+      at,
+      at,
+      at,
+    );
 }
 
 function adventure(): Adventure {

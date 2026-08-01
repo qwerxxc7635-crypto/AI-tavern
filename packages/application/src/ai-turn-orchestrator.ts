@@ -1,4 +1,5 @@
 import {
+  routeModel,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -19,6 +20,7 @@ import {
 import { DomainPatchValidationError } from '@ember-tavern/domain';
 import {
   GenerationRecordRepository,
+  ModelProfileRepository,
   PendingAiRequestRepository,
   type IdempotentCommitResult,
   type TransactionalSqliteDatabase,
@@ -30,6 +32,9 @@ export interface AITurnGenerationOptions {
   readonly temperature: number;
   readonly maxOutputTokens: number;
   readonly timeoutMs: number;
+  readonly minimumContextTokens?: number;
+  readonly streaming?: boolean;
+  readonly allowTextFallback?: boolean;
 }
 
 export interface ExecuteAITurn {
@@ -61,6 +66,7 @@ export class AIOrchestrationError extends Error {
 export class AITurnOrchestrator {
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
+  private readonly modelProfiles: ModelProfileRepository;
 
   public constructor(
     database: TransactionalSqliteDatabase,
@@ -70,6 +76,7 @@ export class AITurnOrchestrator {
   ) {
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
+    this.modelProfiles = new ModelProfileRepository(database);
   }
 
   public async execute(command: ExecuteAITurn): Promise<IdempotentCommitResult> {
@@ -107,21 +114,55 @@ export class AITurnOrchestrator {
     }
 
     let request: NormalizedAIRequest;
+    let selectedModelProfileId: ModelProfileId;
     try {
-      const models = await this.provider.listModels();
-      const model = models.find(({ name }) => name === command.modelName);
-      if (model === undefined) {
+      const profiles = this.modelProfiles.listEnabled(this.providerConfig.id);
+      const ordered = [...profiles].sort((left, right) => {
+        const leftPreferred =
+          left.id === command.modelProfileId || left.modelName === command.modelName;
+        const rightPreferred =
+          right.id === command.modelProfileId || right.modelName === command.modelName;
+        return Number(rightPreferred) - Number(leftPreferred);
+      });
+      let decision: ReturnType<typeof routeModel>;
+      try {
+        decision = routeModel(
+          ordered.map((profile) => ({
+            name: profile.modelName,
+            displayName: profile.displayName,
+            capabilities: profile.capabilities,
+          })),
+          {
+            minimumContextTokens: command.generationOptions.minimumContextTokens ?? 0,
+            streaming: command.generationOptions.streaming ?? false,
+            structuredOutput: true,
+            allowTextFallback: command.generationOptions.allowTextFallback ?? true,
+          },
+        );
+      } catch (error) {
+        if (error instanceof RangeError) {
+          throw new AIOrchestrationError(
+            'NO_MODEL_CANDIDATE',
+            'No registered model satisfies the AI task requirements',
+            { cause: error },
+          );
+        }
+        throw error;
+      }
+      const selectedProfile = ordered.find((profile) => profile.modelName === decision.model.name);
+      if (selectedProfile === undefined) {
         throw new AIOrchestrationError(
-          'MODEL_NOT_FOUND',
-          `Configured model is unavailable: ${command.modelName}`,
+          'MODEL_PROFILE_MISSING',
+          'The routed model profile is unavailable',
         );
       }
-      const formatted = formatTaskPrompt(command.task, context, model.capabilities);
+      selectedModelProfileId = selectedProfile.id;
+      const formatted = formatTaskPrompt(command.task, context, decision.model.capabilities);
       request = Object.freeze({
         requestId: command.requestId,
         task: command.task,
         promptVersion: formatted.promptVersion,
-        modelName: command.modelName,
+        modelName: decision.model.name,
         messages: formatted.messages,
         responseFormat: formatted.responseFormat,
         temperature: command.generationOptions.temperature,
@@ -145,7 +186,7 @@ export class AITurnOrchestrator {
       campaignId: command.campaignId,
       requestId: command.requestId,
       task: command.task,
-      modelProfileId: command.modelProfileId,
+      modelProfileId: selectedModelProfileId,
       promptVersion: request.promptVersion,
       request: requestJson(request, context),
       startedAt: this.now(),
@@ -155,7 +196,7 @@ export class AITurnOrchestrator {
     let rawResponseText: string;
     try {
       const response = await this.provider.generate(request, this.providerConfig);
-      if (response.requestId !== command.requestId || response.modelName !== command.modelName) {
+      if (response.requestId !== command.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError(
           'PROVIDER_RESPONSE_MISMATCH',
           'Provider response does not match the normalized request',

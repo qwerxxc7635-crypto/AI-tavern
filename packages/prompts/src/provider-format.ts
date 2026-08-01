@@ -1,5 +1,6 @@
 import {
   AI_TASK_SCHEMAS,
+  selectStructuredFormat,
   type AITask,
   type ModelCapabilities,
   type NormalizedMessage,
@@ -50,14 +51,15 @@ function responseFormat(
   outputSchema: z.ZodType,
   capabilities: ModelCapabilities,
 ): NormalizedResponseFormat {
-  if (capabilities.jsonSchema) {
+  const selected = selectStructuredFormat(capabilities);
+  if (selected === 'JSON_SCHEMA') {
     return Object.freeze({
       kind: 'JSON_SCHEMA',
       name,
       schema: jsonRecord(z.toJSONSchema(outputSchema)),
     });
   }
-  if (capabilities.jsonMode) return Object.freeze({ kind: 'JSON_OBJECT' });
+  if (selected === 'JSON_OBJECT') return Object.freeze({ kind: 'JSON_OBJECT' });
   return Object.freeze({ kind: 'TEXT' });
 }
 

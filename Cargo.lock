@@ -824,6 +824,7 @@ dependencies = [
  "serde",
  "tauri",
  "tauri-build",
+ "time",
  "tokio-util",
 ]
 

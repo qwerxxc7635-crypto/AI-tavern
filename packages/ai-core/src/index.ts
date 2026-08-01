@@ -18,6 +18,13 @@ export type {
 export { FakeAIProvider, FakeAIProviderError } from './fake-ai-provider.js';
 export { FAKE_TASK_OUTPUTS } from './fake-task-outputs.js';
 export { validateAIOutput } from './output-validator.js';
+export { routeModel, selectStructuredFormat } from './model-router.js';
+export type {
+  ModelRoutingDecision,
+  ModelRoutingRequirements,
+  RoutableModel,
+  StructuredFormat,
+} from './model-router.js';
 export type {
   OutputValidationErrorCode,
   OutputValidationFailure,

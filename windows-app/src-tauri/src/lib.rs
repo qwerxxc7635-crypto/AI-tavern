@@ -18,6 +18,7 @@ use ember_provider_openai_compatible::{
 use ember_secure_secrets::{CredentialRef, SecretStore};
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
+use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Serialize)]
@@ -78,8 +79,22 @@ struct ProviderProbeInput {
 struct ProviderProbeModel {
     name: String,
     display_name: String,
-    cost_status: &'static str,
+    capabilities: ProbeCapabilities,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProbeCapabilities {
+    text: bool,
+    streaming: bool,
+    system_messages: bool,
+    json_mode: bool,
+    json_schema: bool,
+    tool_calling: bool,
+    reasoning: bool,
     context_window_tokens: Option<u64>,
+    cost_status: &'static str,
+    checked_at: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -144,19 +159,40 @@ async fn provider_probe(input: ProviderProbeInput) -> Result<ProviderProbeResult
         }
         _ => return Err(ProviderError::InvalidConfig.into()),
     };
+    let checked_at = OffsetDateTime::now_utc()
+        .format(&Rfc3339)
+        .map_err(|_| ProviderError::InvalidResponse)?;
+    let preset_key = input.preset_key;
     let models = OpenAiCompatibleProvider::new()?
         .list_models(&config, CancellationToken::new())
         .await?
         .into_iter()
-        .map(|model| ProviderProbeModel {
-            name: model.name,
-            display_name: model.display_name,
-            cost_status: match model.cost_status {
-                ModelCostStatus::Free => "FREE",
-                ModelCostStatus::Paid => "PAID",
-                ModelCostStatus::Unknown => "UNKNOWN",
-            },
-            context_window_tokens: model.context_window_tokens,
+        .map(|model| {
+            let json_mode = match preset_key.as_str() {
+                "deepseek" | "qwen" | "ollama" => true,
+                "openrouter" => model.supports_json_mode.unwrap_or(false),
+                _ => false,
+            };
+            ProviderProbeModel {
+                name: model.name,
+                display_name: model.display_name,
+                capabilities: ProbeCapabilities {
+                    text: true,
+                    streaming: false,
+                    system_messages: true,
+                    json_mode,
+                    json_schema: false,
+                    tool_calling: false,
+                    reasoning: matches!(preset_key.as_str(), "deepseek" | "qwen"),
+                    context_window_tokens: model.context_window_tokens,
+                    cost_status: match model.cost_status {
+                        ModelCostStatus::Free => "FREE",
+                        ModelCostStatus::Paid => "PAID",
+                        ModelCostStatus::Unknown => "UNKNOWN",
+                    },
+                    checked_at: checked_at.clone(),
+                },
+            }
         })
         .collect();
     Ok(ProviderProbeResult { models })

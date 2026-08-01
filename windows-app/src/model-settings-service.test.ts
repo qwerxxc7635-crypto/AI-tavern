@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ModelSettingsGateway } from './model-settings-service.js';
+import { parseModelSettingsSnapshot, type ModelSettingsGateway } from './model-settings-service.js';
 
 describe('model settings contract', () => {
   it('keeps API keys outside saved provider settings', async () => {
@@ -33,10 +33,55 @@ describe('model settings contract', () => {
       credentialRef: reference,
       modelName: 'deepseek-v4-flash',
       modelDisplayName: 'DeepSeek V4 Flash',
+      capabilities: {
+        text: true,
+        streaming: false,
+        systemMessages: true,
+        jsonMode: true,
+        jsonSchema: false,
+        toolCalling: false,
+        reasoning: true,
+        contextWindowTokens: 1048576,
+        costStatus: 'UNKNOWN',
+        checkedAt: '2026-08-01T00:00:00Z',
+      },
       useAsDefault: true,
       useAsFallback: false,
     });
     expect(calls.join('\n')).not.toContain('runtime-secret');
     expect(calls.join('\n')).toContain('credential:v1:');
+  });
+
+  it('rejects a capability timestamp that is not RFC3339', () => {
+    expect(() =>
+      parseModelSettingsSnapshot({
+        profiles: [
+          {
+            id: 'profile-1',
+            providerId: 'provider-1',
+            presetKey: 'custom',
+            providerDisplayName: 'Local',
+            baseUrl: 'http://127.0.0.1:11434/',
+            hasCredential: false,
+            modelName: 'local-model',
+            modelDisplayName: 'Local Model',
+            capabilities: {
+              text: true,
+              streaming: false,
+              systemMessages: true,
+              jsonMode: false,
+              jsonSchema: false,
+              toolCalling: false,
+              reasoning: false,
+              contextWindowTokens: 8192,
+              costStatus: 'UNKNOWN',
+              checkedAt: '2026-08-01 00:00:00Z',
+            },
+          },
+        ],
+        defaultModelProfileId: null,
+        fallbackModelProfileId: null,
+      }),
+    ).toThrow('timestamp');
   });
 });

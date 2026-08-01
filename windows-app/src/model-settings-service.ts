@@ -11,6 +11,7 @@ export interface ModelProfile {
   readonly hasCredential: boolean;
   readonly modelName: string;
   readonly modelDisplayName: string;
+  readonly capabilities: ModelCapabilities | null;
 }
 
 export interface ModelSettingsSnapshot {
@@ -26,6 +27,7 @@ export interface ModelSettingsUpdate {
   readonly credentialRef: string | null;
   readonly modelName: string;
   readonly modelDisplayName: string;
+  readonly capabilities: ModelCapabilities;
   readonly useAsDefault: boolean;
   readonly useAsFallback: boolean;
 }
@@ -33,8 +35,20 @@ export interface ModelSettingsUpdate {
 export interface ProbeModel {
   readonly name: string;
   readonly displayName: string;
-  readonly costStatus: 'FREE' | 'PAID' | 'UNKNOWN';
+  readonly capabilities: ModelCapabilities;
+}
+
+export interface ModelCapabilities {
+  readonly text: boolean;
+  readonly streaming: boolean;
+  readonly systemMessages: boolean;
+  readonly jsonMode: boolean;
+  readonly jsonSchema: boolean;
+  readonly toolCalling: boolean;
+  readonly reasoning: boolean;
   readonly contextWindowTokens: number | null;
+  readonly costStatus: 'FREE' | 'PAID' | 'UNKNOWN';
+  readonly checkedAt: string;
 }
 
 export interface ModelSettingsGateway {
@@ -51,10 +65,10 @@ export interface ModelSettingsGateway {
 
 export const tauriModelSettingsGateway: ModelSettingsGateway = {
   async load() {
-    return parseSnapshot(await invoke<unknown>('model_settings_get'));
+    return parseModelSettingsSnapshot(await invoke<unknown>('model_settings_get'));
   },
   async save(command) {
-    return parseSnapshot(await invoke<unknown>('model_settings_save', { command }));
+    return parseModelSettingsSnapshot(await invoke<unknown>('model_settings_save', { command }));
   },
   async saveSecret(secret) {
     const value = await invoke<unknown>('secret_save', { secret });
@@ -72,7 +86,7 @@ export const tauriModelSettingsGateway: ModelSettingsGateway = {
   },
 };
 
-function parseSnapshot(value: unknown): ModelSettingsSnapshot {
+export function parseModelSettingsSnapshot(value: unknown): ModelSettingsSnapshot {
   const record = requireRecord(value);
   return Object.freeze({
     profiles: Object.freeze(requireArray(record['profiles']).map(parseProfile)),
@@ -96,10 +110,21 @@ function parseProfile(value: unknown): ModelProfile {
     hasCredential: requireBoolean(record['hasCredential']),
     modelName: requireText(record['modelName']),
     modelDisplayName: requireText(record['modelDisplayName']),
+    capabilities:
+      record['capabilities'] === null ? null : parseCapabilities(record['capabilities']),
   });
 }
 
 function parseProbeModel(value: unknown): ProbeModel {
+  const record = requireRecord(value);
+  return Object.freeze({
+    name: requireText(record['name']),
+    displayName: requireText(record['displayName']),
+    capabilities: parseCapabilities(record['capabilities']),
+  });
+}
+
+function parseCapabilities(value: unknown): ModelCapabilities {
   const record = requireRecord(value);
   const status = record['costStatus'];
   if (status !== 'FREE' && status !== 'PAID' && status !== 'UNKNOWN') {
@@ -110,10 +135,16 @@ function parseProbeModel(value: unknown): ProbeModel {
     throw new TypeError('Model context window is invalid');
   }
   return Object.freeze({
-    name: requireText(record['name']),
-    displayName: requireText(record['displayName']),
+    text: requireBoolean(record['text']),
+    streaming: requireBoolean(record['streaming']),
+    systemMessages: requireBoolean(record['systemMessages']),
+    jsonMode: requireBoolean(record['jsonMode']),
+    jsonSchema: requireBoolean(record['jsonSchema']),
+    toolCalling: requireBoolean(record['toolCalling']),
+    reasoning: requireBoolean(record['reasoning']),
     costStatus: status,
     contextWindowTokens: context as number | null,
+    checkedAt: requireTimestamp(record['checkedAt']),
   });
 }
 
@@ -146,5 +177,16 @@ function optionalId(value: unknown): string | null {
 
 function requireBoolean(value: unknown): boolean {
   if (typeof value !== 'boolean') throw new TypeError('Model settings flag is invalid');
+  return value;
+}
+
+function requireTimestamp(value: unknown): string {
+  if (
+    typeof value !== 'string' ||
+    !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/.test(value) ||
+    Number.isNaN(Date.parse(value))
+  ) {
+    throw new TypeError('Model capability timestamp is invalid');
+  }
   return value;
 }

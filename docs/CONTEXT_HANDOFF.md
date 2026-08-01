@@ -186,3 +186,13 @@
 - UI临时连接凭据无论探测成功或失败均显式清理；真实页面测试验证明文不进入保存命令。
 - `pnpm check`通过50个Vitest文件244项、7项Node SQLite和37项Rust测试；Windows build、Tauri release build及隔离窗口烟测通过，测试目录已清理。
 - 下一任务：M6-T10模型能力登记与路由。
+
+## 2026-08-01 M6-T10模型能力登记与路由完成状态
+
+- 账号B的11个已修改文件和2个未跟踪源码文件均已保留；接手前备份位于`.local/handoff-backup/m6-t10-before-account-a`，交接包移至仓库同级`handoff-archive`。
+- Provider探测结果将JSON、流式、上下文、成本及RFC 3339探测时间原子登记到SQLite；非法或互相不一致的能力数据被拒绝，旧版空对象保持未登记。
+- AI回合从当前Provider下已启用、能力完整的模型档案中确定性路由；JSON Schema不可用时可依次降级JSON Object或文本，输出仍通过共享Schema与领域校验后才可写SQLite。
+- 无候选在Provider调用前返回`NO_MODEL_CANDIDATE`；当前没有跨Provider重试、自动切换或结构修复循环，这些属于M7。
+- 完整验证通过51个Vitest文件253项、7项Node SQLite和41项Rust测试，以及格式、lint、类型、严格Clippy、Windows生产build和Tauri release无bundle build。
+- release窗口启动烟测成功；因Tauri应用数据路径未被临时环境变量可靠隔离，不宣称存档烟测。真实SQLite与Fake Provider的业务链在D盘临时测试目录中通过。
+- 下一任务：M7-T01标准错误分类。

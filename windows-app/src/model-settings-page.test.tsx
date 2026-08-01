@@ -29,6 +29,7 @@ describe('model settings page', () => {
               hasCredential: update.credentialRef !== null,
               modelName: update.modelName,
               modelDisplayName: update.modelDisplayName,
+              capabilities: update.capabilities,
             },
           ],
           defaultModelProfileId: 'profile-1',
@@ -46,8 +47,18 @@ describe('model settings page', () => {
           {
             name: 'deepseek-v4-flash',
             displayName: 'DeepSeek V4 Flash',
-            costStatus: 'PAID',
-            contextWindowTokens: 1048576,
+            capabilities: {
+              text: true,
+              streaming: false,
+              systemMessages: true,
+              jsonMode: true,
+              jsonSchema: false,
+              toolCalling: false,
+              reasoning: true,
+              costStatus: 'PAID',
+              contextWindowTokens: 1048576,
+              checkedAt: '2026-08-01T00:00:00Z',
+            },
           },
         ];
       },

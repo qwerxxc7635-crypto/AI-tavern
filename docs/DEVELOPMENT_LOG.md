@@ -1888,3 +1888,29 @@
 
 - M6-T09满足Provider、模型、API Key、连接测试、默认/备用模型和存档事实隔离验收。
 - 未提前实现能力路由；下一任务为M6-T10。
+
+## 2026-08-01 — M6-T10 实现模型能力登记与路由
+
+### 接手与边界
+
+- 从基线`42d2a8a`接手账号B留下的11个已修改文件和2个未跟踪源码文件；读取前将全部差异备份到仓库忽略目录`.local/handoff-backup/m6-t10-before-account-a`。
+- 将交接目录和ZIP移出Git仓库到同级`handoff-archive`，未删除账号B源码、未接入真实模型、未写入API Key或用户存档。
+
+### 实现
+
+- 模型设置在SQLite原子保存JSON、流式、上下文长度、成本和能力探测时间；Rust边界严格校验RFC 3339、JavaScript安全整数和能力列一致性，旧版空能力保持未登记。
+- 新增SQLite模型档案读取器与确定性路由器。候选只来自已启用Provider和模型；结构化任务优先JSON Schema，其次JSON Object，再按显式许可降级文本，同时过滤流式和最小上下文要求。
+- AI回合编排先从SQLite读取候选并完成路由，再选择提示词格式和实际模型。Provider结果仍经过共享Schema、领域规则和SQLite事务提交；无候选在Provider调用前返回稳定错误。
+- Provider探测只登记可证明能力：当前兼容适配器只发送JSON Object，生成流式未暴露时登记为不支持；没有按模型名称猜测JSON Schema。
+
+### 验证与Review
+
+- Rust覆盖能力正常/偏移时间恢复、非法时间与上下文拒绝、Provider隔离、旧能力兼容和事务回滚；Provider合同测试继续验证请求格式。
+- TypeScript覆盖结构化格式优先级、稳定同级顺序、流式/上下文/启用过滤、文本降级、无候选、SQLite实际能力到Fake Provider再到本地验证与持久化的完整链。
+- 定向测试通过；完整验证通过51个Vitest文件253项、7项Node SQLite测试和41项Rust测试，严格Clippy、格式、lint与类型检查通过。Windows前端生产build及Tauri release `--no-bundle`通过。
+- release可执行文件实际启动并获得窗口句柄；环境变量重定向未在隔离目录产生数据库，因此只记为启动烟测，不宣称隔离存档烟测。业务链的隔离验收来自D盘临时目录中的真实SQLite与Fake Provider测试。
+
+### 结论
+
+- M6-T10满足模型能力登记、能力约束路由和JSON Schema不支持时兼容降级验收，且没有放宽本地验证或改写既有游戏事实。
+- 未提前实现跨Provider重试、失败恢复或UI错误行动；下一任务为M7-T01。

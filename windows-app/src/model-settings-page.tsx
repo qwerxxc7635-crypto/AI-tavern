@@ -116,6 +116,11 @@ export function ModelSettingsPage({
       setStatus('云模型需要API Key；密钥只会保存到系统凭据库。');
       return;
     }
+    const selectedModel = models.find((model) => model.name === modelName.trim());
+    if (selectedModel === undefined) {
+      setStatus('请先测试连接，并从服务返回的模型中选择。');
+      return;
+    }
     setBusy(true);
     setStatus(null);
     try {
@@ -126,8 +131,8 @@ export function ModelSettingsPage({
           baseUrl: baseUrl.trim(),
           credentialRef,
           modelName: modelName.trim(),
-          modelDisplayName:
-            models.find((model) => model.name === modelName)?.displayName ?? modelName.trim(),
+          modelDisplayName: selectedModel.displayName,
+          capabilities: selectedModel.capabilities,
           useAsDefault,
           useAsFallback,
         }),

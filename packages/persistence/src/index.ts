@@ -17,6 +17,12 @@ export type {
   CompleteGenerationRecord,
   CreateGenerationRecord,
 } from './generation-record-repository.js';
+export { ModelProfileRepository } from './model-profile-repository.js';
+export type {
+  RegisteredModelCapabilities,
+  RegisteredModelCostStatus,
+  RegisteredModelProfile,
+} from './model-profile-repository.js';
 export {
   ConversationRepository,
   ItemRepository,

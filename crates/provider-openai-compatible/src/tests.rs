@@ -460,6 +460,7 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
                 "id": "community/story-model:free",
                 "name": "Community Story Model (free)",
                 "context_length": 32768,
+                "supported_parameters": ["response_format"],
                 "pricing": { "prompt": "0", "completion": "0", "request": "0" }
             },
             {
@@ -504,6 +505,7 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
     assert_eq!(free.name, "community/story-model:free");
     assert_eq!(free.display_name, "Community Story Model (free)");
     assert_eq!(free.context_window_tokens, Some(32768));
+    assert_eq!(free.supports_json_mode, Some(true));
 
     let mut request = normalized(ResponseFormat::JsonObject);
     request.model_name = free.name.clone();

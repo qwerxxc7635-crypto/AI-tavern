@@ -24,6 +24,7 @@ import {
   idempotencyKey,
   isoTimestamp,
   locationId,
+  modelProfileId,
   npcId,
   playerCharacterId,
   questId,
@@ -95,9 +96,16 @@ describe('AITurnOrchestrator', () => {
       const sqlite = adaptDatabase(database);
       seed(sqlite);
       const buildContext = vi.fn(() => contextFromSqlite(sqlite));
+      const fake = new FakeAIProvider(() => at);
+      const generate = vi.fn((request, config) => fake.generate(request, config));
       const orchestrator = new AITurnOrchestrator(
         sqlite,
-        new FakeAIProvider(() => at),
+        {
+          id: fake.id,
+          listModels: () => fake.listModels(),
+          testConnection: (config) => fake.testConnection(config),
+          generate,
+        },
         providerConfig,
         () => at,
       );
@@ -107,12 +115,20 @@ describe('AITurnOrchestrator', () => {
       await expect(orchestrator.execute(command)).resolves.toBe('ALREADY_COMMITTED');
 
       expect(buildContext).toHaveBeenCalledTimes(1);
+      expect(generate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          modelName: 'ember-fake-v1',
+          responseFormat: { kind: 'TEXT' },
+        }),
+        providerConfig,
+      );
       expect(new PendingAiRequestRepository(sqlite).get(command.requestId)).toMatchObject({
         status: 'COMMITTED',
         attemptCount: 1,
       });
       expect(new GenerationRecordRepository(sqlite).get(command.generationRecordId)).toMatchObject({
         task: 'GENERATE_ADVENTURE_TURN',
+        modelProfileId: modelProfileId('profile-fake'),
         rawResponseText: expect.stringContaining('"sceneText"'),
         validatedOutput: expect.objectContaining({
           adventureState: 'CHECK_REQUIRED',
@@ -173,6 +189,42 @@ describe('AITurnOrchestrator', () => {
         resolvedAt: null,
       });
       expect(new GameEventRepository(sqlite).list(campaignKey)).toEqual([]);
+    } finally {
+      database.close();
+    }
+  });
+
+  it('fails before the provider call when no registered model satisfies native structured output', async () => {
+    const { database } = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      seed(sqlite);
+      const fake = new FakeAIProvider(() => at);
+      const generate = vi.fn((request, config) => fake.generate(request, config));
+      const orchestrator = new AITurnOrchestrator(
+        sqlite,
+        {
+          id: fake.id,
+          listModels: () => fake.listModels(),
+          testConnection: (config) => fake.testConnection(config),
+          generate,
+        },
+        providerConfig,
+        () => at,
+      );
+      const command = executeCommand(sqlite, () => contextFromSqlite(sqlite));
+
+      await expect(
+        orchestrator.execute({
+          ...command,
+          generationOptions: { ...command.generationOptions, allowTextFallback: false },
+        }),
+      ).rejects.toMatchObject({ code: 'NO_MODEL_CANDIDATE' });
+      expect(generate).not.toHaveBeenCalled();
+      expect(new PendingAiRequestRepository(sqlite).get(command.requestId)).toMatchObject({
+        status: 'FAILED',
+        lastError: { code: 'NO_MODEL_CANDIDATE', retryable: false },
+      });
     } finally {
       database.close();
     }
@@ -302,6 +354,41 @@ function commitFromOutput(database: TransactionalSqliteDatabase, value: unknown)
 }
 
 function seed(database: TransactionalSqliteDatabase): void {
+  database
+    .prepare(
+      `INSERT INTO provider_configs (
+         id, provider_type, preset_key, display_name, base_url, credential_ref,
+         options_json, enabled, created_at, updated_at
+       ) VALUES (?, 'LOCAL_OPENAI_COMPATIBLE', 'custom', 'Fake Provider', NULL, NULL,
+                 '{}', 1, ?, ?)`,
+    )
+    .run(providerConfig.id, at, at);
+  database
+    .prepare(
+      `INSERT INTO model_profiles (
+         id, provider_config_id, model_name, display_name, capabilities_json,
+         task_options_json, enabled, capabilities_checked_at, created_at, updated_at
+       ) VALUES (?, ?, 'ember-fake-v1', 'Ember Fake v1', ?, '{}', 1, ?, ?, ?)`,
+    )
+    .run(
+      'profile-fake',
+      providerConfig.id,
+      JSON.stringify({
+        text: true,
+        streaming: false,
+        systemMessages: true,
+        jsonMode: false,
+        jsonSchema: false,
+        toolCalling: false,
+        reasoning: false,
+        contextWindowTokens: 32768,
+        costStatus: 'FREE',
+        checkedAt: at,
+      }),
+      at,
+      at,
+      at,
+    );
   new CampaignRepository(database).create(
     createCampaign({ id: campaignKey, schemaVersion: schemaVersion(1), now: at }),
   );

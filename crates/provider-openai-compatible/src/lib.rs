@@ -288,6 +288,7 @@ impl OpenAiCompatibleProvider {
             .into_iter()
             .map(|model| {
                 let cost_status = model.cost_status();
+                let supports_json_mode = model.supports_parameter("response_format");
                 ModelInfo {
                     display_name: model
                         .name
@@ -297,6 +298,7 @@ impl OpenAiCompatibleProvider {
                     owned_by: model.owned_by,
                     cost_status,
                     context_window_tokens: model.context_length,
+                    supports_json_mode,
                 }
             })
             .collect())
@@ -440,6 +442,7 @@ pub struct ModelInfo {
     pub owned_by: Option<String>,
     pub cost_status: ModelCostStatus,
     pub context_window_tokens: Option<u64>,
+    pub supports_json_mode: Option<bool>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -681,9 +684,16 @@ struct ApiModel {
     owned_by: Option<String>,
     context_length: Option<u64>,
     pricing: Option<Map<String, Value>>,
+    supported_parameters: Option<Vec<String>>,
 }
 
 impl ApiModel {
+    fn supports_parameter(&self, parameter: &str) -> Option<bool> {
+        self.supported_parameters
+            .as_ref()
+            .map(|parameters| parameters.iter().any(|value| value == parameter))
+    }
+
     fn cost_status(&self) -> ModelCostStatus {
         let Some(pricing) = &self.pricing else {
             return ModelCostStatus::Unknown;
