@@ -147,6 +147,23 @@ export function ModelSettingsPage({
     }
   }
 
+  async function forgetCredential(profileId: string) {
+    const accepted = window.confirm(
+      '删除后，该Provider的已保存API Key会从Windows系统凭据库移除；模型配置仍会保留。确定继续吗？',
+    );
+    if (!accepted) return;
+    setBusy(true);
+    setStatus(null);
+    try {
+      setSnapshot(await gateway.forgetCredential(profileId));
+      setStatus('已删除该Provider的系统凭据；模型配置仍保留。');
+    } catch {
+      setStatus('凭据没有完全删除，请重试或在Windows凭据管理器中手工清理。');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="model-settings">
       <header>
@@ -259,6 +276,18 @@ export function ModelSettingsPage({
                 <span>{profile.providerDisplayName}</span>
                 {snapshot.defaultModelProfileId === profile.id ? <em>默认</em> : null}
                 {snapshot.fallbackModelProfileId === profile.id ? <em>备用</em> : null}
+                {profile.hasCredential ? (
+                  <button
+                    className="danger-action danger-action--small"
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void forgetCredential(profile.id)}
+                  >
+                    删除凭据
+                  </button>
+                ) : (
+                  <span>无已保存凭据</span>
+                )}
               </li>
             ))}
           </ul>

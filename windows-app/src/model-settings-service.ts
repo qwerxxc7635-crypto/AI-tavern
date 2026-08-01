@@ -54,6 +54,7 @@ export interface ModelCapabilities {
 export interface ModelSettingsGateway {
   load(): Promise<ModelSettingsSnapshot>;
   save(update: ModelSettingsUpdate): Promise<ModelSettingsSnapshot>;
+  forgetCredential(profileId: string): Promise<ModelSettingsSnapshot>;
   saveSecret(secret: string): Promise<string>;
   deleteSecret(credentialRef: string): Promise<void>;
   probe(input: {
@@ -69,6 +70,11 @@ export const tauriModelSettingsGateway: ModelSettingsGateway = {
   },
   async save(command) {
     return parseModelSettingsSnapshot(await invoke<unknown>('model_settings_save', { command }));
+  },
+  async forgetCredential(profileId) {
+    return parseModelSettingsSnapshot(
+      await invoke<unknown>('model_settings_forget_credential', { profileId }),
+    );
   },
   async saveSecret(secret) {
     const value = await invoke<unknown>('secret_save', { secret });

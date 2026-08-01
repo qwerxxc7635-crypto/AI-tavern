@@ -13,6 +13,9 @@ describe('model settings contract', () => {
         calls.push(JSON.stringify(update));
         return { profiles: [], defaultModelProfileId: null, fallbackModelProfileId: null };
       },
+      async forgetCredential() {
+        return { profiles: [], defaultModelProfileId: null, fallbackModelProfileId: null };
+      },
       async saveSecret(secret) {
         expect(secret).toBe('runtime-secret');
         return 'credential:v1:00000000-0000-4000-8000-000000000001';

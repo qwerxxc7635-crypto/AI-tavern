@@ -36,6 +36,9 @@ const ArchivesPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('./model-settings-page.js').then(({ ModelSettingsPage: page }) => ({ default: page })),
 );
+const RecoveryPage = lazy(() =>
+  import('./recovery-page.js').then(({ RecoveryPage: page }) => ({ default: page })),
+);
 
 export const WINDOWS_NAVIGATION = [
   { path: '/tavern', label: '酒馆', marker: 'T' },
@@ -56,6 +59,16 @@ export function AppRoutes() {
           <AppErrorBoundary>
             <Suspense fallback={<AppLoading />}>
               <SaveHomePage />
+            </Suspense>
+          </AppErrorBoundary>
+        }
+      />
+      <Route
+        path="recovery"
+        element={
+          <AppErrorBoundary>
+            <Suspense fallback={<AppLoading />}>
+              <RecoveryPage />
             </Suspense>
           </AppErrorBoundary>
         }

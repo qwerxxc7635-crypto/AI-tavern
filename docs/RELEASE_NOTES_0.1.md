@@ -24,6 +24,6 @@
 - 保存云Provider配置不会让游戏回合改用云模型；云游戏生成尚未接入Windows服务；
 - iOS任务和iOS端到端验收已延期，不属于本候选完成条件；
 - 不提供自动更新、云同步、独立日志文件、诊断包导出或一键删除全部本机数据；
-- 安装后发布候选的分辨率、键鼠、系统文件对话框和故障恢复入口仍需在最终Windows验收中逐项人工确认。
+- Windows最终验收已覆盖分辨率、键鼠、系统文件对话框、永久删除备份和故障恢复入口；记录见[`WINDOWS_ACCEPTANCE_0.1.md`](WINDOWS_ACCEPTANCE_0.1.md)。
 
 安装、数据目录和卸载保留策略见[`WINDOWS_INSTALL.md`](WINDOWS_INSTALL.md)；自动端到端测试见[`WINDOWS_E2E.md`](WINDOWS_E2E.md)。

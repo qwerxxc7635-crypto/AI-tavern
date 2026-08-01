@@ -53,6 +53,15 @@ const CAMPAIGN_STATES: &[&str] = &[
     "RECOVERY_REQUIRED",
     "ARCHIVED",
 ];
+const RECOVERABLE_RESUME_STATES: &[&str] = &[
+    "CREATING_WORLD",
+    "REVIEWING_WORLD",
+    "CREATING_CHARACTER",
+    "GENERATING_TAVERN",
+    "TAVERN",
+    "ADVENTURE",
+    "SETTLEMENT",
+];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -61,6 +70,14 @@ pub struct CampaignSummary {
     pub state: String,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CampaignRecoverySnapshot {
+    pub campaign: CampaignSummary,
+    pub resume_state: String,
+    pub unfinished_request_count: u64,
 }
 
 #[derive(Debug, Error)]
@@ -160,6 +177,110 @@ impl CampaignStore {
             Some(_) => Err(CampaignStoreError::InvalidData),
             None => Err(CampaignStoreError::NotFound),
         }
+    }
+
+    pub fn delete_campaign(&self, id: &str) -> Result<(), CampaignStoreError> {
+        validate_id(id)?;
+        let connection = self.connect()?;
+        if campaign_state(&connection, id)?.is_none() {
+            return Err(CampaignStoreError::NotFound);
+        }
+        drop(connection);
+
+        create_consistent_backup(&self.database_path)?;
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let changed = transaction.execute("DELETE FROM campaigns WHERE id = ?1", [id])?;
+        if changed != 1 {
+            return Err(CampaignStoreError::NotFound);
+        }
+        transaction.commit()?;
+        Ok(())
+    }
+
+    pub fn campaign_recovery(
+        &self,
+        id: &str,
+    ) -> Result<CampaignRecoverySnapshot, CampaignStoreError> {
+        validate_id(id)?;
+        let connection = self.connect()?;
+        let (campaign, resume_state) = connection
+            .query_row(
+                "SELECT id, state, created_at, updated_at, resume_state
+                 FROM campaigns WHERE id = ?1",
+                [id],
+                |row| {
+                    Ok((
+                        CampaignSummary {
+                            id: row.get(0)?,
+                            state: row.get(1)?,
+                            created_at: row.get(2)?,
+                            updated_at: row.get(3)?,
+                        },
+                        row.get::<_, Option<String>>(4)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or(CampaignStoreError::NotFound)?;
+        if !matches!(
+            campaign.state.as_str(),
+            "GENERATION_FAILED" | "WAITING_FOR_MODEL" | "RECOVERY_REQUIRED"
+        ) {
+            return Err(CampaignStoreError::InvalidState);
+        }
+        let resume_state = resume_state.ok_or(CampaignStoreError::InvalidData)?;
+        validate_resume_state(&resume_state)?;
+        let unfinished_request_count = connection.query_row(
+            "SELECT COUNT(*) FROM pending_ai_requests
+             WHERE campaign_id = ?1 AND status NOT IN ('COMMITTED', 'CANCELLED')",
+            [id],
+            |row| row.get::<_, i64>(0),
+        )?;
+        let unfinished_request_count =
+            u64::try_from(unfinished_request_count).map_err(|_| CampaignStoreError::InvalidData)?;
+        Ok(CampaignRecoverySnapshot {
+            campaign: validate_campaign(campaign)?,
+            resume_state,
+            unfinished_request_count,
+        })
+    }
+
+    pub fn restore_campaign_after_failure(
+        &self,
+        id: &str,
+    ) -> Result<CampaignSummary, CampaignStoreError> {
+        validate_id(id)?;
+        let at = current_timestamp()?;
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let resume_state = transaction
+            .query_row(
+                "SELECT resume_state FROM campaigns
+                 WHERE id = ?1 AND state IN ('GENERATION_FAILED', 'WAITING_FOR_MODEL', 'RECOVERY_REQUIRED')",
+                [id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .ok_or(CampaignStoreError::InvalidState)?
+            .ok_or(CampaignStoreError::InvalidData)?;
+        validate_resume_state(&resume_state)?;
+        transaction.execute(
+            "UPDATE pending_ai_requests SET status = 'CANCELLED', updated_at = ?1
+             WHERE campaign_id = ?2 AND status NOT IN ('COMMITTED', 'CANCELLED')",
+            params![at, id],
+        )?;
+        let changed = transaction.execute(
+            "UPDATE campaigns SET state = ?1, resume_state = NULL, updated_at = ?2
+             WHERE id = ?3 AND state IN ('GENERATION_FAILED', 'WAITING_FOR_MODEL', 'RECOVERY_REQUIRED')",
+            params![resume_state, at, id],
+        )?;
+        if changed != 1 {
+            return Err(CampaignStoreError::InvalidState);
+        }
+        let restored = load_campaign(&transaction, id)?.ok_or(CampaignStoreError::NotFound)?;
+        transaction.commit()?;
+        Ok(restored)
     }
 
     pub(crate) fn connect(&self) -> Result<Connection, CampaignStoreError> {
@@ -371,6 +492,14 @@ fn validate_campaign(campaign: CampaignSummary) -> Result<CampaignSummary, Campa
     Ok(campaign)
 }
 
+fn validate_resume_state(state: &str) -> Result<(), CampaignStoreError> {
+    if RECOVERABLE_RESUME_STATES.contains(&state) {
+        Ok(())
+    } else {
+        Err(CampaignStoreError::InvalidData)
+    }
+}
+
 pub(crate) fn validate_id(id: &str) -> Result<(), CampaignStoreError> {
     if id.is_empty() || id.trim() != id {
         return Err(CampaignStoreError::InvalidData);
@@ -535,6 +664,93 @@ mod tests {
             )
             .expect("archived row");
         assert_eq!(state, "ARCHIVED");
+    }
+
+    #[test]
+    fn permanent_delete_removes_only_the_selected_campaign_after_backup() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("ember-tavern.sqlite");
+        let store = CampaignStore::open(&database_path).expect("open database");
+        store
+            .create_at("campaign-delete".to_owned(), FIRST_TIME.to_owned())
+            .expect("create selected campaign");
+        store
+            .create_at("campaign-keep".to_owned(), SECOND_TIME.to_owned())
+            .expect("create retained campaign");
+
+        store
+            .delete_campaign("campaign-delete")
+            .expect("delete selected campaign");
+
+        assert!(matches!(
+            store.continue_campaign("campaign-delete"),
+            Err(CampaignStoreError::NotFound)
+        ));
+        assert_eq!(store.list().expect("list campaigns").len(), 1);
+        assert_eq!(store.list().expect("list campaigns")[0].id, "campaign-keep");
+        assert!(
+            backup_directory(&database_path)
+                .read_dir()
+                .expect("read backup directory")
+                .any(|entry| entry
+                    .expect("backup entry")
+                    .path()
+                    .extension()
+                    .is_some_and(|ext| ext == "sqlite"))
+        );
+    }
+
+    #[test]
+    fn recovery_cancels_unfinished_requests_and_restores_the_resume_state_atomically() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("recovery.sqlite")).expect("open database");
+        store
+            .create_at("campaign-recovery".to_owned(), FIRST_TIME.to_owned())
+            .expect("create campaign");
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                "UPDATE campaigns SET state = 'RECOVERY_REQUIRED', resume_state = 'CREATING_WORLD'
+                   WHERE id = 'campaign-recovery';
+                 INSERT INTO pending_ai_requests (
+                   id, campaign_id, turn_id, idempotency_key, task, status, model_profile_id,
+                   input_json, context_json, attempt_count, last_error_json, created_at, updated_at
+                 ) VALUES (
+                   'request-recovery', 'campaign-recovery', NULL, 'recovery-key', 'GENERATE_WORLD',
+                   'SENDING', NULL, '{}', '{}', 1, NULL,
+                   '2026-08-01T00:00:00.000Z', '2026-08-01T00:00:00.000Z'
+                 );",
+            )
+            .expect("seed interrupted request");
+        drop(connection);
+
+        let issue = store
+            .campaign_recovery("campaign-recovery")
+            .expect("inspect recovery");
+        assert_eq!(issue.resume_state, "CREATING_WORLD");
+        assert_eq!(issue.unfinished_request_count, 1);
+
+        let restored = store
+            .restore_campaign_after_failure("campaign-recovery")
+            .expect("restore campaign");
+        assert_eq!(restored.state, "CREATING_WORLD");
+        let connection = store.connect().expect("reconnect");
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT status FROM pending_ai_requests WHERE id = 'request-recovery'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .expect("request status"),
+            "CANCELLED"
+        );
+
+        assert!(matches!(
+            validate_resume_state("ARCHIVED"),
+            Err(CampaignStoreError::InvalidData)
+        ));
     }
 
     #[test]

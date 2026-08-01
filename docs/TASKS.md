@@ -930,6 +930,7 @@
 
 - 优先级：P0
 - Windows v0.1分类：P0（本阶段只验收Windows范围；原双端验收在M9恢复后补齐）
+- 状态：Windows v0.1范围已完成（2026-08-01）；M9与M10-T04继续`DEFERRED`
 - 依赖：全部P0任务
 - 必须完成：
 
@@ -949,6 +950,8 @@
 → 重新导入
 → 继续游戏
 ```
+
+- Windows验收记录：`docs/WINDOWS_ACCEPTANCE_0.1.md`
 
 ---
 

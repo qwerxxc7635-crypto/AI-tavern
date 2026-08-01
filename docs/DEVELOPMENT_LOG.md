@@ -2267,3 +2267,31 @@
 - `pnpm check`通过56个Vitest文件334项、10项Node SQLite和55项Rust测试；Windows前端生产build转换177个模块，0.1.0 NSIS安装包复建成功。
 - M10-T05的Windows范围验收通过：玩家可区分本机数据、连接测试联网、未来云生成上下文和API Key边界。iOS说明按既定策略随M9恢复后补充。
 - 下一任务为M10-T06 Windows v0.1最终验收。
+
+## 2026-08-01 — M10-T06 Windows v0.1最终验收
+
+### 收口实现
+
+- 新增备份保护的Campaign永久删除：先生成一致性SQLite完整备份，再在外键事务中只删除目标Campaign；存档首页提供明确的导出提醒、确认和结果反馈。
+- 新增恢复中心：异常Campaign显示恢复入口，原生层校验持久化`resume_state`，在单事务中取消所有未完成请求并恢复最近已提交阶段；前端严格验证恢复快照并按恢复状态导航。
+- 新增模型凭据删除：SQLite先停止引用不透明凭据，再删除Windows安全凭据；系统删除失败时返回可行动的手工清理提示，模型档案本身保留。
+- 修复发布候选长页面不可滚动：应用壳与workspace固定在视口，主内容区独立纵向滚动，避免酒馆、任务、冒险和设置底部操作在较低窗口被永久裁切。
+
+### 实际Windows验收
+
+- 在独立应用标识和独立数据目录中，用Release构建真实完成世界、车卡、酒馆、连续NPC对话、接任务、8回合冒险（3次D20与5次无检定）、结算和档案；结算后的任务、奖励、关系、酒馆TROPHY、世界事实与时钟均写入同一SQLite。
+- 在酒馆提交态强制结束进程后重启，数据库完整性为`ok`且进度无丢失/重复。另行制造`RECOVERY_REQUIRED`与1条`SENDING`请求，恢复中心将其取消并原子返回`TAVERN`。
+- 通过回环OpenAI-Compatible服务实际探测两个模型，把一个切换为默认、另一个保留为备用；模型设置重启保持，凭据删除后引用为`NULL`。没有访问真实Provider或产生费用。
+- 通过Windows系统对话框导出`.emtavern`，永久删除Campaign并确认完整备份存在，再导入并恢复8回合结算档案；Escape取消文件对话框不改变数据库。
+- 逐一检查860×600、1180×760、1366×768与1920×1080，并使用鼠标、Tab、Enter和Escape完成关键操作。隔离测试数据与临时服务在验收后清理，正式用户数据未被修改。
+
+### 最终门禁与产物
+
+- `pnpm check`通过58个Vitest文件338项、10项Node SQLite、32项native-bridge、15项Provider、7项HTTP、3项SecretStore和1项Tauri测试；Prettier、ESLint、TypeScript、Cargo fmt与严格Clippy通过。
+- Windows生产构建转换179个模块；正式NSIS复建产物为`Ember Tavern_0.1.0_x64-setup.exe`，5,070,149字节，SHA-256为`51F824342223895FBC2B8ACB23AB5B6E25BC315E1FF26256007D794CE244F2F6`。
+- Git跟踪源码/配置、导出归档和安装包的高置信秘密扫描均无命中；归档不含Provider配置、凭据引用或设备模型，安装包不含验收测试密钥。
+
+### 结论
+
+- M10-T06 Windows范围验收通过，完整证据见`docs/WINDOWS_ACCEPTANCE_0.1.md`。Windows 0.1内部候选已完成；未签名仍是外部发布限制，不影响内部候选结论。
+- M9与M10-T04继续`DEFERRED`；未自动开始iOS工作。

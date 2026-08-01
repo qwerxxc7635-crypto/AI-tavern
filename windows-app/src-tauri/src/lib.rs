@@ -5,8 +5,8 @@
 use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
-    CampaignArchiveImportMode, CampaignArchiveInspection, CampaignStore, CampaignStoreError,
-    CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
+    CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
+    CampaignStoreError, CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
     CharacterTraitGenerationCommit, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
     NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
     TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
@@ -177,6 +177,25 @@ fn model_settings_save(
 }
 
 #[tauri::command]
+fn model_settings_forget_credential(
+    profile_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<ModelSettingsSnapshot, CommandError> {
+    let (snapshot, credential_ref) = store.forget_model_credential(&profile_id)?;
+    if let Some(value) = credential_ref {
+        let reference = value.parse::<CredentialRef>().map_err(|_| CommandError {
+            code: "CREDENTIAL_INVALID",
+            message: "密钥引用无效；模型配置已停止使用该凭据，请在Windows凭据管理器中检查残留项。",
+        })?;
+        SecretStore.delete(&reference).map_err(|_| CommandError {
+            code: "CREDENTIAL_UNAVAILABLE",
+            message: "模型配置已停止使用该凭据，但系统凭据删除失败，请在Windows凭据管理器中手工清理。",
+        })?;
+    }
+    Ok(snapshot)
+}
+
+#[tauri::command]
 async fn provider_probe(input: ProviderProbeInput) -> Result<ProviderProbeResult, CommandError> {
     let credential = input
         .credential_ref
@@ -262,6 +281,29 @@ fn campaign_continue(
 #[tauri::command]
 fn campaign_archive(id: String, store: State<'_, CampaignStore>) -> Result<(), CommandError> {
     store.archive_campaign(&id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn campaign_delete(id: String, store: State<'_, CampaignStore>) -> Result<(), CommandError> {
+    store.delete_campaign(&id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn campaign_recovery_get(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CampaignRecoverySnapshot, CommandError> {
+    store.campaign_recovery(&id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn campaign_recovery_restore(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CampaignSummary, CommandError> {
+    store
+        .restore_campaign_after_failure(&id)
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -565,6 +607,9 @@ pub fn run() {
             campaign_create,
             campaign_continue,
             campaign_archive,
+            campaign_delete,
+            campaign_recovery_get,
+            campaign_recovery_restore,
             save_archive_inspect,
             save_archive_export,
             save_archive_import,
@@ -597,6 +642,7 @@ pub fn run() {
             secret_delete,
             model_settings_get,
             model_settings_save,
+            model_settings_forget_credential,
             provider_probe
         ])
         .run(tauri::generate_context!())

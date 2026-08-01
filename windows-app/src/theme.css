@@ -92,9 +92,11 @@ button:focus-visible {
 }
 
 .app-frame {
+  height: 100vh;
   min-height: 100vh;
   display: grid;
   grid-template-columns: 15.5rem minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .sidebar {
@@ -236,9 +238,16 @@ button:focus-visible {
 
 .workspace {
   min-width: 0;
-  min-height: 100vh;
+  min-height: 0;
+  height: 100vh;
   display: grid;
   grid-template-rows: auto 1fr;
+  overflow: hidden;
+}
+
+.workspace > main {
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .titlebar {
@@ -769,6 +778,42 @@ input:disabled,
 textarea:disabled {
   color: var(--muted);
   background: rgb(146 166 122 / 5%);
+}
+
+.danger-action {
+  border: 1px solid color-mix(in srgb, var(--danger, #b94a48) 62%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--danger, #b94a48);
+  padding: 0.65rem 1rem;
+}
+
+.danger-action--small {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.recovery-page {
+  display: grid;
+  gap: 1.25rem;
+  padding: clamp(1.25rem, 4vw, 3rem);
+}
+
+.recovery-page__panel {
+  display: grid;
+  gap: 0.85rem;
+  max-width: 48rem;
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  padding: 1.25rem;
+  background: var(--panel);
+}
+
+.recovery-page__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
 }
 
 .range-option {

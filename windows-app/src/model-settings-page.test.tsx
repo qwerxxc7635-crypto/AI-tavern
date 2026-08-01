@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { ModelSettingsPage } from './model-settings-page.js';
 import type { ModelSettingsGateway, ModelSettingsUpdate } from './model-settings-service.js';
@@ -30,6 +30,26 @@ describe('model settings page', () => {
               modelName: update.modelName,
               modelDisplayName: update.modelDisplayName,
               capabilities: update.capabilities,
+            },
+          ],
+          defaultModelProfileId: 'profile-1',
+          fallbackModelProfileId: 'profile-1',
+        };
+      },
+      async forgetCredential(profileId) {
+        expect(profileId).toBe('profile-1');
+        return {
+          profiles: [
+            {
+              id: 'profile-1',
+              providerId: 'provider-1',
+              presetKey: 'deepseek',
+              providerDisplayName: 'DeepSeek',
+              baseUrl: 'https://api.deepseek.com/',
+              hasCredential: false,
+              modelName: 'deepseek-v4-flash',
+              modelDisplayName: 'DeepSeek V4 Flash',
+              capabilities: null,
             },
           ],
           defaultModelProfileId: 'profile-1',
@@ -85,5 +105,10 @@ describe('model settings page', () => {
     await waitFor(() =>
       expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe(''),
     );
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    fireEvent.click(screen.getByRole('button', { name: '删除凭据' }));
+    expect(await screen.findByText('已删除该Provider的系统凭据；模型配置仍保留。')).toBeTruthy();
+    expect(screen.getByText('无已保存凭据')).toBeTruthy();
   });
 });

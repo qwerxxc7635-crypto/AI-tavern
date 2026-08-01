@@ -27,6 +27,7 @@ export interface CampaignGateway {
   create(): Promise<CampaignSummary>;
   continueCampaign(id: string): Promise<CampaignSummary>;
   archive(id: string): Promise<void>;
+  deleteCampaign(id: string): Promise<void>;
 }
 
 export const tauriCampaignGateway: CampaignGateway = {
@@ -34,22 +35,25 @@ export const tauriCampaignGateway: CampaignGateway = {
     return parseCampaignList(await invoke<unknown>('campaign_list'));
   },
   async create() {
-    return parseCampaign(await invoke<unknown>('campaign_create'));
+    return parseCampaignSummary(await invoke<unknown>('campaign_create'));
   },
   async continueCampaign(id) {
-    return parseCampaign(await invoke<unknown>('campaign_continue', { id }));
+    return parseCampaignSummary(await invoke<unknown>('campaign_continue', { id }));
   },
   async archive(id) {
     await invoke('campaign_archive', { id });
+  },
+  async deleteCampaign(id) {
+    await invoke('campaign_delete', { id });
   },
 };
 
 function parseCampaignList(value: unknown): readonly CampaignSummary[] {
   if (!Array.isArray(value)) throw new TypeError('Campaign list response must be an array');
-  return Object.freeze(value.map(parseCampaign));
+  return Object.freeze(value.map(parseCampaignSummary));
 }
 
-function parseCampaign(value: unknown): CampaignSummary {
+export function parseCampaignSummary(value: unknown): CampaignSummary {
   if (typeof value !== 'object' || value === null) {
     throw new TypeError('Campaign response must be an object');
   }

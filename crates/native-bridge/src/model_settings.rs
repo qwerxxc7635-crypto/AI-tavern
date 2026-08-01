@@ -198,6 +198,32 @@ impl CampaignStore {
         transaction.commit()?;
         self.model_settings()
     }
+
+    pub fn forget_model_credential(
+        &self,
+        profile_id: &str,
+    ) -> Result<(ModelSettingsSnapshot, Option<String>), CampaignStoreError> {
+        Uuid::parse_str(profile_id).map_err(|_| CampaignStoreError::InvalidData)?;
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let provider = transaction
+            .query_row(
+                "SELECT p.id, p.credential_ref
+                 FROM model_profiles m
+                 JOIN provider_configs p ON p.id = m.provider_config_id
+                 WHERE m.id = ?1 AND m.enabled = 1 AND p.enabled = 1",
+                [profile_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, Option<String>>(1)?)),
+            )
+            .optional()?
+            .ok_or(CampaignStoreError::NotFound)?;
+        transaction.execute(
+            "UPDATE provider_configs SET credential_ref = NULL, updated_at = ?1 WHERE id = ?2",
+            params![current_timestamp()?, provider.0],
+        )?;
+        transaction.commit()?;
+        Ok((self.model_settings()?, provider.1))
+    }
 }
 
 fn validate_update(update: &ModelSettingsUpdate) -> Result<(), CampaignStoreError> {
@@ -533,6 +559,27 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM model_profiles", [], |row| row.get(0))
             .unwrap();
         assert_eq!((providers, profiles), (0, 0));
+    }
+
+    #[test]
+    fn forgetting_a_credential_clears_the_provider_without_exposing_the_secret() {
+        let directory = tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("forget-credential.sqlite")).unwrap();
+        let credential_ref = format!("credential:v1:{}", Uuid::new_v4());
+        let mut update = settings_update("custom", "Private Provider", "private-model");
+        update.credential_ref = Some(credential_ref.clone());
+        let saved = store.save_model_settings(update).unwrap();
+        let profile_id = saved.profiles[0].id.clone();
+
+        let (snapshot, removed) = store.forget_model_credential(&profile_id).unwrap();
+
+        assert_eq!(removed.as_deref(), Some(credential_ref.as_str()));
+        assert!(!snapshot.profiles[0].has_credential);
+        assert_eq!(snapshot.profiles[0].id, profile_id);
+        assert!(matches!(
+            store.forget_model_credential("not-a-profile-id"),
+            Err(CampaignStoreError::InvalidData)
+        ));
     }
 
     fn settings_update(

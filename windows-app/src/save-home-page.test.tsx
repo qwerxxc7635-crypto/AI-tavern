@@ -46,6 +46,22 @@ describe('save home page', () => {
     expect(gateway.archiveCalls).toEqual(['campaign-created']);
   });
 
+  it('permanently deletes an exported campaign only after explicit confirmation', async () => {
+    const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
+    const confirm = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    renderSaveHome(gateway);
+
+    fireEvent.click(await screen.findByRole('button', { name: '永久删除' }));
+    expect(gateway.deleteCalls).toEqual([]);
+    fireEvent.click(screen.getByRole('button', { name: '永久删除' }));
+    expect((await screen.findByRole('status')).textContent).toContain('已永久删除');
+    expect(gateway.deleteCalls).toEqual([EXISTING_CAMPAIGN.id]);
+    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('完整数据库备份'));
+  });
+
   it('continues a verified campaign and carries its identifier into the shell route', async () => {
     const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
     renderSaveHome(gateway);
@@ -79,6 +95,14 @@ describe('save home page', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: '继续' }));
     expect(await screen.findByText('继续冒险 campaign-existing')).toBeTruthy();
+  });
+
+  it('routes a recoverable campaign to the visible recovery center', async () => {
+    const gateway = new FakeCampaignGateway([{ ...EXISTING_CAMPAIGN, state: 'RECOVERY_REQUIRED' }]);
+    renderSaveHome(gateway);
+
+    fireEvent.click(await screen.findByRole('button', { name: '继续' }));
+    expect(await screen.findByText('恢复 campaign-existing')).toBeTruthy();
   });
 
   it('reloads campaigns from the persistence gateway after a simulated application restart', async () => {
@@ -159,6 +183,7 @@ function renderSaveHome(
         <Route path="/world" element={<WorldRouteEcho />} />
         <Route path="/character/create" element={<CharacterRouteEcho />} />
         <Route path="/adventure" element={<AdventureRouteEcho />} />
+        <Route path="/recovery" element={<RecoveryRouteEcho />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -244,11 +269,18 @@ function AdventureRouteEcho() {
   return <p>继续冒险 {id ?? '未选择'}</p>;
 }
 
+function RecoveryRouteEcho() {
+  const location = useLocation();
+  const id = new URLSearchParams(location.search).get('campaignId');
+  return <p>恢复 {id ?? '未选择'}</p>;
+}
+
 class FakeCampaignGateway implements CampaignGateway {
   public listCalls = 0;
   public createCalls = 0;
   public readonly continueCalls: string[] = [];
   public readonly archiveCalls: string[] = [];
+  public readonly deleteCalls: string[] = [];
 
   public constructor(private campaigns: readonly CampaignSummary[]) {}
 
@@ -278,6 +310,11 @@ class FakeCampaignGateway implements CampaignGateway {
 
   public async archive(id: string): Promise<void> {
     this.archiveCalls.push(id);
+    this.campaigns = this.campaigns.filter((campaign) => campaign.id !== id);
+  }
+
+  public async deleteCampaign(id: string): Promise<void> {
+    this.deleteCalls.push(id);
     this.campaigns = this.campaigns.filter((campaign) => campaign.id !== id);
   }
 }

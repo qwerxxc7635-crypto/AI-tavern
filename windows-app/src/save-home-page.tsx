@@ -100,13 +100,17 @@ export function SaveHomePage({
     try {
       const continued = await gateway.continueCampaign(campaign.id);
       const destination =
-        continued.state === 'CREATING_WORLD' || continued.state === 'REVIEWING_WORLD'
-          ? '/world'
-          : continued.state === 'CREATING_CHARACTER'
-            ? '/character/create'
-            : continued.state === 'ADVENTURE'
-              ? '/adventure'
-              : '/tavern';
+        continued.state === 'GENERATION_FAILED' ||
+        continued.state === 'WAITING_FOR_MODEL' ||
+        continued.state === 'RECOVERY_REQUIRED'
+          ? '/recovery'
+          : continued.state === 'CREATING_WORLD' || continued.state === 'REVIEWING_WORLD'
+            ? '/world'
+            : continued.state === 'CREATING_CHARACTER'
+              ? '/character/create'
+              : continued.state === 'ADVENTURE'
+                ? '/adventure'
+                : '/tavern';
       navigate(`${destination}?campaignId=${encodeURIComponent(continued.id)}`);
     } catch {
       setError('无法继续该存档。请返回列表后重试。');
@@ -123,6 +127,23 @@ export function SaveHomePage({
       await reload();
     } catch {
       setError('存档没有归档成功，本地数据未被修改。');
+    } finally {
+      markBusy(null);
+    }
+  }
+
+  async function deleteCampaign(campaign: CampaignSummary) {
+    const accepted = window.confirm(
+      '永久删除会移除该存档的全部本地数据。应用会先创建完整数据库备份，但请确认已经导出需要保留的 .emtavern 文件。确定继续吗？',
+    );
+    if (!accepted) return;
+    markBusy(`delete:${campaign.id}`);
+    try {
+      await gateway.deleteCampaign(campaign.id);
+      await reload();
+      setTransferNotice(`本地存档 ${campaign.id.slice(0, 8)} 已永久删除。`);
+    } catch {
+      setError('存档没有删除成功，本地数据保持原状。');
     } finally {
       markBusy(null);
     }
@@ -301,6 +322,14 @@ export function SaveHomePage({
                   onClick={() => void archiveCampaign(campaign)}
                 >
                   归档
+                </button>
+                <button
+                  className="danger-action"
+                  type="button"
+                  disabled={busyId !== null}
+                  onClick={() => void deleteCampaign(campaign)}
+                >
+                  {busyId === `delete:${campaign.id}` ? '正在删除…' : '永久删除'}
                 </button>
               </div>
             </article>
