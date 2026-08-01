@@ -160,7 +160,7 @@ describe('AITurnOrchestrator', () => {
         listModels: () => fake.listModels(),
         testConnection: (config) => fake.testConnection(config),
         async generate() {
-          throw new Error('Simulated transport failure');
+          throw Object.freeze({ code: 'NETWORK' });
         },
       };
       const orchestrator = new AITurnOrchestrator(
@@ -172,16 +172,16 @@ describe('AITurnOrchestrator', () => {
       const command = executeCommand(sqlite, () => contextFromSqlite(sqlite));
 
       await expect(orchestrator.execute(command)).rejects.toMatchObject({
-        code: 'PROVIDER_FAILURE',
+        code: 'NETWORK_FAILED',
       });
       expect(new PendingAiRequestRepository(sqlite).get(command.requestId)).toMatchObject({
         status: 'FAILED',
-        lastError: { code: 'PROVIDER_FAILURE', retryable: true },
+        lastError: { code: 'NETWORK_FAILED', retryable: true },
       });
       expect(new GenerationRecordRepository(sqlite).get(command.generationRecordId)).toMatchObject({
         rawResponseText: null,
         validatedOutput: null,
-        validationError: { code: 'PROVIDER_FAILURE' },
+        validationError: { code: 'NETWORK_FAILED' },
         completedAt: at,
       });
       expect(new AdventureRepository(sqlite).getTurn(turnKey)).toMatchObject({

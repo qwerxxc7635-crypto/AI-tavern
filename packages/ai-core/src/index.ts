@@ -54,3 +54,9 @@ export type {
   ProviderType,
   TestResult,
 } from './protocol.js';
+export {
+  STANDARD_AI_ERROR_CODES,
+  StandardAIError,
+  standardizeAIError,
+} from './standard-ai-error.js';
+export type { StandardAIErrorCode } from './standard-ai-error.js';

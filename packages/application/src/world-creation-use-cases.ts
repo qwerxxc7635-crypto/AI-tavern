@@ -3,6 +3,7 @@ import {
   GenerateWorldOutputSchema,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
+  standardizeAIError,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -191,14 +192,22 @@ export class WorldCreationUseCases {
     try {
       const response = await this.provider.generate(request, this.providerConfig);
       if (response.requestId !== request.requestId || response.modelName !== request.modelName)
-        throw new Error('Provider response identity mismatch');
+        throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
       raw = response.content;
       this.requests.markReceived(command.requestId, this.now());
       this.requests.markValidating(command.requestId, this.now());
     } catch (error) {
-      this.record(command, null, null, 'PROVIDER_FAILURE', 'Provider request failed');
-      throw new AIOrchestrationError('PROVIDER_FAILURE', 'Provider request failed', {
-        cause: error,
+      const providerError = standardizeAIError(error);
+      this.record(
+        command,
+        null,
+        null,
+        providerError.code,
+        'Provider request failed',
+        providerError.retryable,
+      );
+      throw new AIOrchestrationError(providerError.code, 'Provider request failed', {
+        cause: providerError,
       });
     }
     const validated = validateAIOutput(task, raw);
@@ -209,8 +218,8 @@ export class WorldCreationUseCases {
         validationError: validated.error,
         completedAt: this.now(),
       });
-      this.fail(command, validated.error.code, 'AI output structure validation failed', true);
-      throw new AIOrchestrationError(validated.error.code, 'AI output structure validation failed');
+      this.fail(command, 'INVALID_OUTPUT', 'AI output structure validation failed', true);
+      throw new AIOrchestrationError('INVALID_OUTPUT', 'AI output structure validation failed');
     }
     let world: WorldBible;
     try {
@@ -304,6 +313,7 @@ export class WorldCreationUseCases {
     output: JsonValue | null,
     code: string,
     message: string,
+    retryable = false,
   ): void {
     this.generations.complete(command.generationRecordId, {
       rawResponseText: raw,
@@ -311,7 +321,7 @@ export class WorldCreationUseCases {
       validationError: output === null ? { code, issues: [{ path: [], code, message }] } : null,
       completedAt: this.now(),
     });
-    this.fail(command, code, message, code === 'PROVIDER_FAILURE');
+    this.fail(command, code, message, retryable);
   }
 
   private fail(

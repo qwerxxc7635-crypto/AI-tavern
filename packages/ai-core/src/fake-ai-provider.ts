@@ -2,6 +2,7 @@ import { isoTimestamp, type IsoTimestamp } from '@ember-tavern/contracts';
 
 import { AI_TASK_SCHEMAS } from './task-schema-registry.js';
 import { FAKE_TASK_OUTPUTS } from './fake-task-outputs.js';
+import { StandardAIError, type StandardAIErrorCode } from './standard-ai-error.js';
 import type {
   AIProvider,
   ModelInfo,
@@ -29,9 +30,10 @@ const fakeModel = Object.freeze({
   }),
 }) satisfies ModelInfo;
 
-export class FakeAIProviderError extends Error {
-  public constructor(message: string) {
-    super(message);
+export class FakeAIProviderError extends StandardAIError {
+  public constructor(code: StandardAIErrorCode, message: string) {
+    super(code);
+    this.message = message;
     this.name = 'FakeAIProviderError';
   }
 }
@@ -61,9 +63,11 @@ export class FakeAIProvider implements AIProvider {
     request: NormalizedAIRequest,
     config: ProviderConfig,
   ): Promise<NormalizedAIResponse> {
-    if (!config.enabled) throw new FakeAIProviderError('Fake provider config is disabled');
+    if (!config.enabled) {
+      throw new FakeAIProviderError('AUTHENTICATION_FAILED', 'Fake provider config is disabled');
+    }
     if (request.modelName !== fakeModel.name) {
-      throw new FakeAIProviderError(`Unknown fake model: ${request.modelName}`);
+      throw new FakeAIProviderError('MODEL_NOT_FOUND', `Unknown fake model: ${request.modelName}`);
     }
     const output = AI_TASK_SCHEMAS[request.task].output.parse(fakeOutput(request));
     return Object.freeze({
@@ -170,7 +174,7 @@ function taskInput(request: NormalizedAIRequest): Record<string, unknown> | unde
   if (offset < 0) return undefined;
   const value: unknown = JSON.parse(message.content.slice(offset + marker.length));
   if (!isRecord(value)) {
-    throw new FakeAIProviderError('Fake task input must be an object');
+    throw new FakeAIProviderError('INVALID_OUTPUT', 'Fake task input must be an object');
   }
   return value;
 }

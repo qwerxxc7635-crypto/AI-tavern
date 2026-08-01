@@ -9,6 +9,7 @@ import {
   type CharacterDraft,
   type WindowsCharacterCreationService,
 } from './character-creation-service.js';
+import { AIErrorNotice } from './ai-error-notice.js';
 
 type CharacterCreationActions = Pick<
   WindowsCharacterCreationService,
@@ -50,7 +51,9 @@ export function CharacterCreationPage({
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
   const [selectedTraitIds, setSelectedTraitIds] = useState<readonly string[]>([]);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<unknown | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
 
   useEffect(() => {
     if (campaignId === null) return;
@@ -66,7 +69,7 @@ export function CharacterCreationPage({
         }
       })
       .catch(() => {
-        if (active) setError('无法读取这个存档的车卡进度。');
+        if (active) setLoadError('无法读取这个存档的车卡进度。');
       });
     return () => {
       active = false;
@@ -84,14 +87,16 @@ export function CharacterCreationPage({
   async function generateTraits() {
     if (draft === null) return;
     setBusy(true);
-    setError(null);
+    setAiError(null);
+    setRetryAction(null);
     try {
       const generated = await service.generateTraits(draft);
       setSnapshot(generated);
       setDraft(generated.draft ?? draft);
       setSelectedTraitIds([]);
-    } catch {
-      setError('特质没有生成成功，本地车卡仍保持在上一个有效状态。');
+    } catch (error) {
+      setAiError(error);
+      setRetryAction(() => generateTraits);
     } finally {
       setBusy(false);
     }
@@ -107,11 +112,13 @@ export function CharacterCreationPage({
     }
     const selected = snapshot.traitCandidates.filter(({ id }) => selectedTraitIds.includes(id));
     setBusy(true);
-    setError(null);
+    setAiError(null);
+    setRetryAction(null);
     try {
       setSnapshot(await service.complete(draft, snapshot.traitGenerationRecordId, selected));
-    } catch {
-      setError('背景与装备没有保存成功，本地车卡仍保持在上一个有效状态。');
+    } catch (error) {
+      setAiError(error);
+      setRetryAction(() => completeCharacter);
     } finally {
       setBusy(false);
     }
@@ -121,14 +128,14 @@ export function CharacterCreationPage({
     return <CharacterMessage title="先选择一个存档。" />;
   }
   if (snapshot === null || draft === null) {
-    return error === null ? (
+    return loadError === null ? (
       <main className="character-studio character-studio--message" aria-busy="true">
         <span className="loading-glyph" aria-hidden="true" />
         <p className="eyebrow">Reading the character sheet</p>
         <h1>正在铺开车卡…</h1>
       </main>
     ) : (
-      <CharacterMessage title={error} />
+      <CharacterMessage title={loadError} />
     );
   }
   if (snapshot.character !== null) {
@@ -190,10 +197,11 @@ export function CharacterCreationPage({
           <h1>决定角色如何面对世界。</h1>
           <p>从经过验证的六个候选特质中选择两个。重新打开应用后，本地进度仍会保留。</p>
         </section>
-        {error === null ? null : (
-          <p className="inline-error" role="alert">
-            {error}
-          </p>
+        {aiError === null ? null : (
+          <AIErrorNotice
+            error={aiError}
+            onRetry={retryAction === null ? undefined : () => void retryAction()}
+          />
         )}
         <section className="trait-grid" aria-label="候选特质">
           {snapshot.traitCandidates.map((trait) => {
@@ -241,10 +249,11 @@ export function CharacterCreationPage({
         <h1>谁会推开酒馆的门？</h1>
         <p>基础事实由你决定；Fake Provider 只负责生成候选特质与背景文本。</p>
       </section>
-      {error === null ? null : (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
+      {aiError === null ? null : (
+        <AIErrorNotice
+          error={aiError}
+          onRetry={retryAction === null ? undefined : () => void retryAction()}
+        />
       )}
       <form
         className="character-form"

@@ -187,12 +187,21 @@ async fn contract_lists_models_tests_connection_and_sends_json_mode() {
 
 #[tokio::test]
 async fn contract_normalizes_http_and_schema_errors() {
-    let (base_url, _) = server(vec![(401, "{}"), (429, "{}"), (500, "{}")]).await;
+    let (base_url, _) = server(vec![
+        (401, "{}"),
+        (402, "{}"),
+        (429, "{}"),
+        (404, "{}"),
+        (500, "{}"),
+    ])
+    .await;
     let config = OpenAiCompatibleConfig::new(&base_url, None).unwrap();
     let provider = OpenAiCompatibleProvider::new().unwrap();
     for expected in [
         ProviderError::Authentication,
+        ProviderError::QuotaExceeded,
         ProviderError::RateLimited,
+        ProviderError::ModelNotFound,
         ProviderError::Service,
     ] {
         let result = provider

@@ -7,6 +7,7 @@ import {
   type WindowsAdventureService,
 } from './adventure-service.js';
 import { windowsSettlementService, type WindowsSettlementService } from './settlement-service.js';
+import { AIErrorNotice } from './ai-error-notice.js';
 
 type AdventureActions = Pick<
   WindowsAdventureService,
@@ -34,7 +35,11 @@ export function AdventurePage({
   const [snapshot, setSnapshot] = useState<AdventureSnapshot | null>(null);
   const [action, setAction] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<unknown | null>(null);
+  const [retryOperation, setRetryOperation] = useState<(() => Promise<AdventureSnapshot>) | null>(
+    null,
+  );
 
   useEffect(() => {
     if (campaignId === null) return;
@@ -50,7 +55,7 @@ export function AdventurePage({
         if (active) setSnapshot(loaded);
       })
       .catch(() => {
-        if (active) setError('冒险记录无法载入，本地存档没有被更改。');
+        if (active) setLoadError('冒险记录无法载入，本地存档没有被更改。');
       });
     return () => {
       active = false;
@@ -60,12 +65,14 @@ export function AdventurePage({
   async function run(operation: () => Promise<AdventureSnapshot>) {
     if (busy) return;
     setBusy(true);
-    setError(null);
+    setAiError(null);
+    setRetryOperation(null);
     try {
       setSnapshot(await operation());
       setAction('');
-    } catch {
-      setError('本次行动未能提交，请从当前本地状态重试。');
+    } catch (error) {
+      setAiError(error);
+      setRetryOperation(() => operation);
     } finally {
       setBusy(false);
     }
@@ -75,13 +82,13 @@ export function AdventurePage({
     return <AdventureMessage title="冒险" detail="请先从任务告示选择一项已接受的委托。" />;
   }
   if (snapshot === null) {
-    return error === null ? (
+    return loadError === null ? (
       <main className="adventure-page adventure-page--loading" aria-busy="true">
         <p className="eyebrow">Preparing the road</p>
         <h1>正在整理冒险记录…</h1>
       </main>
     ) : (
-      <AdventureMessage title={error} />
+      <AdventureMessage title={loadError} />
     );
   }
   if (snapshot.adventureId === null || snapshot.state === null) {
@@ -114,7 +121,12 @@ export function AdventurePage({
         >
           {busy ? '正在启程…' : '开始冒险'}
         </button>
-        {error === null ? null : <p className="form-error">{error}</p>}
+        {aiError === null ? null : (
+          <AIErrorNotice
+            error={aiError}
+            onRetry={retryOperation === null ? undefined : () => void run(retryOperation)}
+          />
+        )}
       </main>
     );
   }
@@ -264,10 +276,11 @@ export function AdventurePage({
               </button>
             </form>
           )}
-          {error === null ? null : (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
+          {aiError === null ? null : (
+            <AIErrorNotice
+              error={aiError}
+              onRetry={retryOperation === null ? undefined : () => void run(retryOperation)}
+            />
           )}
         </section>
 

@@ -1,6 +1,7 @@
 import {
   GenerateQuestInputSchema,
   GenerateQuestOutputSchema,
+  standardizeAIError,
   validateAIOutput,
   type AIProvider,
   type NormalizedAIRequest,
@@ -235,21 +236,27 @@ export class QuestUseCases {
     try {
       const response = await this.provider.generate(request, this.providerConfig);
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
-        throw new Error('Provider response identity mismatch');
+        throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
       }
       raw = response.content;
       this.requests.markReceived(command.requestId, this.now());
       this.requests.markValidating(command.requestId, this.now());
     } catch (error) {
+      const providerError = standardizeAIError(error);
       this.generations.complete(command.generationRecordId, {
         rawResponseText: null,
         validatedOutput: null,
-        validationError: generationError('PROVIDER_FAILURE', 'Quest provider request failed'),
+        validationError: generationError(providerError.code, 'Quest provider request failed'),
         completedAt: this.now(),
       });
-      this.fail(command, 'PROVIDER_FAILURE', 'Quest provider request failed', true);
-      throw new AIOrchestrationError('PROVIDER_FAILURE', 'Quest provider request failed', {
-        cause: error,
+      this.fail(
+        command,
+        providerError.code,
+        'Quest provider request failed',
+        providerError.retryable,
+      );
+      throw new AIOrchestrationError(providerError.code, 'Quest provider request failed', {
+        cause: providerError,
       });
     }
     const validated = validateAIOutput('GENERATE_QUEST', raw);
@@ -260,8 +267,8 @@ export class QuestUseCases {
         validationError: validated.error,
         completedAt: this.now(),
       });
-      this.fail(command, validated.error.code, 'Quest output validation failed', true);
-      throw new AIOrchestrationError(validated.error.code, 'Quest output validation failed');
+      this.fail(command, 'INVALID_OUTPUT', 'Quest output validation failed', true);
+      throw new AIOrchestrationError('INVALID_OUTPUT', 'Quest output validation failed');
     }
     this.generations.complete(command.generationRecordId, {
       rawResponseText: raw,

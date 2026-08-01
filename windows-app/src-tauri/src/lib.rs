@@ -58,10 +58,40 @@ impl From<CampaignStoreError> for CommandError {
 }
 
 impl From<ProviderError> for CommandError {
-    fn from(_: ProviderError) -> Self {
-        Self {
-            code: "PROVIDER_UNAVAILABLE",
-            message: "无法连接该模型服务，请检查地址、密钥和服务状态。",
+    fn from(error: ProviderError) -> Self {
+        match error {
+            ProviderError::QuotaExceeded => Self {
+                code: "QUOTA_EXCEEDED",
+                message: "模型额度已用尽，请检查额度或更换模型。",
+            },
+            ProviderError::Authentication | ProviderError::Credential => Self {
+                code: "AUTHENTICATION_FAILED",
+                message: "模型服务认证失败，请检查API Key。",
+            },
+            ProviderError::RateLimited => Self {
+                code: "RATE_LIMITED",
+                message: "模型服务请求过于频繁，请稍后重试。",
+            },
+            ProviderError::Timeout => Self {
+                code: "TIMEOUT",
+                message: "模型服务响应超时，请重试。",
+            },
+            ProviderError::ModelNotFound => Self {
+                code: "MODEL_NOT_FOUND",
+                message: "当前模型不存在或已下线，请重新选择模型。",
+            },
+            ProviderError::InvalidResponse => Self {
+                code: "INVALID_OUTPUT",
+                message: "模型返回内容无法验证，本地存档未修改。",
+            },
+            ProviderError::Network => Self {
+                code: "NETWORK_FAILED",
+                message: "无法连接模型服务，请检查网络和服务状态。",
+            },
+            _ => Self {
+                code: "PROVIDER_UNAVAILABLE",
+                message: "模型服务暂时不可用，请检查配置和服务状态。",
+            },
         }
     }
 }
@@ -507,4 +537,26 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provider_command_errors_keep_actionable_standard_codes() {
+        for (source, expected) in [
+            (ProviderError::QuotaExceeded, "QUOTA_EXCEEDED"),
+            (ProviderError::Authentication, "AUTHENTICATION_FAILED"),
+            (ProviderError::RateLimited, "RATE_LIMITED"),
+            (ProviderError::Timeout, "TIMEOUT"),
+            (ProviderError::ModelNotFound, "MODEL_NOT_FOUND"),
+            (ProviderError::InvalidResponse, "INVALID_OUTPUT"),
+            (ProviderError::Network, "NETWORK_FAILED"),
+        ] {
+            let command_error = CommandError::from(source);
+            assert_eq!(command_error.code, expected);
+            assert!(!command_error.message.is_empty());
+        }
+    }
 }

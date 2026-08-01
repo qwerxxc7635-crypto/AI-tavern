@@ -1914,3 +1914,23 @@
 
 - M6-T10满足模型能力登记、能力约束路由和JSON Schema不支持时兼容降级验收，且没有放宽本地验证或改写既有游戏事实。
 - 未提前实现跨Provider重试、失败恢复或UI错误行动；下一任务为M7-T01。
+
+## 2026-08-01 — M7-T01 实现标准错误分类
+
+### 实现
+
+- 新增共享标准错误类型，覆盖`QUOTA_EXCEEDED`、`AUTHENTICATION_FAILED`、`RATE_LIMITED`、`TIMEOUT`、`MODEL_NOT_FOUND`、`INVALID_OUTPUT`、`NETWORK_FAILED`及未知兜底，并固定每类可重试性。
+- OpenAI兼容Provider将HTTP 402、401/403、429、404、超时和网络失败映射为稳定错误；Tauri命令保留分类和安全中文说明，不返回上游响应正文。
+- 世界、车卡、酒馆、NPC、任务、冒险、结算及统一回合编排不再把错误压成`PROVIDER_FAILURE`，而是将具体代码与可重试性写入pending请求。结构失败对外统一为`INVALID_OUTPUT`，GenerationRecord继续保存原始JSON/Schema问题。
+- Windows共享错误提示为额度、认证和模型不存在提供设置入口，为限流、超时、结构和网络失败提供当前操作的可点击重试；已接入世界、车卡、NPC对话和冒险交互，不显示底层异常。
+
+### 验证
+
+- 错误映射单测覆盖全部七个要求分类、旧代码归一化、可重试性、未知错误脱敏、设置链接和真实重试回调；应用编排验证网络分类写入SQLite且没有局部游戏提交。
+- `pnpm check`通过53个Vitest文件270项、7项Node SQLite和42项Rust测试；格式、lint、类型检查及严格Clippy通过。
+- Windows前端生产build转换170个模块；Tauri release `--no-bundle`通过。独立测试标识`com.embertavern.smoke.m7t01`的release窗口启动并获得窗口句柄，进程停止后其LocalAppData目录已精确删除；恢复正式标识后再次完成release build。
+
+### 结论
+
+- M7-T01满足标准错误分类与UI可执行下一步验收，失败时不改写正式游戏状态。
+- 未实现自动重试、备用模型或跨厂商切换；下一任务为M7-T02。

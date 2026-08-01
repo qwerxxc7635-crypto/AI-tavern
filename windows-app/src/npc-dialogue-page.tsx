@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import {
@@ -6,6 +6,7 @@ import {
   type NpcDialogueSnapshot,
   type WindowsNpcDialogueService,
 } from './npc-dialogue-service.js';
+import { AIErrorNotice } from './ai-error-notice.js';
 
 type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
 
@@ -20,7 +21,8 @@ export function NpcDialoguePage({
   const [snapshot, setSnapshot] = useState<NpcDialogueSnapshot | null>(null);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<unknown | null>(null);
 
   useEffect(() => {
     if (campaignId === null || npcId === null) return;
@@ -31,24 +33,23 @@ export function NpcDialoguePage({
         if (active) setSnapshot(loaded);
       })
       .catch(() => {
-        if (active) setError('无法读取这段对话，本地存档没有发生改变。');
+        if (active) setLoadError('无法读取这段对话，本地存档没有发生改变。');
       });
     return () => {
       active = false;
     };
   }, [campaignId, npcId, service]);
 
-  async function send(event: FormEvent) {
-    event.preventDefault();
+  async function send() {
     if (campaignId === null || npcId === null || busy || draft.trim().length === 0) return;
     const message = draft.trim();
     setBusy(true);
-    setError(null);
+    setAiError(null);
     try {
       setSnapshot(await service.send(campaignId, npcId, message));
       setDraft('');
-    } catch {
-      setError('回复没有通过验证或提交失败，请稍后重试。');
+    } catch (error) {
+      setAiError(error);
     } finally {
       setBusy(false);
     }
@@ -58,13 +59,13 @@ export function NpcDialoguePage({
     return <DialogueMessage title="请先从酒馆选择一位 NPC。" />;
   }
   if (snapshot === null) {
-    return error === null ? (
+    return loadError === null ? (
       <main className="dialogue-room" aria-busy="true">
         <p className="eyebrow">Opening conversation</p>
         <h1>正在回忆先前的谈话…</h1>
       </main>
     ) : (
-      <DialogueMessage title={error} />
+      <DialogueMessage title={loadError} />
     );
   }
 
@@ -116,7 +117,13 @@ export function NpcDialoguePage({
             </div>
           )}
 
-          <form className="dialogue-composer" onSubmit={(event) => void send(event)}>
+          <form
+            className="dialogue-composer"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void send();
+            }}
+          >
             <label htmlFor="dialogue-message">你想说什么？</label>
             <textarea
               id="dialogue-message"
@@ -132,11 +139,7 @@ export function NpcDialoguePage({
               </button>
             </div>
           </form>
-          {error === null ? null : (
-            <p className="form-error" role="alert">
-              {error}
-            </p>
-          )}
+          {aiError === null ? null : <AIErrorNotice error={aiError} onRetry={() => void send()} />}
         </section>
 
         <aside className="dialogue-sidebar">

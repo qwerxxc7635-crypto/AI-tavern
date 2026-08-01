@@ -533,11 +533,13 @@ impl TokenUsage {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ConnectionErrorCode {
+    QuotaExceeded,
     Authentication,
     Network,
     RateLimited,
     Timeout,
     Unsupported,
+    ModelNotFound,
     Unknown,
 }
 
@@ -563,6 +565,8 @@ pub enum ProviderError {
     InvalidResponse,
     #[error("provider authentication failed")]
     Authentication,
+    #[error("provider quota is exhausted")]
+    QuotaExceeded,
     #[error("provider request was rate limited")]
     RateLimited,
     #[error("provider request timed out")]
@@ -575,6 +579,8 @@ pub enum ProviderError {
     Service,
     #[error("provider capability is unsupported")]
     Unsupported,
+    #[error("provider model was not found")]
+    ModelNotFound,
     #[error("provider credential is unavailable")]
     Credential,
 }
@@ -582,11 +588,13 @@ pub enum ProviderError {
 impl ProviderError {
     fn code(self) -> ConnectionErrorCode {
         match self {
+            Self::QuotaExceeded => ConnectionErrorCode::QuotaExceeded,
             Self::Authentication | Self::Credential => ConnectionErrorCode::Authentication,
             Self::RateLimited => ConnectionErrorCode::RateLimited,
             Self::Timeout => ConnectionErrorCode::Timeout,
             Self::Network => ConnectionErrorCode::Network,
             Self::Unsupported => ConnectionErrorCode::Unsupported,
+            Self::ModelNotFound => ConnectionErrorCode::ModelNotFound,
             _ => ConnectionErrorCode::Unknown,
         }
     }
@@ -621,7 +629,9 @@ fn map_transport_error(error: TransportError) -> ProviderError {
         TransportError::Authentication => ProviderError::Authentication,
         TransportError::RateLimited => ProviderError::RateLimited,
         TransportError::Tls | TransportError::Network => ProviderError::Network,
-        TransportError::Client(400 | 404 | 422) => ProviderError::InvalidRequest,
+        TransportError::Client(402) => ProviderError::QuotaExceeded,
+        TransportError::Client(404) => ProviderError::ModelNotFound,
+        TransportError::Client(400 | 422) => ProviderError::InvalidRequest,
         TransportError::Configuration
         | TransportError::Client(_)
         | TransportError::Server(_)

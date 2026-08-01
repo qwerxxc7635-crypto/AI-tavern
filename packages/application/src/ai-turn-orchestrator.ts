@@ -1,5 +1,7 @@
 import {
   routeModel,
+  StandardAIError,
+  standardizeAIError,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -206,7 +208,8 @@ export class AITurnOrchestrator {
       this.requests.markReceived(command.requestId, this.now());
       this.requests.markValidating(command.requestId, this.now());
     } catch (error) {
-      const validationError = generationError('PROVIDER_FAILURE', 'Provider request failed');
+      const providerError = standardizeAIError(error);
+      const validationError = generationError(providerError.code, 'Provider request failed');
       this.generations.complete(command.generationRecordId, {
         rawResponseText: null,
         validatedOutput: null,
@@ -214,17 +217,18 @@ export class AITurnOrchestrator {
         completedAt: this.now(),
       });
       this.failPending(command.requestId, {
-        code: 'PROVIDER_FAILURE',
+        code: providerError.code,
         message: 'Provider request failed',
-        retryable: true,
+        retryable: providerError.retryable,
       });
-      throw new AIOrchestrationError('PROVIDER_FAILURE', 'Provider request failed', {
-        cause: error,
+      throw new AIOrchestrationError(providerError.code, 'Provider request failed', {
+        cause: providerError,
       });
     }
 
     const structural = validateAIOutput(command.task, rawResponseText);
     if (!structural.ok) {
+      const outputError = new StandardAIError('INVALID_OUTPUT');
       this.generations.complete(command.generationRecordId, {
         rawResponseText,
         validatedOutput: null,
@@ -232,14 +236,13 @@ export class AITurnOrchestrator {
         completedAt: this.now(),
       });
       this.failPending(command.requestId, {
-        code: structural.error.code,
+        code: outputError.code,
         message: 'AI output structure validation failed',
-        retryable: true,
+        retryable: outputError.retryable,
       });
-      throw new AIOrchestrationError(
-        structural.error.code,
-        'AI output structure validation failed',
-      );
+      throw new AIOrchestrationError(outputError.code, 'AI output structure validation failed', {
+        cause: outputError,
+      });
     }
 
     let commit: TurnCommit;

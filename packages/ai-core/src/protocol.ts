@@ -132,7 +132,14 @@ export interface NormalizedAIResponse {
 }
 
 export type ConnectionErrorCode =
-  'AUTHENTICATION' | 'NETWORK' | 'RATE_LIMITED' | 'TIMEOUT' | 'UNSUPPORTED' | 'UNKNOWN';
+  | 'QUOTA_EXCEEDED'
+  | 'AUTHENTICATION'
+  | 'NETWORK'
+  | 'RATE_LIMITED'
+  | 'TIMEOUT'
+  | 'MODEL_NOT_FOUND'
+  | 'UNSUPPORTED'
+  | 'UNKNOWN';
 
 export type TestResult =
   | Readonly<{ ok: true; latencyMs: number }>

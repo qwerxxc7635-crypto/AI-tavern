@@ -196,3 +196,13 @@
 - 完整验证通过51个Vitest文件253项、7项Node SQLite和41项Rust测试，以及格式、lint、类型、严格Clippy、Windows生产build和Tauri release无bundle build。
 - release窗口启动烟测成功；因Tauri应用数据路径未被临时环境变量可靠隔离，不宣称存档烟测。真实SQLite与Fake Provider的业务链在D盘临时测试目录中通过。
 - 下一任务：M7-T01标准错误分类。
+
+## 2026-08-01 M7-T01标准错误分类完成状态
+
+- 标准AI错误覆盖额度不足、认证失败、限流、超时、模型不存在、结构错误和网络失败；未知错误只显示安全兜底，不解析或展示上游自由文本。
+- Rust Provider、Tauri命令、全部应用AI用例、pending请求SQLite记录和Windows提示保持具体分类；旧的`PROVIDER_FAILURE`覆盖已从这些生成链移除。
+- JSON或Schema失败对外统一为`INVALID_OUTPUT`，GenerationRecord仍保留本地诊断细节，不合规内容不进入游戏事务。
+- Windows世界、车卡、NPC对话和冒险操作显示实际可点击的重试或模型设置入口；本任务没有自动切换、备用模型或跨厂商确认。
+- `pnpm check`通过53个Vitest文件270项、7项Node SQLite和42项Rust测试；Windows生产build、Tauri release build及独立应用标识的窗口启动烟测通过。
+- 烟测使用`com.embertavern.smoke.m7t01`隔离WebView数据，未接触正式应用标识；进程停止后测试LocalAppData目录已精确删除，正式标识已恢复并重建最终release。
+- 下一任务：M7-T02模型切换和重试。

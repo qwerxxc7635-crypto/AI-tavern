@@ -8,6 +8,7 @@ import {
   type WorldCreationSnapshot,
   type WorldDraft,
 } from './world-creation-service.js';
+import { AIErrorNotice } from './ai-error-notice.js';
 
 type WorldCreationActions = Pick<
   WindowsWorldCreationService,
@@ -40,7 +41,11 @@ export function WorldCreationPage({
   const [editor, setEditor] = useState<WorldDraft | null>(null);
   const [lockedFields, setLockedFields] = useState<WorldBibleView['lockedFields']>([]);
   const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [aiError, setAiError] = useState<unknown | null>(null);
+  const [retryOperation, setRetryOperation] = useState<
+    (() => Promise<WorldCreationSnapshot>) | null
+  >(null);
   const [revision, setRevision] = useState('');
 
   useEffect(() => {
@@ -52,7 +57,7 @@ export function WorldCreationPage({
         if (active) setSnapshot(loaded);
       })
       .catch(() => {
-        if (active) setError('无法读取该存档的世界构筑进度。');
+        if (active) setLoadError('无法读取该存档的世界构筑进度。');
       });
     return () => {
       active = false;
@@ -67,11 +72,13 @@ export function WorldCreationPage({
 
   async function perform(label: string, action: () => Promise<WorldCreationSnapshot>) {
     setBusy(label);
-    setError(null);
+    setAiError(null);
+    setRetryOperation(null);
     try {
       setSnapshot(await action());
-    } catch {
-      setError('这次操作没有完成，本地存档保持在上一个有效状态。');
+    } catch (error) {
+      setAiError(error);
+      setRetryOperation(() => action);
     } finally {
       setBusy(null);
     }
@@ -89,7 +96,7 @@ export function WorldCreationPage({
     );
   }
 
-  if (snapshot === null && error === null) {
+  if (snapshot === null && loadError === null) {
     return (
       <main className="world-studio world-studio--message" aria-live="polite" aria-busy="true">
         <span className="loading-glyph" aria-hidden="true" />
@@ -98,12 +105,16 @@ export function WorldCreationPage({
       </main>
     );
   }
+  if (snapshot === null) {
+    return <WorldMessage title={loadError ?? '无法读取该存档的世界构筑进度。'} />;
+  }
 
   if (snapshot?.campaignState === 'CREATING_WORLD') {
     return (
       <WorldOptions
         busy={busy !== null}
-        error={error}
+        error={aiError}
+        onRetry={retryOperation === null ? undefined : () => void perform('retry', retryOperation)}
         onGenerate={(options) =>
           void perform('generate', () => service.generate(campaignId, options))
         }
@@ -147,10 +158,13 @@ export function WorldCreationPage({
           </button>
         </section>
 
-        {error === null ? null : (
-          <p className="inline-error" role="alert">
-            {error}
-          </p>
+        {aiError === null ? null : (
+          <AIErrorNotice
+            error={aiError}
+            onRetry={
+              retryOperation === null ? undefined : () => void perform('retry', retryOperation)
+            }
+          />
         )}
 
         <div className="world-layout">
@@ -318,13 +332,26 @@ export function WorldCreationPage({
   );
 }
 
+function WorldMessage({ title }: { readonly title: string }) {
+  return (
+    <main className="world-studio world-studio--message" role="alert">
+      <p className="eyebrow">World stage unavailable</p>
+      <h1>{title}</h1>
+      <Link className="text-link" to="/saves">
+        返回存档首页
+      </Link>
+    </main>
+  );
+}
+
 interface WorldOptionsProps {
   readonly busy: boolean;
-  readonly error: string | null;
+  readonly error: unknown | null;
+  readonly onRetry?: (() => void) | undefined;
   readonly onGenerate: (options: Parameters<WindowsWorldCreationService['generate']>[1]) => void;
 }
 
-function WorldOptions({ busy, error, onGenerate }: WorldOptionsProps) {
+function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
   const [worldType, setWorldType] = useState('奇幻');
   const [tone, setTone] = useState('冒险');
   const [magic, setMagic] = useState('中');
@@ -349,11 +376,7 @@ function WorldOptions({ busy, error, onGenerate }: WorldOptionsProps) {
         <p>基础选项决定边界；自定义构想可以留空。所有结果都会先预览，再由你确认。</p>
       </section>
 
-      {error === null ? null : (
-        <p className="inline-error" role="alert">
-          {error}
-        </p>
-      )}
+      {error === null ? null : <AIErrorNotice error={error} onRetry={onRetry} />}
 
       <form
         className="world-options"

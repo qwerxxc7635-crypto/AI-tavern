@@ -562,6 +562,19 @@ button:focus-visible {
   background: rgb(117 72 52 / 18%);
 }
 
+.ai-error-notice {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.ai-error-notice p {
+  margin: 0;
+}
+
+.ai-error-notice :is(.secondary-action, .text-link) {
+  width: fit-content;
+}
+
 .save-home__footer {
   max-width: 76rem;
   display: flex;
