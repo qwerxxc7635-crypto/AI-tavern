@@ -12,6 +12,57 @@ use zeroize::Zeroizing;
 
 const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
 
+pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/";
+pub const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-flash";
+
+pub struct DeepSeekPreset;
+
+impl DeepSeekPreset {
+    pub const KEY: &'static str = "deepseek";
+    pub const DISPLAY_NAME: &'static str = "DeepSeek";
+    pub const MODELS: [PresetModel; 2] = [
+        PresetModel {
+            name: "deepseek-v4-flash",
+            display_name: "DeepSeek V4 Flash",
+            json_mode: true,
+            reasoning: true,
+            context_window_tokens: 1_048_576,
+        },
+        PresetModel {
+            name: "deepseek-v4-pro",
+            display_name: "DeepSeek V4 Pro",
+            json_mode: true,
+            reasoning: true,
+            context_window_tokens: 1_048_576,
+        },
+    ];
+
+    pub fn config(credential_ref: CredentialRef) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(DEEPSEEK_BASE_URL, Some(credential_ref))
+    }
+
+    pub fn model(name: &str) -> Option<PresetModel> {
+        Self::MODELS
+            .iter()
+            .copied()
+            .find(|model| model.name == name)
+    }
+
+    #[cfg(test)]
+    fn config_for_contract_test(base_url: &str) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(base_url, None)
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct PresetModel {
+    pub name: &'static str,
+    pub display_name: &'static str,
+    pub json_mode: bool,
+    pub reasoning: bool,
+    pub context_window_tokens: u64,
+}
+
 #[derive(Clone, Debug)]
 pub struct OpenAiCompatibleConfig {
     endpoint: ApprovedEndpoint,

@@ -32,13 +32,16 @@ impl Drop for CredentialCleanup {
     }
 }
 
-async fn server(responses: Vec<(u16, &'static str)>) -> (String, Arc<Mutex<Vec<CapturedRequest>>>) {
+async fn server<B: Into<String> + Send + 'static>(
+    responses: Vec<(u16, B)>,
+) -> (String, Arc<Mutex<Vec<CapturedRequest>>>) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = listener.local_addr().unwrap();
     let captured = Arc::new(Mutex::new(Vec::new()));
     let server_captured = Arc::clone(&captured);
     tokio::spawn(async move {
         for (status, response_body) in responses {
+            let response_body = response_body.into();
             let (mut socket, _) = listener.accept().await.unwrap();
             let request = read_request(&mut socket).await;
             server_captured.lock().await.push(request);
@@ -261,4 +264,90 @@ fn maps_every_transport_failure_without_exposing_raw_details() {
         map_transport_error(TransportError::Server(503)),
         ProviderError::Service
     );
+}
+
+#[tokio::test]
+async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
+    assert_eq!(DeepSeekPreset::KEY, "deepseek");
+    assert_eq!(DEEPSEEK_BASE_URL, "https://api.deepseek.com/");
+    assert_eq!(DEEPSEEK_DEFAULT_MODEL, "deepseek-v4-flash");
+    assert_eq!(
+        DeepSeekPreset::model("deepseek-v4-pro"),
+        Some(PresetModel {
+            name: "deepseek-v4-pro",
+            display_name: "DeepSeek V4 Pro",
+            json_mode: true,
+            reasoning: true,
+            context_window_tokens: 1_048_576,
+        })
+    );
+    assert!(DeepSeekPreset::model("deepseek-chat").is_none());
+
+    let models = r#"{"data":[{"id":"deepseek-v4-flash","owned_by":"deepseek"},{"id":"deepseek-v4-pro","owned_by":"deepseek"}]}"#
+        .to_owned();
+    let world_content = serde_json::json!({
+        "name": "潮痕群岛",
+        "currentRegion": "灰帆港",
+        "summary": "被季风与古代航标连接的群岛。",
+        "coreConflict": "失控潮汐正在吞没航路。",
+        "technologyLevel": "航海时代早期",
+        "powerRules": ["潮汐魔法必须借助刻印施展。"],
+        "factions": [{
+            "name": "引潮会",
+            "description": "维护群岛航标的领航者。",
+            "goals": ["重启灰帆港主航标。"]
+        }],
+        "locations": [{
+            "name": "灰帆港",
+            "description": "建在玄武岩海湾中的港城。",
+            "parentName": null,
+            "factionNames": ["引潮会"]
+        }],
+        "narrativeStyle": "克制的航海奇幻与悬疑。",
+        "forbiddenElements": [],
+        "tavernReason": "船员在此等待潮窗与护航。",
+        "storyHooks": ["主航标每逢退潮便熄灭。"]
+    });
+    let world = serde_json::json!({
+        "id": "world-generation",
+        "model": "deepseek-v4-flash",
+        "choices": [{
+            "message": { "content": world_content.to_string() },
+            "finish_reason": "stop"
+        }]
+    })
+    .to_string();
+    let (base_url, captured) = server(vec![(200, models), (200, world)]).await;
+    let config = DeepSeekPreset::config_for_contract_test(&base_url).unwrap();
+    let provider = OpenAiCompatibleProvider::new().unwrap();
+    let listed = provider
+        .list_models(&config, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(
+        listed
+            .iter()
+            .map(|model| model.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["deepseek-v4-flash", "deepseek-v4-pro"]
+    );
+
+    let mut request = normalized(ResponseFormat::JsonObject);
+    request.model_name = DEEPSEEK_DEFAULT_MODEL.to_owned();
+    request.messages[1].content = "生成一个中文奇幻海岛世界。".to_owned();
+    let response = provider
+        .generate(&config, &request, CancellationToken::new())
+        .await
+        .unwrap();
+    let generated_world: Value = serde_json::from_str(&response.content).unwrap();
+    assert_eq!(generated_world["name"], "潮痕群岛");
+    assert_eq!(generated_world["currentRegion"], "灰帆港");
+    assert_eq!(generated_world["factions"].as_array().unwrap().len(), 1);
+    assert_eq!(generated_world["locations"].as_array().unwrap().len(), 1);
+    assert_eq!(generated_world["storyHooks"].as_array().unwrap().len(), 1);
+
+    let requests = captured.lock().await;
+    let body: Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(body["model"], DEEPSEEK_DEFAULT_MODEL);
+    assert_eq!(body["response_format"]["type"], "json_object");
 }

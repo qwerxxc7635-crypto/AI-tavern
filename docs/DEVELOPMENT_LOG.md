@@ -1765,3 +1765,24 @@
 - `pnpm check`通过：48个Vitest文件242项、7项Node SQLite、31项Rust测试；格式、ESLint、类型、Rust fmt和严格Clippy通过。
 - `cargo metadata --format-version 1`、Windows生产前端build和Tauri release `--no-bundle`通过。
 - M6-T03验收通过；适配器尚未暴露页面命令或写入Provider配置，下一任务为M6-T04 DeepSeek预设。
+
+## 2026-08-01 — M6-T04 添加DeepSeek预设
+
+### 实现与依据
+
+- 查阅DeepSeek官方当前模型/价格页与2026-04-24 V4更新：OpenAI兼容Base URL保持`https://api.deepseek.com`，当前模型为`deepseek-v4-flash`和`deepseek-v4-pro`。
+- 新增`DeepSeekPreset`，规范化尾斜杠根地址，默认Flash；两个模型均登记JSON模式、推理能力和1,048,576上下文。
+- 官方说明旧`deepseek-chat`与`deepseek-reasoner`在2026-07-24停用，因此预设明确不接受旧别名。
+- 未登记会动态变化的价格或免费状态；生产配置必须传入系统CredentialRef。
+
+### 验证
+
+- 测试专用回环配置复用通用OpenAI兼容适配器，服务器列出Flash/Pro后以默认Flash执行JSON Object世界生成。
+- 本地响应包含名称、地区、摘要、核心冲突、技术水平、力量规则、势力、地点、叙事风格、禁用元素、酒馆理由和剧情钩子；解析后核对中文内容与集合。
+- 定向Provider测试6项通过；`pnpm check`通过48个Vitest文件242项、7项Node SQLite和32项Rust测试，严格Clippy及格式检查通过。
+- Windows前端生产build和Tauri release `--no-bundle`通过。
+
+### 结论
+
+- M6-T04在不使用真实API Key和不产生付费调用的条件下，通过准确本地合同验证连接语义、模型列表、配置和世界生成。
+- 未提前实现Qwen、SiliconFlow/OpenRouter、Ollama或自定义配置；下一任务为M6-T05。

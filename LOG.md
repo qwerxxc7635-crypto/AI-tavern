@@ -1360,3 +1360,13 @@ cargo --version
 - 认证测试加入Drop清理守卫，测试后Credential Manager残留为0；未调用真实或收费API。
 - `pnpm check`、Cargo metadata/fmt/严格Clippy、31项Rust测试、Windows前端build和Tauri release无bundle build通过。
 - 下一任务：M6-T04 DeepSeek预设。
+
+## 2026-08-01 — M6-T04 DeepSeek预设
+
+- 按DeepSeek官方当前文档新增预设：`https://api.deepseek.com/`、默认`deepseek-v4-flash`，另支持`deepseek-v4-pro`。
+- 两模型登记JSON模式、推理与1M上下文；价格/免费状态不硬编码。已于2026-07-24弃用的旧模型别名不进入预设。
+- 生产配置必须持有系统CredentialRef；回环覆盖函数仅在测试构建可见。
+- 本地合同测试完成模型列表和中文世界JSON生成，内容包含世界摘要、冲突、规则、势力、地点、叙事风格、酒馆理由与剧情钩子。
+- 6项Provider测试及完整`pnpm check`通过；Windows前端与Tauri release无bundle build通过。
+- 未向DeepSeek或其他外部服务发请求，未使用真实凭据或产生费用。
+- 下一任务：M6-T05 Qwen预设。

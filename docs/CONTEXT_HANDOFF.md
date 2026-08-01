@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T03 实现OpenAI-Compatible适配器`
+- 最近完成任务：`M6-T04 添加DeepSeek预设`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T03`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T04 添加DeepSeek预设`
+- 当前任务：`M6-T04`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T05 添加Qwen预设`
 
 ## 架构摘要
 
@@ -44,6 +44,7 @@
 - WebView只有保存、存在检查和删除三个高层命令，没有明文读取命令；Provider的可信Rust代码后续可通过闭包短暂使用秘密字节。
 - `ember-provider-openai-compatible`将规范消息映射到`/v1/chat/completions`语义，支持TEXT与JSON_OBJECT、模型列表、连接测试、用量/结束原因归一化和稳定错误分类。
 - Provider只接受M6-T01审批端点并从M6-T02不透明引用取认证；JSON Schema在本任务显式报告Unsupported，留给能力声明与后续适配，不做静默降级。
+- DeepSeek预设使用官方当前OpenAI兼容根地址与`deepseek-v4-flash`/`deepseek-v4-pro`，默认Flash；不再登记已于2026-07-24弃用的旧模型别名。
 - Windows React/Vite/Tauri入口已加入pnpm/Cargo workspace；HashRouter、基础主题和最小core:default capability可运行。
 - Windows启动页在运行时读取共享contracts Schema版本；无SQL、文件、HTTP、密钥或业务原生命令。
 - Windows AppShell包含侧栏、上下文标题栏、离线状态、统一加载态和错误边界；六个规定入口通过延迟路由模块导航。
@@ -85,7 +86,16 @@
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
 3. 确认M5-T11提交为`test(M5-T11): verify offline vertical slice`且工作树干净。
-4. 确认M6-T03提交后，从M6-T04 DeepSeek预设开始；使用本地合同服务器验证预设，不进行真实或收费调用。
+4. 确认M6-T04提交后，从M6-T05 Qwen预设开始；继续使用本地合同服务器，不进行真实或收费调用。
+
+## 2026-08-01 M6-T04完成状态
+
+- 根据DeepSeek官方2026-04-24更新与当前模型文档，预设根地址为`https://api.deepseek.com/`，模型为`deepseek-v4-flash`和`deepseek-v4-pro`，默认Flash。
+- 两模型登记JSON模式、推理能力和1,048,576上下文；不硬编码价格/免费状态，也不保留已在2026-07-24弃用的`deepseek-chat`/`deepseek-reasoner`。
+- 生产预设必须接收CredentialRef；合同测试的回环端点替换仅在crate测试编译中存在，不向应用配置暴露。
+- 本地合同服务器返回两模型并完成中文世界生成；生成内容覆盖完整GENERATE_WORLD结构，验证JSON模式、默认模型和中文字段。
+- 定向6项Provider测试、`pnpm check`（48文件242项Vitest、7项Node SQLite、32项Rust）、Windows前端build及Tauri release无bundle build通过。
+- 未访问DeepSeek、未使用真实凭据或产生费用；M6-T05及其他预设未提前实现。
 
 ## 2026-08-01 M6-T03完成状态
 
