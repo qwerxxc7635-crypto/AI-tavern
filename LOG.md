@@ -1349,3 +1349,14 @@ cargo --version
 - Windows系统存储真实往返测试使用运行时随机值，清理守卫删除条目；测试后Ember目标残留为0。SQLite既有迁移测试继续验证provider配置没有密钥列。
 - workspace严格Clippy、26项Rust测试、`pnpm check`（48文件242项Vitest、7项Node SQLite）、Windows前端build与Tauri release无bundle build通过。
 - 下一任务：M6-T03 OpenAI-Compatible适配器；仍禁止未经确认的真实或收费调用。
+
+## 2026-08-01 — M6-T03 OpenAI-Compatible适配器
+
+- 新增Rust `ember-provider-openai-compatible`：支持普通文本、JSON Object、模型列表、连接测试及Chat Completions响应归一化。
+- 请求严格验证并复用审批端点、超时/取消/大小上限和系统凭据；认证Header标记敏感，错误不保留原始请求或响应。
+- 响应映射Provider请求ID、模型、首选项内容、结束原因、用量和RFC3339接收时间；空模型、空choices、空内容和无效JSON拒绝。
+- JSON Schema在本任务显式Unsupported，未静默降级或提前实现后续能力；未新增Tauri Provider命令或厂商预设。
+- 5项本地Provider Contract Test覆盖文本、JSON模式、模型列表/连接测试、Windows凭据认证、401/429/500、无效响应和完整错误映射；本地服务器绑定回环地址。
+- 认证测试加入Drop清理守卫，测试后Credential Manager残留为0；未调用真实或收费API。
+- `pnpm check`、Cargo metadata/fmt/严格Clippy、31项Rust测试、Windows前端build和Tauri release无bundle build通过。
+- 下一任务：M6-T04 DeepSeek预设。

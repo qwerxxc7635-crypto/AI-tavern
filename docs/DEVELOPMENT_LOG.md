@@ -1741,3 +1741,27 @@
 
 - M6-T02验收通过：API Key只可进入系统安全存储，SQLite、日志、测试fixture和导出均不接收明文；WebView不能读取已保存秘密。
 - 未提前实现M6-T03 Provider或设置页面，未执行真实API调用；下一任务为M6-T03。
+
+## 2026-08-01 — M6-T03 实现OpenAI-Compatible适配器
+
+### 实现
+
+- 新增`ember-provider-openai-compatible` Rust crate，组合M6-T01安全传输与M6-T02系统密钥仓库，不引入厂商SDK。
+- 实现`GET models`、连接测试和`chat/completions`普通文本/JSON Object请求；system/user/assistant消息、temperature、max_tokens和Bearer认证按OpenAI兼容协议映射。
+- 响应解析Provider请求ID、模型、首个choice内容、stop/length/content_filter/tool_calls/error结束原因、token usage与RFC3339接收时间。
+- 请求拒绝空标识、模型、消息和内容、非法温度及零输出上限；响应拒绝空模型、空choice、空内容、无效JSON和超大正文。
+- 认证、限流、超时、取消、网络、无效请求/响应和服务端失败使用稳定ProviderError；底层URL、Header、响应正文和异常不会进入返回错误。
+- JSON Schema不在M6-T03工作内容中，明确返回Unsupported，不以JSON Object伪装支持；未加入DeepSeek等预设。
+
+### Provider Contract Test
+
+- 本地Tokio HTTP服务器验证模型列表和连接延迟、文本请求、JSON Object的`response_format`、消息角色、模型、用量及结束原因。
+- Windows Credential Manager中的运行时UUID秘密用于认证Header合同验证，源码和fixture没有API Key；Drop守卫保证失败路径清理，最终目标残留为0。
+- 401、429、500、无效JSON、远程HTTP配置拒绝、JSON Schema不支持以及TransportError全分类映射均有断言，共5项。
+- 所有服务器仅监听127.0.0.1，没有真实Provider、账号、凭据或收费请求。
+
+### 验证与结论
+
+- `pnpm check`通过：48个Vitest文件242项、7项Node SQLite、31项Rust测试；格式、ESLint、类型、Rust fmt和严格Clippy通过。
+- `cargo metadata --format-version 1`、Windows生产前端build和Tauri release `--no-bundle`通过。
+- M6-T03验收通过；适配器尚未暴露页面命令或写入Provider配置，下一任务为M6-T04 DeepSeek预设。

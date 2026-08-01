@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T02 实现安全密钥仓库`
+- 最近完成任务：`M6-T03 实现OpenAI-Compatible适配器`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T02`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T03 实现OpenAI-Compatible适配器`
+- 当前任务：`M6-T03`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T04 添加DeepSeek预设`
 
 ## 架构摘要
 
@@ -42,6 +42,8 @@
 - 传输错误只暴露稳定分类；请求Header值和Body在Debug输出中脱敏。WebView没有新增HTTP命令或capability。
 - `ember-secure-secrets`在Windows Credential Manager以本机持久化保存模型密钥；公开值只有严格格式的`credential:v1:<UUID>`引用，秘密内存副本使用后清零。
 - WebView只有保存、存在检查和删除三个高层命令，没有明文读取命令；Provider的可信Rust代码后续可通过闭包短暂使用秘密字节。
+- `ember-provider-openai-compatible`将规范消息映射到`/v1/chat/completions`语义，支持TEXT与JSON_OBJECT、模型列表、连接测试、用量/结束原因归一化和稳定错误分类。
+- Provider只接受M6-T01审批端点并从M6-T02不透明引用取认证；JSON Schema在本任务显式报告Unsupported，留给能力声明与后续适配，不做静默降级。
 - Windows React/Vite/Tauri入口已加入pnpm/Cargo workspace；HashRouter、基础主题和最小core:default capability可运行。
 - Windows启动页在运行时读取共享contracts Schema版本；无SQL、文件、HTTP、密钥或业务原生命令。
 - Windows AppShell包含侧栏、上下文标题栏、离线状态、统一加载态和错误边界；六个规定入口通过延迟路由模块导航。
@@ -83,7 +85,17 @@
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
 3. 确认M5-T11提交为`test(M5-T11): verify offline vertical slice`且工作树干净。
-4. 确认M6-T02提交后，从M6-T03 OpenAI-Compatible适配器开始；只使用本地测试服务器和运行时随机凭据，不进行真实或收费调用。
+4. 确认M6-T03提交后，从M6-T04 DeepSeek预设开始；使用本地合同服务器验证预设，不进行真实或收费调用。
+
+## 2026-08-01 M6-T03完成状态
+
+- 新增`ember-provider-openai-compatible`，实现普通文本、JSON Object模式、`GET models`、连接计时、Chat Completions响应/用量/结束原因归一化。
+- 配置复用审批端点；认证只从CredentialRef解析，并以敏感Authorization Header发送。无凭据支持本地兼容服务。
+- 规范请求验证空ID/模型/消息、温度、输出上限与超时；无效/超大响应、认证、限流、取消、超时、网络、4xx和5xx映射为稳定ProviderError，不携带原始响应。
+- JSON Schema没有在M6-T03范围内伪装成JSON Object，明确返回Unsupported；流式生成仍由M6-T01传输层提供但本任务不提前暴露Provider流API。
+- 5项本地Provider Contract Test覆盖带Windows系统凭据的文本请求、JSON模式、模型列表、连接测试、用量/结束原因、401/429/500、无效JSON、禁用远程HTTP和错误映射。
+- 合同服务器只绑定127.0.0.1；秘密运行时生成并由Drop守卫清理，测试后系统存储残留为0。没有真实API或收费调用。
+- `pnpm check`通过48个Vitest文件242项、7项Node SQLite和31项Rust测试；Cargo metadata/fmt/严格Clippy、Windows前端build及Tauri release无bundle build通过。
 
 ## 2026-08-01 M6-T02完成状态
 

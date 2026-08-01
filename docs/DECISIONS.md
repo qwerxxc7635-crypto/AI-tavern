@@ -827,3 +827,27 @@ WebView只开放规格允许的`secret_save`、`secret_exists`和`secret_delete`
 ### 可逆性
 
 iOS阶段可在相同`SecretStore`语义下加入Keychain后端，或在保持引用格式与迁移策略的前提下替换Windows安全存储实现。不得新增明文读取命令、把秘密复制到SQLite/导出/日志，或允许页面指定任意系统凭据目标。
+
+## DEC-033：OpenAI兼容协议在Rust边界归一化且能力不静默冒充
+
+- 日期：2026-08-01
+- 状态：已采纳
+- 依据：`docs/spec.md` 第22、30、31节；`docs/TASKS.md` 的 `M6-T03`；`DEC-031`、`DEC-032`
+
+### 背景
+
+OpenAI兼容服务共享大体相同的models与chat completions协议，但响应字段、错误状态和可用能力并不完全一致。若页面直接拼请求，或适配器把未实现的JSON Schema静默降级为JSON Object，业务层会误判能力并可能接受不符合任务Schema的输出。
+
+### 决定与理由
+
+通用适配器放在Rust中，只组合审批端点、安全传输和系统凭据。它把规范角色、文本/JSON Object格式、温度与输出上限映射为OpenAI兼容JSON，并把模型、内容、结束原因、用量和接收时间还原为规范响应。模型列表只返回服务实际报告的标识与owner，不臆测上下文窗口、价格或高级能力。
+
+JSON Schema在当前任务显式返回Unsupported；后续只有预设或动态能力确认支持时才能启用。HTTP、解析和密钥错误归一化为稳定ProviderError，不携带底层异常或响应正文。连接测试复用模型列表，不发送生成请求。
+
+### 影响
+
+Provider合同可完全通过本地服务器验证，真实厂商预设只需提供经过校验的配置与能力，不复制协议实现。业务AI输出仍须经过既有任务Schema和领域验证；Provider成功不等于游戏状态可提交。WebView尚未获得通用Provider命令。
+
+### 可逆性
+
+未来可增加Responses API、流式Provider事件、JSON Schema或兼容服务的字段变体，但必须通过显式能力和合同测试。不得绕过审批端点/系统密钥、把未知响应直接交给游戏状态，或用静默降级宣称未验证能力。

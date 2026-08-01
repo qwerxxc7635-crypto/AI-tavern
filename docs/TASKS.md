@@ -641,6 +641,7 @@
 ## M6-T03 实现OpenAI-Compatible适配器
 
 - 优先级：P0
+- 状态：已完成（2026-08-01）
 - 依赖：M6-T01、M6-T02
 - 工作内容：普通文本、JSON模式、模型列表、连接测试、错误映射。
 - 验收：通过Provider Contract Test。
