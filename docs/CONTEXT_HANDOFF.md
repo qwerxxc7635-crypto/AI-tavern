@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T07 添加Ollama预设`
+- 最近完成任务：`M6-T08 添加自定义Base URL配置`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T07`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T08 添加自定义Base URL配置`
+- 当前任务：`M6-T08`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T09 实现模型设置页面`
 
 ## 架构摘要
 
@@ -169,3 +169,11 @@
 - 当前Windows环境未安装`ollama`命令，因此未宣称真实Ollama二进制/已下载模型测试；该项留给有本地模型环境的真实模型验收。
 - 定向9项Provider测试、完整`pnpm check`、Windows生产build与Tauri release无bundle build通过。
 - 下一任务：M6-T08自定义Base URL配置。
+
+## 2026-08-01 M6-T08自定义Base URL配置完成状态
+
+- 新增自定义配置值对象，包含经审批的Base URL、严格模型名、可选CredentialRef及最多16个非秘密附加Header。
+- 自动补齐尾斜杠；远程HTTP被拒绝，远程HTTPS与回环HTTP允许。保留/认证/API Key类Header被拒绝，所有允许值在传输Debug中仍脱敏。
+- 本地合同测试验证自定义模型、附加Header和实际文本生成，并覆盖不安全地址、空模型、Authorization和Host拒绝。
+- `pnpm check`、10项Provider测试、Windows生产build与Tauri release无bundle build通过；未连接外部服务。
+- 下一任务：M6-T09模型设置页面。

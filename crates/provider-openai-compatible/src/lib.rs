@@ -152,10 +152,86 @@ impl QwenPreset {
     }
 }
 
+#[derive(Clone)]
+pub struct CustomHeader(RequestHeader);
+
+impl CustomHeader {
+    pub fn new(name: &str, value: &str) -> Result<Self, ProviderError> {
+        let normalized = name.trim().to_ascii_lowercase();
+        if matches!(
+            normalized.as_str(),
+            "accept"
+                | "api-key"
+                | "authorization"
+                | "connection"
+                | "content-length"
+                | "content-type"
+                | "cookie"
+                | "host"
+                | "proxy-authorization"
+                | "set-cookie"
+                | "transfer-encoding"
+                | "x-api-key"
+                | "x-goog-api-key"
+        ) {
+            return Err(ProviderError::InvalidConfig);
+        }
+        RequestHeader::sensitive(&normalized, value)
+            .map(Self)
+            .map_err(|_| ProviderError::InvalidConfig)
+    }
+}
+
+#[derive(Clone)]
+pub struct CustomCompatibleConfig {
+    provider: OpenAiCompatibleConfig,
+    model_name: String,
+}
+
+impl CustomCompatibleConfig {
+    pub fn new(
+        base_url: &str,
+        model_name: &str,
+        credential_ref: Option<CredentialRef>,
+        additional_headers: Vec<CustomHeader>,
+    ) -> Result<Self, ProviderError> {
+        if model_name.trim().is_empty()
+            || model_name.trim() != model_name
+            || model_name.len() > 256
+            || additional_headers.len() > 16
+        {
+            return Err(ProviderError::InvalidConfig);
+        }
+        let normalized_url = if base_url.ends_with('/') {
+            base_url.to_owned()
+        } else {
+            format!("{base_url}/")
+        };
+        let mut provider = OpenAiCompatibleConfig::new(&normalized_url, credential_ref)?;
+        provider.additional_headers = additional_headers
+            .into_iter()
+            .map(|header| header.0)
+            .collect();
+        Ok(Self {
+            provider,
+            model_name: model_name.to_owned(),
+        })
+    }
+
+    pub fn provider_config(&self) -> &OpenAiCompatibleConfig {
+        &self.provider
+    }
+
+    pub fn model_name(&self) -> &str {
+        &self.model_name
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct OpenAiCompatibleConfig {
     endpoint: ApprovedEndpoint,
     credential_ref: Option<CredentialRef>,
+    additional_headers: Vec<RequestHeader>,
 }
 
 impl OpenAiCompatibleConfig {
@@ -166,6 +242,7 @@ impl OpenAiCompatibleConfig {
         Ok(Self {
             endpoint: ApprovedEndpoint::parse(base_url).map_err(map_transport_error)?,
             credential_ref,
+            additional_headers: Vec::new(),
         })
     }
 }
@@ -318,6 +395,7 @@ impl OpenAiCompatibleProvider {
         let mut headers = vec![
             RequestHeader::sensitive("accept", "application/json").map_err(map_transport_error)?,
         ];
+        headers.extend(config.additional_headers.iter().cloned());
         if method == RequestMethod::Post {
             headers.push(
                 RequestHeader::sensitive("content-type", "application/json")

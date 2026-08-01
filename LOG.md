@@ -1396,3 +1396,11 @@ cargo --version
 - 当前机器`ollama`命令不存在，未执行或伪造真实已安装模型测试。
 - `pnpm check`通过：48个Vitest文件242项、7项Node SQLite和35项Rust测试；Windows前端及Tauri release无bundle build通过。
 - 下一任务：M6-T08自定义Base URL配置。
+
+## 2026-08-01 — M6-T08 自定义Base URL配置
+
+- 新增自定义OpenAI兼容配置，支持Base URL、模型名、CredentialRef和受限非秘密附加Header。
+- 自动规范尾斜杠，远程仅HTTPS、本地仅回环HTTP；拒绝认证、API Key、Host及传输保留Header，最多16项且统一脱敏。
+- 本地合同测试完成自定义服务文本生成并验证Header与拒绝路径；没有真实外部调用。
+- `pnpm check`通过48个Vitest文件242项、7项Node SQLite和36项Rust测试；Windows前端与Tauri release无bundle build通过。
+- 下一任务：M6-T09模型设置页面。

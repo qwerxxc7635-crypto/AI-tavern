@@ -1846,3 +1846,23 @@
 
 - M6-T07的localhost、模型列表、无网本地结构化输出合同已覆盖；真实模型环境验收状态被准确保留。
 - 未提前实现自定义Base URL或设置页；下一任务为M6-T08。
+
+## 2026-08-01 — M6-T08 添加自定义Base URL配置
+
+### 实现与安全边界
+
+- 新增`CustomCompatibleConfig`，持有审批后的Provider配置与严格模型名；缺失尾斜杠由构造器规范化。
+- 远程端点只允许HTTPS，明文HTTP仅允许localhost/回环地址；凭据继续只接受CredentialRef并由Provider注入Bearer。
+- 最多允许16个附加Header，统一标记敏感以避免Debug泄露；Authorization、API Key、Cookie、Host、内容长度/类型和连接类保留头全部拒绝，防止绕过凭据与传输边界。
+
+### 验证
+
+- 本地合同服务验证自定义模型名、两个附加Header和完整文本生成；请求确实到达`/v1/chat/completions`。
+- 负向测试覆盖远程HTTP、空模型、Authorization和Host；附加Header值没有写入日志、SQLite或普通配置。
+- 定向Provider测试10项通过；完整`pnpm check`通过48个Vitest文件242项、7项Node SQLite和36项Rust测试，严格Clippy、格式、lint与类型检查通过。
+- Windows前端生产build和Tauri release `--no-bundle`通过；未访问真实自定义服务。
+
+### 结论
+
+- M6-T08满足用户提供兼容服务的地址、模型和附加Header配置合同，同时保持HTTPS、回环与密钥安全边界。
+- 未提前实现设置页面；下一任务为M6-T09。

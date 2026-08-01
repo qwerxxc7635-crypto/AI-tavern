@@ -590,3 +590,52 @@ async fn ollama_lists_installed_models_and_generates_structured_content_offline(
     assert_eq!(body["model"], "local-story-model:latest");
     assert_eq!(body["response_format"]["type"], "json_object");
 }
+
+#[tokio::test]
+async fn custom_config_validates_endpoints_model_and_additional_headers() {
+    let completion = r#"{"id":"custom-1","model":"custom-story-model","choices":[{"message":{"content":"Custom service response."},"finish_reason":"stop"}]}"#;
+    let (base_url, captured) = server(vec![(200, completion)]).await;
+    let base_url_without_slash = base_url.trim_end_matches('/');
+    let config = CustomCompatibleConfig::new(
+        base_url_without_slash,
+        "custom-story-model",
+        None,
+        vec![
+            CustomHeader::new("X-Workspace", "ember-local").unwrap(),
+            CustomHeader::new("HTTP-Referer", "https://ember.invalid").unwrap(),
+        ],
+    )
+    .unwrap();
+    assert_eq!(config.model_name(), "custom-story-model");
+
+    let mut request = normalized(ResponseFormat::Text);
+    request.model_name = config.model_name().to_owned();
+    let response = OpenAiCompatibleProvider::new()
+        .unwrap()
+        .generate(config.provider_config(), &request, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(response.content, "Custom service response.");
+
+    let requests = captured.lock().await;
+    let head = String::from_utf8_lossy(&requests[0].head).to_ascii_lowercase();
+    assert!(head.contains("x-workspace: ember-local"));
+    assert!(head.contains("http-referer: https://ember.invalid"));
+
+    assert!(matches!(
+        CustomCompatibleConfig::new("http://example.com/v1", "model", None, Vec::new()),
+        Err(ProviderError::InvalidConfig)
+    ));
+    assert!(matches!(
+        CustomCompatibleConfig::new("https://example.com/v1", " ", None, Vec::new()),
+        Err(ProviderError::InvalidConfig)
+    ));
+    assert!(matches!(
+        CustomHeader::new("Authorization", "plaintext-secret"),
+        Err(ProviderError::InvalidConfig)
+    ));
+    assert!(matches!(
+        CustomHeader::new("Host", "attacker.invalid"),
+        Err(ProviderError::InvalidConfig)
+    ));
+}
