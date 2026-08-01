@@ -3,8 +3,11 @@ export {
   buildAdventureTurnContext,
   buildNpcDialogueContext,
   buildWorldEventContext,
+  compressContextHistory,
+  contextBudgetForTask,
   ContextBuildError,
   DEFAULT_CONTEXT_BUDGET,
+  TASK_CONTEXT_BUDGETS,
 } from './context-builder.js';
 export type {
   AdventureContextSource,

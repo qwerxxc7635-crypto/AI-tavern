@@ -3,6 +3,8 @@ import {
   ResolveDiceResultInputSchema,
   ResolveDiceResultOutputSchema,
   buildAdventureTurnContext,
+  compressContextHistory,
+  contextBudgetForTask,
   type AIProvider,
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
@@ -313,20 +315,44 @@ export class AdventureTurnUseCases {
       task: 'GENERATE_ADVENTURE_TURN',
       input: json({ action }),
       buildContext: () =>
-        buildAdventureTurnContext({
-          world: this.requireWorld(command.campaignId),
-          playerCharacter: this.requireCharacter(command.playerCharacterId, command.campaignId),
-          quest: this.requireQuest(adventure.questId, command.campaignId),
-          adventure,
-          currentScene: turn.sceneText,
-          turns: this.adventures.listTurns(adventure.id),
-          clues: this.adventures.getClues(adventure.id),
-          relatedNpcs: this.relatedNpcs(adventure.questId, command.campaignId),
-          playerAction: actionText(action),
-          longTermSummary: null,
-        }),
+        buildAdventureTurnContext(
+          {
+            world: this.requireWorld(command.campaignId),
+            playerCharacter: this.requireCharacter(command.playerCharacterId, command.campaignId),
+            quest: this.requireQuest(adventure.questId, command.campaignId),
+            adventure,
+            currentScene: turn.sceneText,
+            turns: this.adventures.listTurns(adventure.id),
+            clues: this.adventures.getClues(adventure.id),
+            relatedNpcs: this.relatedNpcs(adventure.questId, command.campaignId),
+            playerAction: actionText(action),
+            longTermSummary: this.priorAdventureSummary(command.campaignId, adventure.id),
+          },
+          contextBudgetForTask('GENERATE_ADVENTURE_TURN'),
+        ),
       validateDomainAndBuildCommit: (value) => this.actionCommit(command, adventure, turn, value),
     });
+  }
+
+  private priorAdventureSummary(
+    campaignId: CampaignId,
+    currentAdventureId: AdventureId,
+  ): string | null {
+    const budget = contextBudgetForTask('GENERATE_ADVENTURE_TURN');
+    const summaries = this.adventures
+      .listByCampaign(campaignId)
+      .filter(({ id, state }) => id !== currentAdventureId && state === 'SETTLED')
+      .reverse()
+      .flatMap(({ id }) => {
+        const ending = this.adventures.getEnding(id);
+        return ending === null ? [] : [ending.summary];
+      });
+    const compressed = compressContextHistory(
+      summaries,
+      budget.recentTurnLimit,
+      budget.historicalSummaryMaxCharacters,
+    );
+    return compressed.length === 0 ? null : compressed.join('\n');
   }
 
   private async resolveDiceNarration(

@@ -16,6 +16,7 @@ import type {
 import type { WorldClock } from '@ember-tavern/domain';
 import type { z } from 'zod';
 
+import type { AITask } from './protocol.js';
 import {
   GenerateAdventureTurnInputSchema,
   GenerateWorldEventInputSchema,
@@ -28,6 +29,7 @@ export interface ContextBudget {
   readonly longTermMemoryLimit: number;
   readonly recentTurnLimit: number;
   readonly recentEventLimit: number;
+  readonly historicalSummaryMaxCharacters: number;
 }
 
 export const DEFAULT_CONTEXT_BUDGET = Object.freeze({
@@ -36,7 +38,57 @@ export const DEFAULT_CONTEXT_BUDGET = Object.freeze({
   longTermMemoryLimit: 8,
   recentTurnLimit: 8,
   recentEventLimit: 10,
+  historicalSummaryMaxCharacters: 4_000,
 }) satisfies ContextBudget;
+
+const COMPACT_CONTEXT_BUDGET = Object.freeze({
+  maxCharacters: 12_000,
+  recentMessageLimit: 8,
+  longTermMemoryLimit: 6,
+  recentTurnLimit: 6,
+  recentEventLimit: 8,
+  historicalSummaryMaxCharacters: 2_000,
+}) satisfies ContextBudget;
+
+const DIALOGUE_CONTEXT_BUDGET = Object.freeze({
+  maxCharacters: 16_000,
+  recentMessageLimit: 12,
+  longTermMemoryLimit: 8,
+  recentTurnLimit: 6,
+  recentEventLimit: 8,
+  historicalSummaryMaxCharacters: 3_000,
+}) satisfies ContextBudget;
+
+const ADVENTURE_CONTEXT_BUDGET = Object.freeze({
+  maxCharacters: 22_000,
+  recentMessageLimit: 8,
+  longTermMemoryLimit: 6,
+  recentTurnLimit: 8,
+  recentEventLimit: 10,
+  historicalSummaryMaxCharacters: 4_000,
+}) satisfies ContextBudget;
+
+export const TASK_CONTEXT_BUDGETS: Readonly<Record<AITask, ContextBudget>> = Object.freeze({
+  GENERATE_WORLD: COMPACT_CONTEXT_BUDGET,
+  REFINE_WORLD: COMPACT_CONTEXT_BUDGET,
+  GENERATE_CHARACTER_TRAITS: COMPACT_CONTEXT_BUDGET,
+  COMPLETE_CHARACTER_BACKGROUND: COMPACT_CONTEXT_BUDGET,
+  GENERATE_TAVERN: COMPACT_CONTEXT_BUDGET,
+  GENERATE_NPCS: COMPACT_CONTEXT_BUDGET,
+  NPC_REPLY: DIALOGUE_CONTEXT_BUDGET,
+  GENERATE_QUEST: COMPACT_CONTEXT_BUDGET,
+  GENERATE_ADVENTURE_PLAN: ADVENTURE_CONTEXT_BUDGET,
+  GENERATE_ADVENTURE_TURN: ADVENTURE_CONTEXT_BUDGET,
+  RESOLVE_DICE_RESULT: COMPACT_CONTEXT_BUDGET,
+  GENERATE_WORLD_EVENT: COMPACT_CONTEXT_BUDGET,
+  SUMMARIZE_ADVENTURE: ADVENTURE_CONTEXT_BUDGET,
+  EXTRACT_MEMORIES: DIALOGUE_CONTEXT_BUDGET,
+  CHECK_CONSISTENCY: COMPACT_CONTEXT_BUDGET,
+});
+
+export function contextBudgetForTask(task: AITask): ContextBudget {
+  return TASK_CONTEXT_BUDGETS[task];
+}
 
 export class ContextBuildError extends Error {
   public constructor(message: string) {
@@ -114,11 +166,13 @@ export function buildNpcDialogueContext(
       .map((message) => ({ role: message.role as 'PLAYER' | 'NPC', content: message.content })),
     Math.min(budget.recentMessageLimit, 20),
   );
-  let longTermMemories = takeNewest(
-    source.memories
-      .filter((memory) => memory.npcId === source.npc.id)
-      .map((memory) => memory.summary),
-    Math.min(budget.longTermMemoryLimit, 30),
+  const memoryHistory = source.memories
+    .filter((memory) => memory.npcId === source.npc.id)
+    .map((memory) => memory.summary);
+  let longTermMemories = compressContextHistory(
+    memoryHistory,
+    Math.min(budget.longTermMemoryLimit, 29),
+    budget.historicalSummaryMaxCharacters,
   );
 
   const build = () => ({
@@ -190,12 +244,17 @@ export function buildAdventureTurnContext(
       goal: npc.goal,
       currentMood: npc.currentMood,
     }));
-  let recentTurns = takeNewest(
-    source.turns
-      .filter((turn) => turn.adventureId === source.adventure.id)
-      .sort((left, right) => left.turnNumber - right.turnNumber)
-      .map(summarizeTurn),
-    Math.min(budget.recentTurnLimit, 10),
+  const turnHistory = source.turns
+    .filter((turn) => turn.adventureId === source.adventure.id)
+    .sort((left, right) => left.turnNumber - right.turnNumber)
+    .map(summarizeTurn);
+  let recentTurns = takeNewest(turnHistory, Math.min(budget.recentTurnLimit, 10));
+  let longTermSummary = boundedSummary(
+    [
+      ...(source.longTermSummary === null ? [] : [source.longTermSummary]),
+      ...turnHistory.slice(0, Math.max(0, turnHistory.length - recentTurns.length)),
+    ],
+    budget.historicalSummaryMaxCharacters,
   );
   let discoveredClues = source.clues
     .filter((clue) => clue.adventureId === source.adventure.id && clue.discoveredInTurnId !== null)
@@ -243,7 +302,7 @@ export function buildAdventureTurnContext(
     },
     currentTurnNumber: source.adventure.currentTurnNumber,
     currentScene: source.currentScene,
-    longTermSummary: source.longTermSummary,
+    longTermSummary,
     recentTurns,
     discoveredClues,
     relatedNpcs,
@@ -254,7 +313,9 @@ export function buildAdventureTurnContext(
     if (recentTurns.length > 0) recentTurns = recentTurns.slice(1);
     else if (relatedNpcs.length > 0) relatedNpcs = relatedNpcs.slice(0, -1);
     else if (discoveredClues.length > 0) discoveredClues = discoveredClues.slice(1);
-    else throw new ContextBuildError('Adventure context core fields exceed the character budget');
+    else if (longTermSummary !== null) {
+      longTermSummary = shrinkSummary(longTermSummary);
+    } else throw new ContextBuildError('Adventure context core fields exceed the character budget');
   }
   return GenerateAdventureTurnInputSchema.parse(build());
 }
@@ -313,6 +374,42 @@ function summarizeTurn(turn: AdventureTurn): string {
 
 function takeNewest<Value>(values: readonly Value[], limit: number): Value[] {
   return values.slice(Math.max(0, values.length - limit));
+}
+
+export function compressContextHistory(
+  values: readonly string[],
+  recentLimit: number,
+  summaryMaxCharacters: number,
+): readonly string[] {
+  if (!Number.isSafeInteger(recentLimit) || recentLimit < 1) {
+    throw new ContextBuildError('recentLimit must be a positive safe integer');
+  }
+  if (!Number.isSafeInteger(summaryMaxCharacters) || summaryMaxCharacters < 1) {
+    throw new ContextBuildError('summaryMaxCharacters must be a positive safe integer');
+  }
+  const canonical = values.filter((value) => value.trim().length > 0);
+  const recent = takeNewest(canonical, recentLimit);
+  const older = canonical.slice(0, Math.max(0, canonical.length - recent.length));
+  const prefix = 'Earlier history: ';
+  const summary = boundedSummary(older, Math.max(1, summaryMaxCharacters - prefix.length));
+  return Object.freeze([...(summary === null ? [] : [`${prefix}${summary}`]), ...recent]);
+}
+
+function boundedSummary(values: readonly string[], maxCharacters: number): string | null {
+  if (values.length === 0) return null;
+  const joined = values.map((value, index) => `${index + 1}. ${value}`).join(' | ');
+  if (joined.length <= maxCharacters) return joined;
+  const separator = ' … ';
+  if (maxCharacters <= separator.length) return '…'.slice(0, maxCharacters);
+  const available = maxCharacters - separator.length;
+  const headLength = Math.ceil(available / 2);
+  const tailLength = Math.floor(available / 2);
+  return `${joined.slice(0, headLength)}${separator}${joined.slice(-tailLength)}`;
+}
+
+function shrinkSummary(value: string): string | null {
+  if (value.length <= 64) return null;
+  return `${value.slice(0, Math.max(63, Math.floor(value.length / 2)))}…`;
 }
 
 function serializedLength(value: unknown): number {

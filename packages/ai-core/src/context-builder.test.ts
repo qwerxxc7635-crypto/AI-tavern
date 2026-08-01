@@ -36,9 +36,12 @@ import type { WorldClock } from '@ember-tavern/domain';
 import { describe, expect, it } from 'vitest';
 
 import {
+  AI_TASKS,
   buildAdventureTurnContext,
   buildNpcDialogueContext,
   buildWorldEventContext,
+  compressContextHistory,
+  contextBudgetForTask,
   ContextBuildError,
   GenerateAdventureTurnInputSchema,
   GenerateWorldEventInputSchema,
@@ -151,6 +154,7 @@ const generousBudget: ContextBudget = {
   longTermMemoryLimit: 20,
   recentTurnLimit: 10,
   recentEventLimit: 20,
+  historicalSummaryMaxCharacters: 4_000,
 };
 
 describe('AI context builders', () => {
@@ -361,6 +365,96 @@ describe('AI context builders', () => {
         generousBudget,
       ),
     ).toThrow('same NPC and campaign');
+  });
+
+  it('assigns a validated context budget to every AI task', () => {
+    expect(AI_TASKS.map((task) => contextBudgetForTask(task))).toHaveLength(AI_TASKS.length);
+    expect(contextBudgetForTask('NPC_REPLY').recentMessageLimit).toBe(12);
+    expect(contextBudgetForTask('GENERATE_ADVENTURE_TURN').recentTurnLimit).toBe(8);
+    expect(contextBudgetForTask('GENERATE_WORLD').maxCharacters).toBeLessThan(
+      contextBudgetForTask('GENERATE_ADVENTURE_TURN').maxCharacters,
+    );
+  });
+
+  it('compresses older NPC and adventure history while preserving bounded recent context', () => {
+    const dialogueBudget = contextBudgetForTask('NPC_REPLY');
+    const dialogue = buildNpcDialogueContext(
+      {
+        world,
+        npc: targetNpc,
+        knowledge,
+        relationship,
+        facts,
+        messages: Array.from({ length: 80 }, (_, index) =>
+          message(
+            index + 1,
+            index % 2 === 0 ? 'PLAYER' : 'NPC',
+            index % 2 === 0 ? null : targetNpcId,
+            `dialogue-marker-${index}-${'x'.repeat(120)}`,
+          ),
+        ),
+        memories: Array.from({ length: 40 }, (_, index) =>
+          memory(`memory-${index}`, targetNpcId, `memory-marker-${index}-${'y'.repeat(120)}`),
+        ),
+        playerMessage: 'Continue the long-running conversation.',
+      },
+      dialogueBudget,
+    );
+    expect(dialogue.recentMessages).toHaveLength(dialogueBudget.recentMessageLimit);
+    expect(dialogue.recentMessages[0]?.content).toContain('dialogue-marker-68');
+    expect(dialogue.longTermMemories).toHaveLength(dialogueBudget.longTermMemoryLimit + 1);
+    expect(dialogue.longTermMemories[0]).toMatch(/^Earlier history:/);
+    expect(dialogue.longTermMemories.at(-1)).toContain('memory-marker-39');
+    expect(JSON.stringify(dialogue).length).toBeLessThanOrEqual(dialogueBudget.maxCharacters);
+
+    const quest = createQuest();
+    const adventure = createAdventure(quest);
+    const adventureBudget = contextBudgetForTask('GENERATE_ADVENTURE_TURN');
+    const adventureContext = buildAdventureTurnContext(
+      {
+        world,
+        playerCharacter: createPlayer(),
+        quest,
+        adventure,
+        currentScene: 'The road continues.',
+        turns: Array.from({ length: 60 }, (_, index) =>
+          adventureTurn(
+            `turn-long-${index}`,
+            adventure.id,
+            index,
+            `turn-marker-${index}-${'z'.repeat(150)}`,
+          ),
+        ),
+        clues: [],
+        relatedNpcs: [targetNpc],
+        playerAction: 'Continue.',
+        longTermSummary: 'A previous adventure restored the harbor road.',
+      },
+      adventureBudget,
+    );
+    expect(adventureContext.recentTurns).toHaveLength(adventureBudget.recentTurnLimit);
+    expect(adventureContext.recentTurns[0]).toContain('turn-marker-52');
+    expect(adventureContext.longTermSummary).toContain('previous adventure');
+    expect(adventureContext.longTermSummary).not.toContain('turn-marker-40');
+    expect(JSON.stringify(adventureContext).length).toBeLessThanOrEqual(
+      adventureBudget.maxCharacters,
+    );
+  });
+
+  it('keeps a bounded older-history digest plus the newest entries', () => {
+    const compressed = compressContextHistory(
+      Array.from({ length: 20 }, (_, index) => `entry-${index}-${'x'.repeat(40)}`),
+      3,
+      180,
+    );
+    expect(compressed).toHaveLength(4);
+    expect(compressed[0]).toMatch(/^Earlier history: 1\. entry-0-/);
+    expect(compressed[0]?.length).toBeLessThanOrEqual(180);
+    expect(compressed.slice(1)).toEqual([
+      `entry-17-${'x'.repeat(40)}`,
+      `entry-18-${'x'.repeat(40)}`,
+      `entry-19-${'x'.repeat(40)}`,
+    ]);
   });
 });
 

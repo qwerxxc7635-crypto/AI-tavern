@@ -41,6 +41,7 @@ import {
   AdventureRepository,
   CampaignRepository,
   GameEventRepository,
+  GenerationRecordRepository,
   NpcRepository,
   PendingAiRequestRepository,
   PlayerCharacterRepository,
@@ -97,12 +98,27 @@ describe('AdventureSettlementUseCases', () => {
     try {
       const sqlite = adaptDatabase(database);
       seed(sqlite);
+      const adventures = new AdventureRepository(sqlite);
+      for (let turnNumber = 2; turnNumber <= 80; turnNumber += 1) {
+        adventures.addTurn({
+          ...turn(),
+          id: turnId(`turn-history-${turnNumber}`),
+          turnNumber,
+          sceneText: `history-marker-${turnNumber}-${'x'.repeat(180)}`,
+        });
+      }
       const useCases = settlementUseCases(sqlite, new FakeAIProvider(() => at));
       const summary = await useCases.summarizeAdventure({
         ...generation('summary', summaryGenerationKey, summaryIdempotency),
         outcome: 'SUCCESS',
       });
       expect(summary.npcUpdates).toHaveLength(1);
+      const summaryRequest = JSON.stringify(
+        new GenerationRecordRepository(sqlite).get(summaryGenerationKey)?.request,
+      );
+      expect(summaryRequest).toContain('Earlier history:');
+      expect(summaryRequest).toContain('history-marker-80');
+      expect(summaryRequest).not.toContain('history-marker-40');
       expect(new CampaignRepository(sqlite).get(campaignKey)?.state).toBe('ADVENTURE');
       expect(new QuestRepository(sqlite).get(questKey)?.status).toBe('ACTIVE');
 

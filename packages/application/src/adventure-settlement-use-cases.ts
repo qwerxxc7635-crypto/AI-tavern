@@ -3,6 +3,8 @@ import {
   SummarizeAdventureInputSchema,
   SummarizeAdventureOutputSchema,
   buildWorldEventContext,
+  compressContextHistory,
+  contextBudgetForTask,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -177,9 +179,14 @@ export class AdventureSettlementUseCases {
     const { adventure, quest, turns } = this.requireEndingAdventure(command);
     const clues = this.adventures.getClues(adventure.id);
     const relatedNpcs = quest.relatedNpcIds.map((id) => this.requireNpc(id, command.campaignId));
+    const budget = contextBudgetForTask('SUMMARIZE_ADVENTURE');
     const input = SummarizeAdventureInputSchema.parse({
       questTitle: quest.content.title,
-      turnSummaries: turns.map(turnSummary),
+      turnSummaries: compressContextHistory(
+        turns.map(turnSummary),
+        budget.recentTurnLimit,
+        budget.historicalSummaryMaxCharacters,
+      ),
       ending: command.outcome,
       discoveredClues: clues
         .filter(({ discoveredInTurnId }) => discoveredInTurnId !== null)
@@ -211,12 +218,15 @@ export class AdventureSettlementUseCases {
     this.requireEndingAdventure(command);
     const summary = this.summaryOutput(command.summaryGenerationRecordId, command.campaignId);
     const world = this.requireWorld(command.campaignId);
-    const input = buildWorldEventContext({
-      world,
-      clocks: this.clocks.list(command.campaignId),
-      recentEvents: this.events.list(command.campaignId),
-      currentChapter: summary.summary,
-    });
+    const input = buildWorldEventContext(
+      {
+        world,
+        clocks: this.clocks.list(command.campaignId),
+        recentEvents: this.events.list(command.campaignId),
+        currentChapter: summary.summary,
+      },
+      contextBudgetForTask('GENERATE_WORLD_EVENT'),
+    );
     const output = GenerateWorldEventOutputSchema.parse(
       await this.generateValidated('GENERATE_WORLD_EVENT', command, input),
     );

@@ -32,6 +32,7 @@ import {
 } from '@ember-tavern/contracts';
 import {
   CampaignRepository,
+  ConversationRepository,
   GenerationRecordRepository,
   NpcRepository,
   PlayerCharacterRepository,
@@ -95,6 +96,30 @@ describe('NpcDialogueUseCases', () => {
     database = new DatabaseSync(path);
     const sqlite = adaptDatabase(database);
     try {
+      const conversations = new ConversationRepository(sqlite);
+      for (let sequenceNumber = 3; sequenceNumber <= 62; sequenceNumber += 1) {
+        const isPlayer = sequenceNumber % 2 === 1;
+        conversations.addMessage({
+          id: messageId(`message-history-${sequenceNumber}`),
+          conversationId: conversationKey,
+          sequenceNumber,
+          role: isPlayer ? 'PLAYER' : 'NPC',
+          speakerNpcId: isPlayer ? null : npcKey,
+          content: `dialogue-history-${sequenceNumber}-${'x'.repeat(120)}`,
+          generationRecordId: null,
+          createdAt: at,
+        });
+      }
+      const npcRepository = new NpcRepository(sqlite);
+      for (let index = 0; index < 20; index += 1) {
+        npcRepository.appendMemory({
+          id: npcMemoryId(`memory-history-${index}`),
+          npcId: npcKey,
+          summary: `memory-history-${index}-${'y'.repeat(120)}`,
+          sourceTurnIds: [turnId(`turn-history-${index}`)],
+          createdAt: at,
+        });
+      }
       const useCases = createUseCases(sqlite);
       const second = await useCases.talkToNpc({
         ...request('reply-2'),
@@ -105,7 +130,8 @@ describe('NpcDialogueUseCases', () => {
         npcId: npcKey,
         playerMessage: 'What did you see below?',
       });
-      expect(second.messages.map(({ sequenceNumber }) => sequenceNumber)).toEqual([1, 2, 3, 4]);
+      expect(second.messages).toHaveLength(64);
+      expect(second.messages.at(-1)?.sequenceNumber).toBe(64);
       expect(second.messages[1]?.content).toContain('cellar door');
       expect(second.relationship.trust).toBe(2);
 
@@ -113,10 +139,14 @@ describe('NpcDialogueUseCases', () => {
         generationRecordId('generation-reply-2'),
       );
       expect(JSON.stringify(generation?.request)).toContain('The cellar has an old door.');
-      expect(JSON.stringify(generation?.request)).toContain('Show me the cellar door.');
+      expect(JSON.stringify(generation?.request)).not.toContain('Show me the cellar door.');
       expect(JSON.stringify(generation?.request)).not.toContain(
         'The owner hid a royal seal beneath the floor.',
       );
+      expect(JSON.stringify(generation?.request)).toContain('Earlier history:');
+      expect(JSON.stringify(generation?.request)).toContain('dialogue-history-62');
+      expect(JSON.stringify(generation?.request)).not.toContain('dialogue-history-30');
+      expect(JSON.stringify(generation?.request)).toContain('memory-history-19');
 
       const memories = await useCases.extractMemories({
         ...request('memories'),
@@ -134,7 +164,13 @@ describe('NpcDialogueUseCases', () => {
           createdAt: at,
         },
       ]);
-      expect(new NpcRepository(sqlite).listMemories(npcKey)).toEqual(memories);
+      const memoryGeneration = new GenerationRecordRepository(sqlite).get(
+        generationRecordId('generation-memories'),
+      );
+      expect(JSON.stringify(memoryGeneration?.request)).toContain('Earlier history:');
+      expect(JSON.stringify(memoryGeneration?.request)).toContain('dialogue-history-62');
+      expect(JSON.stringify(memoryGeneration?.request)).not.toContain('dialogue-history-30');
+      expect(new NpcRepository(sqlite).listMemories(npcKey).at(-1)).toEqual(memories[0]);
     } finally {
       database.close();
     }

@@ -3,6 +3,8 @@ import {
   ExtractMemoriesOutputSchema,
   NpcReplyOutputSchema,
   buildNpcDialogueContext,
+  compressContextHistory,
+  contextBudgetForTask,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -133,16 +135,19 @@ export class NpcDialogueUseCases {
     }
     const messages =
       existing === null ? Object.freeze([]) : this.conversations.listMessages(existing.id);
-    const input = buildNpcDialogueContext({
-      world,
-      npc,
-      knowledge,
-      relationship,
-      facts: this.worlds.listFacts(campaign.id),
-      messages,
-      memories: this.npcs.listMemories(npc.id),
-      playerMessage: command.playerMessage,
-    });
+    const input = buildNpcDialogueContext(
+      {
+        world,
+        npc,
+        knowledge,
+        relationship,
+        facts: this.worlds.listFacts(campaign.id),
+        messages,
+        memories: this.npcs.listMemories(npc.id),
+        playerMessage: command.playerMessage,
+      },
+      contextBudgetForTask('NPC_REPLY'),
+    );
     const output = NpcReplyOutputSchema.parse(
       await this.generateValidated('NPC_REPLY', command, input),
     );
@@ -216,15 +221,22 @@ export class NpcDialogueUseCases {
     ) {
       throw new AIOrchestrationError('CONVERSATION_NOT_FOUND', 'NPC conversation not found');
     }
-    const transcript = this.conversations
+    const transcriptHistory = this.conversations
       .listMessages(conversation.id)
       .map(({ role, content }) => `${role}: ${content}`);
-    if (transcript.length === 0 || command.sourceTurnIds.length === 0) {
+    if (transcriptHistory.length === 0 || command.sourceTurnIds.length === 0) {
       throw new AIOrchestrationError(
         'MEMORY_SOURCE_EMPTY',
         'Memory extraction requires transcript and source turn IDs',
       );
     }
+    const budget = contextBudgetForTask('EXTRACT_MEMORIES');
+    const transcript = compressContextHistory(
+      transcriptHistory,
+      budget.recentMessageLimit,
+      budget.historicalSummaryMaxCharacters,
+    );
+    const sourceTurnIds = command.sourceTurnIds.slice(-Math.min(50, budget.recentTurnLimit));
     const input = ExtractMemoriesInputSchema.parse({
       npc: {
         id: npc.id,
@@ -234,13 +246,13 @@ export class NpcDialogueUseCases {
         goal: npc.goal,
         currentMood: npc.currentMood,
       },
-      turnIds: command.sourceTurnIds,
+      turnIds: sourceTurnIds,
       transcript,
     });
     const output = ExtractMemoriesOutputSchema.parse(
       await this.generateValidated('EXTRACT_MEMORIES', command, input),
     );
-    const allowed = new Set(command.sourceTurnIds);
+    const allowed = new Set(sourceTurnIds);
     const timestamp = this.now();
     const memories: readonly NpcMemory[] = Object.freeze(
       output.memories.map((memory, index) => {
