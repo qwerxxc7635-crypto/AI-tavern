@@ -1339,3 +1339,13 @@ cargo --version
 - Cargo metadata/fmt、workspace严格Clippy、23项Rust测试、`pnpm check`（48文件242项Vitest、7项Node SQLite）、Windows前端build与Tauri release无bundle build通过。
 - Review确认超时覆盖完整流、取消同时覆盖请求与流、错误不保留原始URL/正文、请求Debug不暴露Header值或Body；未实现M6-T02。
 - 下一任务：M6-T02安全密钥仓库。
+
+## 2026-08-01 — M6-T02 安全密钥仓库
+
+- 新增`ember-secure-secrets`，使用Windows Credential Manager的Local持久化；数据库与WebView只接触`credential:v1:<UUID>`引用。
+- Tauri注册规格允许的`secret_save`、`secret_exists`、`secret_delete`固定命令，不提供明文读取命令；内部Provider读取通过短生命周期闭包完成。
+- 保存值限制1至2048字节并拒绝NUL；输入、存在检查和内部读取产生的内存副本均使用zeroize清零，错误不包含底层异常或秘密。
+- 依赖Review从一体化keyring缩减为MIT/Apache-2.0的`keyring-core 1.0.0`与`windows-native-keyring-store 1.1.0`，没有引入其他平台后端。
+- Windows系统存储真实往返测试使用运行时随机值，清理守卫删除条目；测试后Ember目标残留为0。SQLite既有迁移测试继续验证provider配置没有密钥列。
+- workspace严格Clippy、26项Rust测试、`pnpm check`（48文件242项Vitest、7项Node SQLite）、Windows前端build与Tauri release无bundle build通过。
+- 下一任务：M6-T03 OpenAI-Compatible适配器；仍禁止未经确认的真实或收费调用。

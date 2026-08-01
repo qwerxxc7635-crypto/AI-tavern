@@ -803,3 +803,27 @@ Rust提交层把跨进程输入视为不可信数据：拒绝未知字段，重�
 ### 可逆性
 
 可在不改变调用语义的前提下替换Reqwest或TLS实现，也可增加经过独立验证的请求方法与错误元数据。远程HTTPS、禁重定向、相对路径约束、资源上限、脱敏错误和不向WebView暴露通用HTTP的边界不得撤销。
+
+## DEC-032：Windows模型密钥使用系统凭据与不透明引用
+
+- 日期：2026-08-01
+- 状态：已采纳
+- 依据：`docs/spec.md` 第30、31节；`docs/TASKS.md` 的 `M6-T02`；`DEC-006`、`DEC-027`
+
+### 背景
+
+Provider配置需要长期关联API Key，但SQLite、普通配置、日志、测试fixture和导出均不得保存明文。直接调用Win32 Credential API需要unsafe代码，与workspace的`unsafe_code = "forbid"`冲突；向WebView提供读取命令又会破坏原生安全边界。
+
+### 决定与理由
+
+Windows通过安全Rust封装`keyring-core`与`windows-native-keyring-store`使用系统Credential Manager，并明确选择Local持久化。保存时由Rust生成`credential:v1:<UUID>`，调用者不能指定系统目标名；SQLite只可保存该引用。秘密限制为1至2048字节并拒绝NUL，所有应用拥有的临时String或字节副本在使用后清零。
+
+WebView只开放规格允许的`secret_save`、`secret_exists`和`secret_delete`，不开放明文读取。可信Rust Provider只能通过`with_secret`闭包在一次调用期间借用秘密字节。系统错误归一化，不能进入日志或跨进程响应；删除为幂等操作。
+
+### 影响
+
+密钥不进入SQLite、普通JSON、导出或生成审计，Provider配置仅携带可验证的不透明引用。Windows系统存储可独立于存档生命周期管理；删除存档不会误删全局Provider凭据，配置删除流程必须显式调用密钥删除。当前未实现iOS存储，非Windows返回Unavailable。
+
+### 可逆性
+
+iOS阶段可在相同`SecretStore`语义下加入Keychain后端，或在保持引用格式与迁移策略的前提下替换Windows安全存储实现。不得新增明文读取命令、把秘密复制到SQLite/导出/日志，或允许页面指定任意系统凭据目标。

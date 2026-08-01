@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T01 实现Rust安全HTTP传输层`
+- 最近完成任务：`M6-T02 实现安全密钥仓库`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T01`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T02 实现安全密钥仓库`
+- 当前任务：`M6-T02`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T03 实现OpenAI-Compatible适配器`
 
 ## 架构摘要
 
@@ -40,6 +40,8 @@
 - RegenerationUseCases支持自由故事和规则限次模式，按Campaign策略与跨厂商披露控制Provider切换；失败恢复安全快照，成功从输入基线替换旧AI游戏结果。
 - `ember-secure-http`提供Rust内部的受限模型HTTP边界：远程仅HTTPS、HTTP仅回环地址、禁用重定向，统一限制请求路径、总时限和响应大小，并支持取消与逐块读取。
 - 传输错误只暴露稳定分类；请求Header值和Body在Debug输出中脱敏。WebView没有新增HTTP命令或capability。
+- `ember-secure-secrets`在Windows Credential Manager以本机持久化保存模型密钥；公开值只有严格格式的`credential:v1:<UUID>`引用，秘密内存副本使用后清零。
+- WebView只有保存、存在检查和删除三个高层命令，没有明文读取命令；Provider的可信Rust代码后续可通过闭包短暂使用秘密字节。
 - Windows React/Vite/Tauri入口已加入pnpm/Cargo workspace；HashRouter、基础主题和最小core:default capability可运行。
 - Windows启动页在运行时读取共享contracts Schema版本；无SQL、文件、HTTP、密钥或业务原生命令。
 - Windows AppShell包含侧栏、上下文标题栏、离线状态、统一加载态和错误边界；六个规定入口通过延迟路由模块导航。
@@ -81,7 +83,17 @@
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
 3. 确认M5-T11提交为`test(M5-T11): verify offline vertical slice`且工作树干净。
-4. 确认M6-T01提交后，从M6-T02安全密钥仓库开始；不得把测试密钥写入SQLite、日志、fixture或导出。
+4. 确认M6-T02提交后，从M6-T03 OpenAI-Compatible适配器开始；只使用本地测试服务器和运行时随机凭据，不进行真实或收费调用。
+
+## 2026-08-01 M6-T02完成状态
+
+- 新增`ember-secure-secrets`，以维护中的MIT/Apache-2.0 `keyring-core 1.0.0`与`windows-native-keyring-store 1.1.0`封装Windows Credential Manager；未引入其他平台后端。
+- 保存命令由Rust生成不透明UUID引用，限制秘密为1至2048字节且拒绝NUL；输入String、存在检查读取副本和Provider内部读取副本均在使用后清零。
+- Windows条目使用Local持久化；删除不存在条目幂等。错误只返回稳定分类，不包含底层异常、目标名或秘密。
+- Tauri只新增规格允许的`secret_save`、`secret_exists`、`secret_delete`，没有明文读取；SQLite迁移仍只有`provider_configs.credential_ref`且既有迁移测试禁止密钥列。
+- 真实Windows Credential Manager测试使用运行时UUID构造秘密，覆盖保存/读取/存在/删除/重复删除；清理后`com.embertavern.model-provider`残留计数为0。
+- workspace严格Clippy和26项Rust测试、`pnpm check`（48文件242项Vitest、7项Node SQLite）、Windows前端build及Tauri release无bundle build通过。
+- 没有实现Provider、设置页面、导出或真实API调用；下一任务为M6-T03。
 
 ## 2026-08-01 M6-T01完成状态
 

@@ -1718,3 +1718,26 @@
 
 - M6-T01验收通过：模型网络能力只存在于未暴露给WebView的Rust crate；前端不能传入任意URL或发起任意模型HTTP。
 - M6-T02密钥存储、Provider适配器和真实模型调用均未实现；下一任务为M6-T02。
+
+## 2026-08-01 — M6-T02 实现安全密钥仓库
+
+### 实现
+
+- 新增`ember-secure-secrets` workspace crate，通过`keyring-core 1.0.0`与`windows-native-keyring-store 1.1.0`访问Windows Credential Manager；两个依赖均为MIT OR Apache-2.0并保持最小Windows范围。
+- `SecretStore::save`生成`credential:v1:<UUID>`不透明引用，秘密限制为1至2048字节且拒绝NUL；Windows条目使用Local持久化。
+- 保存输入、存在检查读取及可信Provider闭包读取均以zeroize清除内存副本；CredentialRef的Debug只显示`<opaque>`，平台错误统一映射，不输出底层异常。
+- 删除不存在条目视为成功，便于配置清理幂等；非Windows平台暂返回明确Unavailable，Keychain实现保留给后续iOS平台任务。
+- Tauri新增规格第31节允许的`secret_save`、`secret_exists`和`secret_delete`；未提供明文读取、任意凭据目标或文件接口。
+
+### 测试与验证
+
+- 3项密钥测试覆盖不可信引用、空值/超长/NUL拒绝，以及Windows Credential Manager保存、内部读取、存在检查、删除和重复删除。
+- 系统存储测试的秘密在运行时由UUID生成，不写入fixture或输出；Drop清理守卫处理失败路径，测试后Ember Credential Manager目标残留计数为0。
+- 既有SQLite迁移测试继续验证`provider_configs`仅有`credential_ref`而无密钥列；新增实现没有写SQLite或导出文件。
+- workspace全目标全特性严格Clippy、`cargo test --workspace`（26项）、`pnpm check`（48个Vitest文件242项、7项Node SQLite）通过。
+- Windows前端生产build和Tauri release `--no-bundle`通过。
+
+### 结论
+
+- M6-T02验收通过：API Key只可进入系统安全存储，SQLite、日志、测试fixture和导出均不接收明文；WebView不能读取已保存秘密。
+- 未提前实现M6-T03 Provider或设置页面，未执行真实API调用；下一任务为M6-T03。

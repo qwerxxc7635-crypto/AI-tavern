@@ -10,6 +10,7 @@ use ember_native_bridge::{
     NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
     TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
 };
+use ember_secure_secrets::{CredentialRef, SecretStore};
 use serde::Serialize;
 use tauri::{Manager, State};
 
@@ -284,6 +285,34 @@ fn adventure_archives_get(
         .map_err(Into::into)
 }
 
+#[tauri::command]
+fn secret_save(secret: String) -> Result<String, String> {
+    SecretStore
+        .save(secret)
+        .map(|reference| reference.to_string())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn secret_exists(credential_ref: String) -> Result<bool, String> {
+    let reference = credential_ref
+        .parse::<CredentialRef>()
+        .map_err(|error| error.to_string())?;
+    SecretStore
+        .exists(&reference)
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn secret_delete(credential_ref: String) -> Result<(), String> {
+    let reference = credential_ref
+        .parse::<CredentialRef>()
+        .map_err(|error| error.to_string())?;
+    SecretStore
+        .delete(&reference)
+        .map_err(|error| error.to_string())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -320,7 +349,10 @@ pub fn run() {
             adventure_roll,
             adventure_dice_commit,
             adventure_settlement_commit,
-            adventure_archives_get
+            adventure_archives_get,
+            secret_save,
+            secret_exists,
+            secret_delete
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");
