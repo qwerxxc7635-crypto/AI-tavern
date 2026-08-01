@@ -438,3 +438,88 @@ async fn qwen_preset_handles_chinese_npc_dialogue_and_a_structured_quest_locally
     assert_eq!(quest_body["response_format"]["type"], "json_object");
     assert_eq!(quest_body["model"], QWEN_DEFAULT_MODEL);
 }
+
+#[tokio::test]
+async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_locally() {
+    assert_eq!(OpenRouterPreset::KEY, "openrouter");
+    assert_eq!(OPENROUTER_BASE_URL, "https://openrouter.ai/api/v1/");
+
+    let models = serde_json::json!({
+        "data": [
+            {
+                "id": "vendor/paid-story-model",
+                "name": "Paid Story Model",
+                "context_length": 131072,
+                "pricing": {
+                    "prompt": "0",
+                    "completion": "0",
+                    "web_search": "0.01"
+                }
+            },
+            {
+                "id": "community/story-model:free",
+                "name": "Community Story Model (free)",
+                "context_length": 32768,
+                "pricing": { "prompt": "0", "completion": "0", "request": "0" }
+            },
+            {
+                "id": "vendor/unknown-price",
+                "pricing": { "prompt": "not-a-price", "completion": "0" }
+            }
+        ]
+    })
+    .to_string();
+    let turn_content = serde_json::json!({
+        "sceneText": "Cold surf floods the beacon stair while the lens pulses overhead.",
+        "speakerNpcIds": [],
+        "suggestedActions": [
+            { "text": "Brace the sea gate." },
+            { "text": "Inspect the lens housing." }
+        ],
+        "checkRequest": null,
+        "discoveredClues": ["Salt-crusted lens key"],
+        "statePatchProposals": [],
+        "adventureState": "WAITING_FOR_PLAYER"
+    });
+    let completion = serde_json::json!({
+        "id": "openrouter-adventure-turn",
+        "model": "community/story-model:free",
+        "choices": [{
+            "message": { "content": turn_content.to_string() },
+            "finish_reason": "stop"
+        }]
+    })
+    .to_string();
+    let (base_url, captured) = server(vec![(200, models), (200, completion)]).await;
+    let config = OpenRouterPreset::config_for_contract_test(&base_url).unwrap();
+    let provider = OpenAiCompatibleProvider::new().unwrap();
+
+    let listed = provider
+        .list_models(&config, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(listed[0].cost_status, ModelCostStatus::Paid);
+    assert_eq!(listed[2].cost_status, ModelCostStatus::Unknown);
+    let free = OpenRouterPreset::select_free_model(&listed).unwrap();
+    assert_eq!(free.name, "community/story-model:free");
+    assert_eq!(free.display_name, "Community Story Model (free)");
+    assert_eq!(free.context_window_tokens, Some(32768));
+
+    let mut request = normalized(ResponseFormat::JsonObject);
+    request.model_name = free.name.clone();
+    request.messages[1].content = "Continue the adventure with one structured turn.".to_owned();
+    let response = provider
+        .generate(&config, &request, CancellationToken::new())
+        .await
+        .unwrap();
+    let turn: Value = serde_json::from_str(&response.content).unwrap();
+    assert_eq!(turn["adventureState"], "WAITING_FOR_PLAYER");
+    assert!(turn["sceneText"].as_str().unwrap().contains("beacon"));
+    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 2);
+    assert_eq!(turn["discoveredClues"].as_array().unwrap().len(), 1);
+
+    let requests = captured.lock().await;
+    let body: Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(body["model"], "community/story-model:free");
+    assert_eq!(body["response_format"]["type"], "json_object");
+}

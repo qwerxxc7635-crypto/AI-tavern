@@ -6,6 +6,7 @@ use ember_secure_http::{
 };
 use ember_secure_secrets::{CredentialRef, SecretStore, SecretStoreError};
 use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio_util::sync::CancellationToken;
 use zeroize::Zeroizing;
@@ -16,6 +17,29 @@ pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/";
 pub const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-flash";
 pub const QWEN_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
 pub const QWEN_DEFAULT_MODEL: &str = "qwen3.7-plus";
+pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1/";
+
+pub struct OpenRouterPreset;
+
+impl OpenRouterPreset {
+    pub const KEY: &'static str = "openrouter";
+    pub const DISPLAY_NAME: &'static str = "OpenRouter";
+
+    pub fn config(credential_ref: CredentialRef) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(OPENROUTER_BASE_URL, Some(credential_ref))
+    }
+
+    pub fn select_free_model(models: &[ModelInfo]) -> Option<&ModelInfo> {
+        models
+            .iter()
+            .find(|model| model.cost_status == ModelCostStatus::Free)
+    }
+
+    #[cfg(test)]
+    fn config_for_contract_test(base_url: &str) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(base_url, None)
+    }
+}
 
 pub struct DeepSeekPreset;
 
@@ -168,10 +192,18 @@ impl OpenAiCompatibleProvider {
         Ok(payload
             .data
             .into_iter()
-            .map(|model| ModelInfo {
-                display_name: model.id.clone(),
-                name: model.id,
-                owned_by: model.owned_by,
+            .map(|model| {
+                let cost_status = model.cost_status();
+                ModelInfo {
+                    display_name: model
+                        .name
+                        .filter(|name| !name.trim().is_empty())
+                        .unwrap_or_else(|| model.id.clone()),
+                    name: model.id,
+                    owned_by: model.owned_by,
+                    cost_status,
+                    context_window_tokens: model.context_length,
+                }
             })
             .collect())
     }
@@ -311,6 +343,15 @@ pub struct ModelInfo {
     pub name: String,
     pub display_name: String,
     pub owned_by: Option<String>,
+    pub cost_status: ModelCostStatus,
+    pub context_window_tokens: Option<u64>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ModelCostStatus {
+    Free,
+    Paid,
+    Unknown,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -541,7 +582,41 @@ struct ModelsResponse {
 #[derive(Deserialize)]
 struct ApiModel {
     id: String,
+    name: Option<String>,
     owned_by: Option<String>,
+    context_length: Option<u64>,
+    pricing: Option<Map<String, Value>>,
+}
+
+impl ApiModel {
+    fn cost_status(&self) -> ModelCostStatus {
+        let Some(pricing) = &self.pricing else {
+            return ModelCostStatus::Unknown;
+        };
+        if !pricing.contains_key("prompt") || !pricing.contains_key("completion") {
+            return ModelCostStatus::Unknown;
+        }
+        let prices = pricing
+            .values()
+            .map(parse_price)
+            .collect::<Option<Vec<_>>>();
+        let Some(prices) = prices else {
+            return ModelCostStatus::Unknown;
+        };
+        if prices.iter().all(|price| *price == 0.0) {
+            ModelCostStatus::Free
+        } else {
+            ModelCostStatus::Paid
+        }
+    }
+}
+
+fn parse_price(value: &Value) -> Option<f64> {
+    value
+        .as_str()?
+        .parse::<f64>()
+        .ok()
+        .filter(|price| price.is_finite() && *price >= 0.0)
 }
 
 #[derive(Deserialize)]

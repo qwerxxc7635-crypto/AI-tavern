@@ -43,7 +43,7 @@ cargo metadata --format-version 1
 cargo test --workspace
 ```
 
-应用默认进入存档首页，未完成的世界、车卡或冒险存档会返回对应页面；GENERATING_TAVERN存档会在进入酒馆时完成离线初始化。酒馆选择NPC后可继续已保存对话，任务告示可接受一项主任务，冒险支持本地D20、无检定回合和ENDING恢复；结算后的奖励、NPC心情、酒馆陈设、世界时钟与历史档案均可在重启后恢复。Windows离线纵向切片已通过实际release应用验收；下一项为M6-T06 SiliconFlow或OpenRouter预设。
+应用默认进入存档首页，未完成的世界、车卡或冒险存档会返回对应页面；GENERATING_TAVERN存档会在进入酒馆时完成离线初始化。酒馆选择NPC后可继续已保存对话，任务告示可接受一项主任务，冒险支持本地D20、无检定回合和ENDING恢复；结算后的奖励、NPC心情、酒馆陈设、世界时钟与历史档案均可在重启后恢复。Windows离线纵向切片已通过实际release应用验收；OpenRouter预设会从实时模型列表与完整价格对象识别免费模型，下一项为M6-T07 Ollama预设。
 
 ## 本地开发缓存
 

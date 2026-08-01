@@ -1379,3 +1379,12 @@ cargo --version
 - 7项Provider测试及完整`pnpm check`通过；Windows前端与Tauri release无bundle build通过。
 - 未向百炼或其他外部服务发请求，未使用真实凭据或产生费用。
 - 下一任务：M6-T06 SiliconFlow或OpenRouter预设。
+
+## 2026-08-01 — M6-T06 OpenRouter预设
+
+- 采用OpenRouter官方OpenAI兼容地址；生产配置继续只接受系统CredentialRef。
+- 扩展动态模型信息，展示服务端名称与上下文，并从完整pricing对象保守判定Free/Paid/Unknown，不硬编码免费模型ID或免费状态。
+- 本地合同服务在运行时提供一个零价格模型，以该模型完成结构化冒险回合；没有发起真实外部调用。
+- `pnpm check`通过：48个Vitest文件242项、7项Node SQLite和34项Rust测试；严格Clippy、格式、lint和类型检查通过。
+- Windows前端生产build及Tauri release `--no-bundle`通过。
+- 下一任务：M6-T07 Ollama预设。

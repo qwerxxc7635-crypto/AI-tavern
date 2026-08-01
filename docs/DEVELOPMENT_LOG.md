@@ -1806,3 +1806,23 @@
 
 - M6-T05在不使用真实API Key和不产生付费调用的条件下，通过准确本地合同验证中文NPC对话与结构化任务。
 - 未提前实现M6-T06及后续预设；下一任务为SiliconFlow或OpenRouter预设。
+
+## 2026-08-01 — M6-T06 添加OpenRouter预设
+
+### 实现与依据
+
+- 按OpenRouter官方Quickstart与Models API使用`https://openrouter.ai/api/v1/`，模型信息保持运行时发现，不登记固定免费模型。
+- `ModelInfo`新增上下文窗口与Free/Paid/Unknown成本状态。判定遍历服务端完整pricing对象：prompt/completion必须存在，任一有效非零价格为Paid，全部为零才是Free，缺失或无效数据为Unknown。
+- 生产预设要求CredentialRef；测试专用回环配置不会进入生产接口。
+
+### 验证
+
+- 本地合同服务器同时返回付费、免费和未知价格模型，其中付费模型仅在额外web_search字段非零，验证不会被误标为免费。
+- 运行时选择零价格模型生成完整JSON Object冒险回合，核对场景、两项建议行动、发现线索、WAITING_FOR_PLAYER状态、请求模型与格式。
+- 定向Provider测试8项通过；完整`pnpm check`通过48个Vitest文件242项、7项Node SQLite和34项Rust测试，严格Clippy、格式、lint与类型检查通过。
+- Windows前端生产build和Tauri release `--no-bundle`通过；未访问OpenRouter，未使用真实凭据或产生费用。
+
+### 结论
+
+- M6-T06通过本地准确合同满足动态模型信息、非硬编码免费状态和免费模型冒险回合验收。
+- 未提前实现Ollama或自定义配置；下一任务为M6-T07。

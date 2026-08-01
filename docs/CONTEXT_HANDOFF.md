@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T05 添加Qwen预设`
+- 最近完成任务：`M6-T06 添加SiliconFlow或OpenRouter预设`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T05`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T06 添加SiliconFlow或OpenRouter预设`
+- 当前任务：`M6-T06`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T07 添加Ollama预设`
 
 ## 架构摘要
 
@@ -153,3 +153,11 @@
 - `pnpm check`通过：48个Vitest文件242项、Node SQLite 7项、native-bridge Rust 16项；Cargo metadata/fmt/严格Clippy/workspace测试、Windows前端build和Tauri release无bundle build均通过。
 - 实际release烟测从已有已接受任务继续，完成8回合/3次D20、结算、档案和返回酒馆；关闭重启后档案恢复。SQLite核对任务COMPLETED、Adventure SETTLED、两份结算生成和四类事件各一份。
 - 烟测唯一Campaign已按精确ID级联删除并VACUUM，剩余Campaign为0；安全策略拒绝删除应用数据目录中的空SQLite容器，容器不含测试或用户游戏数据。
+
+## 2026-08-01 M6-T06 OpenRouter预设完成状态
+
+- 新增OpenRouter生产预设，使用官方OpenAI兼容根地址；生产配置必须持有系统CredentialRef。
+- 模型名称、上下文和价格均来自运行时`/models`响应；免费状态要求prompt/completion存在且完整价格对象所有项目都可解析为零，任一非零为付费，缺失或无效为未知。
+- 本地合同服务器动态返回免费模型，并用该模型完成一个JSON Object冒险回合；验证场景、建议行动、线索、状态、模型名与请求格式。
+- 未连接OpenRouter，未使用真实凭据或产生费用；定向8项Provider测试、完整`pnpm check`、Windows生产build与Tauri release无bundle build通过。
+- 下一任务：M6-T07 Ollama预设。
