@@ -1786,3 +1786,23 @@
 
 - M6-T04在不使用真实API Key和不产生付费调用的条件下，通过准确本地合同验证连接语义、模型列表、配置和世界生成。
 - 未提前实现Qwen、SiliconFlow/OpenRouter、Ollama或自定义配置；下一任务为M6-T05。
+
+## 2026-08-01 — M6-T05 添加Qwen预设
+
+### 实现与依据
+
+- 查阅阿里云百炼官方Base URL总览与当前文本生成模型页：北京按量付费OpenAI兼容地址为`https://dashscope.aliyuncs.com/compatible-mode/v1`，当前通用推荐模型为Qwen 3.7系列。
+- 新增`QwenPreset`，默认`qwen3.7-plus`，另登记`qwen3.7-max`和`qwen3.7-flash`；三者均为1M上下文并支持推理和结构化输出。
+- 未把旧`qwen-plus`放入当前预设，也未硬编码价格、免费额度或跨地域Key可用性；生产配置继续要求CredentialRef。
+
+### 验证
+
+- 本地回环合同服务器首先返回自然中文NPC回复，TEXT请求不包含`response_format`。
+- 第二次请求使用JSON Object生成完整任务提案：content、MODERATE风险、推荐属性、8至12回合、NOTABLE奖励和空关联集合；解析后核对中文标题、回合范围与属性数。
+- 定向Provider测试7项通过；`pnpm check`通过48个Vitest文件242项、7项Node SQLite和33项Rust测试，严格Clippy及格式检查通过。
+- Windows前端生产build和Tauri release `--no-bundle`通过。
+
+### 结论
+
+- M6-T05在不使用真实API Key和不产生付费调用的条件下，通过准确本地合同验证中文NPC对话与结构化任务。
+- 未提前实现M6-T06及后续预设；下一任务为SiliconFlow或OpenRouter预设。

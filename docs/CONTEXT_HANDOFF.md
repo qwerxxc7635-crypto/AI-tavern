@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T04 添加DeepSeek预设`
+- 最近完成任务：`M6-T05 添加Qwen预设`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T04`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T05 添加Qwen预设`
+- 当前任务：`M6-T05`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T06 添加SiliconFlow或OpenRouter预设`
 
 ## 架构摘要
 
@@ -45,6 +45,7 @@
 - `ember-provider-openai-compatible`将规范消息映射到`/v1/chat/completions`语义，支持TEXT与JSON_OBJECT、模型列表、连接测试、用量/结束原因归一化和稳定错误分类。
 - Provider只接受M6-T01审批端点并从M6-T02不透明引用取认证；JSON Schema在本任务显式报告Unsupported，留给能力声明与后续适配，不做静默降级。
 - DeepSeek预设使用官方当前OpenAI兼容根地址与`deepseek-v4-flash`/`deepseek-v4-pro`，默认Flash；不再登记已于2026-07-24弃用的旧模型别名。
+- Qwen预设使用阿里云百炼北京OpenAI兼容地址，默认当前推荐的`qwen3.7-plus`，另登记Max/Flash；三者均按官方文档登记1M上下文、推理和结构化输出。
 - Windows React/Vite/Tauri入口已加入pnpm/Cargo workspace；HashRouter、基础主题和最小core:default capability可运行。
 - Windows启动页在运行时读取共享contracts Schema版本；无SQL、文件、HTTP、密钥或业务原生命令。
 - Windows AppShell包含侧栏、上下文标题栏、离线状态、统一加载态和错误边界；六个规定入口通过延迟路由模块导航。
@@ -86,7 +87,16 @@
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
 3. 确认M5-T11提交为`test(M5-T11): verify offline vertical slice`且工作树干净。
-4. 确认M6-T04提交后，从M6-T05 Qwen预设开始；继续使用本地合同服务器，不进行真实或收费调用。
+4. 确认M6-T05提交后，从M6-T06 SiliconFlow或OpenRouter预设开始；继续使用本地合同服务器，不进行真实或收费调用。
+
+## 2026-08-01 M6-T05完成状态
+
+- 根据阿里云百炼官方当前Base URL与文本模型文档，预设使用北京`https://dashscope.aliyuncs.com/compatible-mode/v1/`，默认`qwen3.7-plus`，另登记`qwen3.7-max`和`qwen3.7-flash`。
+- 三模型登记1,048,576上下文、推理与JSON模式；不硬编码价格/免费状态，也不将旧`qwen-plus`加入当前预设。
+- 本地合同服务器以Plus完成中文NPC自然回复和GENERATE_QUEST形状的结构化任务；验证TEXT不发送response_format，JSON任务发送json_object。
+- 结构化任务包含内容、风险、推荐属性、8至12回合、奖励等级及关联ID集合；测试核对中文标题、回合和属性。
+- 定向7项Provider测试、`pnpm check`（48文件242项Vitest、7项Node SQLite、33项Rust）、Windows前端build及Tauri release无bundle build通过。
+- 未访问阿里云百炼、未使用真实凭据或产生费用；M6-T06未提前实现。
 
 ## 2026-08-01 M6-T04完成状态
 

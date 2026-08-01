@@ -351,3 +351,90 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
     assert_eq!(body["model"], DEEPSEEK_DEFAULT_MODEL);
     assert_eq!(body["response_format"]["type"], "json_object");
 }
+
+#[tokio::test]
+async fn qwen_preset_handles_chinese_npc_dialogue_and_a_structured_quest_locally() {
+    assert_eq!(QwenPreset::KEY, "qwen");
+    assert_eq!(
+        QWEN_BASE_URL,
+        "https://dashscope.aliyuncs.com/compatible-mode/v1/"
+    );
+    assert_eq!(QWEN_DEFAULT_MODEL, "qwen3.7-plus");
+    assert_eq!(QwenPreset::MODELS.len(), 3);
+    assert!(QwenPreset::model("qwen-plus").is_none());
+    assert!(QwenPreset::MODELS.iter().all(|model| {
+        model.json_mode && model.reasoning && model.context_window_tokens == 1_048_576
+    }));
+
+    let dialogue = serde_json::json!({
+        "id": "npc-dialogue",
+        "model": "qwen3.7-plus",
+        "choices": [{
+            "message": { "content": "潮声不对。若你真要下地窖，就别碰那盏发热的灯。" },
+            "finish_reason": "stop"
+        }]
+    })
+    .to_string();
+    let quest_content = serde_json::json!({
+        "content": {
+            "title": "熄灭的潮灯",
+            "summary": "查明港口潮灯为何在夜间熄灭。",
+            "objective": "在下一次涨潮前重启主航标。",
+            "failureCost": "灰帆港将失去安全航路。"
+        },
+        "risk": "MODERATE",
+        "recommendedAttributes": ["knowledge", "agility"],
+        "expectedTurns": { "min": 8, "max": 12 },
+        "rewardTier": "NOTABLE",
+        "relatedNpcIds": [],
+        "relatedFactIds": []
+    });
+    let quest = serde_json::json!({
+        "id": "structured-quest",
+        "model": "qwen3.7-plus",
+        "choices": [{
+            "message": { "content": quest_content.to_string() },
+            "finish_reason": "stop"
+        }]
+    })
+    .to_string();
+    let (base_url, captured) = server(vec![(200, dialogue), (200, quest)]).await;
+    let config = QwenPreset::config_for_contract_test(&base_url).unwrap();
+    let provider = OpenAiCompatibleProvider::new().unwrap();
+
+    let mut dialogue_request = normalized(ResponseFormat::Text);
+    dialogue_request.model_name = QWEN_DEFAULT_MODEL.to_owned();
+    dialogue_request.messages[1].content = "问老板地窖里发生了什么。".to_owned();
+    let dialogue_response = provider
+        .generate(&config, &dialogue_request, CancellationToken::new())
+        .await
+        .unwrap();
+    assert!(dialogue_response.content.contains("地窖"));
+    assert!(dialogue_response.content.contains("潮声"));
+
+    let mut quest_request = normalized(ResponseFormat::JsonObject);
+    quest_request.model_name = QWEN_DEFAULT_MODEL.to_owned();
+    quest_request.messages[1].content = "生成一项8至12回合的中文酒馆任务。".to_owned();
+    let quest_response = provider
+        .generate(&config, &quest_request, CancellationToken::new())
+        .await
+        .unwrap();
+    let structured_quest: Value = serde_json::from_str(&quest_response.content).unwrap();
+    assert_eq!(structured_quest["content"]["title"], "熄灭的潮灯");
+    assert_eq!(structured_quest["expectedTurns"]["min"], 8);
+    assert_eq!(structured_quest["expectedTurns"]["max"], 12);
+    assert_eq!(
+        structured_quest["recommendedAttributes"]
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+
+    let requests = captured.lock().await;
+    let dialogue_body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    let quest_body: Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert!(dialogue_body.get("response_format").is_none());
+    assert_eq!(quest_body["response_format"]["type"], "json_object");
+    assert_eq!(quest_body["model"], QWEN_DEFAULT_MODEL);
+}

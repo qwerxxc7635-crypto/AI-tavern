@@ -1370,3 +1370,12 @@ cargo --version
 - 6项Provider测试及完整`pnpm check`通过；Windows前端与Tauri release无bundle build通过。
 - 未向DeepSeek或其他外部服务发请求，未使用真实凭据或产生费用。
 - 下一任务：M6-T05 Qwen预设。
+
+## 2026-08-01 — M6-T05 Qwen预设
+
+- 按阿里云百炼官方当前文档新增北京OpenAI兼容预设，默认`qwen3.7-plus`，并登记`qwen3.7-max`与`qwen3.7-flash`。
+- 三模型登记1M上下文、推理和JSON模式；价格/免费状态不硬编码，旧`qwen-plus`不进入当前模型集。
+- 本地合同测试分别执行中文NPC文本回复和完整结构化任务，验证中文内容、8至12回合、推荐属性及JSON请求格式。
+- 7项Provider测试及完整`pnpm check`通过；Windows前端与Tauri release无bundle build通过。
+- 未向百炼或其他外部服务发请求，未使用真实凭据或产生费用。
+- 下一任务：M6-T06 SiliconFlow或OpenRouter预设。

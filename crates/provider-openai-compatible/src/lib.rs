@@ -14,6 +14,8 @@ const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
 
 pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/";
 pub const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-flash";
+pub const QWEN_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
+pub const QWEN_DEFAULT_MODEL: &str = "qwen3.7-plus";
 
 pub struct DeepSeekPreset;
 
@@ -61,6 +63,52 @@ pub struct PresetModel {
     pub json_mode: bool,
     pub reasoning: bool,
     pub context_window_tokens: u64,
+}
+
+pub struct QwenPreset;
+
+impl QwenPreset {
+    pub const KEY: &'static str = "qwen";
+    pub const DISPLAY_NAME: &'static str = "Qwen / Alibaba Cloud Model Studio";
+    pub const MODELS: [PresetModel; 3] = [
+        PresetModel {
+            name: "qwen3.7-plus",
+            display_name: "Qwen 3.7 Plus",
+            json_mode: true,
+            reasoning: true,
+            context_window_tokens: 1_048_576,
+        },
+        PresetModel {
+            name: "qwen3.7-max",
+            display_name: "Qwen 3.7 Max",
+            json_mode: true,
+            reasoning: true,
+            context_window_tokens: 1_048_576,
+        },
+        PresetModel {
+            name: "qwen3.7-flash",
+            display_name: "Qwen 3.7 Flash",
+            json_mode: true,
+            reasoning: true,
+            context_window_tokens: 1_048_576,
+        },
+    ];
+
+    pub fn config(credential_ref: CredentialRef) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(QWEN_BASE_URL, Some(credential_ref))
+    }
+
+    pub fn model(name: &str) -> Option<PresetModel> {
+        Self::MODELS
+            .iter()
+            .copied()
+            .find(|model| model.name == name)
+    }
+
+    #[cfg(test)]
+    fn config_for_contract_test(base_url: &str) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(base_url, None)
+    }
 }
 
 #[derive(Clone, Debug)]
