@@ -3,6 +3,7 @@ import { access, copyFile, rename, rm } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { DatabaseSync } from 'node:sqlite';
 
+import { createConsistentDatabaseBackup, DatabaseBackupError } from './database-backup.mjs';
 import { applyMigrations, currentSchemaVersion, migrationManifest } from './migrations.mjs';
 
 export class DatabaseStartupError extends Error {
@@ -13,7 +14,7 @@ export class DatabaseStartupError extends Error {
   }
 }
 
-export async function prepareDatabaseFile(databasePath) {
+export async function prepareDatabaseFile(databasePath, options = {}) {
   const existed = await pathExists(databasePath);
   if (existed) {
     const sidecars = await existingSidecars(databasePath);
@@ -27,7 +28,7 @@ export async function prepareDatabaseFile(databasePath) {
         true,
       );
     }
-    return migrateExistingFile(databasePath);
+    return migrateExistingFile(databasePath, options);
   }
   return createNewFile(databasePath);
 }
@@ -54,10 +55,10 @@ async function createNewFile(databasePath) {
   }
 }
 
-async function migrateExistingFile(databasePath) {
+async function migrateExistingFile(databasePath, options) {
   const token = randomUUID();
   const workingPath = `${databasePath}.migration-${token}.tmp`;
-  const backupPath = `${databasePath}.pre-migration-${token}.sqlite`;
+  const rollbackPath = `${databasePath}.switch-${token}.tmp`;
   let database;
   try {
     await copyFile(databasePath, workingPath, constants.COPYFILE_EXCL);
@@ -78,6 +79,9 @@ async function migrateExistingFile(databasePath) {
       });
     }
 
+    const backup = await createConsistentDatabaseBackup(databasePath, {
+      backupDirectory: options.backupDirectory,
+    });
     await applyMigrations(database);
     assertIntegrity(database);
     const toVersion = inspectSchemaVersion(database);
@@ -90,18 +94,19 @@ async function migrateExistingFile(databasePath) {
     database.close();
     database = undefined;
 
-    await rename(databasePath, backupPath);
+    await rename(databasePath, rollbackPath);
     try {
       await rename(workingPath, databasePath);
     } catch (error) {
-      await restoreOriginal(backupPath, databasePath, error);
+      await restoreOriginal(rollbackPath, databasePath, error);
     }
+    await rm(rollbackPath, { force: true });
     return Object.freeze({
       status: 'MIGRATED',
       databasePath,
       fromVersion,
       toVersion,
-      backupPath,
+      backupPath: backup.backupPath,
     });
   } catch (error) {
     let startupError = closeAfterFailure(database, asStartupError(error, 'MIGRATION_FAILED'));
@@ -198,6 +203,9 @@ async function restoreOriginal(backupPath, databasePath, switchError) {
 
 function asStartupError(error, fallbackCode) {
   if (error instanceof DatabaseStartupError) return error;
+  if (error instanceof DatabaseBackupError) {
+    return new DatabaseStartupError('BACKUP_FAILED', error.message, { cause: error });
+  }
   const message = error instanceof Error ? error.message : String(error);
   return new DatabaseStartupError(fallbackCode, message, { cause: error });
 }

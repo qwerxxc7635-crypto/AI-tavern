@@ -3,6 +3,16 @@ export {
   CampaignRepository,
   PersistenceDataError,
 } from './campaign-repository.js';
+export {
+  createConsistentDatabaseBackup,
+  DatabaseBackupError,
+  listConsistentDatabaseBackups,
+} from './database-backup.mjs';
+export type {
+  DatabaseBackupFailureCode,
+  DatabaseBackupOptions,
+  DatabaseBackupResult,
+} from './database-backup.mjs';
 export { AdventureSettlementRepository } from './adventure-settlement-repository.js';
 export type {
   AdventureSettlementCommit,

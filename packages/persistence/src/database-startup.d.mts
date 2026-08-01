@@ -1,5 +1,6 @@
 export type DatabaseStartupFailureCode =
   | 'ACTIVE_DATABASE'
+  | 'BACKUP_FAILED'
   | 'CLEANUP_FAILED'
   | 'DATABASE_CLOSE_FAILED'
   | 'DATABASE_CREATE_FAILED'
@@ -32,4 +33,7 @@ export class DatabaseStartupError extends Error {
   readonly code: DatabaseStartupFailureCode;
 }
 
-export function prepareDatabaseFile(databasePath: string): Promise<DatabaseStartupResult>;
+export function prepareDatabaseFile(
+  databasePath: string,
+  options?: Readonly<{ backupDirectory?: string }>,
+): Promise<DatabaseStartupResult>;

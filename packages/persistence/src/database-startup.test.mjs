@@ -95,6 +95,34 @@ test('keeps the original bytes unchanged when migration fails', async () => {
   });
 });
 
+test('does not start migration or mutate the original when its required backup fails', async () => {
+  await withDirectory(async (directory) => {
+    const path = join(directory, 'campaign.sqlite');
+    const old = new DatabaseSync(path);
+    old.exec(`
+      CREATE TABLE legacy_notes (id TEXT PRIMARY KEY, note TEXT NOT NULL);
+      INSERT INTO legacy_notes (id, note) VALUES ('note-1', 'keep me');
+    `);
+    old.close();
+    const before = await digest(path);
+    const invalidDirectory = join(directory, 'not-a-directory');
+    await writeFile(invalidDirectory, 'occupied', 'utf8');
+
+    const result = await prepareDatabaseFile(path, { backupDirectory: invalidDirectory });
+
+    assert.equal(result.status, 'FAILED');
+    assert.equal(result.error.code, 'BACKUP_FAILED');
+    assert.equal(result.error.originalPreserved, true);
+    assert.equal(await digest(path), before);
+    const reopened = new DatabaseSync(path, { readOnly: true });
+    assert.equal(
+      reopened.prepare('SELECT note FROM legacy_notes WHERE id = ?').get('note-1').note,
+      'keep me',
+    );
+    reopened.close();
+  });
+});
+
 test('rejects a newer schema with a clear failure and no file mutation', async () => {
   await withDirectory(async (directory) => {
     const path = join(directory, 'future.sqlite');

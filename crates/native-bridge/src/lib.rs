@@ -19,10 +19,11 @@ pub use settlement::*;
 pub use tavern_initialization::*;
 pub use world_creation::*;
 
+use std::ffi::OsString;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
 use thiserror::Error;
 use time::OffsetDateTime;
@@ -32,6 +33,7 @@ use time::macros::format_description;
 use uuid::Uuid;
 
 const INITIAL_MIGRATION: &str = include_str!("../../../database/migrations/0001_initial.sql");
+const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
 const CAMPAIGN_STATES: &[&str] = &[
@@ -88,6 +90,9 @@ impl CampaignStore {
         let database_path = path.as_ref().to_path_buf();
         if let Some(parent) = database_path.parent() {
             std::fs::create_dir_all(parent)?;
+        }
+        if database_path.exists() {
+            create_consistent_backup(&database_path)?;
         }
         let store = Self { database_path };
         let mut connection = store.connect()?;
@@ -189,6 +194,84 @@ impl CampaignStore {
             };
         }
         load_campaign(&connection, id)?.ok_or(CampaignStoreError::NotFound)
+    }
+}
+
+fn create_consistent_backup(database_path: &Path) -> Result<PathBuf, CampaignStoreError> {
+    let backup_directory = backup_directory(database_path);
+    std::fs::create_dir_all(&backup_directory)?;
+    let database_name = database_path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|_| CampaignStoreError::InvalidSystemTime)?
+        .as_nanos();
+    let prefix = format!("{database_name}.full-");
+    let final_path =
+        backup_directory.join(format!("{prefix}{timestamp:039}-{}.sqlite", Uuid::new_v4()));
+    let mut working_name = final_path.as_os_str().to_os_string();
+    working_name.push(".tmp");
+    let working_path = PathBuf::from(working_name);
+
+    let result = (|| {
+        let source = Connection::open_with_flags(
+            database_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        assert_database_integrity(&source)?;
+        source.backup("main", &working_path, None)?;
+        let copy = Connection::open_with_flags(
+            &working_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )?;
+        assert_database_integrity(&copy)?;
+        drop(copy);
+        std::fs::rename(&working_path, &final_path)?;
+        rotate_consistent_backups(&backup_directory, &prefix)?;
+        Ok(final_path.clone())
+    })();
+
+    if result.is_err() {
+        let _ = std::fs::remove_file(&working_path);
+        let _ = std::fs::remove_file(&final_path);
+    }
+    result
+}
+
+fn backup_directory(database_path: &Path) -> PathBuf {
+    let mut path = OsString::from(database_path.as_os_str());
+    path.push(".backups");
+    PathBuf::from(path)
+}
+
+fn rotate_consistent_backups(directory: &Path, prefix: &str) -> Result<(), CampaignStoreError> {
+    let mut backups = std::fs::read_dir(directory)?
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry.file_type().is_ok_and(|file_type| file_type.is_file())
+                && entry
+                    .file_name()
+                    .to_str()
+                    .is_some_and(|name| name.starts_with(prefix) && name.ends_with(".sqlite"))
+        })
+        .collect::<Vec<_>>();
+    backups.sort_by_key(std::fs::DirEntry::file_name);
+    let obsolete_count = backups.len().saturating_sub(FULL_BACKUP_RETENTION);
+    for entry in backups.into_iter().take(obsolete_count) {
+        std::fs::remove_file(entry.path())?;
+    }
+    Ok(())
+}
+
+fn assert_database_integrity(connection: &Connection) -> Result<(), CampaignStoreError> {
+    let integrity =
+        connection.query_row("PRAGMA integrity_check", [], |row| row.get::<_, String>(0))?;
+    if integrity == "ok" {
+        Ok(())
+    } else {
+        Err(CampaignStoreError::InvalidData)
     }
 }
 
@@ -334,6 +417,84 @@ mod tests {
         assert_eq!(
             reopened_again.list().expect("list after second reopen")[0].updated_at,
             SECOND_TIME
+        );
+    }
+
+    #[test]
+    fn native_startup_retains_three_verified_full_backups() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("ember-tavern.sqlite");
+        let store = CampaignStore::open(&database_path).expect("create database");
+        store
+            .create_at("campaign-one".to_owned(), FIRST_TIME.to_owned())
+            .expect("create campaign");
+        drop(store);
+
+        for _ in 0..4 {
+            drop(CampaignStore::open(&database_path).expect("reopen and back up"));
+        }
+
+        let directory = backup_directory(&database_path);
+        let backups = std::fs::read_dir(directory)
+            .expect("read backup directory")
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .is_some_and(|value| value == "sqlite")
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(backups.len(), FULL_BACKUP_RETENTION);
+        for backup in backups {
+            let connection = Connection::open_with_flags(
+                backup.path(),
+                OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )
+            .expect("open backup");
+            assert_database_integrity(&connection).expect("backup integrity");
+            assert_eq!(
+                connection
+                    .query_row("SELECT COUNT(*) FROM campaigns", [], |row| row
+                        .get::<_, i64>(0))
+                    .expect("campaign count"),
+                1
+            );
+        }
+    }
+
+    #[test]
+    fn native_backup_failure_leaves_main_database_bytes_unchanged() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("ember-tavern.sqlite");
+        let store = CampaignStore::open(&database_path).expect("create database");
+        store
+            .create_at("campaign-one".to_owned(), FIRST_TIME.to_owned())
+            .expect("create campaign");
+        drop(store);
+        let before = std::fs::read(&database_path).expect("read database before failure");
+        std::fs::write(backup_directory(&database_path), b"occupied")
+            .expect("occupy backup directory path");
+
+        assert!(matches!(
+            CampaignStore::open(&database_path),
+            Err(CampaignStoreError::Io(_))
+        ));
+        assert_eq!(
+            std::fs::read(&database_path).expect("read database after failure"),
+            before
+        );
+        let connection = Connection::open_with_flags(
+            &database_path,
+            OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        )
+        .expect("reopen main database");
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM campaigns", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("campaign count"),
+            1
         );
     }
 
