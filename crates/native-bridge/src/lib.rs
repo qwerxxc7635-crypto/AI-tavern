@@ -2,11 +2,13 @@
 
 #![forbid(unsafe_code)]
 
+mod adventure_play;
 mod character_creation;
 mod npc_dialogue;
 mod quest_board;
 mod tavern_initialization;
 mod world_creation;
+pub use adventure_play::*;
 pub use character_creation::*;
 pub use npc_dialogue::*;
 pub use quest_board::*;

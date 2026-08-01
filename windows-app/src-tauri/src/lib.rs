@@ -3,11 +3,12 @@
 #![forbid(unsafe_code)]
 
 use ember_native_bridge::{
-    CampaignStore, CampaignStoreError, CampaignSummary, CharacterCompletionCommit,
-    CharacterCreationSnapshot, CharacterTraitGenerationCommit, NpcDialogueCommit,
-    NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
-    TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
-    WorldManualUpdate,
+    AdventureActionSubmit, AdventureDiceCommit, AdventurePlanCommit, AdventureSnapshot,
+    AdventureTurnCommit, CampaignStore, CampaignStoreError, CampaignSummary,
+    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterTraitGenerationCommit,
+    NpcDialogueCommit, NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot,
+    QuestGenerationCommit, TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot,
+    WorldGenerationCommit, WorldManualUpdate,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -198,6 +199,71 @@ fn quest_accept(
         .map_err(Into::into)
 }
 
+#[tauri::command]
+fn adventure_get(
+    campaign_id: String,
+    quest_id: Option<String>,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store
+        .adventure_snapshot(&campaign_id, quest_id.as_deref())
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_plan_commit(
+    command: AdventurePlanCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store.commit_adventure_plan(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_start(
+    campaign_id: String,
+    adventure_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store
+        .start_adventure(&campaign_id, &adventure_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_action_submit(
+    command: AdventureActionSubmit,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store.submit_adventure_action(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_turn_commit(
+    command: AdventureTurnCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store.commit_adventure_turn(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_roll(
+    campaign_id: String,
+    adventure_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store
+        .roll_adventure_check(&campaign_id, &adventure_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_dice_commit(
+    command: AdventureDiceCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureSnapshot, CommandError> {
+    store.commit_adventure_dice(command).map_err(Into::into)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -225,7 +291,14 @@ pub fn run() {
             npc_dialogue_commit,
             quest_board_get,
             quest_generation_commit,
-            quest_accept
+            quest_accept,
+            adventure_get,
+            adventure_plan_commit,
+            adventure_start,
+            adventure_action_submit,
+            adventure_turn_commit,
+            adventure_roll,
+            adventure_dice_commit
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");

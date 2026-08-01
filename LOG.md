@@ -1266,5 +1266,46 @@
 
 ### Git
 
-- Commit hash：待提交。
+- Commit hash：`66ed01e`。
 - Commit message：`feat(M5-T08): add persistent quest board`
+
+## 2026-08-01 — M5-T09 接管、Review 与环境阻塞
+
+- 已确认仓库根目录为 `D:/4D(0801)/4D`、分支 `main`、HEAD `66ed01e`，M5-T08 已提交；接管时暂存区为空，10个未提交文件均属于M5-T09。
+- 正常重构了 `adventure_play.rs` 的 `clippy::collapsible_if`，未添加allow或降低检查标准。
+- Review发现Fake冒险前7回合全部检定，违反规格2至4次检定；已改为确定性8回合、3次检定、4个无检定中间回合和最终ENDING，并避免重复写入同一Fake世界事实。
+- Review发现Provider在玩家行动或D20已持久化后失败时，再试会重复提交；Windows服务现先读取SQLite状态并续跑WAITING_FOR_PLAYER/RESOLVING，不重复写行动或骰点，新增恢复测试。
+- Node侧通过：`format:check`、`lint`、`typecheck`、46个Vitest文件237项、Node SQLite 7项及Windows生产前端build；M5-T09定向24项测试通过。
+- 硬阻塞：当前机器没有可调用的`cargo.exe`、`rustc.exe`或Rustup安装，PATH和常见C/D盘安装位置均已核查。因此未能运行Rust fmt、严格Clippy、workspace Rust测试、Tauri build及Windows桌面烟测，不能提交或标记M5-T09完成。
+- 未执行M5-T10，未暂存或提交任何变更。
+
+### 恢复第一条命令
+
+```powershell
+cargo --version
+```
+
+确认Rust工具链恢复后，从`cargo fmt --all -- --check`开始，并继续M5-T09完整质量门、Tauri烟测、文档与独立提交。
+
+### 2026-08-01 Rust恢复后的续验结果
+
+- 已确认项目工具链位于`.local/tools/cargo`与`.local/tools/rustup`，并按D盘缓存规则设置`CARGO_HOME`、`CARGO_TARGET_DIR`、`RUSTUP_HOME`、`TEMP`和`TMP`。
+- `cargo fmt --all -- --check`通过。
+- 严格Clippy启动后失败：MSVC目标找不到`link.exe`；系统中也不存在Visual Studio Build Tools目录或Windows SDK Lib目录。失败发生在依赖build script链接阶段，尚未进入项目源码Clippy，不能视为源码检查通过。
+- 因缺少MSVC C++ Build Tools与Windows SDK，Cargo测试、Tauri build及桌面烟测仍无法执行；未暂存、未提交、未进入M5-T10。
+- 恢复前需要安装Visual Studio 2022 Build Tools的“Desktop development with C++”及匹配Windows SDK；恢复后第一条项目命令仍为`cargo clippy --workspace --all-targets --all-features -- -D warnings`。
+
+## 2026-08-01 — M5-T09 Windows持久化三栏冒险完成
+
+- Windows冒险页覆盖角色、目标、世界时钟、剧情、建议行动、自由输入、物品、已发现线索与最近一次本地骰点；隐藏AdventurePlan仅进入AI上下文。
+- Fake Provider确定性完成8回合，其中3次本地D20、4个无检定中间回合和1个ENDING回合；三条核心线索关联各自发现回合，未重复写Fake世界事实。
+- Rust固定命令验证Campaign/Quest/Adventure/Turn归属、状态机、连续序号、输入上下文、AI结构、NPC/线索引用和事实补丁；行动先持久化，骰点只由本地生成，事务失败不留下部分AI结果。
+- Provider失败或应用重启后，服务从SQLite续跑WAITING_FOR_PLAYER/RESOLVING，不重复提交行动或骰点；存档首页的ADVENTURE状态正确返回冒险页。
+- 实际Tauri烟测发现并修复真实特质ID泄漏到严格AI Schema、冒险继续路由错误和无检定回合遮蔽最近骰点三个问题。
+- 完整质量门通过：Vitest 46文件239项、Node SQLite 7项、native-bridge Rust 15项、Rust fmt、严格Clippy、Cargo workspace测试、Windows前端build和Tauri release无bundle build。
+- 真实release应用从新建存档完成世界、车卡、酒馆、任务接受、冒险准备、3次D20和8回合ENDING；两次关闭重开均恢复，最终SQLite为8回合/3骰点/3线索/2初始物品，未生成结算、奖励、NPC/时钟/世界变化或ending_json。
+- 烟测进程已停止，唯一测试Campaign级联删除后测试SQLite及空应用数据目录也已移除；未执行M5-T10。
+
+### Git
+
+- Commit message：`feat(M5-T09): add persistent three-column adventures`

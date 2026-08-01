@@ -72,6 +72,14 @@ describe('save home page', () => {
     expect(await screen.findByText('继续车卡 campaign-existing')).toBeTruthy();
   });
 
+  it('returns an active campaign to its persisted adventure', async () => {
+    const gateway = new FakeCampaignGateway([{ ...EXISTING_CAMPAIGN, state: 'ADVENTURE' }]);
+    renderSaveHome(gateway);
+
+    fireEvent.click(await screen.findByRole('button', { name: '继续' }));
+    expect(await screen.findByText('继续冒险 campaign-existing')).toBeTruthy();
+  });
+
   it('reloads campaigns from the persistence gateway after a simulated application restart', async () => {
     const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
     const firstRun = renderSaveHome(gateway);
@@ -92,6 +100,7 @@ function renderSaveHome(gateway: CampaignGateway) {
         <Route path="/tavern" element={<CampaignRouteEcho />} />
         <Route path="/world" element={<WorldRouteEcho />} />
         <Route path="/character/create" element={<CharacterRouteEcho />} />
+        <Route path="/adventure" element={<AdventureRouteEcho />} />
       </Routes>
     </MemoryRouter>,
   );
@@ -113,6 +122,12 @@ function CharacterRouteEcho() {
   const location = useLocation();
   const id = new URLSearchParams(location.search).get('campaignId');
   return <p>继续车卡 {id ?? '未选择'}</p>;
+}
+
+function AdventureRouteEcho() {
+  const location = useLocation();
+  const id = new URLSearchParams(location.search).get('campaignId');
+  return <p>继续冒险 {id ?? '未选择'}</p>;
 }
 
 class FakeCampaignGateway implements CampaignGateway {

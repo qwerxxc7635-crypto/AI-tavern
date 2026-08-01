@@ -25,7 +25,7 @@ const QuestsPage = lazy(() =>
   import('./quest-board-page.js').then(({ QuestBoardPage: page }) => ({ default: page })),
 );
 const AdventurePage = lazy(() =>
-  sectionPages().then(({ AdventurePage: page }) => ({ default: page })),
+  import('./adventure-page.js').then(({ AdventurePage: page }) => ({ default: page })),
 );
 const CharacterPage = lazy(() =>
   sectionPages().then(({ CharacterPage: page }) => ({ default: page })),

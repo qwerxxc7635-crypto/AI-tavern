@@ -1614,3 +1614,35 @@
 - 本任务沿用 `DEC-029` 的统一Provider执行与受限原生原子提交边界，没有形成新的重大架构决定，因此未更新 `docs/DECISIONS.md`。
 - M5-T08验收“接受任务后可进入冒险准备”由页面路由测试、真实SQLite接受/重开测试、全量门禁、release构建和窗口烟测共同覆盖。
 - 未实现M5-T09或任何后续任务。
+
+## 2026-08-01 — M5-T09 实现Windows冒险三栏页面
+
+### 范围与实现
+
+- 接入冒险准备、启动、行动提交、AI回合、程序D20和骰点叙事的固定Tauri语义命令；WebView不接触SQL、数据库路径或任意模型HTTP。
+- 三栏页面分别展示角色/目标/世界时钟、持久化剧情/建议行动/自由输入、物品/已发现线索/最近骰点，AdventurePlan不返回公开页面字段。
+- Fake Provider按计划最少回合数在第8回合进入ENDING，第1、3、6回合请求检定，其余中间回合无需检定；骰点由Rust本地生成。
+- 玩家行动在AI生成前写入SQLite；WAITING_FOR_PLAYER和RESOLVING可在Provider失败或应用重启后续跑，重复点击与重复恢复不会重复写行动或骰点。
+- Rust在事务内重建并比较AI输入，复核Campaign/Quest/Adventure/Turn归属、状态机、连续序号、线索发现回合、NPC引用、检定枚举和事实补丁。
+
+### Review修复
+
+- 修复原交接实现前7回合全部检定，改为符合规格的3次检定与无检定混合流程。
+- 修复真实角色特质携带本地ID导致严格冒险输入Schema拒绝；原生上下文只投影name和description，并由真实SQLite测试断言。
+- 修复ADVENTURE存档从首页继续时错误进入酒馆；新增存档首页路由测试。
+- 修复无检定回合后右栏隐藏已持久化最近骰点；页面改为查找最近非空DiceResult并补测试。
+- 修复Provider失败后重试会再次提交动作/掷骰；服务现在先读取SQLite状态并恢复原工作。
+
+### 验证与烟测
+
+- `cargo fmt --all -- --check`、`cargo clippy --workspace --all-targets --all-features -- -D warnings`和`cargo test --workspace`通过；native-bridge 15项测试通过。
+- `pnpm check`、Windows生产前端build和`tauri build --no-bundle`通过。
+- release应用真实完成新建存档、世界、车卡、酒馆、任务接受、冒险准备、8回合、3次D20和ENDING；关闭重开恢复待处理回合与最终8回合记录。
+- SQLite核对为8回合、3个DiceResult、3条发现线索、2件初始物品；Adventure ending_json为空、Quest仍ACTIVE、世界时钟全0、无摘要/世界事件生成，确认未执行M5-T10结算。
+- 烟测进程已停止，唯一测试Campaign级联删除后，测试SQLite和空应用数据目录也已移除。
+
+### 自审
+
+- SQLite仍是唯一事实源；AI输出经共享Schema和Rust业务验证后才能提交，且AI不生成骰点。
+- 页面只调用固定命令；并发、失败、重启、输入验证和事务原子性均有测试或真实烟测证据。
+- 未实现奖励、NPC变化、世界变化、返回酒馆或档案页面；这些保持在M5-T10范围。

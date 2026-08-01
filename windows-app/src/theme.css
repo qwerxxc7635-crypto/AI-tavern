@@ -1866,6 +1866,343 @@ textarea:disabled {
   }
 }
 
+.adventure-page {
+  min-height: 100%;
+  padding: clamp(1rem, 2.5vw, 2.5rem);
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 50% 0, rgb(170 104 55 / 10%), transparent 34rem), var(--paper);
+}
+
+.adventure-page--loading,
+.adventure-preparation {
+  display: grid;
+  min-height: calc(100% - 5rem);
+  max-width: 48rem;
+  margin: 0 auto;
+  place-content: center;
+}
+
+.adventure-preparation h1 {
+  margin: 0.2rem 0 0.8rem;
+  font: 700 clamp(2.2rem, 6vw, 4.8rem) / 0.95 var(--font-display);
+}
+
+.adventure-preparation > p:not(.eyebrow, .form-error) {
+  max-width: 42rem;
+  font-size: 1.08rem;
+  line-height: 1.7;
+}
+
+.adventure-preparation dl {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  margin: 1.5rem 0;
+  gap: 1rem;
+}
+
+.adventure-preparation dt {
+  color: var(--muted);
+  font-size: 0.72rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.adventure-preparation dd {
+  margin: 0.25rem 0 0;
+}
+
+.adventure-header {
+  display: flex;
+  max-width: 96rem;
+  margin: 0 auto 1rem;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.adventure-header h1 {
+  margin: 0;
+  font: 700 clamp(1.7rem, 4vw, 3.2rem) / 1 var(--font-display);
+}
+
+.adventure-state {
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  color: var(--moss);
+  font-size: 0.74rem;
+  letter-spacing: 0.05em;
+}
+
+.adventure-state--check_required,
+.adventure-state--ending {
+  color: var(--ember);
+}
+
+.adventure-columns {
+  display: grid;
+  grid-template-columns: minmax(13rem, 0.72fr) minmax(24rem, 1.7fr) minmax(14rem, 0.8fr);
+  max-width: 96rem;
+  min-height: calc(100vh - 11rem);
+  margin: 0 auto;
+  border: 1px solid var(--line-strong);
+  background: rgb(255 252 245 / 80%);
+  box-shadow: 0 1.2rem 4rem rgb(48 32 20 / 12%);
+}
+
+.adventure-column {
+  min-width: 0;
+}
+
+.adventure-character,
+.adventure-ledger {
+  padding: 1rem;
+}
+
+.adventure-character {
+  border-right: 1px solid var(--line);
+}
+
+.adventure-ledger {
+  border-left: 1px solid var(--line);
+}
+
+.adventure-character section,
+.adventure-ledger section {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.adventure-character section:first-child,
+.adventure-ledger section:first-child {
+  padding-top: 0.25rem;
+}
+
+.adventure-character h2,
+.adventure-character h3 {
+  margin: 0.2rem 0;
+  font-family: var(--font-display);
+}
+
+.attribute-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin-top: 1rem;
+  gap: 0.3rem;
+}
+
+.attribute-grid span {
+  display: grid;
+  border: 1px solid var(--line);
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+}
+
+.attribute-grid small {
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.attribute-grid strong {
+  font: 700 1.25rem var(--font-display);
+}
+
+.clock-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  margin-top: 0.75rem;
+  gap: 0.25rem 0.8rem;
+}
+
+.clock-row progress {
+  width: 100%;
+  grid-column: 1 / -1;
+  accent-color: var(--ember);
+}
+
+.adventure-story {
+  display: flex;
+  min-height: 34rem;
+  flex-direction: column;
+}
+
+.story-scroll {
+  display: flex;
+  overflow: auto;
+  padding: clamp(1.2rem, 3vw, 2.3rem);
+  flex: 1;
+  flex-direction: column;
+  gap: 1.6rem;
+}
+
+.story-scroll article {
+  max-width: 48rem;
+}
+
+.story-scroll article + article {
+  padding-top: 1.4rem;
+  border-top: 1px solid var(--line);
+}
+
+.story-scroll small {
+  color: var(--ember);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+}
+
+.story-scroll p {
+  margin: 0.5rem 0 0;
+  white-space: pre-line;
+  font: 1.08rem/1.75 var(--font-body);
+}
+
+.adventure-actions,
+.check-prompt,
+.adventure-ending {
+  padding: 1rem 1.5rem 1.3rem;
+  border-top: 1px solid var(--line);
+  background: var(--paper-deep);
+}
+
+.suggested-actions {
+  display: flex;
+  margin-bottom: 0.7rem;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.suggested-actions button {
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  color: var(--ink);
+  background: transparent;
+  cursor: pointer;
+}
+
+.adventure-actions label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-weight: 700;
+}
+
+.adventure-actions textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 5rem;
+  margin-bottom: 0.65rem;
+  resize: vertical;
+}
+
+.check-prompt {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.25rem 1rem;
+}
+
+.check-prompt p {
+  margin: 0;
+  font-weight: 700;
+}
+
+.check-prompt span {
+  color: var(--muted);
+}
+
+.check-prompt button {
+  grid-column: 2;
+  grid-row: 1 / 3;
+}
+
+.adventure-ending h2 {
+  margin: 0.2rem 0;
+  font-family: var(--font-display);
+}
+
+.ledger-entry {
+  display: grid;
+  margin-top: 0.75rem;
+  gap: 0.2rem;
+}
+
+.ledger-entry span,
+.adventure-muted {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.dice-ledger {
+  display: grid;
+  text-align: center;
+  justify-items: center;
+  gap: 0.25rem;
+}
+
+.dice-ledger .eyebrow {
+  justify-self: start;
+}
+
+.dice-face {
+  display: grid;
+  width: 3.4rem;
+  height: 3.4rem;
+  border: 1px solid var(--brass);
+  transform: rotate(45deg);
+  place-items: center;
+  font: 700 1.7rem var(--font-display);
+}
+
+.dice-face::first-line {
+  transform: rotate(-45deg);
+}
+
+.dice-ledger em {
+  color: var(--ember);
+  font-style: normal;
+}
+
+@media (max-width: 1050px) {
+  .adventure-columns {
+    grid-template-columns: minmax(13rem, 0.7fr) minmax(24rem, 1.5fr);
+  }
+
+  .adventure-ledger {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--line);
+    border-left: 0;
+    gap: 1rem;
+  }
+}
+
+@media (max-width: 760px) {
+  .adventure-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .adventure-character,
+  .adventure-ledger {
+    border-right: 0;
+    border-left: 0;
+  }
+
+  .adventure-character {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border-bottom: 1px solid var(--line);
+    gap: 1rem;
+  }
+
+  .adventure-ledger {
+    grid-column: auto;
+    grid-template-columns: 1fr;
+  }
+}
+
 .quest-board-page {
   min-height: 100%;
   padding: clamp(1.5rem, 4vw, 3.5rem);

@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T08 实现任务页面`
+- 最近完成任务：`M5-T09 实现Windows冒险三栏页面`（待提交）
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T08` 已验收，准备提交
-- 下一任务：`M5-T09 实现Windows冒险三栏页面`
+- 当前任务：`M5-T09`已实现、Review和验收，准备独立提交
+- 下一任务：`M5-T10 结算与冒险档案页面`
 
 ## 架构摘要
 
@@ -63,9 +63,20 @@
 - Windows生产前端与Tauri release无bundle构建通过；release窗口标题正确、窗口句柄非零且响应。
 - TypeScript、ESLint、Prettier、Rust fmt、严格Clippy和workspace test通过。
 
+## 2026-08-01 M5-T09完成状态
+
+- 接管基线：`main` / `66ed01e`；原有10个M5-T09未提交文件均已保留。
+- 已修复`adventure_play.rs`的`clippy::collapsible_if`。
+- Fake Provider现运行8回合，其中第1、3、6回合请求本地D20，4个中间回合无需检定，第8回合进入ENDING；三条核心线索分别关联发现回合，重复Fake事实补丁已消除。
+- WindowsAdventureService会从SQLite续跑已持久化的WAITING_FOR_PLAYER和RESOLVING状态，避免Provider失败重试时重复提交玩家行动或骰点；对应测试已添加。
+- 已通过Node侧格式、lint、类型、46个Vitest文件237项、Node SQLite 7项、Windows生产前端build；定向冒险测试24项通过。
+- Rust工具链、MSVC与Windows SDK已恢复；Rust fmt、严格Clippy、Cargo workspace测试、`pnpm check`、Windows build和Tauri release无bundle build均通过。
+- 真实release烟测覆盖新存档到8回合ENDING、3次D20、无检定回合、两次关闭重开、物品/线索/骰点恢复及M5-T10零提前结算；唯一测试Campaign、测试SQLite和空应用数据目录已移除。
+- 未提交文件除原交接清单外还包含本次Review对Fake流程、失败恢复测试及本交接文档/LOG的修改；暂存区为空。
+
 ## 恢复步骤
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 完成并提交当前 `M5-T08` 变更。
-4. 从 `M5-T09` 实现Windows冒险三栏页面；不要提前实现M5-T10设置页。
+3. 确认M5-T09提交为`feat(M5-T09): add persistent three-column adventures`且工作树干净。
+4. 从M5-T10结算与冒险档案页面开始；不要提前接入真实Provider。
