@@ -2081,3 +2081,24 @@
 
 - M8-T01格式文档验收完成，未提前实现ZIP导出、导入事务或Windows文件交互。
 - 下一任务为M8-T02实现存档导出。
+
+## 2026-08-01 — M8-T02 实现存档导出
+
+### 实现
+
+- 新增共享`exportCampaignSave`服务，在单个SQLite读事务中检查数据库完整性、外键和当前Schema，并稳定捕获Campaign行、14类游戏事实、事件及全部GenerationRecord。
+- JSON文本列统一解析、禁止秘密键扫描和规范化；Campaign默认/备用/任务模型绑定及GenerationRecord模型外键归一为空，Provider、模型、app设置、pending请求和旧快照不进入归档。
+- 生成`manifest.json`、`campaign.json`、`events.ndjson`、`generations.json`的SHA-256及`checksum.json`，使用无新增依赖的ZIP32 STORE编码器返回确定性`.emtavern`字节和安全建议文件名。
+- ZIP写入UTF-8标志、CRC32、中央目录和结束记录，复制归档前执行256 MiB上限；服务不写用户路径，不提前实现M8-T04。
+
+### 验证
+
+- 真实SQLite测试把Campaign绑定到含credentialRef和API Key测试值的设备Provider，同时写入事件、GenerationRecord、游戏事实和含秘密的app设置；解包结果只有五个规定条目，内容完整且不含任一设备秘密或credential字段。
+- 校验manifest计数、14表边界、模型外键归一化、事件NDJSON、生成审计、四文件SHA-256、重复导出字节一致；禁止秘密键导致整体失败，缺失Campaign失败后连接可立即开启新事务。
+- `pnpm check`通过54个Vitest文件282项、10项Node SQLite和44项Rust测试；格式、lint、类型检查及严格Clippy通过。
+- Windows前端生产build转换170个模块；Tauri release `--no-bundle`成功生成可执行文件。
+
+### 结论
+
+- M8-T02满足导出文件包含完整游戏内容且不包含API Key的验收，并保持导出只读。
+- 未实现存档校验、导入迁移和IMPORT快照；下一任务为M8-T03。

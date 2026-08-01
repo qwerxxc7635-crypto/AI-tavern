@@ -59,6 +59,12 @@ export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';
+export { exportCampaignSave } from './save-export.js';
+export type {
+  CampaignSaveExport,
+  CampaignSaveExportOptions,
+  CampaignSaveManifest,
+} from './save-export.js';
 export type {
   SqliteDatabase,
   SqliteRunResult,
