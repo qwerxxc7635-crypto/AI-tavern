@@ -116,4 +116,88 @@ describe('D20 rule engine', () => {
       ),
     ).toThrow(D20RuleError);
   });
+
+  it.each([0, 6, 1.5, Number.NaN])('rejects invalid attribute value %s', (attributeValue) => {
+    expect(() =>
+      resolveD20Check(
+        {
+          checkRequestId: checkId,
+          attributeValue,
+          equipmentModifier: 0,
+          statusModifier: 0,
+          difficulty: 8,
+        },
+        fixed(10),
+      ),
+    ).toThrow(D20RuleError);
+  });
+
+  it.each([
+    ['equipmentModifier', Number.POSITIVE_INFINITY, 0],
+    ['statusModifier', 0, Number.NaN],
+    ['statusModifier', 0, 0.5],
+  ] as const)('rejects unsafe %s', (_label, equipmentModifier, statusModifier) => {
+    expect(() =>
+      resolveD20Check(
+        {
+          checkRequestId: checkId,
+          attributeValue: 1,
+          equipmentModifier,
+          statusModifier,
+          difficulty: 8,
+        },
+        fixed(10),
+      ),
+    ).toThrow(D20RuleError);
+  });
+
+  it('rejects a difficulty outside the closed ruleset', () => {
+    expect(() =>
+      resolveD20Check(
+        {
+          checkRequestId: checkId,
+          attributeValue: 1,
+          equipmentModifier: 0,
+          statusModifier: 0,
+          difficulty: 9 as CheckDifficulty,
+        },
+        fixed(10),
+      ),
+    ).toThrow(/difficulty must be one of/u);
+  });
+
+  it('rejects a total that exceeds the safe integer range', () => {
+    expect(() =>
+      resolveD20Check(
+        {
+          checkRequestId: checkId,
+          attributeValue: 5,
+          equipmentModifier: Number.MAX_SAFE_INTEGER,
+          statusModifier: 0,
+          difficulty: 8,
+        },
+        fixed(20),
+      ),
+    ).toThrow(/total must be a safe integer/u);
+  });
+
+  it('returns an immutable auditable result', () => {
+    const result = resolveD20Check(
+      {
+        checkRequestId: checkId,
+        attributeValue: 3,
+        equipmentModifier: 1,
+        statusModifier: 0,
+        difficulty: 11,
+      },
+      fixed(7),
+    );
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(result).toMatchObject({
+      checkRequestId: checkId,
+      d20: 7,
+      total: 11,
+      success: true,
+    });
+  });
 });

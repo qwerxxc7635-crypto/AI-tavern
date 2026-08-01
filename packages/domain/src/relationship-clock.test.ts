@@ -59,6 +59,30 @@ describe('relationship patches', () => {
   it('rejects an empty patch', () => {
     expect(() => applyRelationshipPatch(relationship, {})).toThrow(DomainPatchError);
   });
+
+  it('accepts exact relationship boundaries for every dimension and freezes the result', () => {
+    const nearBoundary = createNpcRelationship({
+      ...relationship,
+      trust: 4,
+      closeness: -4,
+      awe: 4,
+      obligation: -4,
+    });
+    const result = applyRelationshipPatch(nearBoundary, {
+      trust: 1,
+      closeness: -1,
+      awe: 1,
+      obligation: -1,
+    });
+    expect(result).toMatchObject({ trust: 5, closeness: -5, awe: 5, obligation: -5 });
+    expect(Object.isFrozen(result)).toBe(true);
+  });
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY])('rejects non-finite delta %s', (delta) => {
+    expect(() => applyRelationshipPatch(relationship, { obligation: delta })).toThrow(
+      DomainPatchError,
+    );
+  });
 });
 
 describe('world clock rules', () => {
@@ -72,6 +96,17 @@ describe('world clock rules', () => {
     expect(advanceWorldClock(clock(2), 1).triggeredStages).toEqual([]);
   });
 
+  it('does not mutate the source clock and freezes returned collections', () => {
+    const source = clock(3);
+    const result = advanceWorldClock(source, 1);
+    expect(source.current).toBe(3);
+    expect(result.clock.current).toBe(4);
+    expect(Object.isFrozen(result)).toBe(true);
+    expect(Object.isFrozen(result.clock)).toBe(true);
+    expect(Object.isFrozen(result.clock.stages)).toBe(true);
+    expect(Object.isFrozen(result.triggeredStages)).toBe(true);
+  });
+
   it.each([-1, 0, 2, 1.5])('rejects advance amount %s', (amount) => {
     expect(() => advanceWorldClock(clock(2), amount)).toThrow(DomainPatchError);
   });
@@ -83,7 +118,12 @@ describe('world clock rules', () => {
   it.each([
     { ...clock(0), current: -1 },
     { ...clock(0), current: 7 },
+    { ...clock(0), current: 0.5 },
     { ...clock(0), max: 0 },
+    { ...clock(0), max: 1.5 },
+    { ...clock(0), max: Number.POSITIVE_INFINITY },
+    { ...clock(0), stages: [{ at: 0, title: 'Invalid' }] },
+    { ...clock(0), stages: [{ at: 1.5, title: 'Invalid' }] },
     { ...clock(0), stages: [{ at: 7, title: 'Invalid' }] },
     {
       ...clock(0),

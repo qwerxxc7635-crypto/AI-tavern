@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  CAMPAIGN_ACTIVE_STATES,
+  CAMPAIGN_EXCEPTION_STATES,
   CampaignTransitionError,
   campaignId,
   createCampaign,
+  isCampaignActiveState,
+  isCampaignExceptionState,
   isoTimestamp,
   schemaVersion,
   transitionCampaign,
@@ -86,10 +90,47 @@ describe('campaign state machine', () => {
     expect(() => advance(failed, 'TAVERN', 4)).toThrow(CampaignTransitionError);
   });
 
+  it.each(CAMPAIGN_EXCEPTION_STATES)(
+    'classifies, enters and resumes exception state %s without losing the active state',
+    (exceptionState) => {
+      const reviewing = advance(freshCampaign(), 'REVIEWING_WORLD', 1);
+      const suspended = advance(reviewing, exceptionState, 2);
+
+      expect(isCampaignExceptionState(suspended.state)).toBe(true);
+      expect(isCampaignActiveState(suspended.state)).toBe(false);
+      expect(suspended.resumeState).toBe('REVIEWING_WORLD');
+      expect(advance(suspended, 'REVIEWING_WORLD', 3)).toMatchObject({
+        state: 'REVIEWING_WORLD',
+        resumeState: null,
+      });
+    },
+  );
+
+  it('classifies every declared state without overlap', () => {
+    for (const state of CAMPAIGN_ACTIVE_STATES) {
+      expect(isCampaignActiveState(state)).toBe(true);
+      expect(isCampaignExceptionState(state)).toBe(false);
+    }
+    for (const state of CAMPAIGN_EXCEPTION_STATES) {
+      expect(isCampaignActiveState(state)).toBe(false);
+      expect(isCampaignExceptionState(state)).toBe(true);
+    }
+    expect(isCampaignActiveState('ARCHIVED')).toBe(false);
+    expect(isCampaignExceptionState('ARCHIVED')).toBe(false);
+  });
+
   it('allows any non-archived campaign to be archived and makes archive terminal', () => {
     const archived = advance(freshCampaign(), 'ARCHIVED', 1);
     expect(archived).toMatchObject({ state: 'ARCHIVED', resumeState: null });
     expect(() => advance(archived, 'CREATING_WORLD', 2)).toThrow(CampaignTransitionError);
+  });
+
+  it('archives an exception state without retaining a stale resume state', () => {
+    const waiting = advance(freshCampaign(), 'WAITING_FOR_MODEL', 1);
+    expect(advance(waiting, 'ARCHIVED', 2)).toMatchObject({
+      state: 'ARCHIVED',
+      resumeState: null,
+    });
   });
 
   it.each([
@@ -117,6 +158,22 @@ describe('campaign state machine', () => {
     expect(() =>
       transitionCampaign(reviewing, 'CREATING_CHARACTER', isoTimestamp(times[1])),
     ).toThrow(CampaignTransitionError);
+  });
+
+  it('rejects a forged exception state without a recovery target', () => {
+    const invalid: Campaign = {
+      ...freshCampaign(),
+      state: 'RECOVERY_REQUIRED',
+      resumeState: null,
+    };
+
+    expect(() => advance(invalid, 'GENERATION_FAILED', 1)).toThrow(/requires a resume state/u);
+  });
+
+  it('allows an atomic transition at the same canonical timestamp', () => {
+    const campaign = freshCampaign();
+    const reviewing = transitionCampaign(campaign, 'REVIEWING_WORLD', campaign.updatedAt);
+    expect(reviewing.updatedAt).toBe(campaign.updatedAt);
   });
 
   it('does not mutate the original campaign', () => {

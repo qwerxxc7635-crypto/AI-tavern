@@ -161,6 +161,128 @@ describe('AI domain state patch validation', () => {
       'CLOCK_LIMIT',
     );
   });
+
+  it('rejects a world from another campaign before evaluating proposals', () => {
+    try {
+      validateDomainStatePatches([], {
+        ...context(),
+        world: { ...world(), campaignId: campaignId('campaign-other') },
+      });
+      throw new Error('Expected INVALID_PATCH');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DomainPatchValidationError);
+      expect(error).toMatchObject({
+        code: 'INVALID_PATCH',
+        patchIndex: -1,
+        path: ['world', 'campaignId'],
+      });
+    }
+  });
+
+  it.each([
+    proposal('QUEST', questId('quest-unknown'), { status: 'ACCEPTED' }),
+    proposal('RELATIONSHIP', npcId('npc-unknown'), { trust: 1 }),
+    proposal('CLOCK', worldClockId('clock-unknown'), { amount: 1 }),
+  ])('rejects a patch whose target is outside the campaign context', (patch) => {
+    expectValidationError(() => validateDomainStatePatches([patch], context()), 'UNKNOWN_TARGET');
+  });
+
+  it.each([
+    null,
+    [],
+    new Date('2026-07-31T00:00:00.000Z'),
+    { ...proposal('FACT', null, { statement: 'Valid fact.' }), extra: true },
+    { kind: 'FACT', targetId: null, rationale: '', payload: { statement: 'Valid fact.' } },
+    { kind: 'FACT', targetId: null, rationale: 'Reason', payload: [] },
+  ])('rejects non-plain, incomplete or extra-key patch shape %#', (patch) => {
+    expectValidationError(() => validateDomainStatePatches([patch], context()), 'INVALID_PATCH');
+  });
+
+  it('reports the exact failing patch index and field path', () => {
+    try {
+      validateDomainStatePatches(
+        [
+          proposal('FACT', null, { statement: 'The first patch is valid.' }),
+          proposal('RELATIONSHIP', npcIdentifier, { trust: 'many' }),
+        ],
+        context(),
+      );
+      throw new Error('Expected RELATIONSHIP_LIMIT');
+    } catch (error) {
+      expect(error).toBeInstanceOf(DomainPatchValidationError);
+      expect(error).toMatchObject({
+        code: 'RELATIONSHIP_LIMIT',
+        patchIndex: 1,
+        path: ['payload', 'trust'],
+      });
+    }
+  });
+
+  it('rejects empty relationship changes, non-numeric clocks and completed clocks', () => {
+    expectValidationError(
+      () => validateDomainStatePatches([proposal('RELATIONSHIP', npcIdentifier, {})], context()),
+      'RELATIONSHIP_LIMIT',
+    );
+    expectValidationError(
+      () =>
+        validateDomainStatePatches(
+          [proposal('CLOCK', clockIdentifier, { amount: '1' })],
+          context(),
+        ),
+      'CLOCK_LIMIT',
+    );
+    const base = context();
+    expectValidationError(
+      () =>
+        validateDomainStatePatches([proposal('CLOCK', clockIdentifier, { amount: 1 })], {
+          ...base,
+          clocks: [{ ...clock(), current: 6 }],
+        }),
+      'CLOCK_LIMIT',
+    );
+  });
+
+  it('requires a completed authorized quest and a known non-escalating reward tier', () => {
+    const reward = (rewardTier: string) =>
+      proposal('ITEM_REWARD', null, {
+        questId: questIdentifier,
+        name: 'Beacon Compass',
+        description: 'A lawful reward.',
+        rewardTier,
+      });
+
+    expectValidationError(
+      () => validateDomainStatePatches([reward('BASIC')], context()),
+      'REWARD_NOT_AUTHORIZED',
+    );
+    const completed = context({ questStatus: 'COMPLETED' });
+    expectValidationError(
+      () =>
+        validateDomainStatePatches([reward('BASIC')], {
+          ...completed,
+          rewardAuthorizations: [],
+        }),
+      'REWARD_NOT_AUTHORIZED',
+    );
+    expectValidationError(
+      () => validateDomainStatePatches([reward('MYTHIC')], completed),
+      'INVALID_PATCH',
+    );
+    expect(validateDomainStatePatches([reward('BASIC')], completed)[0]).toMatchObject({
+      kind: 'ITEM_REWARD',
+      rewardTier: 'BASIC',
+    });
+  });
+
+  it.each([
+    proposal('FACT', null, { kind: 'HISTORICAL_FACT', statement: 'Invalid replacement.' }),
+    proposal('ATTRIBUTES', playerIdentifier, { strength: 5 }),
+    proposal('UNSUPPORTED', null, {}),
+  ] as const)('rejects forbidden or unsupported patch kind %#', (patch) => {
+    const expectedCode =
+      patch.kind === 'ATTRIBUTES' ? 'ATTRIBUTE_CHANGE_FORBIDDEN' : 'INVALID_PATCH';
+    expectValidationError(() => validateDomainStatePatches([patch], context()), expectedCode);
+  });
 });
 
 function context(
