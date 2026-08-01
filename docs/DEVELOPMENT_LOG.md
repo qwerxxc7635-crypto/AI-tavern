@@ -1695,3 +1695,26 @@
 
 - `docs/TASKS.md`列出的Windows离线纵向切片流程全部通过，关闭重启后所有核心进度仍存在。
 - 下一任务是M6-T01 Rust安全HTTP传输层；真实凭证和可能收费调用仍受硬性确认约束。
+
+## 2026-08-01 — M6-T01 实现Rust安全HTTP传输层
+
+### 实现
+
+- 新增workspace crate `ember-secure-http`，以Reqwest 0.13的最小Rustls与stream特性实现Rust内部HTTP边界。
+- `ApprovedEndpoint`只允许远程HTTPS和本机回环HTTP，拒绝URL凭证、查询、片段、缺失尾斜杠及相对路径逃逸；客户端关闭重定向。
+- `SecureHttpTransport`支持GET/POST、敏感Header、请求正文、100毫秒至120秒总时限、CancellationToken、逐块响应和每请求响应上限（全局最大16 MiB）。
+- 将配置、输入、超时、取消、TLS、网络、认证、限流、客户端、服务端、流和大小错误映射为稳定枚举，不向调用者携带Reqwest原始错误。
+- Header值与请求Body在Debug中脱敏；没有注册Tauri HTTP命令或扩大`core:default` capability。
+
+### 测试与验证
+
+- 本地Tokio TCP服务器测试请求收集、流式首块、在途取消、全流超时、429映射、响应大小限制、端点/路径拒绝及Debug脱敏，共7项；没有真实Provider调用。
+- Review发现测试服务器固定等待4096字节会与HTTP keep-alive互锁，改为读取到头结束标记，并用Notify只同步取消用例。
+- `cargo metadata --format-version 1 --no-deps`、`cargo fmt --all -- --check`、workspace全目标全特性严格Clippy和`cargo test --workspace`通过；Rust共23项测试。
+- `pnpm check`通过：48个Vitest文件242项、7项Node SQLite以及23项Rust测试；格式、ESLint和类型检查通过。
+- Windows前端生产build及Tauri release `--no-bundle`通过。
+
+### 结论
+
+- M6-T01验收通过：模型网络能力只存在于未暴露给WebView的Rust crate；前端不能传入任意URL或发起任意模型HTTP。
+- M6-T02密钥存储、Provider适配器和真实模型调用均未实现；下一任务为M6-T02。

@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T11 Windows离线纵向切片验收`
+- 最近完成任务：`M6-T01 实现Rust安全HTTP传输层`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T11`已完成验收，准备独立提交
-- 下一任务：`M6-T01 实现Rust安全HTTP传输层`
+- 当前任务：`M6-T01`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T02 实现安全密钥仓库`
 
 ## 架构摘要
 
@@ -38,6 +38,8 @@
 - AdventureEnding的ending_json保存关键选择、未决方向、未发现线索、参与NPC、奖励/世界事实/酒馆变化ID以及摘要/世界事件GenerationRecord引用；完整档案可从SQLite重新组装。
 - 玩家行动写入后创建TURN_INPUT AUTO快照；SnapshotRepository以规范JSON、SHA-256和SQLite事务恢复Campaign有效游戏状态，保留独立AI审计并限制最近10个AUTO快照。
 - RegenerationUseCases支持自由故事和规则限次模式，按Campaign策略与跨厂商披露控制Provider切换；失败恢复安全快照，成功从输入基线替换旧AI游戏结果。
+- `ember-secure-http`提供Rust内部的受限模型HTTP边界：远程仅HTTPS、HTTP仅回环地址、禁用重定向，统一限制请求路径、总时限和响应大小，并支持取消与逐块读取。
+- 传输错误只暴露稳定分类；请求Header值和Body在Debug输出中脱敏。WebView没有新增HTTP命令或capability。
 - Windows React/Vite/Tauri入口已加入pnpm/Cargo workspace；HashRouter、基础主题和最小core:default capability可运行。
 - Windows启动页在运行时读取共享contracts Schema版本；无SQL、文件、HTTP、密钥或业务原生命令。
 - Windows AppShell包含侧栏、上下文标题栏、离线状态、统一加载态和错误边界；六个规定入口通过延迟路由模块导航。
@@ -79,7 +81,16 @@
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
 3. 确认M5-T11提交为`test(M5-T11): verify offline vertical slice`且工作树干净。
-4. 从M6-T01 Rust安全HTTP传输层开始；没有用户付费确认时只使用Fake Transport或本地测试服务器。
+4. 确认M6-T01提交后，从M6-T02安全密钥仓库开始；不得把测试密钥写入SQLite、日志、fixture或导出。
+
+## 2026-08-01 M6-T01完成状态
+
+- 新增独立Rust crate `ember-secure-http`，使用Reqwest 0.13最小Rustls/stream特性；依赖下载和Cargo target均位于项目`.local`。
+- 端点策略拒绝非HTTPS远程地址、含凭证/查询/片段或缺少尾斜杠的基地址；只允许回环HTTP供本地Provider与合同测试使用，相对路径不能绝对跳转或包含上级段。
+- 客户端禁用重定向，支持GET/POST、敏感Header、总请求时限、CancellationToken、逐块响应及16 MiB硬上限；错误标准化且不携带原始URL、Header或响应正文。
+- 本地TCP测试覆盖请求、流式首块、取消、超时、429映射、大小限制、端点逃逸及Debug脱敏，共7项；未调用真实模型或外部收费API。
+- Cargo metadata/fmt、workspace严格Clippy和23项Rust测试通过；`pnpm check`通过48个Vitest文件242项、7项Node SQLite及23项Rust测试；Windows前端build和Tauri release无bundle build通过。
+- `default.json`仍仅授予`core:default`，Tauri命令表没有任意HTTP命令；M6-T02及后续Provider未提前实现。
 
 ## 2026-08-01 M5-T11完成状态
 

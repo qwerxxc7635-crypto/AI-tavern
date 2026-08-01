@@ -1329,3 +1329,13 @@ cargo --version
 - M5-T11仅为验收任务，没有新增或修改源码；未提前实现spec 33.4中属于后续任务的模型切换、导出/删除/导入。
 - 验收进程停止，唯一测试Campaign按精确ID级联删除并VACUUM，剩余0条。
 - 下一任务：M6-T01 Rust安全HTTP传输层；未经付费确认不得进行真实模型调用。
+
+## 2026-08-01 — M6-T01 Rust安全HTTP传输层
+
+- 新增Rust内部`ember-secure-http` crate：审批基地址仅接受远程HTTPS或回环HTTP，拒绝凭证、查询、片段、缺失尾斜杠和路径逃逸；客户端禁止重定向。
+- 实现GET/POST请求、敏感Header脱敏、全流程超时、显式取消、流式逐块读取、响应大小硬上限和不含原始请求信息的稳定错误分类。
+- 最初本地HTTP测试服务器错误等待固定4096字节并造成假超时；改为读取至HTTP头结束且用Notify同步后，7项传输测试全部通过。
+- Reqwest/Rustls依赖使用项目D盘Cargo缓存；未使用API Key、真实模型或收费调用。WebView capability仍为`core:default`且未新增HTTP命令。
+- Cargo metadata/fmt、workspace严格Clippy、23项Rust测试、`pnpm check`（48文件242项Vitest、7项Node SQLite）、Windows前端build与Tauri release无bundle build通过。
+- Review确认超时覆盖完整流、取消同时覆盖请求与流、错误不保留原始URL/正文、请求Debug不暴露Header值或Body；未实现M6-T02。
+- 下一任务：M6-T02安全密钥仓库。
