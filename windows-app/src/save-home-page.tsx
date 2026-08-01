@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import {
@@ -6,6 +6,7 @@ import {
   type CampaignGateway,
   type CampaignSummary,
 } from './campaign-gateway.js';
+import { tauriSaveTransferGateway, type SaveTransferGateway } from './save-transfer-gateway.js';
 
 const STATE_LABELS: Readonly<Record<CampaignSummary['state'], string>> = {
   CREATING_WORLD: '构筑世界',
@@ -22,19 +23,30 @@ const STATE_LABELS: Readonly<Record<CampaignSummary['state'], string>> = {
 
 interface SaveHomePageProps {
   readonly gateway?: CampaignGateway;
+  readonly transferGateway?: SaveTransferGateway;
 }
 
-export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePageProps) {
+export function SaveHomePage({
+  gateway = tauriCampaignGateway,
+  transferGateway = tauriSaveTransferGateway,
+}: SaveHomePageProps) {
   const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState<readonly CampaignSummary[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const busyIdRef = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [transferNotice, setTransferNotice] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setError(null);
     const loaded = await gateway.list();
     setCampaigns(loaded);
   }, [gateway]);
+
+  function markBusy(value: string | null) {
+    busyIdRef.current = value;
+    setBusyId(value);
+  }
 
   useEffect(() => {
     let active = true;
@@ -51,20 +63,40 @@ export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePagePro
     };
   }, [gateway]);
 
+  useEffect(() => {
+    let active = true;
+    let unlisten: (() => void) | null = null;
+    void transferGateway
+      .subscribeToArchiveDrops((paths) => {
+        if (active) void importDroppedPaths(paths);
+      })
+      .then((stop) => {
+        if (active) unlisten = stop;
+        else stop();
+      })
+      .catch(() => {
+        if (active) setError('无法启用文件拖放；仍可使用“导入存档”选择文件。');
+      });
+    return () => {
+      active = false;
+      unlisten?.();
+    };
+  }, [transferGateway]);
+
   async function createCampaign() {
-    setBusyId('new');
+    markBusy('new');
     try {
       await gateway.create();
       await reload();
     } catch {
       setError('新存档没有创建成功，本地数据未被修改。');
     } finally {
-      setBusyId(null);
+      markBusy(null);
     }
   }
 
   async function continueCampaign(campaign: CampaignSummary) {
-    setBusyId(campaign.id);
+    markBusy(campaign.id);
     try {
       const continued = await gateway.continueCampaign(campaign.id);
       const destination =
@@ -78,21 +110,87 @@ export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePagePro
       navigate(`${destination}?campaignId=${encodeURIComponent(continued.id)}`);
     } catch {
       setError('无法继续该存档。请返回列表后重试。');
-      setBusyId(null);
+      markBusy(null);
     }
   }
 
   async function archiveCampaign(campaign: CampaignSummary) {
     const accepted = window.confirm('归档后，该存档会从当前列表中移除。确定继续吗？');
     if (!accepted) return;
-    setBusyId(campaign.id);
+    markBusy(campaign.id);
     try {
       await gateway.archive(campaign.id);
       await reload();
     } catch {
       setError('存档没有归档成功，本地数据未被修改。');
     } finally {
-      setBusyId(null);
+      markBusy(null);
+    }
+  }
+
+  async function chooseImportArchive() {
+    setError(null);
+    setTransferNotice(null);
+    try {
+      const path = await transferGateway.chooseImportPath();
+      if (path !== null) await importArchive(path);
+    } catch {
+      setError('无法打开该存档文件；本地数据未被修改。');
+    }
+  }
+
+  async function importDroppedPaths(paths: readonly string[]) {
+    if (busyIdRef.current !== null) return;
+    if (paths.length !== 1 || !paths[0]?.toLowerCase().endsWith('.emtavern')) {
+      setError('请一次拖入一个 .emtavern 存档文件。');
+      return;
+    }
+    await importArchive(paths[0]);
+  }
+
+  async function importArchive(path: string) {
+    if (busyIdRef.current !== null) return;
+    markBusy('import');
+    setError(null);
+    setTransferNotice(null);
+    try {
+      const inspection = await transferGateway.inspect(path);
+      let mode: 'CREATE' | 'OVERWRITE' = 'CREATE';
+      if (inspection.campaignExists) {
+        const accepted = window.confirm(
+          `本地已存在存档 ${inspection.campaignId.slice(0, 8)}。覆盖前会创建完整数据库备份，确定继续吗？`,
+        );
+        if (!accepted) return;
+        mode = 'OVERWRITE';
+      }
+      const imported = await transferGateway.importArchive(path, mode);
+      await reload();
+      setTransferNotice(
+        imported.state === 'ARCHIVED'
+          ? `已导入归档存档 ${imported.id.slice(0, 8)}；它仍保留归档状态。`
+          : `已导入存档 ${imported.id.slice(0, 8)}，现在可以继续游玩。`,
+      );
+    } catch {
+      setError('导入失败：文件未通过校验或无法写入；本地存档保持原状。');
+    } finally {
+      markBusy(null);
+    }
+  }
+
+  async function exportCampaign(campaign: CampaignSummary) {
+    if (busyIdRef.current !== null) return;
+    markBusy(`export:${campaign.id}`);
+    setError(null);
+    setTransferNotice(null);
+    try {
+      const path = await transferGateway.chooseExportPath(`${campaign.id}.emtavern`);
+      if (path === null) return;
+      await transferGateway.exportArchive(campaign.id, path);
+      setTransferNotice(`存档 ${campaign.id.slice(0, 8)} 已导出到所选位置。`);
+    } catch {
+      setError('导出失败：没有生成正式存档文件，本地游戏数据未被修改。');
+    } finally {
+      markBusy(null);
     }
   }
 
@@ -122,6 +220,28 @@ export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePagePro
           {error}
         </p>
       )}
+
+      {transferNotice === null ? null : (
+        <p className="transfer-notice" role="status">
+          {transferNotice}
+        </p>
+      )}
+
+      <section className="save-transfer" aria-label="存档导入与导出">
+        <div>
+          <p className="eyebrow">Portable archive</p>
+          <h2>迁移你的旅程</h2>
+          <p>选择或拖入一个 .emtavern 文件。设备模型与 API Key 不会随存档迁移。</p>
+        </div>
+        <button
+          className="quiet-action"
+          type="button"
+          disabled={busyId !== null}
+          onClick={() => void chooseImportArchive()}
+        >
+          {busyId === 'import' ? '正在校验…' : '导入存档'}
+        </button>
+      </section>
 
       {campaigns === null && error === null ? (
         <section className="save-home__loading" aria-live="polite" aria-busy="true">
@@ -165,6 +285,14 @@ export function SaveHomePage({ gateway = tauriCampaignGateway }: SaveHomePagePro
                   onClick={() => void continueCampaign(campaign)}
                 >
                   {busyId === campaign.id ? '正在打开…' : '继续'}
+                </button>
+                <button
+                  className="quiet-action"
+                  type="button"
+                  disabled={busyId !== null}
+                  onClick={() => void exportCampaign(campaign)}
+                >
+                  {busyId === `export:${campaign.id}` ? '正在导出…' : '导出'}
                 </button>
                 <button
                   className="quiet-action"

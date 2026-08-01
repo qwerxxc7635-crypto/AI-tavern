@@ -7,6 +7,7 @@ mod character_creation;
 mod model_settings;
 mod npc_dialogue;
 mod quest_board;
+mod save_archive;
 mod settlement;
 mod tavern_initialization;
 mod world_creation;
@@ -15,6 +16,7 @@ pub use character_creation::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
 pub use quest_board::*;
+pub use save_archive::*;
 pub use settlement::*;
 pub use tavern_initialization::*;
 pub use world_creation::*;
@@ -77,6 +79,12 @@ pub enum CampaignStoreError {
     Database(#[from] rusqlite::Error),
     #[error("application data directory could not be created")]
     Io(#[from] std::io::Error),
+    #[error("save archive is invalid")]
+    ArchiveInvalid,
+    #[error("save archive conflicts with local state")]
+    ArchiveConflict,
+    #[error("save archive path is invalid")]
+    ArchivePathInvalid,
 }
 
 /// Owns a platform database path without exposing SQL or file access to the WebView.

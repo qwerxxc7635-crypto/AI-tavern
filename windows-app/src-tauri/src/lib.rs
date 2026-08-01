@@ -4,8 +4,9 @@
 
 use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
-    AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignStore,
-    CampaignStoreError, CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
+    AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
+    CampaignArchiveImportMode, CampaignArchiveInspection, CampaignStore, CampaignStoreError,
+    CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
     CharacterTraitGenerationCommit, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
     NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
     TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
@@ -46,6 +47,18 @@ impl From<CampaignStoreError> for CommandError {
             CampaignStoreError::InvalidData | CampaignStoreError::IncompatibleSchema => Self {
                 code: "CAMPAIGN_DATA_INVALID",
                 message: "本地存档数据无法读取。",
+            },
+            CampaignStoreError::ArchiveInvalid => Self {
+                code: "SAVE_ARCHIVE_INVALID",
+                message: "存档文件损坏、格式不兼容或未通过安全校验。",
+            },
+            CampaignStoreError::ArchiveConflict => Self {
+                code: "SAVE_ARCHIVE_CONFLICT",
+                message: "导入方式与本地同名存档不一致，请刷新后重试。",
+            },
+            CampaignStoreError::ArchivePathInvalid => Self {
+                code: "SAVE_PATH_INVALID",
+                message: "请选择有效的.emtavern文件位置。",
             },
             CampaignStoreError::InvalidSystemTime
             | CampaignStoreError::Database(_)
@@ -249,6 +262,53 @@ fn campaign_continue(
 #[tauri::command]
 fn campaign_archive(id: String, store: State<'_, CampaignStore>) -> Result<(), CommandError> {
     store.archive_campaign(&id).map_err(Into::into)
+}
+
+#[tauri::command]
+async fn save_archive_inspect(
+    path: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CampaignArchiveInspection, CommandError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || store.inspect_campaign_archive(path))
+        .await
+        .map_err(|_| archive_worker_error())?
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+async fn save_archive_export(
+    id: String,
+    path: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CampaignArchiveExportResult, CommandError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        store.export_campaign_archive(&id, path, env!("CARGO_PKG_VERSION"))
+    })
+    .await
+    .map_err(|_| archive_worker_error())?
+    .map_err(Into::into)
+}
+
+#[tauri::command]
+async fn save_archive_import(
+    path: String,
+    mode: CampaignArchiveImportMode,
+    store: State<'_, CampaignStore>,
+) -> Result<CampaignSummary, CommandError> {
+    let store = store.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || store.import_campaign_archive(path, mode))
+        .await
+        .map_err(|_| archive_worker_error())?
+        .map_err(Into::into)
+}
+
+fn archive_worker_error() -> CommandError {
+    CommandError {
+        code: "LOCAL_STORAGE_UNAVAILABLE",
+        message: "存档文件处理进程意外中止，请重试。",
+    }
 }
 
 #[tauri::command]
@@ -494,6 +554,7 @@ fn secret_delete(credential_ref: String) -> Result<(), String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let database_path = app.path().app_data_dir()?.join("ember-tavern.sqlite");
             app.manage(CampaignStore::open(database_path)?);
@@ -504,6 +565,9 @@ pub fn run() {
             campaign_create,
             campaign_continue,
             campaign_archive,
+            save_archive_inspect,
+            save_archive_export,
+            save_archive_import,
             world_creation_get,
             world_generation_commit,
             world_draft_update,

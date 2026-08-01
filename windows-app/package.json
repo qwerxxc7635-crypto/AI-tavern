@@ -14,6 +14,7 @@
     "@ember-tavern/contracts": "workspace:*",
     "@ember-tavern/prompts": "workspace:*",
     "@tauri-apps/api": "^2.10.1",
+    "@tauri-apps/plugin-dialog": "2.7.2",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2"

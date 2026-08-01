@@ -459,10 +459,49 @@ button:focus-visible {
 .save-list,
 .save-home__empty,
 .save-home__loading,
-.inline-error {
+.inline-error,
+.transfer-notice,
+.save-transfer {
   max-width: 76rem;
   margin-right: auto;
   margin-left: auto;
+}
+
+.save-transfer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  margin-top: 1.5rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px dashed rgb(146 166 122 / 48%);
+  background: linear-gradient(90deg, rgb(146 166 122 / 9%), transparent 62%);
+}
+
+.save-transfer h2,
+.save-transfer p {
+  margin: 0;
+}
+
+.save-transfer h2 {
+  margin-top: 0.25rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.45rem;
+  font-weight: 400;
+}
+
+.save-transfer div > p:last-child {
+  margin-top: 0.4rem;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.transfer-notice {
+  margin-top: 1.5rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgb(146 166 122 / 42%);
+  color: #cdd8ba;
+  background: rgb(75 91 66 / 20%);
 }
 
 .save-list {
@@ -1659,6 +1698,16 @@ textarea:disabled {
 
   .save-card__actions {
     grid-column: 2;
+  }
+
+  .save-transfer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .save-transfer .quiet-action {
+    width: fit-content;
   }
 
   .world-options,
