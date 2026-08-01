@@ -101,6 +101,20 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
           ))}
         </ul>
       </section>
+      {tavern.changes.length === 0 ? null : (
+        <section className="tavern-changes">
+          <p className="eyebrow">Returned stories</p>
+          <h2>冒险留下的变化</h2>
+          <ul>
+            {tavern.changes.map((change) => (
+              <li key={change.id}>
+                <strong>{change.kind}</strong>
+                <span>{change.description}</span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div className="tavern-grid">
         <section className="tavern-patrons">

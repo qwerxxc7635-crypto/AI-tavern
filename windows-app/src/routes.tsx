@@ -31,7 +31,7 @@ const CharacterPage = lazy(() =>
   sectionPages().then(({ CharacterPage: page }) => ({ default: page })),
 );
 const ArchivesPage = lazy(() =>
-  sectionPages().then(({ ArchivesPage: page }) => ({ default: page })),
+  import('./archives-page.js').then(({ ArchivesPage: page }) => ({ default: page })),
 );
 const SettingsPage = lazy(() =>
   sectionPages().then(({ SettingsPage: page }) => ({ default: page })),

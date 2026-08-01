@@ -1309,3 +1309,14 @@ cargo --version
 ### Git
 
 - Commit message：`feat(M5-T09): add persistent three-column adventures`
+
+## 2026-08-01 — M5-T10 结算与冒险档案页面
+
+- 通过Fake Provider的`SUMMARIZE_ADVENTURE`与`GENERATE_WORLD_EVENT`生成提案，共享Schema和Rust领域边界双重验证；NPC与时钟使用当前SQLite上下文中的真实ID。
+- 新增固定Tauri结算/档案命令；单个SQLite立即事务提交Quest COMPLETED、Adventure SETTLED、NPC心情与关系、酒馆变化、程序控制奖励、世界事实、时钟、四类事件、两份AI审计和Campaign返回TAVERN。
+- 结算服务按Campaign单飞；原生事务处理并发，重复提交返回既有档案。未知时钟失败测试确认不留下奖励或状态部分写入。
+- 档案页展示摘要、关键选择、骰子、参与NPC、未解决线索、酒馆变化、奖励、世界事实、后续方向及模型/Prompt版本；返回酒馆可见陈设、NPC心情和时钟变化。
+- 完整`pnpm check`、Cargo metadata/fmt/严格Clippy/workspace测试、Windows前端build和Tauri release无bundle build通过；Vitest 48文件242项、Node SQLite 7项、Rust 16项。
+- release烟测完成真实8回合/3骰点结算、档案、返回酒馆和关闭重启恢复；SQLite中结算生成与四类事件均各一份。唯一测试Campaign已级联删除并VACUUM，剩余0条。
+- Review修复冒险快照遗漏publisherNpcId导致准备页无法载入、Fake固定符号ID无法匹配UUID、并发状态检查位于事务外、AI审计未比对原始响应以及结算事件不完整等问题。
+- 下一任务：M5-T11 Windows离线纵向切片验收。

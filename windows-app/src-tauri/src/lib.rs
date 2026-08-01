@@ -3,12 +3,12 @@
 #![forbid(unsafe_code)]
 
 use ember_native_bridge::{
-    AdventureActionSubmit, AdventureDiceCommit, AdventurePlanCommit, AdventureSnapshot,
-    AdventureTurnCommit, CampaignStore, CampaignStoreError, CampaignSummary,
-    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterTraitGenerationCommit,
-    NpcDialogueCommit, NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot,
-    QuestGenerationCommit, TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot,
-    WorldGenerationCommit, WorldManualUpdate,
+    AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
+    AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignStore,
+    CampaignStoreError, CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
+    CharacterTraitGenerationCommit, NpcDialogueCommit, NpcDialogueSnapshot,
+    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
+    TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
 };
 use serde::Serialize;
 use tauri::{Manager, State};
@@ -264,6 +264,26 @@ fn adventure_dice_commit(
     store.commit_adventure_dice(command).map_err(Into::into)
 }
 
+#[tauri::command]
+fn adventure_settlement_commit(
+    command: AdventureSettlementCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<AdventureArchiveView, CommandError> {
+    store
+        .commit_adventure_settlement(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn adventure_archives_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<Vec<AdventureArchiveView>, CommandError> {
+    store
+        .list_adventure_archives(&campaign_id)
+        .map_err(Into::into)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -298,7 +318,9 @@ pub fn run() {
             adventure_action_submit,
             adventure_turn_commit,
             adventure_roll,
-            adventure_dice_commit
+            adventure_dice_commit,
+            adventure_settlement_commit,
+            adventure_archives_get
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");

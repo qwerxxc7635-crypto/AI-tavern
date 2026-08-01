@@ -48,6 +48,11 @@ export interface TavernView {
   readonly specialRules: readonly string[];
   readonly longTermProblem: string;
   readonly ownerNpcId: string;
+  readonly changes: readonly {
+    readonly id: string;
+    readonly kind: string;
+    readonly description: string;
+  }[];
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -332,6 +337,16 @@ function parseTavern(value: unknown, expectedCampaignId: string): TavernView {
     specialRules: stringArray(record['specialRules']),
     longTermProblem: requireString(record['longTermProblem']),
     ownerNpcId: requireString(record['ownerNpcId']),
+    changes: Object.freeze(
+      requireArray(record['changes']).map((value) => {
+        const change = requireRecord(value);
+        return Object.freeze({
+          id: requireString(change['id']),
+          kind: requireString(change['kind']),
+          description: requireString(change['description']),
+        });
+      }),
+    ),
     createdAt: isoTimestamp(requireString(record['createdAt'])),
     updatedAt: isoTimestamp(requireString(record['updatedAt'])),
   });

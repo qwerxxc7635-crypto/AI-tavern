@@ -43,16 +43,6 @@ export function CharacterPage() {
   );
 }
 
-export function ArchivesPage() {
-  return (
-    <SectionPage
-      eyebrow="Story archive"
-      title="档案"
-      description="完成的冒险、关键选择和世界变化将在这里组成可追溯记录。"
-    />
-  );
-}
-
 export function SettingsPage() {
   return (
     <SectionPage

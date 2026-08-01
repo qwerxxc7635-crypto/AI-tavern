@@ -126,6 +126,8 @@ function sceneSnapshot(): AdventureSnapshot {
     },
     quest: {
       id: 'quest-beacon',
+      publisherNpcId: 'npc-owner',
+      relatedNpcIds: ['npc-owner'],
       content: {
         title: 'The Fading Beacon',
         summary: 'Investigate the lighthouse.',

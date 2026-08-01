@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T09 实现Windows冒险三栏页面`（待提交）
+- 最近完成任务：`M5-T10 实现结算与冒险档案页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T09`已实现、Review和验收，准备独立提交
-- 下一任务：`M5-T10 结算与冒险档案页面`
+- 当前任务：`M5-T10`已实现、Review和验收，准备独立提交
+- 下一任务：`M5-T11 Windows离线纵向切片验收`
 
 ## 架构摘要
 
@@ -78,5 +78,15 @@
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 确认M5-T09提交为`feat(M5-T09): add persistent three-column adventures`且工作树干净。
-4. 从M5-T10结算与冒险档案页面开始；不要提前接入真实Provider。
+3. 确认M5-T10提交为`feat(M5-T10): add adventure settlement and archives`且工作树干净。
+4. 从M5-T11 Windows离线纵向切片验收开始；不要提前接入真实Provider。
+
+## 2026-08-01 M5-T10完成状态
+
+- Windows结算服务通过统一Fake Provider生成并以共享Schema验证冒险摘要与世界事件；Fake输出中的NPC和时钟引用按当前输入动态生成。
+- Rust固定命令复核Campaign、Adventure、Quest、发布者、角色、时钟、奖励等级、AI审计和原始响应，立即事务原子写入任务、NPC关系/心情、酒馆变化、程序控制奖励、世界事实/时钟、四类事件、GenerationRecord、ending_json和Campaign返回酒馆。
+- 并发结算由服务单飞和SQLite立即事务串行化；已结算重放只返回同一档案。未知时钟测试证明失败后Adventure仍为ENDING且没有奖励部分写入。
+- 档案页从SQLite重建摘要、关键选择、骰子、参与NPC、未解决线索、奖励、世界事实、酒馆变化及模型/Prompt版本；酒馆页展示结算后的陈设、NPC心情与时钟。
+- `pnpm check`通过：48个Vitest文件242项、Node SQLite 7项、native-bridge Rust 16项；Cargo metadata/fmt/严格Clippy/workspace测试、Windows前端build和Tauri release无bundle build均通过。
+- 实际release烟测从已有已接受任务继续，完成8回合/3次D20、结算、档案和返回酒馆；关闭重启后档案恢复。SQLite核对任务COMPLETED、Adventure SETTLED、两份结算生成和四类事件各一份。
+- 烟测唯一Campaign已按精确ID级联删除并VACUUM，剩余Campaign为0；安全策略拒绝删除应用数据目录中的空SQLite容器，容器不含测试或用户游戏数据。

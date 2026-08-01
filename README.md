@@ -4,7 +4,7 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文�
 
 ## 当前状态
 
-项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2、AI基础设施里程碑 M3 和应用用例里程碑 M4 已完成。Windows Tauri 2客户端可启动，应用壳可在酒馆、任务、冒险、角色、档案和设置间导航；存档首页支持在系统应用数据目录的SQLite中新建、继续和归档存档。世界创建与车卡流程可使用Fake Provider完成；酒馆页会生成并展示老板、两名常驻NPC、一名访客、三条不显示真伪的传闻、任务入口和三个SQLite世界时钟。NPC聊天支持历史恢复，任务告示支持单主任务接受；冒险页提供角色/目标/时钟、剧情/行动、物品/线索/骰子三栏，可完成并在重启后恢复8回合Fake冒险。结算、冒险档案和真实Provider仍未实现。
+项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2、AI基础设施里程碑 M3 和应用用例里程碑 M4 已完成。Windows Tauri 2客户端可启动，应用壳可在酒馆、任务、冒险、角色、档案和设置间导航；存档首页支持在系统应用数据目录的SQLite中新建、继续和归档存档。世界创建与车卡流程可使用Fake Provider完成；酒馆页会生成并展示老板、两名常驻NPC、一名访客、三条不显示真伪的传闻、任务入口和三个SQLite世界时钟。NPC聊天支持历史恢复，任务告示支持单主任务接受；冒险页提供角色/目标/时钟、剧情/行动、物品/线索/骰子三栏，可完成并在重启后恢复8回合Fake冒险。结算会原子提交任务、NPC、奖励、世界时钟与事实，档案页从SQLite恢复完整结局摘要；真实Provider仍未实现。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
@@ -43,7 +43,7 @@ cargo metadata --format-version 1
 cargo test --workspace
 ```
 
-应用默认进入存档首页，未完成的世界、车卡或冒险存档会返回对应页面；GENERATING_TAVERN存档会在进入酒馆时完成离线初始化。酒馆选择NPC后可继续已保存对话，任务告示可接受一项主任务，冒险支持本地D20、无检定回合和ENDING恢复。下一项为M5-T10结算与冒险档案页面。
+应用默认进入存档首页，未完成的世界、车卡或冒险存档会返回对应页面；GENERATING_TAVERN存档会在进入酒馆时完成离线初始化。酒馆选择NPC后可继续已保存对话，任务告示可接受一项主任务，冒险支持本地D20、无检定回合和ENDING恢复；结算后的奖励、NPC心情、酒馆陈设、世界时钟与历史档案均可在重启后恢复。下一项为M5-T11 Windows离线纵向切片验收。
 
 ## 本地开发缓存
 
@@ -54,14 +54,15 @@ $ProjectRoot = (Resolve-Path .).Path
 $env:PNPM_HOME = "$ProjectRoot\.local\tools\pnpm"
 $env:PNPM_STORE_DIR = "$ProjectRoot\.local\cache\pnpm-store"
 $env:npm_config_cache = "$ProjectRoot\.local\cache\npm"
-$env:CARGO_HOME = "$ProjectRoot\.local\cache\cargo"
+$env:RUSTUP_HOME = "$ProjectRoot\.local\tools\rustup"
+$env:CARGO_HOME = "$ProjectRoot\.local\tools\cargo"
 $env:CARGO_TARGET_DIR = "$ProjectRoot\.local\build\cargo-target"
-$env:PATH = "$env:USERPROFILE\.cargo\bin;$env:PATH"
+$env:PATH = "$env:CARGO_HOME\bin;$env:RUSTUP_HOME\toolchains\stable-x86_64-pc-windows-msvc\bin;$env:PATH"
 $env:TEMP = "$ProjectRoot\.local\cache\temp"
 $env:TMP = $env:TEMP
 ```
 
-仓库配置已将 pnpm store 固定为 `.local/cache/pnpm-store`。现有 Rust 工具链继续从系统安装位置调用，Cargo 下载和构建输出必须使用上述 D 盘项目路径。
+仓库配置已将 pnpm store 固定为 `.local/cache/pnpm-store`。Rust工具链、Cargo下载和构建输出均使用上述D盘项目路径。
 
 ## 开发约定
 

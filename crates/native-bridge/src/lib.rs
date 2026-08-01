@@ -6,12 +6,14 @@ mod adventure_play;
 mod character_creation;
 mod npc_dialogue;
 mod quest_board;
+mod settlement;
 mod tavern_initialization;
 mod world_creation;
 pub use adventure_play::*;
 pub use character_creation::*;
 pub use npc_dialogue::*;
 pub use quest_board::*;
+pub use settlement::*;
 pub use tavern_initialization::*;
 pub use world_creation::*;
 

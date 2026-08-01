@@ -61,6 +61,8 @@ export interface AdventureSnapshot {
   };
   readonly quest: {
     readonly id: string;
+    readonly publisherNpcId: string;
+    readonly relatedNpcIds: readonly string[];
     readonly content: {
       readonly title: string;
       readonly objective: string;
@@ -405,6 +407,8 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
     }),
     quest: Object.freeze({
       id: requireText(quest['id']),
+      publisherNpcId: requireText(quest['publisherNpcId']),
+      relatedNpcIds: Object.freeze(requireArray(quest['relatedNpcIds']).map(requireText)),
       content: Object.freeze({
         title: requireText(content['title']),
         objective: requireText(content['objective']),

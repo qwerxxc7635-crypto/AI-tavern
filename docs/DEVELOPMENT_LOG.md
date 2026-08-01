@@ -1646,3 +1646,33 @@
 - SQLite仍是唯一事实源；AI输出经共享Schema和Rust业务验证后才能提交，且AI不生成骰点。
 - 页面只调用固定命令；并发、失败、重启、输入验证和事务原子性均有测试或真实烟测证据。
 - 未实现奖励、NPC变化、世界变化、返回酒馆或档案页面；这些保持在M5-T10范围。
+
+## 2026-08-01 — M5-T10 结算与冒险档案页面
+
+### 范围与实现
+
+- Windows服务使用统一Fake Provider、Prompt和共享Schema生成摘要与世界事件；固定Tauri命令在Rust侧再次验证审计、引用和领域边界。
+- SQLite立即事务一次写入任务完成、NPC心情/关系、酒馆陈设、程序授权奖励、世界事实/时钟、四类GameEvent、两份AI审计、AdventureEnding和Campaign返回酒馆。
+- 档案从已提交ending_json及关联SQLite事实重建；页面展示摘要、关键选择、骰子记录、参与NPC、未解决线索、奖励、世界事实、后续方向及模型/Prompt版本，酒馆同步展示永久变化。
+
+### Review修复
+
+- 修复冒险快照遗漏publisherNpcId造成真实准备流程无法载入；真实release烟测发现后补齐Rust/TypeScript契约并重建验证。
+- Fake结算输出改为使用输入中的真实NPC/时钟ID，避免测试符号ID与Windows UUID不一致。
+- 将已结算检查移入SQLite立即事务，消除两个并发结算都观察ENDING的竞态；服务侧同时按Campaign单飞。
+- 增加原始响应与验证输出一致性、上下文Adventure ID、奖励等级、关系目标/增量、时钟唯一性和文本/集合上限验证。
+- 补齐RELATIONSHIP_CHANGED、ITEM_ACQUIRED、WORLD_CLOCK_ADVANCED与ADVENTURE_COMPLETED事件；未知时钟回滚测试确认没有部分写入。
+
+### 验证与烟测
+
+- `pnpm check`通过：48个Vitest文件242项、Node SQLite 7项、native-bridge 16项；格式、ESLint、类型、Rust fmt、严格Clippy和workspace测试全部通过。
+- `cargo metadata --format-version 1`、独立Cargo门、Windows生产前端build及`tauri build --no-bundle`通过。
+- release应用从已接受任务完成准备、8回合、3次本地D20、结算、档案和返回酒馆；可见NPC变为Relieved、一个世界时钟推进、酒馆新增TROPHY。
+- 关闭重启后档案完整恢复；SQLite为Quest COMPLETED、Adventure SETTLED、8回合/3骰点、3件物品、1条结算事实，两份结算GenerationRecord及四类事件各一份。
+- 烟测进程停止，唯一测试Campaign按精确ID级联删除并VACUUM，剩余Campaign为0；空SQLite容器因终端安全策略保留，不含游戏数据。
+
+### 自审
+
+- WebView只调用固定结算与档案命令，不接触SQL；AI只提出内容，所有ID绑定、奖励效果、时钟推进和提交权限由本地程序控制。
+- 事务原子性、失败回滚、幂等重放、快速重复点击、重启恢复和页面展示均有自动化或真实烟测证据。
+- 沿用DEC-027与DEC-029的结算和Windows Provider边界，没有新增重大架构决定；未实现M5-T11或真实Provider。

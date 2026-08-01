@@ -16,6 +16,47 @@
   --line: rgb(232 237 240 / 12%);
 }
 
+.archive-page {
+  padding: 2rem;
+  max-width: 920px;
+  margin: 0 auto;
+}
+.archive-page > header {
+  margin-bottom: 2rem;
+}
+.archive-card {
+  background: rgba(31, 25, 21, 0.9);
+  border: 1px solid rgba(211, 159, 94, 0.28);
+  border-radius: 16px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+}
+.archive-card h2 {
+  color: var(--ember-gold);
+}
+.archive-card h3 {
+  margin: 1.25rem 0 0.4rem;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+.archive-empty {
+  padding: 3rem;
+  text-align: center;
+  border: 1px dashed rgba(211, 159, 94, 0.28);
+}
+.tavern-changes {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  border-left: 3px solid var(--ember-gold);
+  background: rgba(31, 25, 21, 0.72);
+}
+.tavern-changes li {
+  display: flex;
+  gap: 1rem;
+  margin: 0.5rem 0;
+}
+
 * {
   box-sizing: border-box;
 }

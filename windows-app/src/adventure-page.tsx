@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   windowsAdventureService,
   type AdventureSnapshot,
   type WindowsAdventureService,
 } from './adventure-service.js';
+import { windowsSettlementService, type WindowsSettlementService } from './settlement-service.js';
 
 type AdventureActions = Pick<
   WindowsAdventureService,
@@ -21,9 +22,12 @@ const ATTRIBUTE_LABELS = {
 
 export function AdventurePage({
   service = windowsAdventureService,
+  settlementService = windowsSettlementService,
 }: {
   readonly service?: AdventureActions;
+  readonly settlementService?: Pick<WindowsSettlementService, 'settle'>;
 }) {
+  const navigate = useNavigate();
   const [search] = useSearchParams();
   const campaignId = search.get('campaignId');
   const questId = search.get('questId') ?? undefined;
@@ -194,7 +198,21 @@ export function AdventurePage({
             <div className="adventure-ending">
               <p className="eyebrow">Adventure ending</p>
               <h2>冒险已抵达结局</h2>
-              <p>本轮记录已保存。结算与返回酒馆将在后续结算任务中处理。</p>
+              <p>本轮记录已保存。结算将原子更新任务、人物、奖励与世界状态。</p>
+              <button
+                className="primary-action"
+                type="button"
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    const archive = await settlementService.settle(campaignId, snapshot);
+                    navigate(`/archives?campaignId=${encodeURIComponent(archive.campaignId)}`);
+                    return snapshot;
+                  })
+                }
+              >
+                {busy ? '正在结算…' : '结算并查看档案'}
+              </button>
             </div>
           ) : check !== null && snapshot.state === 'CHECK_REQUIRED' ? (
             <div className="check-prompt">

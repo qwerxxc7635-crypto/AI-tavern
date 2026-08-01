@@ -84,6 +84,33 @@ export class FakeAIProvider implements AIProvider {
 
 function fakeOutput(request: NormalizedAIRequest): unknown {
   const base = FAKE_TASK_OUTPUTS[request.task];
+  if (request.task === 'SUMMARIZE_ADVENTURE') {
+    const input = taskInput(request);
+    const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;
+    const npcId = isRecord(npc) && typeof npc['id'] === 'string' ? npc['id'] : undefined;
+    if (npcId !== undefined) {
+      const summary = FAKE_TASK_OUTPUTS.SUMMARIZE_ADVENTURE;
+      return {
+        ...summary,
+        npcUpdates: summary.npcUpdates.map((update) => ({ ...update, npcId })),
+        statePatchProposals: summary.statePatchProposals.map((proposal) =>
+          proposal.kind === 'RELATIONSHIP' ? { ...proposal, targetId: npcId } : proposal,
+        ),
+      };
+    }
+  }
+  if (request.task === 'GENERATE_WORLD_EVENT') {
+    const input = taskInput(request);
+    const clock = Array.isArray(input?.['activeClocks']) ? input['activeClocks'][0] : undefined;
+    const clockId = isRecord(clock) && typeof clock['id'] === 'string' ? clock['id'] : undefined;
+    if (clockId !== undefined) {
+      const event = FAKE_TASK_OUTPUTS.GENERATE_WORLD_EVENT;
+      return {
+        ...event,
+        clockAdvances: event.clockAdvances.map((advance) => ({ ...advance, clockId })),
+      };
+    }
+  }
   if (request.task !== 'GENERATE_ADVENTURE_TURN') return base;
   const adventureBase = FAKE_TASK_OUTPUTS.GENERATE_ADVENTURE_TURN;
   const input = taskInput(request);

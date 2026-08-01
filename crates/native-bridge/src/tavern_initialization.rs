@@ -40,6 +40,7 @@ pub struct TavernView {
     pub special_rules: Vec<String>,
     pub long_term_problem: String,
     pub owner_npc_id: String,
+    pub changes: Value,
     pub created_at: String,
     pub updated_at: String,
 }
@@ -490,7 +491,7 @@ fn load_tavern(
     connection
         .query_row(
             "SELECT id, campaign_id, location_id, name, position, environment,
-                    special_rules_json, long_term_problem, owner_npc_id, created_at, updated_at
+                    special_rules_json, long_term_problem, owner_npc_id, changes_json, created_at, updated_at
              FROM taverns WHERE campaign_id = ?1",
             [campaign_id],
             |row| {
@@ -504,8 +505,9 @@ fn load_tavern(
                     special_rules: from_json(row.get::<_, String>(6)?)?,
                     long_term_problem: row.get(7)?,
                     owner_npc_id: row.get(8)?,
-                    created_at: row.get(9)?,
-                    updated_at: row.get(10)?,
+                    changes: from_json(row.get::<_, String>(9)?)?,
+                    created_at: row.get(10)?,
+                    updated_at: row.get(11)?,
                 })
             },
         )

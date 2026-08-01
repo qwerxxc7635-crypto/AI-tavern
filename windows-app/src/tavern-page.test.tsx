@@ -124,6 +124,7 @@ function finalSnapshot(): TavernSnapshot {
       specialRules: ['Weapons remain sheathed beside the common fire.'],
       longTermProblem: 'A strange light appears beneath the cellar.',
       ownerNpcId: 'npc-owner',
+      changes: [],
       createdAt: '2026-07-31T04:00:00.000Z',
       updatedAt: '2026-07-31T04:00:00.000Z',
     },

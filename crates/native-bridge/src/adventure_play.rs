@@ -913,7 +913,7 @@ fn quest_data(
 ) -> Result<Value, CampaignStoreError> {
     connection
         .query_row(
-            "SELECT id, content_json, status, risk, recommended_attributes_json,
+            "SELECT id, publisher_npc_id, content_json, status, risk, recommended_attributes_json,
                     expected_turns_min, expected_turns_max, reward_tier,
                     related_npc_ids_json, related_fact_ids_json
              FROM quests WHERE id = ?1 AND campaign_id = ?2",
@@ -921,17 +921,18 @@ fn quest_data(
             |row| {
                 Ok(json!({
                     "id": row.get::<_, String>(0)?,
-                    "content": from_json::<Value>(row.get(1)?)?,
-                    "status": row.get::<_, String>(2)?,
-                    "risk": row.get::<_, String>(3)?,
-                    "recommendedAttributes": from_json::<Value>(row.get(4)?)?,
+                    "publisherNpcId": row.get::<_, String>(1)?,
+                    "content": from_json::<Value>(row.get(2)?)?,
+                    "status": row.get::<_, String>(3)?,
+                    "risk": row.get::<_, String>(4)?,
+                    "recommendedAttributes": from_json::<Value>(row.get(5)?)?,
                     "expectedTurns": {
-                        "min": row.get::<_, i64>(5)?,
-                        "max": row.get::<_, i64>(6)?,
+                        "min": row.get::<_, i64>(6)?,
+                        "max": row.get::<_, i64>(7)?,
                     },
-                    "rewardTier": row.get::<_, String>(7)?,
-                    "relatedNpcIds": from_json::<Value>(row.get(8)?)?,
-                    "relatedFactIds": from_json::<Value>(row.get(9)?)?,
+                    "rewardTier": row.get::<_, String>(8)?,
+                    "relatedNpcIds": from_json::<Value>(row.get(9)?)?,
+                    "relatedFactIds": from_json::<Value>(row.get(10)?)?,
                 }))
             },
         )
