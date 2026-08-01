@@ -64,6 +64,10 @@ describe('model settings page', () => {
       },
     };
     render(<ModelSettingsPage gateway={gateway} />);
+    expect(screen.getByRole('heading', { name: '隐私与联网' })).toBeTruthy();
+    expect(screen.getByText(/保存默认或备用模型不会发送Campaign内容/)).toBeTruthy();
+    expect(screen.getByText(/“测试连接”会向所选Base URL发送API Key/)).toBeTruthy();
+    expect(screen.getByText(/发送必要游戏上下文前必须另行确认/)).toBeTruthy();
     await screen.findByText('尚未配置模型。');
     fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'private-key' } });
     fireEvent.click(screen.getByLabelText('备用模型'));

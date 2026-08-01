@@ -154,6 +154,17 @@ export function ModelSettingsPage({
         <h1>设置</h1>
         <p>配置模型服务、默认模型与备用模型。API Key只保存到系统凭据库。</p>
       </header>
+      <section className="model-settings__privacy" aria-label="隐私与联网说明">
+        <h2>隐私与联网</h2>
+        <p>当前0.1候选的游戏内容由本地演示模型生成；保存默认或备用模型不会发送Campaign内容。</p>
+        <p>
+          “测试连接”会向所选Base URL发送API
+          Key（若填写）并读取模型列表；自定义地址就是本次连接的数据接收方。远程地址只允许HTTPS，本机回环服务可使用HTTP。
+        </p>
+        <p>
+          当前候选尚未启用云端游戏生成。未来启用云生成或跨服务商切换时，发送必要游戏上下文前必须另行确认。
+        </p>
+      </section>
       <section className="model-settings__panel" aria-label="模型配置">
         <label>
           Provider

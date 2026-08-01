@@ -2246,3 +2246,24 @@
 - M10-T03验收通过：`docs/spec.md`第33.4节的创建世界至重新导入后继续游戏链，已由一条可重复、单存档、真实SQLite自动测试覆盖。
 - 这项自动化不冒充安装后UI人工验收；发布候选的首次启动、分辨率、键鼠、故障恢复入口与实际文件对话框仍保留在`docs/WINDOWS_V0_1.md`最终清单。
 - M10-T04继续`DEFERRED`；下一任务按Windows-first顺序执行M10-T05的Windows隐私、数据与发布说明。
+
+## 2026-08-01 — M10-T05 完成Windows隐私和数据说明
+
+### 玩家说明
+
+- 新增`docs/PRIVACY_WINDOWS.md`，逐项说明SQLite与完整备份内容、生成审计敏感性、Windows安全凭据、当前联网、未来云上下文、跨厂商确认、`.emtavern`边界、卸载保留和彻底清理步骤。
+- 新增`docs/RELEASE_NOTES_0.1.md`，记录Windows 0.1内部候选范围、隐私摘要和已知限制；安装文档补充“无独立文本日志”、SQLite诊断记录和隐私文档入口。
+- 设置页直接显示固定的“隐私与联网”说明，明确保存模型不发送Campaign、测试连接会向所选Base URL发送Key并读取模型列表、远程只允许HTTPS，以及云游戏生成尚未启用。
+
+### 现状核验
+
+- 核对7个Windows游戏服务均使用本地`FakeAIProvider`；当前云Provider仅由`provider_probe`执行模型列表/连接测试，不把Campaign或对话作为请求体发送。
+- 核对API Key由`com.embertavern.model-provider`系统安全存储持有，SQLite只保存`credentialRef`；远程端点要求HTTPS、回环地址可用HTTP且禁用重定向。
+- 核对SQLite保存请求结构、原始响应、验证错误和待处理上下文；`.emtavern`包含Campaign生成审计但排除Provider配置、系统凭据、恢复缓存和日志。
+
+### 验证与结论
+
+- 设置页定向Vitest通过，验证三段玩家可见隐私文案；ESLint、TypeScript、Prettier和差异空白检查通过。
+- `pnpm check`通过56个Vitest文件334项、10项Node SQLite和55项Rust测试；Windows前端生产build转换177个模块，0.1.0 NSIS安装包复建成功。
+- M10-T05的Windows范围验收通过：玩家可区分本机数据、连接测试联网、未来云生成上下文和API Key边界。iOS说明按既定策略随M9恢复后补充。
+- 下一任务为M10-T06 Windows v0.1最终验收。

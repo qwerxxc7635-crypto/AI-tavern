@@ -1976,12 +1976,22 @@ textarea:disabled {
 }
 
 .model-settings__panel,
+.model-settings__privacy,
 .model-settings__saved {
   display: grid;
   gap: 1rem;
   border: 1px solid var(--line);
   padding: clamp(1rem, 3vw, 2rem);
   background: var(--panel);
+}
+
+.model-settings__privacy h2 {
+  margin-top: 0;
+}
+
+.model-settings__privacy p {
+  color: var(--text-muted);
+  line-height: 1.7;
 }
 
 .model-settings__panel > label {
