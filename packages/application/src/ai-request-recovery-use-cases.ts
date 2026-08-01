@@ -24,6 +24,7 @@ import {
 } from './ai-turn-orchestrator.js';
 
 const RECOVERABLE_FAILURES = new Set([
+  'APP_INTERRUPTED',
   'QUOTA_EXCEEDED',
   'AUTHENTICATION_FAILED',
   'RATE_LIMITED',

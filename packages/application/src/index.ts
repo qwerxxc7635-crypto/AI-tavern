@@ -72,3 +72,11 @@ export type {
   RegenerateAdventureTurnCommand,
   RegenerationPolicy,
 } from './regeneration-use-cases.js';
+export { inspectDatabaseStartup, RecoveryCenterUseCases } from './recovery-center-use-cases.js';
+export type {
+  AdventureContinueTarget,
+  CampaignRecoveryState,
+  DatabaseRecoveryState,
+  RecoveryAction,
+  RecoveryIssue,
+} from './recovery-center-use-cases.js';

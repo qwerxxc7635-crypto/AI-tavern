@@ -208,6 +208,19 @@ export class AdventureRepository {
     return row === undefined ? null : mapAdventure(row);
   }
 
+  public listByCampaign(id: Adventure['campaignId']): readonly Adventure[] {
+    return Object.freeze(
+      this.database
+        .prepare(
+          `SELECT * FROM adventures
+           WHERE campaign_id = ?
+           ORDER BY updated_at DESC, id`,
+        )
+        .all(id)
+        .map(mapAdventure),
+    );
+  }
+
   public startPrepared(
     id: Adventure['id'],
     campaignIdValue: Adventure['campaignId'],

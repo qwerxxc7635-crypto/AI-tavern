@@ -222,6 +222,26 @@ export class SnapshotRepository {
   }
 
   public restore(id: SnapshotId): SaveSnapshot {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const snapshot = this.restoreInCurrentTransaction(id);
+      this.database.exec('COMMIT');
+      return snapshot;
+    } catch (error) {
+      try {
+        this.database.exec('ROLLBACK');
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Snapshot restore and rollback both failed',
+          { cause: rollbackError },
+        );
+      }
+      throw error;
+    }
+  }
+
+  public restoreInCurrentTransaction(id: SnapshotId): SaveSnapshot {
     const row = requireRow(
       this.database.prepare('SELECT * FROM save_snapshots WHERE id = ?').get(id),
       `Snapshot not found: ${id}`,
@@ -245,29 +265,14 @@ export class SnapshotRepository {
       .all(snapshot.campaignId)
       .map(toStoredRow);
 
-    this.database.exec('BEGIN IMMEDIATE');
-    try {
-      this.database.exec('PRAGMA defer_foreign_keys = ON');
-      this.deleteCampaignState(snapshot.campaignId);
-      this.restoreCampaign(payload.campaign);
-      for (const table of INSERT_ORDER) {
-        for (const stored of payload.tables[table]) this.insertRow(table, stored);
-      }
-      for (const request of turnRequests) this.restoreTurnRequest(request);
-      this.database.exec('COMMIT');
-      return snapshot;
-    } catch (error) {
-      try {
-        this.database.exec('ROLLBACK');
-      } catch (rollbackError) {
-        throw new AggregateError(
-          [error, rollbackError],
-          'Snapshot restore and rollback both failed',
-          { cause: rollbackError },
-        );
-      }
-      throw error;
+    this.database.exec('PRAGMA defer_foreign_keys = ON');
+    this.deleteCampaignState(snapshot.campaignId);
+    this.restoreCampaign(payload.campaign);
+    for (const table of INSERT_ORDER) {
+      for (const stored of payload.tables[table]) this.insertRow(table, stored);
     }
+    for (const request of turnRequests) this.restoreTurnRequest(request);
+    return snapshot;
   }
 
   private capturePayload(campaign: CampaignId): SnapshotPayload {

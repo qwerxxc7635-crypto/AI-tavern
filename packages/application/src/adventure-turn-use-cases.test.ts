@@ -44,6 +44,7 @@ import {
   GameEventRepository,
   ItemRepository,
   NpcRepository,
+  PendingAiRequestRepository,
   PlayerCharacterRepository,
   QuestRepository,
   SnapshotRepository,
@@ -56,7 +57,12 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyMigrations } from '../../persistence/src/migrations.mjs';
-import { AdventureTurnUseCases, type AdventureTurnIdentityFactory } from './index.js';
+import {
+  AdventureTurnUseCases,
+  inspectDatabaseStartup,
+  RecoveryCenterUseCases,
+  type AdventureTurnIdentityFactory,
+} from './index.js';
 import { RegenerationUseCases } from './regeneration-use-cases.js';
 
 const directories: string[] = [];
@@ -136,6 +142,17 @@ describe('AdventureTurnUseCases', () => {
       });
       expect(awaitingRoll.resolvedAt).toBeNull();
       expect(new AdventureRepository(sqlite).get(adventureKey)?.state).toBe('CHECK_REQUIRED');
+      const checkRecovery = new RecoveryCenterUseCases(sqlite, () => at);
+      expect(checkRecovery.inspectCampaign(campaignKey)).toMatchObject({
+        needsRecovery: true,
+        adventureId: adventureKey,
+        issues: [{ kind: 'CRASHED_TURN', turnId: firstTurnId, actions: ['CONTINUE'] }],
+      });
+      expect(checkRecovery.continueAdventure(campaignKey, adventureKey)).toEqual({
+        kind: 'ROLL_CHECK',
+        adventureId: adventureKey,
+        turnId: firstTurnId,
+      });
       expect(
         new AdventureRepository(sqlite)
           .getClues(adventureKey)
@@ -212,6 +229,113 @@ describe('AdventureTurnUseCases', () => {
       expect(new AdventureRepository(sqlite).getTurn(incompleteTurnId)).toBeNull();
       expect(new AdventureRepository(sqlite).get(adventureKey)?.currentTurnNumber).toBe(2);
 
+      const requests = new PendingAiRequestRepository(sqlite);
+      const historicalFailureId = aiRequestId('request:historical-failure');
+      requests.createOrGet({
+        id: historicalFailureId,
+        campaignId: campaignKey,
+        turnId: secondTurnId,
+        idempotencyKey: idempotencyKey('adventure-turn:historical-failure'),
+        task: 'GENERATE_ADVENTURE_TURN',
+        modelProfileId: null,
+        input: { audit: true },
+        createdAt: at,
+      });
+      requests.fail(
+        historicalFailureId,
+        { code: 'NETWORK_FAILED', message: 'Historical failure', retryable: true },
+        at,
+      );
+
+      const crashedTurnId = turnId('turn-crashed-generation');
+      noCheck.submitPlayerAction({
+        campaignId: campaignKey,
+        adventureId: adventureKey,
+        turnId: crashedTurnId,
+        currentScene: restored.sceneText,
+        action: { kind: 'FREEFORM', text: 'Open the unstable door.' },
+      });
+      const crashedRequestId = aiRequestId('request:crashed-generation');
+      requests.createOrGet({
+        id: crashedRequestId,
+        campaignId: campaignKey,
+        turnId: crashedTurnId,
+        idempotencyKey: idempotencyKey('adventure-turn:crashed-generation'),
+        task: 'GENERATE_ADVENTURE_TURN',
+        modelProfileId: null,
+        input: { action: 'Open the unstable door.' },
+        createdAt: at,
+      });
+      requests.setContext(crashedRequestId, { scene: restored.sceneText }, at);
+      requests.startAttempt(crashedRequestId, at);
+
+      const recovery = new RecoveryCenterUseCases(sqlite, () => at);
+      expect(recovery.inspectCampaign(campaignKey)).toMatchObject({
+        needsRecovery: true,
+        adventureId: adventureKey,
+        issues: [
+          {
+            kind: 'INTERRUPTED_AI_REQUEST',
+            requestId: crashedRequestId,
+            turnId: crashedTurnId,
+            actions: ['RETRY', 'CHANGE_MODEL', 'CANCEL'],
+          },
+        ],
+      });
+      expect(recovery.prepareRetry(campaignKey, crashedRequestId)).toMatchObject({
+        status: 'FAILED',
+        lastError: { code: 'APP_INTERRUPTED', retryable: true },
+      });
+      expect(recovery.inspectCampaign(campaignKey).issues[0]?.kind).toBe('FAILED_AI_REQUEST');
+
+      const completeSnapshot = new SnapshotRepository(sqlite).findLatestAutoByReasonPrefix(
+        campaignKey,
+        `AFTER_COMPLETE_TURN:${adventureKey}:`,
+      );
+      expect(completeSnapshot).not.toBeNull();
+      sqlite
+        .prepare('UPDATE save_snapshots SET checksum_sha256 = ? WHERE id = ?')
+        .run('0'.repeat(64), completeSnapshot?.id ?? 'missing');
+      expect(() => recovery.cancelAndRestoreLatestCompleteTurn(campaignKey, adventureKey)).toThrow(
+        'checksum mismatch',
+      );
+      expect(requests.get(crashedRequestId)?.status).toBe('FAILED');
+      expect(new AdventureRepository(sqlite).getTurn(crashedTurnId)).not.toBeNull();
+      sqlite
+        .prepare('UPDATE save_snapshots SET checksum_sha256 = ? WHERE id = ?')
+        .run(completeSnapshot?.checksumSha256 ?? 'missing', completeSnapshot?.id ?? 'missing');
+
+      recovery.cancelAndRestoreLatestCompleteTurn(campaignKey, adventureKey);
+      expect(new AdventureRepository(sqlite).getTurn(crashedTurnId)).toBeNull();
+      expect(requests.get(crashedRequestId)).toBeNull();
+      expect(requests.get(historicalFailureId)?.status).toBe('FAILED');
+      expect(new AdventureRepository(sqlite).get(adventureKey)).toMatchObject({
+        state: 'SCENE',
+        currentTurnNumber: 2,
+      });
+      expect(recovery.inspectCampaign(campaignKey).needsRecovery).toBe(false);
+
+      const contentRequestId = aiRequestId('request:interrupted-content');
+      requests.createOrGet({
+        id: contentRequestId,
+        campaignId: campaignKey,
+        turnId: null,
+        idempotencyKey: idempotencyKey('content:interrupted'),
+        task: 'GENERATE_QUEST',
+        modelProfileId: null,
+        input: { subject: 'harbor' },
+        createdAt: at,
+      });
+      expect(recovery.inspectCampaign(campaignKey).issues).toMatchObject([
+        {
+          kind: 'INTERRUPTED_AI_REQUEST',
+          requestId: contentRequestId,
+          actions: ['CANCEL'],
+        },
+      ]);
+      expect(recovery.cancelContentRequest(campaignKey, contentRequestId).status).toBe('CANCELLED');
+      expect(recovery.inspectCampaign(campaignKey).needsRecovery).toBe(false);
+
       const snapshots = new SnapshotRepository(sqlite);
       for (let index = 1; index <= 12; index += 1) {
         snapshots.create({
@@ -241,6 +365,26 @@ describe('AdventureTurnUseCases', () => {
     } finally {
       database.close();
     }
+  });
+
+  it('maps database startup failures into recovery-center state', () => {
+    expect(
+      inspectDatabaseStartup({
+        status: 'FAILED',
+        databasePath: 'D:/isolated/ember-tavern.sqlite',
+        error: {
+          code: 'INTEGRITY_CHECK_FAILED',
+          message: 'integrity check failed',
+          originalPreserved: true,
+        },
+      }),
+    ).toEqual({
+      status: 'RECOVERY_REQUIRED',
+      databasePath: 'D:/isolated/ember-tavern.sqlite',
+      code: 'INTEGRITY_CHECK_FAILED',
+      message: 'integrity check failed',
+      originalPreserved: true,
+    });
   });
 
   it('regenerates from the input snapshot and can roll back without combining AI results', async () => {
