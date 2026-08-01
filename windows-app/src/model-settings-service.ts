@@ -1,0 +1,150 @@
+import { invoke } from '@tauri-apps/api/core';
+
+export type PresetKey = 'deepseek' | 'qwen' | 'openrouter' | 'ollama' | 'custom';
+
+export interface ModelProfile {
+  readonly id: string;
+  readonly providerId: string;
+  readonly presetKey: PresetKey;
+  readonly providerDisplayName: string;
+  readonly baseUrl: string | null;
+  readonly hasCredential: boolean;
+  readonly modelName: string;
+  readonly modelDisplayName: string;
+}
+
+export interface ModelSettingsSnapshot {
+  readonly profiles: readonly ModelProfile[];
+  readonly defaultModelProfileId: string | null;
+  readonly fallbackModelProfileId: string | null;
+}
+
+export interface ModelSettingsUpdate {
+  readonly presetKey: PresetKey;
+  readonly providerDisplayName: string;
+  readonly baseUrl: string | null;
+  readonly credentialRef: string | null;
+  readonly modelName: string;
+  readonly modelDisplayName: string;
+  readonly useAsDefault: boolean;
+  readonly useAsFallback: boolean;
+}
+
+export interface ProbeModel {
+  readonly name: string;
+  readonly displayName: string;
+  readonly costStatus: 'FREE' | 'PAID' | 'UNKNOWN';
+  readonly contextWindowTokens: number | null;
+}
+
+export interface ModelSettingsGateway {
+  load(): Promise<ModelSettingsSnapshot>;
+  save(update: ModelSettingsUpdate): Promise<ModelSettingsSnapshot>;
+  saveSecret(secret: string): Promise<string>;
+  deleteSecret(credentialRef: string): Promise<void>;
+  probe(input: {
+    readonly presetKey: PresetKey;
+    readonly baseUrl: string | null;
+    readonly credentialRef: string | null;
+  }): Promise<readonly ProbeModel[]>;
+}
+
+export const tauriModelSettingsGateway: ModelSettingsGateway = {
+  async load() {
+    return parseSnapshot(await invoke<unknown>('model_settings_get'));
+  },
+  async save(command) {
+    return parseSnapshot(await invoke<unknown>('model_settings_save', { command }));
+  },
+  async saveSecret(secret) {
+    const value = await invoke<unknown>('secret_save', { secret });
+    if (typeof value !== 'string' || !/^credential:v1:[0-9a-f-]{36}$/.test(value)) {
+      throw new TypeError('Credential reference is invalid');
+    }
+    return value;
+  },
+  async deleteSecret(credentialRef) {
+    await invoke('secret_delete', { credentialRef });
+  },
+  async probe(input) {
+    const value = requireRecord(await invoke<unknown>('provider_probe', { input }));
+    return requireArray(value['models']).map(parseProbeModel);
+  },
+};
+
+function parseSnapshot(value: unknown): ModelSettingsSnapshot {
+  const record = requireRecord(value);
+  return Object.freeze({
+    profiles: Object.freeze(requireArray(record['profiles']).map(parseProfile)),
+    defaultModelProfileId: optionalId(record['defaultModelProfileId']),
+    fallbackModelProfileId: optionalId(record['fallbackModelProfileId']),
+  });
+}
+
+function parseProfile(value: unknown): ModelProfile {
+  const record = requireRecord(value);
+  const presetKey = requireText(record['presetKey']) as PresetKey;
+  if (!['deepseek', 'qwen', 'openrouter', 'ollama', 'custom'].includes(presetKey)) {
+    throw new TypeError('Provider preset is invalid');
+  }
+  return Object.freeze({
+    id: requireText(record['id']),
+    providerId: requireText(record['providerId']),
+    presetKey,
+    providerDisplayName: requireText(record['providerDisplayName']),
+    baseUrl: optionalText(record['baseUrl']),
+    hasCredential: requireBoolean(record['hasCredential']),
+    modelName: requireText(record['modelName']),
+    modelDisplayName: requireText(record['modelDisplayName']),
+  });
+}
+
+function parseProbeModel(value: unknown): ProbeModel {
+  const record = requireRecord(value);
+  const status = record['costStatus'];
+  if (status !== 'FREE' && status !== 'PAID' && status !== 'UNKNOWN') {
+    throw new TypeError('Model cost status is invalid');
+  }
+  const context = record['contextWindowTokens'];
+  if (context !== null && (!Number.isSafeInteger(context) || (context as number) <= 0)) {
+    throw new TypeError('Model context window is invalid');
+  }
+  return Object.freeze({
+    name: requireText(record['name']),
+    displayName: requireText(record['displayName']),
+    costStatus: status,
+    contextWindowTokens: context as number | null,
+  });
+}
+
+function requireRecord(value: unknown): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError('Model settings response must be an object');
+  }
+  return value as Record<string, unknown>;
+}
+
+function requireArray(value: unknown): readonly unknown[] {
+  if (!Array.isArray(value)) throw new TypeError('Model settings list must be an array');
+  return value;
+}
+
+function requireText(value: unknown): string {
+  if (typeof value !== 'string' || value.length === 0 || value.trim() !== value) {
+    throw new TypeError('Model settings text is invalid');
+  }
+  return value;
+}
+
+function optionalText(value: unknown): string | null {
+  return value === null ? null : requireText(value);
+}
+
+function optionalId(value: unknown): string | null {
+  return optionalText(value);
+}
+
+function requireBoolean(value: unknown): boolean {
+  if (typeof value !== 'boolean') throw new TypeError('Model settings flag is invalid');
+  return value;
+}

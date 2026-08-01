@@ -1404,3 +1404,12 @@ cargo --version
 - 本地合同测试完成自定义服务文本生成并验证Header与拒绝路径；没有真实外部调用。
 - `pnpm check`通过48个Vitest文件242项、7项Node SQLite和36项Rust测试；Windows前端与Tauri release无bundle build通过。
 - 下一任务：M6-T09模型设置页面。
+
+## 2026-08-01 — M6-T09 模型设置页面
+
+- 新增Windows模型设置页和固定语义命令：Provider、Base URL、API Key、连接测试、模型列表、默认与备用模型。
+- API Key只进入系统凭据库；SQLite只保存CredentialRef，页面读取快照只显示hasCredential。
+- 全局设置事务写provider_configs/model_profiles/app_settings；真实SQLite重开测试确认Campaign状态与时间均未变化。
+- Review补齐CredentialRef存在性验证与连接测试临时密钥清理；secure-http补齐自身使用的Tokio macros特性声明。
+- `pnpm check`通过50个Vitest文件244项、7项Node SQLite和37项Rust测试；Windows两项构建和隔离release窗口烟测通过并清理。
+- 下一任务：M6-T10模型能力登记与路由。

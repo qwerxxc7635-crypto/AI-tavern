@@ -1866,3 +1866,25 @@
 
 - M6-T08满足用户提供兼容服务的地址、模型和附加Header配置合同，同时保持HTTPS、回环与密钥安全边界。
 - 未提前实现设置页面；下一任务为M6-T09。
+
+## 2026-08-01 — M6-T09 实现模型设置页面
+
+### 实现
+
+- 设置页覆盖DeepSeek、Qwen、OpenRouter、Ollama和自定义兼容服务，支持服务名称、Base URL、密码输入、连接测试与动态模型列表、默认/备用选择。
+- Tauri新增`model_settings_get`、`model_settings_save`和`provider_probe`固定语义命令；WebView没有通用HTTP、SQL或密钥读取能力。
+- API Key先写Windows Credential Manager，SQLite只接收存在性已验证的CredentialRef；读取视图仅返回hasCredential。连接测试使用临时凭据并在finally路径显式删除。
+- SQLite立即事务upsert provider_configs与model_profiles，并将全局默认/备用ID保存到app_settings；预设、文本、URL和引用均在Rust边界验证。
+
+### 验证与Review
+
+- 真实SQLite测试创建Campaign后保存默认/备用配置、关闭重开并恢复设置；Campaign ID、状态、创建/更新时间完全不变，证明设置切换不修改已有存档事实。
+- 页面测试执行凭据保存、连接测试、模型选择、默认/备用保存和明文隔离；服务合同从unknown逐字段验证原生响应。
+- Review修复`secure-http`依赖隐式Tokio feature、保留Header安全边界、CredentialRef悬空写入和临时密钥清理错误可见性。
+- `pnpm check`通过50个Vitest文件244项、7项Node SQLite和37项Rust测试；严格Clippy、格式、lint、类型检查、Windows前端build及Tauri release `--no-bundle`通过。
+- release应用使用隔离到`.local`的临时APPDATA启动并获得窗口句柄；进程停止后测试目录已逐级精确清理。
+
+### 结论
+
+- M6-T09满足Provider、模型、API Key、连接测试、默认/备用模型和存档事实隔离验收。
+- 未提前实现能力路由；下一任务为M6-T10。

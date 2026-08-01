@@ -34,7 +34,7 @@ const ArchivesPage = lazy(() =>
   import('./archives-page.js').then(({ ArchivesPage: page }) => ({ default: page })),
 );
 const SettingsPage = lazy(() =>
-  sectionPages().then(({ SettingsPage: page }) => ({ default: page })),
+  import('./model-settings-page.js').then(({ ModelSettingsPage: page }) => ({ default: page })),
 );
 
 export const WINDOWS_NAVIGATION = [

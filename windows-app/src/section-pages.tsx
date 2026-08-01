@@ -43,16 +43,6 @@ export function CharacterPage() {
   );
 }
 
-export function SettingsPage() {
-  return (
-    <SectionPage
-      eyebrow="Local preferences"
-      title="设置"
-      description="模型、隐私与本地选项将在对应任务中逐项开放。"
-    />
-  );
-}
-
 interface SectionPageProps {
   readonly eyebrow: string;
   readonly title: string;

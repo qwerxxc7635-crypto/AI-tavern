@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T08 添加自定义Base URL配置`
+- 最近完成任务：`M6-T09 实现模型设置页面`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T08`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T09 实现模型设置页面`
+- 当前任务：`M6-T09`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T10 实现模型能力登记与路由`
 
 ## 架构摘要
 
@@ -177,3 +177,12 @@
 - 本地合同测试验证自定义模型、附加Header和实际文本生成，并覆盖不安全地址、空模型、Authorization和Host拒绝。
 - `pnpm check`、10项Provider测试、Windows生产build与Tauri release无bundle build通过；未连接外部服务。
 - 下一任务：M6-T09模型设置页面。
+
+## 2026-08-01 M6-T09模型设置页面完成状态
+
+- Windows设置页支持五类Provider、Base URL、密码输入、连接测试/模型列表、模型名和默认/备用标记。
+- 三个固定语义命令读取/保存设置并探测Provider；API Key由既有安全命令保存，保存前验证CredentialRef确实存在，页面永不读取密钥。
+- provider_configs、model_profiles和app_settings在立即事务中更新；重开恢复测试证明设置持久化，Campaign状态/时间及游戏事实不变。
+- UI临时连接凭据无论探测成功或失败均显式清理；真实页面测试验证明文不进入保存命令。
+- `pnpm check`通过50个Vitest文件244项、7项Node SQLite和37项Rust测试；Windows build、Tauri release build及隔离窗口烟测通过，测试目录已清理。
+- 下一任务：M6-T10模型能力登记与路由。

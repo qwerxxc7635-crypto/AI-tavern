@@ -1907,6 +1907,71 @@ textarea:disabled {
   }
 }
 
+.model-settings {
+  display: grid;
+  gap: 1.5rem;
+  padding: clamp(1.25rem, 4vw, 3rem);
+}
+
+.model-settings__panel,
+.model-settings__saved {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--line);
+  padding: clamp(1rem, 3vw, 2rem);
+  background: var(--panel);
+}
+
+.model-settings__panel > label {
+  display: grid;
+  gap: 0.45rem;
+  color: var(--muted);
+}
+
+.model-settings__panel input,
+.model-settings__panel select {
+  min-height: 2.7rem;
+  border: 1px solid var(--line);
+  padding: 0.6rem 0.75rem;
+  color: var(--ink);
+  background: var(--panel-raised);
+}
+
+.model-settings__checks,
+.model-settings__actions,
+.model-settings__saved li {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.model-settings__actions button {
+  min-height: 2.7rem;
+  padding: 0.65rem 1rem;
+}
+
+.model-settings__saved ul {
+  display: grid;
+  gap: 0.7rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.model-settings__saved li {
+  border-top: 1px solid var(--line);
+  padding-top: 0.7rem;
+}
+
+.model-settings__saved li span {
+  color: var(--muted);
+}
+
+.model-settings__saved li em {
+  color: var(--ember);
+}
+
 .adventure-page {
   min-height: 100%;
   padding: clamp(1rem, 2.5vw, 2.5rem);

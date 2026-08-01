@@ -765,6 +765,7 @@ checksum = "4ef6b89e5b37196644d8796de5268852ff179b44e96276cf4290264843743bb7"
 name = "ember-native-bridge"
 version = "0.1.0"
 dependencies = [
+ "ember-secure-http",
  "rusqlite",
  "serde",
  "serde_json",
@@ -818,10 +819,12 @@ name = "ember-tavern-windows"
 version = "0.1.0"
 dependencies = [
  "ember-native-bridge",
+ "ember-provider-openai-compatible",
  "ember-secure-secrets",
  "serde",
  "tauri",
  "tauri-build",
+ "tokio-util",
 ]
 
 [[package]]

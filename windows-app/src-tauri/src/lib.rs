@@ -6,13 +6,19 @@ use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignStore,
     CampaignStoreError, CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
-    CharacterTraitGenerationCommit, NpcDialogueCommit, NpcDialogueSnapshot,
-    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
-    TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    CharacterTraitGenerationCommit, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
+    NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
+    TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
+    WorldManualUpdate,
+};
+use ember_provider_openai_compatible::{
+    CustomCompatibleConfig, DeepSeekPreset, ModelCostStatus, OllamaPreset, OpenAiCompatibleConfig,
+    OpenAiCompatibleProvider, OpenRouterPreset, ProviderError, QwenPreset,
 };
 use ember_secure_secrets::{CredentialRef, SecretStore};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -48,6 +54,112 @@ impl From<CampaignStoreError> for CommandError {
             },
         }
     }
+}
+
+impl From<ProviderError> for CommandError {
+    fn from(_: ProviderError) -> Self {
+        Self {
+            code: "PROVIDER_UNAVAILABLE",
+            message: "无法连接该模型服务，请检查地址、密钥和服务状态。",
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ProviderProbeInput {
+    preset_key: String,
+    base_url: Option<String>,
+    credential_ref: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderProbeModel {
+    name: String,
+    display_name: String,
+    cost_status: &'static str,
+    context_window_tokens: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ProviderProbeResult {
+    models: Vec<ProviderProbeModel>,
+}
+
+#[tauri::command]
+fn model_settings_get(
+    store: State<'_, CampaignStore>,
+) -> Result<ModelSettingsSnapshot, CommandError> {
+    store.model_settings().map_err(Into::into)
+}
+
+#[tauri::command]
+fn model_settings_save(
+    command: ModelSettingsUpdate,
+    store: State<'_, CampaignStore>,
+) -> Result<ModelSettingsSnapshot, CommandError> {
+    if let Some(value) = command.credential_ref.as_deref() {
+        let reference = value.parse::<CredentialRef>().map_err(|_| CommandError {
+            code: "CREDENTIAL_INVALID",
+            message: "密钥引用无效，请重新输入API Key。",
+        })?;
+        if !SecretStore.exists(&reference).map_err(|_| CommandError {
+            code: "CREDENTIAL_UNAVAILABLE",
+            message: "无法访问系统凭据库，请稍后重试。",
+        })? {
+            return Err(CommandError {
+                code: "CREDENTIAL_NOT_FOUND",
+                message: "找不到已保存的API Key，请重新输入。",
+            });
+        }
+    }
+    store.save_model_settings(command).map_err(Into::into)
+}
+
+#[tauri::command]
+async fn provider_probe(input: ProviderProbeInput) -> Result<ProviderProbeResult, CommandError> {
+    let credential = input
+        .credential_ref
+        .map(|value| value.parse::<CredentialRef>())
+        .transpose()
+        .map_err(|_| ProviderError::InvalidConfig)?;
+    let config: OpenAiCompatibleConfig = match input.preset_key.as_str() {
+        "deepseek" => DeepSeekPreset::config(credential.ok_or(ProviderError::InvalidConfig)?)?,
+        "qwen" => QwenPreset::config(credential.ok_or(ProviderError::InvalidConfig)?)?,
+        "openrouter" => OpenRouterPreset::config(credential.ok_or(ProviderError::InvalidConfig)?)?,
+        "ollama" => OllamaPreset::config()?,
+        "custom" => {
+            let custom = CustomCompatibleConfig::new(
+                input
+                    .base_url
+                    .as_deref()
+                    .ok_or(ProviderError::InvalidConfig)?,
+                "probe-model",
+                credential,
+                Vec::new(),
+            )?;
+            custom.provider_config().clone()
+        }
+        _ => return Err(ProviderError::InvalidConfig.into()),
+    };
+    let models = OpenAiCompatibleProvider::new()?
+        .list_models(&config, CancellationToken::new())
+        .await?
+        .into_iter()
+        .map(|model| ProviderProbeModel {
+            name: model.name,
+            display_name: model.display_name,
+            cost_status: match model.cost_status {
+                ModelCostStatus::Free => "FREE",
+                ModelCostStatus::Paid => "PAID",
+                ModelCostStatus::Unknown => "UNKNOWN",
+            },
+            context_window_tokens: model.context_window_tokens,
+        })
+        .collect();
+    Ok(ProviderProbeResult { models })
 }
 
 #[tauri::command]
@@ -352,7 +464,10 @@ pub fn run() {
             adventure_archives_get,
             secret_save,
             secret_exists,
-            secret_delete
+            secret_delete,
+            model_settings_get,
+            model_settings_save,
+            provider_probe
         ])
         .run(tauri::generate_context!())
         .expect("failed to run Ember Tavern");
