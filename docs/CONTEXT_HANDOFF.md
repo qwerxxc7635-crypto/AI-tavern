@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M6-T06 添加SiliconFlow或OpenRouter预设`
+- 最近完成任务：`M6-T07 添加Ollama预设`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M6-T06`已实现并完成验证，准备独立提交
-- 下一任务：`M6-T07 添加Ollama预设`
+- 当前任务：`M6-T07`已实现并完成验证，准备独立提交
+- 下一任务：`M6-T08 添加自定义Base URL配置`
 
 ## 架构摘要
 
@@ -161,3 +161,11 @@
 - 本地合同服务器动态返回免费模型，并用该模型完成一个JSON Object冒险回合；验证场景、建议行动、线索、状态、模型名与请求格式。
 - 未连接OpenRouter，未使用真实凭据或产生费用；定向8项Provider测试、完整`pnpm check`、Windows生产build与Tauri release无bundle build通过。
 - 下一任务：M6-T07 Ollama预设。
+
+## 2026-08-01 M6-T07 Ollama预设完成状态
+
+- 新增无凭据Ollama预设，固定官方OpenAI兼容localhost地址；受限传输层仅允许回环明文HTTP。
+- 本地隔离合同服务验证`/v1/models`、无Authorization、JSON Object冒险回合与模型选择；测试不依赖互联网。
+- 当前Windows环境未安装`ollama`命令，因此未宣称真实Ollama二进制/已下载模型测试；该项留给有本地模型环境的真实模型验收。
+- 定向9项Provider测试、完整`pnpm check`、Windows生产build与Tauri release无bundle build通过。
+- 下一任务：M6-T08自定义Base URL配置。

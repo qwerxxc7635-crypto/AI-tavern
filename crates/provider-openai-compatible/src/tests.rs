@@ -523,3 +523,70 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
     assert_eq!(body["model"], "community/story-model:free");
     assert_eq!(body["response_format"]["type"], "json_object");
 }
+
+#[tokio::test]
+async fn ollama_lists_installed_models_and_generates_structured_content_offline() {
+    assert_eq!(OllamaPreset::KEY, "ollama");
+    assert_eq!(OLLAMA_BASE_URL, "http://localhost:11434/v1/");
+    let production = OllamaPreset::config().unwrap();
+    assert!(production.credential_ref.is_none());
+
+    let models = r#"{"data":[{"id":"local-story-model:latest","owned_by":"library"}]}"#.to_owned();
+    let turn_content = serde_json::json!({
+        "sceneText": "The cellar door opens onto a dry passage beneath the harbor.",
+        "speakerNpcIds": [],
+        "suggestedActions": [
+            { "text": "Follow the chalk marks." },
+            { "text": "Listen for movement." }
+        ],
+        "checkRequest": null,
+        "discoveredClues": [],
+        "statePatchProposals": [],
+        "adventureState": "WAITING_FOR_PLAYER"
+    });
+    let completion = serde_json::json!({
+        "id": "ollama-local-turn",
+        "model": "local-story-model:latest",
+        "choices": [{
+            "message": { "content": turn_content.to_string() },
+            "finish_reason": "stop"
+        }]
+    })
+    .to_string();
+    let (base_url, captured) = server(vec![(200, models), (200, completion)]).await;
+    let config = OllamaPreset::config_for_contract_test(&base_url).unwrap();
+    let provider = OpenAiCompatibleProvider::new().unwrap();
+
+    let models = provider
+        .list_models(&config, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(models[0].name, "local-story-model:latest");
+    assert_eq!(models[0].cost_status, ModelCostStatus::Unknown);
+
+    let mut request = normalized(ResponseFormat::JsonObject);
+    request.model_name = models[0].name.clone();
+    request.messages[1].content = "Generate the next structured adventure turn.".to_owned();
+    let response = provider
+        .generate(&config, &request, CancellationToken::new())
+        .await
+        .unwrap();
+    let turn: Value = serde_json::from_str(&response.content).unwrap();
+    assert_eq!(turn["adventureState"], "WAITING_FOR_PLAYER");
+    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 2);
+
+    let requests = captured.lock().await;
+    let model_head = String::from_utf8_lossy(&requests[0].head);
+    let completion_head = String::from_utf8_lossy(&requests[1].head);
+    assert!(model_head.starts_with("GET /v1/models "));
+    assert!(completion_head.starts_with("POST /v1/chat/completions "));
+    assert!(!model_head.to_ascii_lowercase().contains("authorization:"));
+    assert!(
+        !completion_head
+            .to_ascii_lowercase()
+            .contains("authorization:")
+    );
+    let body: Value = serde_json::from_slice(&requests[1].body).unwrap();
+    assert_eq!(body["model"], "local-story-model:latest");
+    assert_eq!(body["response_format"]["type"], "json_object");
+}

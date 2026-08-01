@@ -1826,3 +1826,23 @@
 
 - M6-T06通过本地准确合同满足动态模型信息、非硬编码免费状态和免费模型冒险回合验收。
 - 未提前实现Ollama或自定义配置；下一任务为M6-T07。
+
+## 2026-08-01 — M6-T07 添加Ollama预设
+
+### 实现与边界
+
+- 新增`OllamaPreset`，使用官方OpenAI兼容根地址`http://localhost:11434/v1/`，不要求CredentialRef。
+- 端点仍由`ApprovedEndpoint`校验：明文HTTP只能指向localhost或回环IP；未开放WebView HTTP命令。
+- 模型通过`/v1/models`动态读取，生成继续使用标准Chat Completions JSON Object语义。
+
+### 验证
+
+- 独立回环合同服务模拟已安装本地模型，验证模型列表、请求路径、没有Authorization头、所选模型名和结构化冒险回合内容；整个测试不访问互联网。
+- 当前Windows环境检查结果为`OLLAMA_COMMAND=not-found`，所以没有把真实Ollama程序或真实下载模型写成已验证；在安装Ollama与模型后可按同一接口复验。
+- 定向Provider测试9项通过；完整`pnpm check`通过48个Vitest文件242项、7项Node SQLite和35项Rust测试，严格Clippy、格式、lint与类型检查通过。
+- Windows前端生产build和Tauri release `--no-bundle`通过。
+
+### 结论
+
+- M6-T07的localhost、模型列表、无网本地结构化输出合同已覆盖；真实模型环境验收状态被准确保留。
+- 未提前实现自定义Base URL或设置页；下一任务为M6-T08。

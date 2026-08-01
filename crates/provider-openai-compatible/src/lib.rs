@@ -18,6 +18,23 @@ pub const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-flash";
 pub const QWEN_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
 pub const QWEN_DEFAULT_MODEL: &str = "qwen3.7-plus";
 pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1/";
+pub const OLLAMA_BASE_URL: &str = "http://localhost:11434/v1/";
+
+pub struct OllamaPreset;
+
+impl OllamaPreset {
+    pub const KEY: &'static str = "ollama";
+    pub const DISPLAY_NAME: &'static str = "Ollama (local)";
+
+    pub fn config() -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(OLLAMA_BASE_URL, None)
+    }
+
+    #[cfg(test)]
+    fn config_for_contract_test(base_url: &str) -> Result<OpenAiCompatibleConfig, ProviderError> {
+        OpenAiCompatibleConfig::new(base_url, None)
+    }
+}
 
 pub struct OpenRouterPreset;
 

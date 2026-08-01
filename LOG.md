@@ -1388,3 +1388,11 @@ cargo --version
 - `pnpm check`通过：48个Vitest文件242项、7项Node SQLite和34项Rust测试；严格Clippy、格式、lint和类型检查通过。
 - Windows前端生产build及Tauri release `--no-bundle`通过。
 - 下一任务：M6-T07 Ollama预设。
+
+## 2026-08-01 — M6-T07 Ollama预设
+
+- 新增`http://localhost:11434/v1/`无凭据预设，复用仅允许回环明文HTTP的安全传输边界。
+- 隔离本地合同服务器验证模型列表、无认证头、模型选择和JSON Object结构化冒险回合；无需互联网。
+- 当前机器`ollama`命令不存在，未执行或伪造真实已安装模型测试。
+- `pnpm check`通过：48个Vitest文件242项、7项Node SQLite和35项Rust测试；Windows前端及Tauri release无bundle build通过。
+- 下一任务：M6-T08自定义Base URL配置。
