@@ -770,6 +770,7 @@
 
 ## M8-T01 定义`.emtavern`格式
 
+- 状态：已完成（2026-08-01）
 - 优先级：P0
 - 依赖：M2全部任务
 - 工作内容：manifest、campaign、events、generation records、checksum、Schema版本。

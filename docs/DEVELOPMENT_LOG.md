@@ -2062,3 +2062,22 @@
 
 - M7-T07满足冒险摘要、NPC长期摘要、历史压缩和按任务预算验收，长存档不会把全部历史发送给模型。
 - 未定义存档交换格式；下一任务为M8-T01。
+
+## 2026-08-01 — M8-T01 定义 `.emtavern` 格式
+
+### 实现
+
+- 新增`docs/save-format.md`，将`.emtavern` v1定义为包含manifest、Campaign事实、NDJSON事件、生成审计和SHA-256清单的五文件ZIP。
+- 独立定义`formatVersion`与`databaseSchemaVersion`，固定SQLite行标量、JSON文本、稳定排序、UTF-8规范字节和旧Schema迁移边界。
+- 明确14类Campaign游戏事实、全部事件和GenerationRecord必须包含；设备Provider、模型档案、设置、credential引用、pending请求、旧快照、日志和缓存必须排除。
+- 模型绑定在档案中归一为空，目标设备重新选择模型；导入成功后创建新IMPORT快照。定义ZIP路径/大小防护、秘密键扫描、一致性导出、校验与原子导入顺序。
+
+### 验证
+
+- 文档逐项覆盖M8-T01要求的manifest、campaign、events、generation records、checksum和Schema版本，并与当前迁移Schema v1及22表数据边界核对。
+- `pnpm check`通过；Windows前端生产build与Tauri release `--no-bundle`通过。
+
+### 结论
+
+- M8-T01格式文档验收完成，未提前实现ZIP导出、导入事务或Windows文件交互。
+- 下一任务为M8-T02实现存档导出。
