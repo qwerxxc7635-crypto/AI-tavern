@@ -1676,3 +1676,22 @@
 - WebView只调用固定结算与档案命令，不接触SQL；AI只提出内容，所有ID绑定、奖励效果、时钟推进和提交权限由本地程序控制。
 - 事务原子性、失败回滚、幂等重放、快速重复点击、重启恢复和页面展示均有自动化或真实烟测证据。
 - 沿用DEC-027与DEC-029的结算和Windows Provider边界，没有新增重大架构决定；未实现M5-T11或真实Provider。
+
+## 2026-08-01 — M5-T11 Windows离线纵向切片验收
+
+### 验收过程
+
+- 启动最终Tauri release可执行文件，从空SQLite创建全新存档，完成世界、车卡、酒馆生成和与Ilyra Venn的自由对话。
+- 接受任务后完成冒险准备、8回合Fake冒险和3次本地D20，随后完成结算、查看完整档案并返回酒馆。
+- 关闭应用并重新启动，分别打开NPC对话、档案和酒馆页面，确认对话历史、关系、骰子、模型/Prompt审计、奖励、世界事实、酒馆变化、NPC心情和世界时钟恢复。
+
+### 数据核对与清理
+
+- 重启前SQLite为Campaign TAVERN、Quest COMPLETED、Adventure SETTLED且current_turn_number=8、3个DiceResult、2条对话消息、3件物品、1条结算世界事实和非空ending_json。
+- M5-T10最终完整质量门及release构建已通过；本验收任务没有源码修改，也未触碰真实Provider、模型切换或导入导出等后续范围。
+- 进程停止后确认应用数据中只有本次测试Campaign，再按精确ID级联删除并VACUUM；剩余Campaign为0，空SQLite容器无游戏数据。
+
+### 结论
+
+- `docs/TASKS.md`列出的Windows离线纵向切片流程全部通过，关闭重启后所有核心进度仍存在。
+- 下一任务是M6-T01 Rust安全HTTP传输层；真实凭证和可能收费调用仍受硬性确认约束。

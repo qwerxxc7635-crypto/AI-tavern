@@ -1320,3 +1320,12 @@ cargo --version
 - release烟测完成真实8回合/3骰点结算、档案、返回酒馆和关闭重启恢复；SQLite中结算生成与四类事件均各一份。唯一测试Campaign已级联删除并VACUUM，剩余0条。
 - Review修复冒险快照遗漏publisherNpcId导致准备页无法载入、Fake固定符号ID无法匹配UUID、并发状态检查位于事务外、AI审计未比对原始响应以及结算事件不完整等问题。
 - 下一任务：M5-T11 Windows离线纵向切片验收。
+
+## 2026-08-01 — M5-T11 Windows离线纵向切片验收
+
+- 最终release应用使用全新存档完成：世界创建→车卡→酒馆→NPC自由对话→接受任务→冒险准备→8回合/3次本地D20→结算→档案→返回酒馆。
+- 关闭并重启后，NPC双方消息、关系、档案骰子和模型/Prompt审计、奖励、世界事实、酒馆TROPHY、NPC Relieved心情与1/6世界时钟均从SQLite恢复。
+- SQLite核对Campaign TAVERN、Quest COMPLETED、Adventure SETTLED/8回合、3骰点、2条对话消息、3件物品、1条结算世界事实和非空ending_json。
+- M5-T11仅为验收任务，没有新增或修改源码；未提前实现spec 33.4中属于后续任务的模型切换、导出/删除/导入。
+- 验收进程停止，唯一测试Campaign按精确ID级联删除并VACUUM，剩余0条。
+- 下一任务：M6-T01 Rust安全HTTP传输层；未经付费确认不得进行真实模型调用。

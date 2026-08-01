@@ -3,10 +3,10 @@
 ## 当前状态
 
 - 分支：`main`
-- 最近完成任务：`M5-T10 实现结算与冒险档案页面`
+- 最近完成任务：`M5-T11 Windows离线纵向切片验收`
 - 已完成里程碑：M0、M1、M2、M3、M4
-- 当前任务：`M5-T10`已实现、Review和验收，准备独立提交
-- 下一任务：`M5-T11 Windows离线纵向切片验收`
+- 当前任务：`M5-T11`已完成验收，准备独立提交
+- 下一任务：`M6-T01 实现Rust安全HTTP传输层`
 
 ## 架构摘要
 
@@ -78,8 +78,16 @@
 
 1. 完整读取规则、规格、任务、日志、决策、README、`LOG.md`、本文件和 `docs/data-model.md`。
 2. 检查Git并设置`.local/`环境变量。
-3. 确认M5-T10提交为`feat(M5-T10): add adventure settlement and archives`且工作树干净。
-4. 从M5-T11 Windows离线纵向切片验收开始；不要提前接入真实Provider。
+3. 确认M5-T11提交为`test(M5-T11): verify offline vertical slice`且工作树干净。
+4. 从M6-T01 Rust安全HTTP传输层开始；没有用户付费确认时只使用Fake Transport或本地测试服务器。
+
+## 2026-08-01 M5-T11完成状态
+
+- 使用最终release可执行文件和全新存档，实际完成世界创建、车卡、酒馆生成、NPC自由对话、接受任务、冒险准备、8回合/3次本地D20、结算、档案及返回酒馆。
+- 关闭并重启应用后，UI确认NPC双方对话、档案骰子/模型审计/奖励、酒馆TROPHY、NPC Relieved心情及推进后的1/6世界时钟全部恢复。
+- 重启前SQLite核对Campaign TAVERN、Quest COMPLETED、Adventure SETTLED/8回合、3个DiceResult、2条对话消息、3件物品、1条结算世界事实及非空ending_json。
+- M5-T10最终`pnpm check`、Cargo严格门、Windows生产前端和Tauri release无bundle build均通过；M5-T11没有修改源码。
+- 验收进程已停止，唯一测试Campaign按精确ID级联删除并VACUUM，剩余Campaign为0；空SQLite容器不含测试或用户游戏数据。
 
 ## 2026-08-01 M5-T10完成状态
 
