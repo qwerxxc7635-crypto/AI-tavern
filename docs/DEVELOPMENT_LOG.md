@@ -2102,3 +2102,25 @@
 
 - M8-T02满足导出文件包含完整游戏内容且不包含API Key的验收，并保持导出只读。
 - 未实现存档校验、导入迁移和IMPORT快照；下一任务为M8-T03。
+
+## 2026-08-01 — M8-T03 实现存档导入
+
+### 实现
+
+- 新增共享异步`importCampaignSave`服务，在写库前严格解析固定五条目ZIP32，支持STORE与DEFLATE，拒绝多盘、加密、危险路径、符号链接、异常标志、重复/额外条目、越界、CRC错误、非法UTF-8、BOM及压缩/解压体积超限。
+- 校验规范JSON与NDJSON、四文件SHA-256、manifest媒体类型/数量/时间/生成器版本、format与数据库Schema、Campaign归属、当前表精确列集合、SQLite标量、JSON文本、秘密键及归一为空的设备模型绑定；当前v1无历史Schema需要转换，较新或无迁移器的较旧版本明确拒绝。
+- 提供保留原ID的CREATE和显式OVERWRITE两种模式。CREATE遇到同ID整体拒绝；OVERWRITE必须在SQLite事务开始前完成调用方提供的完整备份回调，回调缺失或失败不会删除现有Campaign。
+- 使用单个立即事务按外键顺序导入Campaign、GenerationRecord、14类游戏事实和GameEvent，执行外键检查并通过共享Repository逐类回读领域对象；成功后在同一事务创建新的IMPORT快照，任一步失败连同级联删除和快照一起回滚。
+
+### 验证
+
+- 真实SQLite往返测试先导出含世界事实、事件、生成审计及设备模型绑定的Campaign，删除本地Campaign后以CREATE恢复；确认模型绑定保持为空、IMPORT快照存在，并能把恢复后的状态继续推进到`REVIEWING_WORLD`。
+- 覆盖测试先修改本地事实，确认缺少备份回调或备份回调失败时原数据不变；完成一次备份回调后OVERWRITE恢复导出值且仅创建目标导入快照。
+- 损坏ZIP正文触发CRC/校验失败且不创建Campaign或快照；构造SQLite约束允许但共享领域Repository拒绝的事实JSON，确认所有导入行和IMPORT快照整笔回滚、外键仍完整。
+- `pnpm check`通过54个Vitest文件286项、10项Node SQLite和44项Rust测试；格式、lint、类型检查及严格Clippy通过。
+- Windows前端生产build转换170个模块；Tauri release `--no-bundle`成功生成`target/release/ember-tavern-windows.exe`。
+
+### 结论
+
+- M8-T03满足校验、Schema迁移边界、新建/覆盖、导入快照，以及删除本地存档后从导出文件恢复并继续的验收。
+- 未实现文件选择、拖放或保存位置交互；下一任务为M8-T04。

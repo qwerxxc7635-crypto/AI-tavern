@@ -65,6 +65,8 @@ export type {
   CampaignSaveExportOptions,
   CampaignSaveManifest,
 } from './save-export.js';
+export { importCampaignSave } from './save-import.js';
+export type { CampaignSaveImportOptions, CampaignSaveImportResult } from './save-import.js';
 export type {
   SqliteDatabase,
   SqliteRunResult,

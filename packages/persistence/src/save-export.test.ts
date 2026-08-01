@@ -11,9 +11,11 @@ import {
   modelProfileId,
   promptVersion,
   schemaVersion,
+  snapshotId,
+  transitionCampaign,
   worldFactId,
 } from '@ember-tavern/contracts';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { applyMigrations } from './migrations.mjs';
 import {
@@ -21,7 +23,9 @@ import {
   GameEventRepository,
   GenerationRecordRepository,
   PersistenceDataError,
+  SnapshotRepository,
   exportCampaignSave,
+  importCampaignSave,
 } from './index.js';
 import type { SqliteStatement, SqliteValue, TransactionalSqliteDatabase } from './sqlite-port.js';
 
@@ -36,6 +40,10 @@ beforeEach(async () => {
   await applyMigrations(native);
   database = adaptDatabase(native);
   seed(database);
+});
+
+afterEach(() => {
+  native.close();
 });
 
 describe('exportCampaignSave', () => {
@@ -131,6 +139,158 @@ describe('exportCampaignSave', () => {
     ).toThrow('Campaign not found for export');
     expect(() => database.exec('BEGIN IMMEDIATE')).not.toThrow();
     database.exec('ROLLBACK');
+  });
+});
+
+describe('importCampaignSave', () => {
+  it('restores a deleted campaign, creates an IMPORT snapshot and can continue play', async () => {
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
+    expect(new CampaignRepository(database).get(campaignKey)).toBeNull();
+
+    const importedAt = isoTimestamp('2026-08-01T13:01:00.000Z');
+    const imported = await importCampaignSave(database, exported.bytes, {
+      mode: 'CREATE',
+      importedAt,
+      snapshotId: snapshotId('snapshot-import-create'),
+    });
+
+    expect(imported.campaign).toMatchObject({ id: campaignKey, state: 'CREATING_WORLD' });
+    expect(imported.importedEventCount).toBe(1);
+    expect(imported.importedGenerationCount).toBe(1);
+    expect(imported.snapshot).toMatchObject({
+      campaignId: campaignKey,
+      kind: 'IMPORT',
+      reason: `IMPORT:${importedAt}`,
+      schemaVersion: 1,
+    });
+    expect(new SnapshotRepository(database).get(snapshotId('snapshot-import-create'))).toEqual(
+      imported.snapshot,
+    );
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
+    ).toEqual({ statement: 'The beacon is lit.' });
+    expect(
+      native
+        .prepare('SELECT model_profile_id FROM generation_records WHERE id = ?')
+        .get('generation-export'),
+    ).toEqual({ model_profile_id: null });
+    expect(
+      native
+        .prepare('SELECT default_model_profile_id FROM campaigns WHERE id = ?')
+        .get(campaignKey),
+    ).toEqual({ default_model_profile_id: null });
+
+    const continued = transitionCampaign(
+      imported.campaign,
+      'REVIEWING_WORLD',
+      isoTimestamp('2026-08-01T13:02:00.000Z'),
+    );
+    new CampaignRepository(database).update(continued);
+    expect(new CampaignRepository(database).get(campaignKey)?.state).toBe('REVIEWING_WORLD');
+  });
+
+  it('requires a completed backup callback before replacing an existing campaign', async () => {
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    native
+      .prepare('UPDATE world_facts SET statement = ? WHERE id = ?')
+      .run('Locally changed.', worldFactId('fact-export'));
+
+    await expect(
+      importCampaignSave(database, exported.bytes, {
+        mode: 'OVERWRITE',
+        importedAt: isoTimestamp('2026-08-01T13:03:00.000Z'),
+        snapshotId: snapshotId('snapshot-import-no-backup'),
+      }),
+    ).rejects.toThrow('requires a completed backup callback');
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
+    ).toEqual({ statement: 'Locally changed.' });
+
+    await expect(
+      importCampaignSave(database, exported.bytes, {
+        mode: 'OVERWRITE',
+        importedAt: isoTimestamp('2026-08-01T13:03:30.000Z'),
+        snapshotId: snapshotId('snapshot-import-backup-failed'),
+        prepareOverwriteBackup: () => {
+          throw new Error('simulated backup failure');
+        },
+      }),
+    ).rejects.toThrow('simulated backup failure');
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
+    ).toEqual({ statement: 'Locally changed.' });
+
+    let backups = 0;
+    const imported = await importCampaignSave(database, exported.bytes, {
+      mode: 'OVERWRITE',
+      importedAt: isoTimestamp('2026-08-01T13:04:00.000Z'),
+      snapshotId: snapshotId('snapshot-import-overwrite'),
+      prepareOverwriteBackup: () => {
+        backups += 1;
+      },
+    });
+    expect(backups).toBe(1);
+    expect(imported.snapshot.kind).toBe('IMPORT');
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
+    ).toEqual({ statement: 'The beacon is lit.' });
+  });
+
+  it('rejects corrupted archive bytes before creating campaign state', async () => {
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    const corrupted = exported.bytes.slice();
+    const needle = new TextEncoder().encode('The beacon is lit.');
+    const offset = findBytes(corrupted, needle);
+    if (offset < 0) throw new Error('Expected test text in exported ZIP');
+    corrupted[offset] = (corrupted[offset] ?? 0) ^ 1;
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
+
+    await expect(
+      importCampaignSave(database, corrupted, {
+        mode: 'CREATE',
+        importedAt: isoTimestamp('2026-08-01T13:05:00.000Z'),
+        snapshotId: snapshotId('snapshot-import-corrupt'),
+      }),
+    ).rejects.toThrow(PersistenceDataError);
+    expect(new CampaignRepository(database).get(campaignKey)).toBeNull();
+    expect(native.prepare('SELECT COUNT(*) AS count FROM save_snapshots').get()).toEqual({
+      count: 0,
+    });
+  });
+
+  it('rolls back all rows when repository-level domain validation fails', async () => {
+    native
+      .prepare('UPDATE world_facts SET faction_ids_json = ? WHERE id = ?')
+      .run('{}', worldFactId('fact-export'));
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
+
+    await expect(
+      importCampaignSave(database, exported.bytes, {
+        mode: 'CREATE',
+        importedAt: isoTimestamp('2026-08-01T13:06:00.000Z'),
+        snapshotId: snapshotId('snapshot-import-invalid-domain'),
+      }),
+    ).rejects.toThrow(PersistenceDataError);
+    expect(new CampaignRepository(database).get(campaignKey)).toBeNull();
+    expect(native.prepare('SELECT COUNT(*) AS count FROM world_facts').get()).toEqual({ count: 0 });
+    expect(native.prepare('SELECT COUNT(*) AS count FROM save_snapshots').get()).toEqual({
+      count: 0,
+    });
+    expect(native.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   });
 });
 
@@ -274,6 +434,16 @@ function requireArray(value: unknown): readonly unknown[] {
 
 function sha256(bytes: Uint8Array): string {
   return createHash('sha256').update(bytes).digest('hex');
+}
+
+function findBytes(haystack: Uint8Array, needle: Uint8Array): number {
+  outer: for (let index = 0; index <= haystack.length - needle.length; index += 1) {
+    for (let offset = 0; offset < needle.length; offset += 1) {
+      if (haystack[index + offset] !== needle[offset]) continue outer;
+    }
+    return index;
+  }
+  return -1;
 }
 
 function adaptDatabase(database: DatabaseSync): TransactionalSqliteDatabase {
