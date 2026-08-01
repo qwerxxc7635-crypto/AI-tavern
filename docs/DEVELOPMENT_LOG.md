@@ -2164,3 +2164,25 @@
 
 - 开发方向调整为Windows-first，不改变SQLite唯一事实源、AI输出校验、秘密存储和共享层跨平台边界。
 - M9-T01仍未完成且不会在Windows环境伪造验收；缺少Xcode只延期iOS，不阻塞Windows v0.1继续开发。
+
+## 2026-08-01 — WV0.1-T01 Windows安装包与启动验收
+
+### 实现
+
+- 启用x64 NSIS bundle，写入Ember Tavern 0.1.0产品信息、现有ICO、当前用户安装、简体中文/英文界面、LZMA压缩、禁止降级和WebView2下载bootstrapper。
+- 使用`useLocalToolsDir`把NSIS 3.11及Tauri NSIS工具缓存固定到仓库`target/.tauri`；两次网络超时后重试完成下载、SHA校验和解压，没有回退到用户C盘工具缓存。
+- 新增Tauri发布配置测试，固定bundle启用、NSIS目标、当前用户模式、版本/标识、WebView2策略、语言和安装/卸载图标存在性。
+- 新增`docs/WINDOWS_INSTALL.md`，说明安装要求、产物、生产数据路径、备份、Credential Manager、卸载保留行为及未签名本地候选限制。
+
+### 验证
+
+- `tauri build --bundles nsis --no-sign`成功生成`target/release/bundle/nsis/Ember Tavern_0.1.0_x64-setup.exe`；最终复建产物大小5,062,611字节，SHA-256为`4CB54D928612EB47EA9AE07716B8B9C6DF5770C77561502E0F9836AAC5E94D87`。
+- 隔离目录静默安装退出码0；安装EXE与卸载器存在，产品名、文件描述和版本为Ember Tavern 0.1.0，HKCU卸载项的路径与版本正确。静默卸载退出码0后，程序文件、卸载器和卸载注册表项均消失。
+- 从安装目录启动发布候选后进程持续运行30秒，证明不依赖开发服务器。Windows Known Folder API不接受测试进程的`APPDATA`重定向，因此启动按生产规则访问既有应用数据目录并创建了一份启动前完整备份；主数据库最后写入时间保持2026-07-31 03:11:53不变。主库与新增备份均只读通过`PRAGMA integrity_check`且Schema为v1。该恢复性备份被保留，没有擅自删除真实用户数据，后续不再重复启动触碰该目录。
+- 已有M5-T11实际首次启动证据确认生产数据库路径为`%APPDATA%/com.embertavern.windows/ember-tavern.sqlite`；原生空库迁移和存档首页空状态继续由真实SQLite及页面测试覆盖。
+- `pnpm check`通过56个Vitest文件292项、10项Node SQLite和49项Rust测试；格式、lint、类型检查及严格Clippy通过。Windows前端生产build转换177个模块，最终NSIS Release复建通过。
+
+### 结论
+
+- WV0.1-T01满足普通用户安装产物、非开发目录启动、产品元数据、卸载闭环、生产数据路径和卸载保留策略验收。
+- 本地产物未签名；正式外部发布需要代码签名证书，不阻塞当前内部发布候选及后续M10收口。下一任务为M10-T01。

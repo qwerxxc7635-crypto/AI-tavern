@@ -27,6 +27,28 @@
     }
   },
   "bundle": {
-    "active": false
+    "active": true,
+    "targets": ["nsis"],
+    "publisher": "Ember Tavern",
+    "icon": ["icons/icon.ico"],
+    "category": "RolePlayingGame",
+    "shortDescription": "由本地规则与SQLite守护进度的单人AI文字冒险。",
+    "longDescription": "Ember Tavern（炉火酒馆）是一款Windows单人AI文字冒险。模型负责生成叙事，本地程序负责规则、验证、状态、恢复与存档。",
+    "useLocalToolsDir": true,
+    "windows": {
+      "allowDowngrades": false,
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper",
+        "silent": true
+      },
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "uninstallerIcon": "icons/icon.ico",
+        "installMode": "currentUser",
+        "languages": ["SimpChinese", "English"],
+        "displayLanguageSelector": false,
+        "compression": "lzma"
+      }
+    }
   }
 }
