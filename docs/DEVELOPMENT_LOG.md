@@ -2225,3 +2225,24 @@
 
 - M10-T02验收通过：每个正式启用Provider均通过同一测试集合，且共享适配器的结构和业务错误边界未被绕过。
 - 下一任务为M10-T03完成Windows端到端测试。
+
+## 2026-08-01 — M10-T03 完成Windows端到端测试
+
+### 实现
+
+- 新增`windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save`，只使用临时目录中的真实SQLite、原生业务入口和本地Fake生成结果，在同一Campaign上完成世界生成/字段锁定、车卡、酒馆与NPC、对话、接任务、8回合冒险、本地D20、结算与返回酒馆。
+- 结算后先登记本地默认/备用模型，再切换到第二个默认模型并继续同一NPC对话；随后关闭并重开Store，验证Campaign、4条对话和结算档案恢复。
+- 同一流程继续导出`.emtavern`、删除精确Campaign、检查归档、CREATE方式重新导入、再次重开、继续Campaign并新增第三轮对话，最终验证6条消息、1份结算档案和2份设备模型配置。
+- 根脚本新增`pnpm test:windows-e2e`，发布纵向链也包含在常规`cargo test --workspace`/`pnpm check`中。
+
+### 验证
+
+- `pnpm test:windows-e2e`单独通过；测试执行期间只使用自动清理的临时目录，没有访问`%APPDATA%`、系统凭据、真实Provider或网络。
+- `pnpm check`通过56个Vitest文件334项、10项Node SQLite和55项Rust测试；格式、lint、类型检查及严格Clippy通过。
+- Windows前端生产build转换177个模块；`tauri build --bundles nsis --no-sign`成功复建0.1.0 NSIS安装包。
+
+### 结论与边界
+
+- M10-T03验收通过：`docs/spec.md`第33.4节的创建世界至重新导入后继续游戏链，已由一条可重复、单存档、真实SQLite自动测试覆盖。
+- 这项自动化不冒充安装后UI人工验收；发布候选的首次启动、分辨率、键鼠、故障恢复入口与实际文件对话框仍保留在`docs/WINDOWS_V0_1.md`最终清单。
+- M10-T04继续`DEFERRED`；下一任务按Windows-first顺序执行M10-T05的Windows隐私、数据与发布说明。

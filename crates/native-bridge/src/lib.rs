@@ -10,6 +10,8 @@ mod quest_board;
 mod save_archive;
 mod settlement;
 mod tavern_initialization;
+#[cfg(test)]
+mod windows_e2e;
 mod world_creation;
 pub use adventure_play::*;
 pub use character_creation::*;
