@@ -48,7 +48,7 @@ API Key保存在Windows系统安全凭据库，服务标识为`com.embertavern.m
 2. 玩家主动点击“测试连接并列出模型”时，应用向所选Base URL请求模型列表；云Provider通常会收到API Key、源IP和正常HTTP元数据，但不会收到Campaign、对话或角色内容。
 3. Ollama和自定义本机服务使用`localhost`/回环地址；数据会离开Ember Tavern进程并交给该本机服务处理。该服务是否继续联网由其自身配置和隐私规则决定。
 
-远程Provider只允许HTTPS；明文HTTP只允许本机回环地址。HTTP重定向被禁用，防止已批准地址把请求转发到另一来源。
+远程Provider只允许HTTPS；明文HTTP只允许本机回环地址。发送前会解析并检查全部候选地址：HTTPS结果必须全部为公开可路由地址，HTTP结果必须全部为回环地址；连接会固定到这批已验证地址。HTTP重定向被禁用，防止已批准地址把请求转发到另一来源。
 
 ## 云游戏生成尚未启用
 

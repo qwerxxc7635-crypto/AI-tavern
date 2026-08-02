@@ -2295,3 +2295,21 @@
 
 - M10-T06 Windows范围验收通过，完整证据见`docs/WINDOWS_ACCEPTANCE_0.1.md`。Windows 0.1内部候选已完成；未签名仍是外部发布限制，不影响内部候选结论。
 - M9与M10-T04继续`DEFERRED`；未自动开始iOS工作。
+## 2026-08-02 — Windows v0.1 第一轮独立发布审查
+
+### 独立发现与修复
+
+- 在审查起始 HEAD `3a2027c0b1111016e5ac46e748dbfae1fc69ddc7` 上先记录四项问题：一项 P1 Provider SSRF/解析重绑定边界，三项 P2（生产 CSP、最小 Tauri 能力、`.emtavern` 双实现互操作门禁）。
+- Provider 请求现在验证并固定全部解析地址；生产 WebView 启用 CSP；能力清单移除 `core:default`；归档增加 TypeScript 与 Rust 双向固定夹具。
+- SQLite 唯一真实数据源、AI 输出验证、系统凭据和 Fake Provider 游戏生成边界均保持不变。
+
+### 独立审查身份烟测
+
+- 临时使用 `com.embertavern.windows.audit1` 与 `Ember Tavern Audit 1` 构建并静默安装未签名 NSIS；首次启动创建独立 SQLite，强制终止后完整性为 `ok`，再次启动成功。
+- 隔离临时目录中的 Windows 端到端纵向切片覆盖世界、角色、酒馆、NPC、任务、冒险、D20、结算、重启、导出、删除、导入和继续游戏；恢复测试验证未完成请求取消与状态原子回退。
+- 卸载器删除程序与注册项并按既定策略保留应用数据；审查结束后只清理审查身份目录。正式 `com.embertavern.windows` 数据库哈希未变化，临时生产配置已恢复。
+
+### 浏览器复核
+
+- 真实 Edge/Playwright 复核 860×600、1180×760、1366×768 与 1920×1080，并检查设置、导入导出和恢复中心；未发现横向溢出或新增阻断性 UI 问题。
+- 完整门禁结果、正式产物哈希、签名状态、剩余风险与移交包位置在最终审查报告中记录。
