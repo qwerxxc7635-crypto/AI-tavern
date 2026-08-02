@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
@@ -143,6 +144,34 @@ describe('exportCampaignSave', () => {
 });
 
 describe('importCampaignSave', () => {
+  it('imports the Rust v1 fixture without device state', async () => {
+    const archive = new Uint8Array(
+      readFileSync(new URL('../test-fixtures/rust-export-v1.emtavern', import.meta.url)),
+    );
+    const imported = await importCampaignSave(database, archive, {
+      mode: 'CREATE',
+      importedAt: isoTimestamp('2026-08-01T13:00:30.000Z'),
+      snapshotId: snapshotId('snapshot-rust-interop'),
+    });
+
+    expect(imported.campaign).toMatchObject({
+      id: campaignId('campaign-transfer'),
+      state: 'CREATING_WORLD',
+    });
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-transfer'),
+    ).toEqual({ statement: 'The bell is ringing.' });
+    expect(
+      native
+        .prepare('SELECT COUNT(*) AS count FROM provider_configs WHERE id <> ?')
+        .get('provider-secret'),
+    ).toEqual({ count: 0 });
+    expect(imported.snapshot).toMatchObject({
+      campaignId: campaignId('campaign-transfer'),
+      kind: 'IMPORT',
+    });
+  });
+
   it('restores a deleted campaign, creates an IMPORT snapshot and can continue play', async () => {
     const exported = exportCampaignSave(database, campaignKey, {
       createdAt: at,

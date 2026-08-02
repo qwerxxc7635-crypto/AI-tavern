@@ -1262,6 +1262,66 @@ mod tests {
     const FIRST_TIME: &str = "2026-08-01T13:00:00.000Z";
 
     #[test]
+    fn imports_the_typescript_v1_fixture_without_device_state() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let archive_path = directory.path().join("typescript-export-v1.emtavern");
+        fs::write(
+            &archive_path,
+            include_bytes!(
+                "../../../packages/persistence/test-fixtures/typescript-export-v1.emtavern"
+            ),
+        )
+        .expect("write TypeScript fixture");
+        let store = CampaignStore::open(directory.path().join("ember-tavern.sqlite"))
+            .expect("open database");
+
+        let imported = store
+            .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
+            .expect("import TypeScript fixture");
+        assert_eq!(imported.id, "campaign-export");
+
+        let connection = store.connect().expect("inspect imported fixture");
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT statement FROM world_facts WHERE id = 'fact-export'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .expect("imported fact"),
+            "The beacon is lit."
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM provider_configs", [], |row| {
+                    row.get::<_, i64>(0)
+                })
+                .expect("provider count"),
+            0
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT model_profile_id FROM generation_records WHERE id = 'generation-export'",
+                    [],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .expect("portable generation model"),
+            None
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM save_snapshots WHERE campaign_id = 'campaign-export' AND kind = 'IMPORT'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("import snapshot count"),
+            1
+        );
+    }
+
+    #[test]
     fn exports_deletes_imports_and_continues_a_native_campaign() {
         let directory = tempfile::tempdir().expect("temp directory");
         let database_path = directory.path().join("ember-tavern.sqlite");
