@@ -8,6 +8,8 @@ dist/
 build/
 coverage/
 .vite/
+release/
+review_round1_to_chatgpt_*/
 
 # Rust and Tauri build output
 target/
