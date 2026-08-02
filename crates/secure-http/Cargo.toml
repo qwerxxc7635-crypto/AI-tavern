@@ -9,7 +9,7 @@ bytes = "1.11.1"
 futures-util = "0.3.32"
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "stream"] }
 thiserror = "2.0.18"
-tokio = { version = "1.53.1", features = ["macros", "time"] }
+tokio = { version = "1.53.1", features = ["macros", "net", "time"] }
 tokio-util = { version = "0.7.19", features = ["rt"] }
 
 [dev-dependencies]

@@ -4,12 +4,20 @@
 //! HTTPS; cleartext HTTP is reserved for loopback development providers. Redirects
 //! are disabled so an approved origin cannot redirect a request elsewhere.
 
-use std::{fmt, net::IpAddr, pin::Pin, time::Duration};
+use std::{
+    fmt,
+    net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
+    pin::Pin,
+    time::Duration,
+};
 
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use reqwest::{Method, StatusCode, Url, header::HeaderName};
-use tokio::time::{Instant, timeout_at};
+use tokio::{
+    net::lookup_host,
+    time::{Instant, timeout_at},
+};
 use tokio_util::sync::CancellationToken;
 
 const MIN_TIMEOUT: Duration = Duration::from_millis(100);
@@ -28,6 +36,11 @@ impl ApprovedEndpoint {
         let secure_remote = url.scheme() == "https";
         let loopback_http = url.scheme() == "http" && host_is_loopback(host);
         if !secure_remote && !loopback_http
+            || secure_remote
+                && host
+                    .trim_matches(['[', ']'])
+                    .parse::<IpAddr>()
+                    .is_ok_and(|address| !address_is_public(address))
             || !url.username().is_empty()
             || url.password().is_some()
             || url.query().is_some()
@@ -52,6 +65,29 @@ impl ApprovedEndpoint {
             .join(relative_path)
             .map_err(|_| TransportError::InvalidRequest)
     }
+
+    async fn pinned_client(&self) -> Result<reqwest::Client, TransportError> {
+        let host = self
+            .base_url
+            .host_str()
+            .ok_or(TransportError::InvalidEndpoint)?;
+        let port = self
+            .base_url
+            .port_or_known_default()
+            .ok_or(TransportError::InvalidEndpoint)?;
+        let mut addresses = lookup_host((host, port))
+            .await
+            .map_err(|_| TransportError::Network)?
+            .collect::<Vec<_>>();
+        addresses.sort_unstable();
+        addresses.dedup();
+        validate_resolved_addresses(self.base_url.scheme(), &addresses)?;
+        reqwest::Client::builder()
+            .redirect(reqwest::redirect::Policy::none())
+            .resolve_to_addrs(host, &addresses)
+            .build()
+            .map_err(|_| TransportError::Configuration)
+    }
 }
 
 fn host_is_loopback(host: &str) -> bool {
@@ -60,6 +96,63 @@ fn host_is_loopback(host: &str) -> bool {
             .trim_matches(['[', ']'])
             .parse::<IpAddr>()
             .is_ok_and(|address| address.is_loopback())
+}
+
+fn validate_resolved_addresses(
+    scheme: &str,
+    addresses: &[SocketAddr],
+) -> Result<(), TransportError> {
+    let allowed = !addresses.is_empty()
+        && match scheme {
+            "http" => addresses.iter().all(|address| address.ip().is_loopback()),
+            "https" => addresses
+                .iter()
+                .all(|address| address_is_public(address.ip())),
+            _ => false,
+        };
+    if allowed {
+        Ok(())
+    } else {
+        Err(TransportError::DisallowedEndpoint)
+    }
+}
+
+fn address_is_public(address: IpAddr) -> bool {
+    match address {
+        IpAddr::V4(address) => ipv4_is_public(address),
+        IpAddr::V6(address) => ipv6_is_public(address),
+    }
+}
+
+fn ipv4_is_public(address: Ipv4Addr) -> bool {
+    let [first, second, third, _] = address.octets();
+    !(first == 0
+        || first == 10
+        || first == 127
+        || first >= 224
+        || first == 100 && (64..=127).contains(&second)
+        || first == 169 && second == 254
+        || first == 172 && (16..=31).contains(&second)
+        || first == 192 && second == 0 && third == 0
+        || first == 192 && second == 0 && third == 2
+        || first == 192 && second == 168
+        || first == 198 && (second == 18 || second == 19)
+        || first == 198 && second == 51 && third == 100
+        || first == 203 && second == 0 && third == 113)
+}
+
+fn ipv6_is_public(address: Ipv6Addr) -> bool {
+    if let Some(mapped) = address.to_ipv4_mapped() {
+        return ipv4_is_public(mapped);
+    }
+    let segments = address.segments();
+    !(address.is_unspecified()
+        || address.is_loopback()
+        || address.is_multicast()
+        || segments[0] & 0xfe00 == 0xfc00
+        || segments[0] & 0xffc0 == 0xfe80
+        || segments[0] & 0xffc0 == 0xfec0
+        || segments[0] == 0x2001 && segments[1] == 0x0db8)
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -133,17 +226,11 @@ impl TransportRequest {
 }
 
 #[derive(Clone)]
-pub struct SecureHttpTransport {
-    client: reqwest::Client,
-}
+pub struct SecureHttpTransport;
 
 impl SecureHttpTransport {
     pub fn new() -> Result<Self, TransportError> {
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .build()
-            .map_err(|_| TransportError::Configuration)?;
-        Ok(Self { client })
+        Ok(Self)
     }
 
     pub async fn send(
@@ -172,11 +259,17 @@ impl SecureHttpTransport {
         validate_request(&request)?;
         let url = endpoint.resolve(&request.relative_path)?;
         let deadline = Instant::now() + request.timeout;
+        let client = tokio::select! {
+            () = cancellation.cancelled() => return Err(TransportError::Cancelled),
+            result = timeout_at(deadline, endpoint.pinned_client()) => {
+                result.map_err(|_| TransportError::Timeout)??
+            }
+        };
         let method = match request.method {
             RequestMethod::Get => Method::GET,
             RequestMethod::Post => Method::POST,
         };
-        let mut builder = self.client.request(method, url).body(request.body);
+        let mut builder = client.request(method, url).body(request.body);
         for header in request.headers {
             builder = builder.header(header.name, header.value);
         }

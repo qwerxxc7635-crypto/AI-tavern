@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Minimal capability set for the Ember Tavern main window.",
   "windows": ["main"],
-  "permissions": ["core:default", "dialog:allow-open", "dialog:allow-save"]
+  "permissions": ["core:event:default", "dialog:allow-open", "dialog:allow-save"]
 }

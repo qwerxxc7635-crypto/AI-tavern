@@ -52,6 +52,18 @@ fn endpoint_policy_rejects_unsafe_origins_and_paths() {
         ApprovedEndpoint::parse("https://example.com/v1"),
         Err(TransportError::DisallowedEndpoint)
     );
+    for endpoint in [
+        "https://127.0.0.1/v1/",
+        "https://[::1]/v1/",
+        "https://10.0.0.1/v1/",
+        "https://169.254.169.254/v1/",
+        "https://[fe80::1]/v1/",
+    ] {
+        assert_eq!(
+            ApprovedEndpoint::parse(endpoint),
+            Err(TransportError::DisallowedEndpoint)
+        );
+    }
     let endpoint = ApprovedEndpoint::parse("https://example.com/v1/").unwrap();
     assert_eq!(
         endpoint.resolve("../admin"),
@@ -60,6 +72,39 @@ fn endpoint_policy_rejects_unsafe_origins_and_paths() {
     assert_eq!(
         endpoint.resolve("//attacker.example/api"),
         Err(TransportError::InvalidRequest)
+    );
+}
+
+#[test]
+fn resolved_endpoint_policy_rejects_private_and_mixed_dns_answers() {
+    let public_v4 = "93.184.216.34:443".parse().unwrap();
+    let public_v6 = "[2606:2800:220:1:248:1893:25c8:1946]:443".parse().unwrap();
+    let private_v4 = "10.0.0.8:443".parse().unwrap();
+    let loopback_v6 = "[::1]:443".parse().unwrap();
+
+    assert_eq!(
+        validate_resolved_addresses("https", &[public_v4, public_v6]),
+        Ok(())
+    );
+    assert_eq!(
+        validate_resolved_addresses("https", &[private_v4]),
+        Err(TransportError::DisallowedEndpoint)
+    );
+    assert_eq!(
+        validate_resolved_addresses("https", &[public_v4, loopback_v6]),
+        Err(TransportError::DisallowedEndpoint)
+    );
+    assert_eq!(
+        validate_resolved_addresses("http", &["127.0.0.1:11434".parse().unwrap()]),
+        Ok(())
+    );
+    assert_eq!(
+        validate_resolved_addresses("http", &["[::1]:11434".parse().unwrap()]),
+        Ok(())
+    );
+    assert_eq!(
+        validate_resolved_addresses("http", &[public_v4]),
+        Err(TransportError::DisallowedEndpoint)
     );
 }
 
