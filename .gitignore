@@ -10,6 +10,7 @@ coverage/
 .vite/
 release/
 review_round1_to_chatgpt_*/
+review_round1_to_chatgpt_*.zip
 
 # Rust and Tauri build output
 target/
