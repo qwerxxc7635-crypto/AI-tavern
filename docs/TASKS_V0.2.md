@@ -19,7 +19,8 @@
 - `V02-M1-T05`：DONE；Provider探测回执绑定规范化端点、模型、能力来源与能力指纹，端点切换会原子禁用旧模型并清理默认/备用引用。
 - `V02-M1-T06`：DONE；跨进程操作锁、桌面单实例锁与SQLite data-version重确认共同关闭备份后删除/覆盖的并发窗口。
 - `V02-M1-T07`：DONE；`pnpm archive:interop`从当前双实现生成归档、交叉导入、校验来源清单并对提交夹具执行逐条目regenerate-and-diff，CI已接入。
-- 下一执行项：严格进入 `V02-M1-T08`。
+- `V02-M1-T08`：DONE；CI共享门禁覆盖Windows/macOS，Windows构建NSIS并跑纵向测试，macOS构建app；关键命令和产物均输出结构化UTF-8证据与SHA-256。
+- M1第二轮安全/数据修复代码任务完成；下一执行项严格进入 `V02-M2-T01`。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

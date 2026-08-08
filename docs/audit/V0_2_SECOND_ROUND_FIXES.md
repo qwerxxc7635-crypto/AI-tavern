@@ -57,6 +57,19 @@
 - 生成结果与已提交夹具逐一比较五个固定ZIP条目的名称和字节内容；清单同时锁定提交文件原始SHA-256。ZIP平台`made by`头不作为内容漂移，避免Windows/macOS元数据造成伪差异。
 - `.github/workflows/ci.yml`显式执行该命令；任一当前实现交叉不兼容、来源哈希改变或夹具内容陈旧都会使CI失败。
 
+## SR2-008 — CLOSED
+
+- 共享quality job改为`windows-latest`与`macos-latest`矩阵，两端都执行安装、格式、lint、类型、TypeScript/Node测试、Rust fmt/Clippy/workspace测试和双向归档门禁。
+- 独立Windows release job执行纵向SQLite E2E，并构建NSIS bundle；独立macOS job构建`.app` bundle。两者均在共享门禁通过后执行。
+- Windows NSIS和macOS app bundle会生成逐文件大小/SHA-256清单并与命令证据一并通过`actions/upload-artifact`上传；缺少产物会使job失败。
+- 工作流回归测试锁定双平台矩阵、NSIS/app命令、纵向测试、互操作门禁、证据包装、哈希与上传步骤。
+
+## SR2-009 — CLOSED
+
+- `run-with-evidence.mjs`以UTF-8 JSON逐条记录原始命令数组、ISO开始/结束时间、退出码、signal、stdout和stderr；不再依赖PowerShell默认编码或把成功命令包装成异常文本。
+- `collect-release-evidence.mjs`递归拒绝symlink并记录平台、架构、相对产物路径、字节数和SHA-256；空bundle直接失败。
+- CI在失败时仍上传已生成的命令证据；包装器测试覆盖中文UTF-8 stdout、stderr、时间与退出码，产物测试覆盖确定路径、长度和哈希。
+
 ## 待关闭
 
-- SR2-008～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。
+- SR2-010：完整实机截图证据在最终Windows/macOS验收和下一轮审查包阶段关闭，不能用当前CI配置提前标记。

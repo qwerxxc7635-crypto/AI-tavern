@@ -2515,3 +2515,23 @@
 ### 结论
 
 - SR2-007 / `V02-M1-T07` 关闭。下一项严格为 `V02-M1-T08` CI / evidence。
+
+## 2026-08-08 — V02-M1-T08 建立双平台CI与结构化证据
+
+### 实现
+
+- GitHub Actions quality job扩展为Windows/macOS矩阵，两端运行完整共享检查与当前TS/Rust归档交叉门禁。
+- Windows release job通过证据包装器运行纵向SQLite E2E和Tauri NSIS构建；macOS build job同样构建Tauri `.app`。
+- 新增UTF-8命令证据包装器，记录命令、起止时间、退出码、signal、stdout和stderr；新增release证据收集器，记录bundle内全部常规文件的相对路径、大小与SHA-256并拒绝symlink/空目录。
+- 两个平台的bundle和JSON证据均上传为CI artifact，失败时仍上传已产生的证据。
+
+### 验证
+
+- 新增4项Node测试：2项验证UTF-8命令/产物证据，2项锁定双平台矩阵、归档门禁、Windows纵向测试、NSIS、macOS app、哈希和artifact上传配置。
+- 本机包装器测试真实捕获中文stdout与stderr并验证退出码/时间；临时bundle的长度与SHA-256逐值匹配。
+- macOS本机实际`tauri build --bundles app`通过，release可执行文件与`Ember Tavern.app`生成成功；结构化命令证据退出码为0，bundle证据记录3个常规文件及SHA-256。
+- 托管Windows NSIS和macOS app job只在远端CI运行；当前提交不把尚未出现的远端run结果写成已通过，M9仍需双环境最终验收。
+
+### 结论
+
+- SR2-008、SR2-009 / `V02-M1-T08` 关闭。SR2-010保留至最终连续流程截图；下一项严格为 `V02-M2-T01` AI Task Orchestrator。
