@@ -34,7 +34,8 @@
 - `V02-M4-T02`：DONE；版本化Stable Prompt Profile固定System Contract、Game Rules、Output Schema、Prompt Profile、Stable World Truths五段顺序并拒绝易变请求元数据。
 - `V02-M4-T03`：DONE；Prompt与Context hash共享canonical JSON，稳定keys/whitespace/enums/numbers/LF并保留数组语义顺序，拒绝非有限数与Unicode等价重复key。
 - `V02-M4-T04`：DONE；Cache Layout固定summary、lore/knowledge为semi-stable，history、scene/state、action为dynamic，五段位于TASK_INPUT前且层级/未知类型fail closed。
-- 下一执行项严格进入 `V02-M4-T05` Cache Metrics。
+- `V02-M4-T05`：DONE；解析DeepSeek hit/miss tokens，本地有界记录task、hit/miss、计算ratio、cacheable prefix hash和时间，严格排除完整Prompt/上下文/请求ID/credential。
+- 下一执行项严格进入 `V02-M4-T06` Cache Regression。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

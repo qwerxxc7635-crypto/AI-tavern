@@ -2801,3 +2801,23 @@
 ### 结论
 
 - `V02-M4-T04`完成。下一项严格为`V02-M4-T05` Cache Metrics。
+
+## 2026-08-08 — V02-M4-T05 建立 Cache Metrics
+
+### 实现
+
+- OpenAI-compatible Provider usage新增可选`prompt_cache_hit_tokens`和`prompt_cache_miss_tokens`解析；字段缺失保持unknown，不从总token猜测命中。
+- 新增cacheable prefix SHA-256，只覆盖Stable Prompt Profile及summary/lore/knowledge两个semi-stable段，不含dynamic history/scene/action或Task Input。
+- 新增设备级Cache Metrics Repository，记录task type、hit/miss、计算ratio、prefix hash和记录时间，使用`BEGIN IMMEDIATE`更新现有`app_settings.deepseek_cache_metrics_v1`并仅保留最近200项。
+- 指标读取严格拒绝未知字段、非法task、负数/非安全整数、伪造ratio、非法hash和时间；数据模型明确排除完整Prompt、messages、context、request ID及credential，不进入Campaign可移植格式。
+- 记录`DEC-070`并同步目标架构/数据模型；不承诺固定命中率，不在Fake Provider路径生成虚假指标。
+
+### 验证
+
+- Rust Provider 15/15契约测试通过；DeepSeek本地mock响应断言1000 hit与400 miss被准确解析，未访问真实API。
+- 新增2项持久指标测试，覆盖ratio、精确字段白名单、SQLite持久读取、无Prompt内容、非法输入及注入`fullPrompt`拒绝。
+- Prompt测试断言prefix hash为64位小写SHA-256；相关13项TypeScript测试、`pnpm typecheck`和`pnpm lint`通过。
+
+### 结论
+
+- `V02-M4-T05`完成。下一项严格为`V02-M4-T06` Cache Regression。

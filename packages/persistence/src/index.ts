@@ -31,6 +31,8 @@ export type {
   CompleteGenerationRecord,
   CreateGenerationRecord,
 } from './generation-record-repository.js';
+export { CacheMetricsRepository } from './cache-metrics-repository.js';
+export type { CacheMetric, CacheMetricInput } from './cache-metrics-repository.js';
 export { ModelProfileRepository } from './model-profile-repository.js';
 export type {
   RegisteredModelCapabilities,

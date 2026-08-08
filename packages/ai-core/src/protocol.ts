@@ -119,6 +119,8 @@ export interface NormalizedTokenUsage {
   readonly inputTokens: number | null;
   readonly outputTokens: number | null;
   readonly totalTokens: number | null;
+  readonly promptCacheHitTokens?: number | null;
+  readonly promptCacheMissTokens?: number | null;
 }
 
 export interface NormalizedAIResponse {

@@ -1556,3 +1556,19 @@ Layout从已完成预算/相关性筛选的ContextAssembly投影，仅保留type
 ### 影响与边界
 
 Provider-neutral formatter可显式接收stable world truths及layout，把五个context段放在`TASK_INPUT`之前；原调用不传layout时保持兼容。当前云游戏生成仍未启用，因此不会用Fake路径伪造DeepSeek命中；后续实际生成路径必须先从知识边界过滤后的细粒度ContextBlock构建layout，不能把现有复合`task`块冒充缓存分层。
+
+## DEC-070：Cache metrics是有界设备遥测且不保存Prompt
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T05`、DeepSeek cache隐私要求
+
+### 决定与理由
+
+OpenAI-compatible usage增加可选`prompt_cache_hit_tokens`与`prompt_cache_miss_tokens`，缺失保持unknown而非推算。可缓存prefix只由Stable Prompt Profile与两个semi-stable Context段的规范UTF-8字节计算SHA-256；动态history/scene/action及task input不进入prefix hash。
+
+本地指标每项只含task type、hit、miss、按`hit/(hit+miss)`计算的ratio、prefix hash和记录时间。最多保留最近200项，使用现有device-local `app_settings.deepseek_cache_metrics_v1`原子更新，不提升Campaign schema或改动`.emtavern`。读取时拒绝未知字段，因而完整Prompt、messages、context、request ID或credential不能混入指标对象。
+
+### 影响与边界
+
+指标是设备观测而非游戏事实，不随Campaign导出；ratio为当次Provider usage的描述，不承诺固定命中率。当前Provider adapter已能解析真实响应字段，但测试只使用本地mock HTTP；云游戏生成尚未启用时不会伪造指标。若未来多进程写入，仍必须在`BEGIN IMMEDIATE`内读改写，不能用无锁JSON覆盖。

@@ -426,6 +426,8 @@ erDiagram
 
 应用设置仅保存设备级非秘密偏好。API Key、令牌和Campaign游戏事实都不得写入此表。
 
+保留键`deepseek_cache_metrics_v1`的值为最多200项有界数组，每项只含task type、cache hit/miss tokens、由二者计算的ratio、64位小写十六进制prefix hash与记录时间；禁止写完整Prompt、消息、上下文、request ID或credential。该设备遥测不属于Campaign可移植事实。
+
 ## 5. JSON列清单与边界
 
 | 表 | JSON列 |

@@ -491,7 +491,14 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
         "choices": [{
             "message": { "content": world_content.to_string() },
             "finish_reason": "stop"
-        }]
+        }],
+        "usage": {
+            "prompt_tokens": 1400,
+            "completion_tokens": 120,
+            "total_tokens": 1520,
+            "prompt_cache_hit_tokens": 1000,
+            "prompt_cache_miss_tokens": 400
+        }
     })
     .to_string();
     let (base_url, captured) = server(vec![(200, models), (200, world)]).await;
@@ -522,6 +529,8 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
     assert_eq!(generated_world["factions"].as_array().unwrap().len(), 1);
     assert_eq!(generated_world["locations"].as_array().unwrap().len(), 1);
     assert_eq!(generated_world["storyHooks"].as_array().unwrap().len(), 1);
+    assert_eq!(response.usage.prompt_cache_hit_tokens, Some(1_000));
+    assert_eq!(response.usage.prompt_cache_miss_tokens, Some(400));
 
     let requests = captured.lock().await;
     let body: Value = serde_json::from_slice(&requests[1].body).unwrap();

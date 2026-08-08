@@ -19,6 +19,7 @@ import {
   createStablePromptProfile,
   formatOutputRepairPrompt,
   formatTaskPrompt,
+  promptCachePrefixHash,
   renderStablePromptProfile,
 } from './index.js';
 
@@ -236,6 +237,9 @@ describe('stable prompt profile', () => {
     expect(content.indexOf('[PLAYER_ACTION]')).toBeLessThan(content.indexOf('[TASK_INPUT]'));
     expect(formatted.messages[0]?.content).toContain(
       '[STABLE_WORLD_TRUTHS]\n{"setting":"Beacon Coast"}',
+    );
+    await expect(promptCachePrefixHash(formatted.stableProfile, layout)).resolves.toMatch(
+      /^[0-9a-f]{64}$/,
     );
   });
 });

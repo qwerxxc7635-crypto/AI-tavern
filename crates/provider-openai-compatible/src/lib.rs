@@ -520,6 +520,8 @@ pub struct TokenUsage {
     pub input_tokens: Option<u64>,
     pub output_tokens: Option<u64>,
     pub total_tokens: Option<u64>,
+    pub prompt_cache_hit_tokens: Option<u64>,
+    pub prompt_cache_miss_tokens: Option<u64>,
 }
 
 impl TokenUsage {
@@ -528,6 +530,8 @@ impl TokenUsage {
             input_tokens: None,
             output_tokens: None,
             total_tokens: None,
+            prompt_cache_hit_tokens: None,
+            prompt_cache_miss_tokens: None,
         }
     }
 }
@@ -759,6 +763,8 @@ struct ApiUsage {
     prompt_tokens: Option<u64>,
     completion_tokens: Option<u64>,
     total_tokens: Option<u64>,
+    prompt_cache_hit_tokens: Option<u64>,
+    prompt_cache_miss_tokens: Option<u64>,
 }
 
 impl From<ApiUsage> for TokenUsage {
@@ -767,6 +773,8 @@ impl From<ApiUsage> for TokenUsage {
             input_tokens: value.prompt_tokens,
             output_tokens: value.completion_tokens,
             total_tokens: value.total_tokens,
+            prompt_cache_hit_tokens: value.prompt_cache_hit_tokens,
+            prompt_cache_miss_tokens: value.prompt_cache_miss_tokens,
         }
     }
 }
