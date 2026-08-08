@@ -2413,3 +2413,24 @@
 ### 结论
 
 - SR2-002 / `V02-M1-T02` 关闭。下一项严格为 `V02-M1-T03` `.emtavern` resource limits。
+
+## 2026-08-08 — V02-M1-T03 关闭存档资源耗尽风险
+
+### 实现
+
+- `.emtavern` 压缩包/展开总量收敛到32/64 MiB，五个固定条目各自限制64 KiB、16 MiB或32 MiB，压缩比最多100:1。
+- JSON文本在通用解析器前做非递归深度扫描，解析后以迭代遍历限制深度64、数组100,000项和字符串1,048,576字符/字节。
+- 事件、生成记录、单个Campaign事实表和档案总记录数分别限制为100,000、20,000、20,000和200,000；导出与导入共享相同政策。
+- TypeScript ZIP读取器只保留中央目录描述并按需用`maxOutputLength`展开；Rust先扫描全部元数据，再逐条目读取、校验SHA-256并解析，不再同时保存全部展开字节。
+
+### 验证
+
+- TypeScript资源测试与跨实现存档测试：12/12；包含实际中央目录压缩比炸弹拒绝。
+- Rust native archive tests：7/7；包含真实DEFLATE高压缩比炸弹、极深JSON、超长数组/字符串、记录数、单条目和展开总量。
+- `pnpm check:shared`：59 files / 344 tests 全部通过。
+- `cargo test --workspace` 全部通过；native bridge 37/37，且 TypeScript/Rust v1 fixtures 双向互操作保持通过。
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
+
+### 结论
+
+- SR2-003 / `V02-M1-T03` 关闭。下一项严格为 `V02-M1-T04` Secret scanning。

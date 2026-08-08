@@ -297,6 +297,26 @@ describe('importCampaignSave', () => {
     });
   });
 
+  it('rejects a ZIP entry whose declared expansion exceeds the ratio budget', async () => {
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    const bomb = exported.bytes.slice();
+    const central = findCentralEntry(bomb, 'campaign.json');
+    const compressedSize = central.getUint32(20, true);
+    central.setUint32(24, compressedSize * 101, true);
+
+    await expect(
+      importCampaignSave(database, bomb, {
+        mode: 'OVERWRITE',
+        importedAt: isoTimestamp('2026-08-01T13:05:30.000Z'),
+        snapshotId: snapshotId('snapshot-import-ratio-bomb'),
+        prepareOverwriteBackup: () => undefined,
+      }),
+    ).rejects.toThrow(/compression ratio/u);
+  });
+
   it('rolls back all rows when repository-level domain validation fails', async () => {
     native
       .prepare('UPDATE world_facts SET faction_ids_json = ? WHERE id = ?')
@@ -473,6 +493,23 @@ function findBytes(haystack: Uint8Array, needle: Uint8Array): number {
     return index;
   }
   return -1;
+}
+
+function findCentralEntry(bytes: Uint8Array, expectedName: string): DataView {
+  const end = new DataView(bytes.buffer, bytes.byteOffset + bytes.length - 22, 22);
+  let offset = end.getUint32(16, true);
+  const count = end.getUint16(10, true);
+  for (let index = 0; index < count; index += 1) {
+    const central = new DataView(bytes.buffer, bytes.byteOffset + offset, 46);
+    if (central.getUint32(0, true) !== 0x02014b50) throw new Error('Invalid central header');
+    const nameLength = central.getUint16(28, true);
+    const extraLength = central.getUint16(30, true);
+    const commentLength = central.getUint16(32, true);
+    const name = new TextDecoder().decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+    if (name === expectedName) return central;
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  throw new Error(`Missing central entry: ${expectedName}`);
 }
 
 function adaptDatabase(database: DatabaseSync): TransactionalSqliteDatabase {

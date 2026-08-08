@@ -32,6 +32,20 @@ import { GenerationRecordRepository } from './generation-record-repository.js';
 import { PlayerCharacterRepository } from './player-character-repository.js';
 import { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 import { SnapshotRepository } from './snapshot-repository.js';
+import {
+  MAX_ARCHIVE_BYTES,
+  MAX_EVENT_RECORDS,
+  MAX_GENERATION_RECORDS,
+  MAX_JSON_ARRAY_LENGTH,
+  MAX_TABLE_RECORDS,
+  MAX_TOTAL_RECORDS,
+  addExpandedBytes,
+  archiveEntrySizeLimit,
+  validateArchiveEntryResources,
+  validateJsonTextResources,
+  validateJsonValueResources,
+  validateRecordCount,
+} from './save-resource-limits.js';
 import type { SqliteValue, TransactionalSqliteDatabase } from './sqlite-port.js';
 import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 import { WorldRepository } from './world-repository.js';
@@ -42,8 +56,6 @@ type ImportMode = 'CREATE' | 'OVERWRITE';
 
 const FORMAT_VERSION = 1;
 const ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
-const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -209,12 +221,23 @@ interface ParsedArchive {
 }
 
 function parseArchive(archive: Uint8Array): ParsedArchive {
-  const entries = readZipEntries(archive);
-  const manifestText = decodeEntry(entries, 'manifest.json');
-  const checksumText = decodeEntry(entries, 'checksum.json');
-  const manifest = parseCanonicalDocument(manifestText, 'manifest.json');
-  const checksum = parseCanonicalDocument(checksumText, 'checksum.json');
-  validateChecksums(entries, checksum);
+  const zip = readZipArchive(archive);
+  const checksum = parseCanonicalDocument(
+    decodeUtf8(zip.read('checksum.json'), 'checksum.json'),
+    'checksum.json',
+  );
+  const expectedChecksums = validateChecksumDocument(checksum);
+  const readVerified = (name: keyof typeof expectedChecksums): Uint8Array => {
+    const bytes = zip.read(name);
+    if (sha256(bytes) !== expectedChecksums[name]) {
+      throw new PersistenceDataError(`Save checksum mismatch: ${name}`);
+    }
+    return bytes;
+  };
+  const manifest = parseCanonicalDocument(
+    decodeUtf8(readVerified('manifest.json'), 'manifest.json'),
+    'manifest.json',
+  );
   const campaignIdValue = requireString(manifest['campaignId'], 'manifest.campaignId');
   const importedCampaignId = campaignId(campaignIdValue);
   requireExactKeys(
@@ -250,11 +273,11 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     );
   }
   const campaignDocument = parseCanonicalDocument(
-    decodeEntry(entries, 'campaign.json'),
+    decodeUtf8(readVerified('campaign.json'), 'campaign.json'),
     'campaign.json',
   );
   const generationDocument = parseCanonicalDocument(
-    decodeEntry(entries, 'generations.json'),
+    decodeUtf8(readVerified('generations.json'), 'generations.json'),
     'generations.json',
   );
   requireEnvelope(campaignDocument, importedCampaignId, databaseVersion, 'campaign.json');
@@ -282,13 +305,18 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
   requireExactKeys(tableRoot, [...CAMPAIGN_TABLES], 'campaign.tables');
   const tables = campaignTableRecord((table) =>
     Object.freeze(
-      requireArray(tableRoot[table], `campaign.tables.${table}`).map((row) =>
-        parseStoredRow(row, table),
+      requireRecordArray(tableRoot[table], `campaign.tables.${table}`, MAX_TABLE_RECORDS).map(
+        (row) => parseStoredRow(row, table),
       ),
     ),
   );
+  const tableRecordCount = Object.values(tables).reduce((total, rows) => total + rows.length, 0);
   const generations = Object.freeze(
-    requireArray(generationDocument['records'], 'generations.records').map((row) => {
+    requireRecordArray(
+      generationDocument['records'],
+      'generations.records',
+      MAX_GENERATION_RECORDS,
+    ).map((row) => {
       const parsed = parseStoredRow(row, 'generation_records');
       if (parsed['campaign_id'] !== importedCampaignId || parsed['model_profile_id'] !== null) {
         throw new PersistenceDataError('Generation archive scope or model binding is invalid');
@@ -296,7 +324,13 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
       return parsed;
     }),
   );
-  const events = parseEvents(decodeEntry(entries, 'events.ndjson'), importedCampaignId);
+  const events = parseEvents(
+    decodeUtf8(readVerified('events.ndjson'), 'events.ndjson'),
+    importedCampaignId,
+  );
+  if (1 + tableRecordCount + generations.length + events.length > MAX_TOTAL_RECORDS) {
+    throw new PersistenceDataError('Save archive exceeds the total record limit');
+  }
   validateManifestCounts(manifest, events.length, generations.length);
   return Object.freeze({
     campaignId: importedCampaignId,
@@ -308,10 +342,12 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
   });
 }
 
-function validateChecksums(
-  entries: ReadonlyMap<string, Uint8Array>,
-  checksum: Record<string, unknown>,
-): void {
+function validateChecksumDocument(checksum: Record<string, unknown>): Readonly<{
+  'campaign.json': string;
+  'events.ndjson': string;
+  'generations.json': string;
+  'manifest.json': string;
+}> {
   requireExactKeys(checksum, ['algorithm', 'files', 'formatVersion'], 'checksum.json');
   if (checksum['algorithm'] !== 'SHA-256' || checksum['formatVersion'] !== FORMAT_VERSION) {
     throw new PersistenceDataError('Unsupported checksum manifest');
@@ -319,12 +355,21 @@ function validateChecksums(
   const files = requireRecord(checksum['files'], 'checksum.files');
   const hashedNames = ['campaign.json', 'events.ndjson', 'generations.json', 'manifest.json'];
   requireExactKeys(files, hashedNames, 'checksum.files');
-  for (const name of hashedNames) {
-    const expected = requireString(files[name], `checksum.files.${name}`);
-    if (!/^[0-9a-f]{64}$/u.test(expected) || sha256(requireEntry(entries, name)) !== expected) {
-      throw new PersistenceDataError(`Save checksum mismatch: ${name}`);
-    }
-  }
+  const result = Object.fromEntries(
+    hashedNames.map((name) => {
+      const expected = requireString(files[name], `checksum.files.${name}`);
+      if (!/^[0-9a-f]{64}$/u.test(expected)) {
+        throw new PersistenceDataError(`Save checksum is invalid: ${name}`);
+      }
+      return [name, expected];
+    }),
+  );
+  return Object.freeze(result) as Readonly<{
+    'campaign.json': string;
+    'events.ndjson': string;
+    'generations.json': string;
+    'manifest.json': string;
+  }>;
 }
 
 function validateManifestCounts(
@@ -367,6 +412,7 @@ function parseEvents(text: string, expectedCampaignId: CampaignId): readonly Sto
   if (text.length === 0) return Object.freeze([]);
   if (!text.endsWith('\n')) throw new PersistenceDataError('events.ndjson must end with LF');
   const lines = text.slice(0, -1).split('\n');
+  validateRecordCount('events.ndjson', lines.length, MAX_EVENT_RECORDS);
   return Object.freeze(
     lines.map((line, index) => {
       if (line.length === 0) throw new PersistenceDataError('events.ndjson contains an empty line');
@@ -552,8 +598,11 @@ function parseCanonicalDocument(text: string, label: string): Record<string, unk
 }
 
 function parseJson(text: string, label: string): unknown {
+  validateJsonTextResources(text, label);
   try {
-    return JSON.parse(text) as unknown;
+    const value = JSON.parse(text) as unknown;
+    validateJsonValueResources(value, label);
+    return value;
   } catch (error) {
     throw new PersistenceDataError(`${label} is not valid JSON`, { cause: error });
   }
@@ -584,7 +633,19 @@ function assertNoSecretKeys(value: unknown, path: string): void {
   }
 }
 
-function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
+interface ZipEntryDescriptor {
+  readonly compressed: Uint8Array;
+  readonly expectedCrc: number;
+  readonly method: number;
+  readonly name: string;
+  readonly uncompressedSize: number;
+}
+
+interface BoundedZipArchive {
+  read(name: string): Uint8Array;
+}
+
+function readZipArchive(archive: Uint8Array): BoundedZipArchive {
   if (archive.length > MAX_ARCHIVE_BYTES || archive.length < 22) {
     throw new PersistenceDataError('Save archive size is invalid');
   }
@@ -609,7 +670,7 @@ function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
   ) {
     throw new PersistenceDataError('Save ZIP central directory is invalid');
   }
-  const entries = new Map<string, Uint8Array>();
+  const entries = new Map<string, ZipEntryDescriptor>();
   let offset = centralOffset;
   let uncompressedTotal = 0;
   for (let index = 0; index < entryCount; index += 1) {
@@ -640,11 +701,9 @@ function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
     viewAt(archive, nameStart, nameLength + extraLength + commentLength, 'ZIP central entry');
     const name = decodeUtf8(archive.slice(nameStart, nameStart + nameLength), 'ZIP entry name');
     validateEntryName(name, entries);
+    validateArchiveEntryResources(name, compressedSize, uncompressedSize);
     offset = nameStart + nameLength + extraLength + commentLength;
-    uncompressedTotal += uncompressedSize;
-    if (uncompressedTotal > MAX_UNCOMPRESSED_BYTES) {
-      throw new PersistenceDataError('Save ZIP exceeds the uncompressed size limit');
-    }
+    uncompressedTotal = addExpandedBytes(uncompressedTotal, uncompressedSize);
     const local = viewAt(archive, localOffset, 30, 'ZIP local header');
     if (
       local.getUint32(0, true) !== 0x04034b50 ||
@@ -665,30 +724,52 @@ function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
     const dataStart = localNameStart + localNameLength + localExtraLength;
     const dataEnd = dataStart + compressedSize;
     if (dataEnd > centralOffset) throw new PersistenceDataError('Save ZIP entry range is invalid');
-    const compressed = archive.slice(dataStart, dataEnd);
-    let data: Uint8Array;
-    try {
-      data =
-        method === 0
-          ? compressed
-          : new Uint8Array(inflateRawSync(compressed, { maxOutputLength: uncompressedSize + 1 }));
-    } catch (error) {
-      throw new PersistenceDataError(`Save ZIP entry cannot be decompressed: ${name}`, {
-        cause: error,
-      });
-    }
-    if (data.length !== uncompressedSize || crc32(data) !== expectedCrc) {
-      throw new PersistenceDataError(`Save ZIP CRC or size mismatch: ${name}`);
-    }
-    entries.set(name, data);
+    const compressed = archive.subarray(dataStart, dataEnd);
+    entries.set(
+      name,
+      Object.freeze({
+        compressed,
+        expectedCrc,
+        method,
+        name,
+        uncompressedSize,
+      }),
+    );
   }
   if (offset !== endOffset || entries.size !== ENTRY_NAMES.length) {
     throw new PersistenceDataError('Save ZIP has missing or duplicate entries');
   }
-  return entries;
+  return Object.freeze({
+    read(name: string): Uint8Array {
+      const entry = entries.get(name);
+      if (entry === undefined) throw new PersistenceDataError(`Missing save entry: ${name}`);
+      let data: Uint8Array;
+      try {
+        data =
+          entry.method === 0
+            ? entry.compressed
+            : new Uint8Array(
+                inflateRawSync(entry.compressed, {
+                  maxOutputLength: Math.min(
+                    entry.uncompressedSize + 1,
+                    (archiveEntrySizeLimit(entry.name) ?? 0) + 1,
+                  ),
+                }),
+              );
+      } catch (error) {
+        throw new PersistenceDataError(`Save ZIP entry cannot be decompressed: ${entry.name}`, {
+          cause: error,
+        });
+      }
+      if (data.length !== entry.uncompressedSize || crc32(data) !== entry.expectedCrc) {
+        throw new PersistenceDataError(`Save ZIP CRC or size mismatch: ${entry.name}`);
+      }
+      return data;
+    },
+  });
 }
 
-function validateEntryName(name: string, entries: ReadonlyMap<string, Uint8Array>): void {
+function validateEntryName(name: string, entries: ReadonlyMap<string, unknown>): void {
   if (
     !ENTRY_NAME_SET.has(name) ||
     entries.has(name) ||
@@ -708,10 +789,6 @@ function viewAt(bytes: Uint8Array, offset: number, length: number, label: string
   return new DataView(bytes.buffer, bytes.byteOffset + offset, length);
 }
 
-function decodeEntry(entries: ReadonlyMap<string, Uint8Array>, name: string): string {
-  return decodeUtf8(requireEntry(entries, name), name);
-}
-
 function decodeUtf8(bytes: Uint8Array, label: string): string {
   try {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -721,12 +798,6 @@ function decodeUtf8(bytes: Uint8Array, label: string): string {
     if (error instanceof PersistenceDataError) throw error;
     throw new PersistenceDataError(`${label} is not valid UTF-8`, { cause: error });
   }
-}
-
-function requireEntry(entries: ReadonlyMap<string, Uint8Array>, name: string): Uint8Array {
-  const entry = entries.get(name);
-  if (entry === undefined) throw new PersistenceDataError(`Missing save entry: ${name}`);
-  return entry;
 }
 
 function requireImportOptions(options: CampaignSaveImportOptions): void {
@@ -751,7 +822,16 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
 
 function requireArray(value: unknown, label: string): readonly unknown[] {
   if (!Array.isArray(value)) throw new PersistenceDataError(`${label} must be an array`);
+  if (value.length > MAX_JSON_ARRAY_LENGTH) {
+    throw new PersistenceDataError(`${label} exceeds the JSON array limit`);
+  }
   return value;
+}
+
+function requireRecordArray(value: unknown, label: string, limit: number): readonly unknown[] {
+  const records = requireArray(value, label);
+  validateRecordCount(label, records.length, limit);
+  return records;
 }
 
 function requireString(value: unknown, label: string): string {

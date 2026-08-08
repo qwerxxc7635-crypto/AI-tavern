@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 
 use rusqlite::types::{Value as SqlValue, ValueRef};
@@ -23,8 +23,16 @@ use super::{
 const FORMAT_VERSION: u64 = 1;
 const DATABASE_SCHEMA_VERSION: u64 = 1;
 const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 2;
-const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES: u64 = 1024 * 1024 * 1024;
+const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_COMPRESSION_RATIO: u64 = 100;
+const MAX_JSON_DEPTH: usize = 64;
+const MAX_JSON_ARRAY_LENGTH: usize = 100_000;
+const MAX_JSON_STRING_BYTES: usize = 1_048_576;
+const MAX_EVENT_RECORDS: usize = 100_000;
+const MAX_GENERATION_RECORDS: usize = 20_000;
+const MAX_TABLE_RECORDS: usize = 20_000;
+const MAX_TOTAL_RECORDS: usize = 200_000;
 const ENTRY_NAMES: [&str; 5] = [
     "manifest.json",
     "campaign.json",
@@ -208,8 +216,13 @@ impl CampaignStore {
             Value::String("{}".to_owned()),
         );
         let mut tables = Map::new();
+        let mut total_records = 1_usize;
         for table in CAMPAIGN_TABLES {
             let rows = query_campaign_table(&transaction, table, campaign_id)?;
+            validate_record_count(rows.len(), MAX_TABLE_RECORDS)?;
+            total_records = total_records
+                .checked_add(rows.len())
+                .ok_or(CampaignStoreError::ArchiveInvalid)?;
             tables.insert(
                 table.to_owned(),
                 Value::Array(rows.into_iter().map(Value::Object).collect()),
@@ -221,12 +234,19 @@ impl CampaignStore {
             "SELECT * FROM game_events WHERE campaign_id = ?1 ORDER BY occurred_at, id",
             campaign_id,
         )?;
+        validate_record_count(events.len(), MAX_EVENT_RECORDS)?;
         let mut generations = query_rows(
             &transaction,
             "generation_records",
             "SELECT * FROM generation_records WHERE campaign_id = ?1 ORDER BY started_at, id",
             campaign_id,
         )?;
+        validate_record_count(generations.len(), MAX_GENERATION_RECORDS)?;
+        total_records = total_records
+            .checked_add(events.len())
+            .and_then(|total| total.checked_add(generations.len()))
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        validate_record_count(total_records, MAX_TOTAL_RECORDS)?;
         for generation in &mut generations {
             generation.insert("model_profile_id".to_owned(), Value::Null);
         }
@@ -395,6 +415,12 @@ fn query_rows(
 }
 
 fn encode_zip(files: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, CampaignStoreError> {
+    let mut uncompressed_total = 0_u64;
+    for name in ENTRY_NAMES {
+        let bytes = files.get(name).ok_or(CampaignStoreError::ArchiveInvalid)?;
+        validate_archive_entry_resources(name, bytes.len() as u64, bytes.len() as u64)?;
+        uncompressed_total = add_expanded_bytes(uncompressed_total, bytes.len() as u64)?;
+    }
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
     for name in ENTRY_NAMES {
@@ -424,7 +450,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let allowed = ENTRY_NAMES.into_iter().collect::<BTreeSet<_>>();
-    let mut files = BTreeMap::new();
+    let mut seen = BTreeSet::new();
     let mut uncompressed_total = 0_u64;
     for index in 0..archive.len() {
         let file = archive
@@ -432,7 +458,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
         let name = file.name().to_owned();
         if !allowed.contains(name.as_str())
-            || files.contains_key(&name)
+            || !seen.insert(name.clone())
             || file.is_dir()
             || file.enclosed_name().is_none()
             || file
@@ -445,31 +471,20 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
-        uncompressed_total = uncompressed_total
-            .checked_add(file.size())
-            .ok_or(CampaignStoreError::ArchiveInvalid)?;
-        if uncompressed_total > MAX_UNCOMPRESSED_BYTES {
-            return Err(CampaignStoreError::ArchiveInvalid);
-        }
-        let expected_size = file.size();
-        let mut contents = Vec::with_capacity(
-            usize::try_from(expected_size).map_err(|_| CampaignStoreError::ArchiveInvalid)?,
-        );
-        file.take(expected_size.saturating_add(1))
-            .read_to_end(&mut contents)
-            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
-        if contents.len() as u64 != expected_size {
-            return Err(CampaignStoreError::ArchiveInvalid);
-        }
-        files.insert(name, contents);
+        uncompressed_total = add_expanded_bytes(uncompressed_total, file.size())?;
+        validate_archive_entry_resources(&name, file.compressed_size(), file.size())?;
     }
-    if files.len() != ENTRY_NAMES.len() {
+    if seen.len() != ENTRY_NAMES.len() {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
 
-    let manifest = parse_canonical_document(require_file(&files, "manifest.json")?)?;
-    let checksum = parse_canonical_document(require_file(&files, "checksum.json")?)?;
-    validate_checksum(&files, &checksum)?;
+    let checksum = parse_canonical_document(&read_archive_entry(&mut archive, "checksum.json")?)?;
+    let expected_checksums = validate_checksum_document(&checksum)?;
+    let manifest = parse_canonical_document(&read_verified_archive_entry(
+        &mut archive,
+        &expected_checksums,
+        "manifest.json",
+    )?)?;
     require_exact_keys(
         &manifest,
         &[
@@ -502,8 +517,16 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
 
-    let campaign_document = parse_canonical_document(require_file(&files, "campaign.json")?)?;
-    let generation_document = parse_canonical_document(require_file(&files, "generations.json")?)?;
+    let campaign_document = parse_canonical_document(&read_verified_archive_entry(
+        &mut archive,
+        &expected_checksums,
+        "campaign.json",
+    )?)?;
+    let generation_document = parse_canonical_document(&read_verified_archive_entry(
+        &mut archive,
+        &expected_checksums,
+        "generations.json",
+    )?)?;
     validate_envelope(&campaign_document, &campaign_id, database_version)?;
     validate_envelope(&generation_document, &campaign_id, database_version)?;
     require_exact_keys(
@@ -542,8 +565,14 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
     let table_root = require_object(campaign_document.get("tables"))?;
     require_exact_keys(table_root, &CAMPAIGN_TABLES)?;
     let mut tables = BTreeMap::new();
+    let mut total_records = 1_usize;
     for table in CAMPAIGN_TABLES {
-        let rows = require_array(table_root.get(table))?
+        let values = require_array(table_root.get(table))?;
+        validate_record_count(values.len(), MAX_TABLE_RECORDS)?;
+        total_records = total_records
+            .checked_add(values.len())
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        let rows = values
             .iter()
             .map(|value| parse_stored_row(require_object(Some(value))?, table))
             .collect::<Result<Vec<_>, _>>()?;
@@ -556,7 +585,12 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         }
         tables.insert(table.to_owned(), rows);
     }
-    let generations = require_array(generation_document.get("records"))?
+    let generation_values = require_array(generation_document.get("records"))?;
+    validate_record_count(generation_values.len(), MAX_GENERATION_RECORDS)?;
+    total_records = total_records
+        .checked_add(generation_values.len())
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    let generations = generation_values
         .iter()
         .map(|value| parse_stored_row(require_object(Some(value))?, "generation_records"))
         .collect::<Result<Vec<_>, _>>()?;
@@ -567,7 +601,16 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
     }
-    let events = parse_events(require_file(&files, "events.ndjson")?, &campaign_id)?;
+    let events = parse_events(
+        &read_verified_archive_entry(&mut archive, &expected_checksums, "events.ndjson")?,
+        &campaign_id,
+    )?;
+    total_records = total_records
+        .checked_add(events.len())
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    if total_records > MAX_TOTAL_RECORDS {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
     validate_manifest_counts(&manifest, events.len(), generations.len())?;
     Ok(ParsedArchive {
         campaign_id,
@@ -591,11 +634,14 @@ fn parse_events(
     let text = std::str::from_utf8(bytes).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
     let mut rows = Vec::new();
     for line in text[..text.len() - 1].split('\n') {
+        validate_record_count(rows.len().saturating_add(1), MAX_EVENT_RECORDS)?;
         if line.is_empty() {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        validate_json_text_resources(line.as_bytes())?;
         let value: Value =
             serde_json::from_str(line).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        validate_json_value_resources(&value)?;
         if canonical_json_bytes(&value)? != line.as_bytes() {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
@@ -608,10 +654,9 @@ fn parse_events(
     Ok(rows)
 }
 
-fn validate_checksum(
-    files: &BTreeMap<String, Vec<u8>>,
+fn validate_checksum_document(
     checksum: &Map<String, Value>,
-) -> Result<(), CampaignStoreError> {
+) -> Result<BTreeMap<String, String>, CampaignStoreError> {
     require_exact_keys(checksum, &["algorithm", "files", "formatVersion"])?;
     if checksum.get("algorithm") != Some(&Value::String("SHA-256".to_owned()))
         || checksum.get("formatVersion").and_then(Value::as_u64) != Some(FORMAT_VERSION)
@@ -626,18 +671,19 @@ fn validate_checksum(
     ];
     let expected = require_object(checksum.get("files"))?;
     require_exact_keys(expected, &expected_names)?;
+    let mut result = BTreeMap::new();
     for name in expected_names {
         let digest = require_text(expected.get(name))?;
         if digest.len() != 64
             || !digest
                 .bytes()
                 .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-            || sha256(require_file(files, name)?) != digest
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        result.insert(name.to_owned(), digest.to_owned());
     }
-    Ok(())
+    Ok(result)
 }
 
 fn validate_manifest_counts(
@@ -698,6 +744,12 @@ fn parse_stored_row(
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        if value
+            .as_str()
+            .is_some_and(|text| text.len() > MAX_JSON_STRING_BYTES)
+        {
+            return Err(CampaignStoreError::ArchiveInvalid);
+        }
         if is_json_column(table, column) && !value.is_null() {
             let text = value.as_str().ok_or(CampaignStoreError::ArchiveInvalid)?;
             if normalize_json_text(text, table, column)? != text {
@@ -726,8 +778,10 @@ fn normalize_json_text(
     table: &str,
     column: &str,
 ) -> Result<String, CampaignStoreError> {
+    validate_json_text_resources(text.as_bytes())?;
     let value: Value =
         serde_json::from_str(text).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_json_value_resources(&value)?;
     validate_json_container(table, column, &value)?;
     assert_no_secret_keys(&value)?;
     String::from_utf8(canonical_json_bytes(&value)?).map_err(|_| CampaignStoreError::ArchiveInvalid)
@@ -771,7 +825,9 @@ fn scan_json_text_if_present(text: &str) -> Result<(), CampaignStoreError> {
     if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
         return Ok(());
     }
+    validate_json_text_resources(trimmed.as_bytes())?;
     if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        validate_json_value_resources(&value)?;
         assert_no_secret_keys(&value)?;
     }
     Ok(())
@@ -1159,8 +1215,10 @@ fn parse_canonical_document(bytes: &[u8]) -> Result<Map<String, Value>, Campaign
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let body = &bytes[..bytes.len() - 1];
+    validate_json_text_resources(body)?;
     let value: Value =
         serde_json::from_slice(body).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_json_value_resources(&value)?;
     if canonical_json_bytes(&value)? != body {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
@@ -1183,6 +1241,7 @@ fn canonical_ndjson_bytes(rows: &[Map<String, Value>]) -> Result<Vec<u8>, Campai
 }
 
 fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, CampaignStoreError> {
+    validate_json_value_resources(value)?;
     let sorted = sort_json(value);
     serde_json::to_vec(&sorted).map_err(|_| CampaignStoreError::ArchiveInvalid)
 }
@@ -1208,14 +1267,37 @@ fn sha256(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn require_file<'a>(
-    files: &'a BTreeMap<String, Vec<u8>>,
+fn read_archive_entry<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
     name: &str,
-) -> Result<&'a [u8], CampaignStoreError> {
-    files
-        .get(name)
-        .map(Vec::as_slice)
-        .ok_or(CampaignStoreError::ArchiveInvalid)
+) -> Result<Vec<u8>, CampaignStoreError> {
+    let file = archive
+        .by_name(name)
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_archive_entry_resources(name, file.compressed_size(), file.size())?;
+    let expected_size = file.size();
+    let mut contents = Vec::with_capacity(
+        usize::try_from(expected_size).map_err(|_| CampaignStoreError::ArchiveInvalid)?,
+    );
+    file.take(expected_size.saturating_add(1))
+        .read_to_end(&mut contents)
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    if contents.len() as u64 != expected_size {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(contents)
+}
+
+fn read_verified_archive_entry<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    expected: &BTreeMap<String, String>,
+    name: &str,
+) -> Result<Vec<u8>, CampaignStoreError> {
+    let contents = read_archive_entry(archive, name)?;
+    if expected.get(name).map(String::as_str) != Some(sha256(&contents).as_str()) {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(contents)
 }
 
 fn require_object(value: Option<&Value>) -> Result<&Map<String, Value>, CampaignStoreError> {
@@ -1225,19 +1307,130 @@ fn require_object(value: Option<&Value>) -> Result<&Map<String, Value>, Campaign
 }
 
 fn require_array(value: Option<&Value>) -> Result<&Vec<Value>, CampaignStoreError> {
-    value
+    let values = value
         .and_then(Value::as_array)
-        .ok_or(CampaignStoreError::ArchiveInvalid)
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    if values.len() > MAX_JSON_ARRAY_LENGTH {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(values)
 }
 
 fn require_text(value: Option<&Value>) -> Result<&str, CampaignStoreError> {
     let text = value
         .and_then(Value::as_str)
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
-    if text.is_empty() {
+    if text.is_empty() || text.len() > MAX_JSON_STRING_BYTES {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     Ok(text)
+}
+
+fn entry_size_limit(name: &str) -> Result<u64, CampaignStoreError> {
+    match name {
+        "manifest.json" | "checksum.json" => Ok(64 * 1024),
+        "campaign.json" => Ok(32 * 1024 * 1024),
+        "events.ndjson" | "generations.json" => Ok(16 * 1024 * 1024),
+        _ => Err(CampaignStoreError::ArchiveInvalid),
+    }
+}
+
+fn validate_archive_entry_resources(
+    name: &str,
+    compressed_size: u64,
+    uncompressed_size: u64,
+) -> Result<u64, CampaignStoreError> {
+    let limit = entry_size_limit(name)?;
+    if uncompressed_size > limit
+        || (uncompressed_size > 0
+            && (compressed_size == 0
+                || uncompressed_size > compressed_size.saturating_mul(MAX_COMPRESSION_RATIO)))
+    {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(limit)
+}
+
+fn validate_record_count(count: usize, limit: usize) -> Result<(), CampaignStoreError> {
+    if count > limit {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(())
+}
+
+fn add_expanded_bytes(total: u64, entry: u64) -> Result<u64, CampaignStoreError> {
+    let next = total
+        .checked_add(entry)
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    if next > MAX_UNCOMPRESSED_BYTES {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(next)
+}
+
+fn validate_json_text_resources(bytes: &[u8]) -> Result<(), CampaignStoreError> {
+    let mut depth = 0_usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut string_bytes = 0_usize;
+    for byte in bytes {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                in_string = false;
+            }
+            string_bytes = string_bytes.saturating_add(1);
+            if string_bytes > MAX_JSON_STRING_BYTES.saturating_mul(6) {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+        } else if *byte == b'"' {
+            in_string = true;
+            string_bytes = 0;
+        } else if matches!(*byte, b'{' | b'[') {
+            depth = depth
+                .checked_add(1)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?;
+            if depth > MAX_JSON_DEPTH {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+        } else if matches!(*byte, b'}' | b']') {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    Ok(())
+}
+
+fn validate_json_value_resources(value: &Value) -> Result<(), CampaignStoreError> {
+    let mut pending = vec![(value, 1_usize)];
+    while let Some((current, depth)) = pending.pop() {
+        if depth > MAX_JSON_DEPTH {
+            return Err(CampaignStoreError::ArchiveInvalid);
+        }
+        match current {
+            Value::String(text) if text.len() > MAX_JSON_STRING_BYTES => {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+            Value::Array(values) => {
+                if values.len() > MAX_JSON_ARRAY_LENGTH {
+                    return Err(CampaignStoreError::ArchiveInvalid);
+                }
+                pending.extend(values.iter().map(|entry| (entry, depth + 1)));
+            }
+            Value::Object(values) => {
+                for (key, entry) in values {
+                    if key.len() > MAX_JSON_STRING_BYTES {
+                        return Err(CampaignStoreError::ArchiveInvalid);
+                    }
+                    pending.push((entry, depth + 1));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn require_exact_keys(
@@ -1544,5 +1737,50 @@ mod tests {
             fs::read(&archive_path).expect("read preserved destination"),
             b"original destination"
         );
+    }
+
+    #[test]
+    fn archive_resource_limits_reject_bombs_and_pathological_json() {
+        assert!(add_expanded_bytes(MAX_UNCOMPRESSED_BYTES - 1, 1).is_ok());
+        assert!(add_expanded_bytes(MAX_UNCOMPRESSED_BYTES, 1).is_err());
+        assert!(validate_archive_entry_resources("manifest.json", 1024, 64 * 1024 + 1).is_err());
+        assert!(validate_archive_entry_resources("campaign.json", 1024, 1024 * 101).is_err());
+        assert!(validate_record_count(MAX_EVENT_RECORDS, MAX_EVENT_RECORDS).is_ok());
+        assert!(validate_record_count(MAX_EVENT_RECORDS + 1, MAX_EVENT_RECORDS).is_err());
+
+        let deep = format!(
+            "{}0{}",
+            "[".repeat(MAX_JSON_DEPTH + 1),
+            "]".repeat(MAX_JSON_DEPTH + 1)
+        );
+        assert!(validate_json_text_resources(deep.as_bytes()).is_err());
+        assert!(
+            validate_json_value_resources(&Value::Array(vec![
+                Value::Null;
+                MAX_JSON_ARRAY_LENGTH + 1
+            ]))
+            .is_err()
+        );
+        assert!(
+            validate_json_value_resources(&Value::String("x".repeat(MAX_JSON_STRING_BYTES + 1)))
+                .is_err()
+        );
+
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        for name in ENTRY_NAMES {
+            writer.start_file(name, options).unwrap();
+            if name == "campaign.json" {
+                writer.write_all(&vec![b'a'; 1024 * 1024]).unwrap();
+            } else {
+                writer.write_all(b"{}\n").unwrap();
+            }
+        }
+        let bomb = writer.finish().unwrap().into_inner();
+        assert!(bomb.len() < 32 * 1024);
+        assert!(matches!(
+            parse_archive(&bomb),
+            Err(CampaignStoreError::ArchiveInvalid)
+        ));
     }
 }

@@ -37,7 +37,10 @@ Campaign、世界圣经和事件行中已有的 `schema_version` 是各领域对
 - 所有文本使用 UTF-8、无 BOM、LF 换行。JSON 不允许重复键、`NaN`、`Infinity` 或尾随内容。
 - `manifest.json`、`campaign.json`、`generations.json` 和 `checksum.json` 文件末尾必须有一个 LF。
 - `events.ndjson` 每个非空行是一个完整 JSON 对象并以 LF 结束；没有事件时文件长度为0。
-- v1 写入方应拒绝大于256 MiB的压缩包或大于1 GiB的解压总量。读取方必须设置自身可承受的条目数、单文件和解压总量上限，以防 ZIP bomb。
+- 压缩包最多32 MiB，全部条目展开总量最多64 MiB；任一非空条目的展开/压缩比不得超过100:1。
+- 条目上限固定为：`manifest.json` 64 KiB、`checksum.json` 64 KiB、`campaign.json` 32 MiB、`events.ndjson` 16 MiB、`generations.json` 16 MiB。
+- JSON最大深度64，单数组最多100,000项，单字符串最多1,048,576字符/UTF-8字节。事件最多100,000条，GenerationRecord最多20,000条，每个Campaign事实表最多20,000行，档案总记录最多200,000条。
+- 读取方必须先扫描ZIP中央目录并验证所有预算，再按条目有界展开、校验和解析；不得同时保留五个展开条目。任何上限命中都在正式SQLite事务前整体拒绝。
 
 ### 3.1 规范 JSON
 

@@ -4,6 +4,18 @@ import type { CampaignId, IsoTimestamp } from '@ember-tavern/contracts';
 
 import { PersistenceDataError } from './campaign-repository.js';
 import { currentSchemaVersion } from './migrations.mjs';
+import {
+  MAX_ARCHIVE_BYTES,
+  MAX_EVENT_RECORDS,
+  MAX_GENERATION_RECORDS,
+  MAX_TABLE_RECORDS,
+  MAX_TOTAL_RECORDS,
+  MAX_UNCOMPRESSED_BYTES,
+  archiveEntrySizeLimit,
+  validateJsonTextResources,
+  validateJsonValueResources,
+  validateRecordCount,
+} from './save-resource-limits.js';
 import type { TransactionalSqliteDatabase } from './sqlite-port.js';
 
 type StoredScalar = string | number | null;
@@ -13,7 +25,6 @@ const FORMAT_VERSION = 1;
 // Device-only schema migrations (for example, credential cleanup bookkeeping)
 // must not change the portable campaign archive contract.
 const ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
-const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -170,12 +181,15 @@ export function exportCampaignSave(
 
   const encoded = encodeFiles(captured);
   const uncompressedSize = encoded.entries.reduce((total, entry) => total + entry.data.length, 0);
-  if (uncompressedSize > MAX_ARCHIVE_BYTES) {
-    throw new PersistenceDataError('Exported save exceeds the 256 MiB archive limit');
+  if (
+    uncompressedSize > MAX_UNCOMPRESSED_BYTES ||
+    encoded.entries.some((entry) => entry.data.length > (archiveEntrySizeLimit(entry.name) ?? 0))
+  ) {
+    throw new PersistenceDataError('Exported save exceeds a resource limit');
   }
   const bytes = encodeStoredZip(encoded.entries, options.createdAt);
   if (bytes.length > MAX_ARCHIVE_BYTES) {
-    throw new PersistenceDataError('Exported save exceeds the 256 MiB archive limit');
+    throw new PersistenceDataError('Exported save exceeds the 32 MiB archive limit');
   }
   return Object.freeze({
     fileName: `${safeFileStem(campaignId)}.emtavern`,
@@ -222,6 +236,15 @@ function captureSave(
       .all(campaignId)
       .map((row) => normalizeRow('generation_records', row)),
   );
+  let totalRecords = 1;
+  for (const [table, rows] of Object.entries(tables)) {
+    validateRecordCount(`campaign.tables.${table}`, rows.length, MAX_TABLE_RECORDS);
+    totalRecords += rows.length;
+  }
+  validateRecordCount('events.ndjson', eventRows.length, MAX_EVENT_RECORDS);
+  validateRecordCount('generations.records', generationRows.length, MAX_GENERATION_RECORDS);
+  totalRecords += eventRows.length + generationRows.length;
+  validateRecordCount('archive total', totalRecords, MAX_TOTAL_RECORDS);
   const normalizedCampaign = Object.freeze({
     ...campaign,
     default_model_profile_id: null,
@@ -349,6 +372,9 @@ function normalizeRow(table: string, value: unknown): StoredRow {
           if (table === 'generation_records' && column === 'raw_response_text') {
             scanJsonTextIfPresent(entry);
           }
+          if (typeof entry === 'string') {
+            validateJsonValueResources(entry, `${table}.${column}`);
+          }
           return [column, entry];
         }
         throw new PersistenceDataError(`${table}.${column} has an unsupported storage type`);
@@ -358,12 +384,14 @@ function normalizeRow(table: string, value: unknown): StoredRow {
 }
 
 function normalizeJsonText(text: string, label: string): string {
+  validateJsonTextResources(text, label);
   let value: unknown;
   try {
     value = JSON.parse(text) as unknown;
   } catch (error) {
     throw new PersistenceDataError(`${label} is not valid JSON`, { cause: error });
   }
+  validateJsonValueResources(value, label);
   assertNoSecretKeys(value, label);
   return canonicalJson(value);
 }
@@ -373,7 +401,10 @@ function scanJsonTextIfPresent(value: StoredScalar): void {
   const trimmed = value.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return;
   try {
-    assertNoSecretKeys(JSON.parse(trimmed) as unknown, 'generation_records.raw_response_text');
+    validateJsonTextResources(trimmed, 'generation_records.raw_response_text');
+    const decoded = JSON.parse(trimmed) as unknown;
+    validateJsonValueResources(decoded, 'generation_records.raw_response_text');
+    assertNoSecretKeys(decoded, 'generation_records.raw_response_text');
   } catch (error) {
     if (error instanceof PersistenceDataError) throw error;
   }
