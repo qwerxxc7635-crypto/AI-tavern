@@ -1,4 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
+
+import {
+  ApiBindingTimeoutError,
+  INITIAL_API_BINDING_STATE,
+  reduceApiBindingState,
+  withApiBindingTimeout,
+} from './api-binding-state-machine.js';
 
 import {
   CONNECTION_PROFILES,
@@ -15,8 +22,10 @@ const DEFAULT_PROFILE = getConnectionProfile('deepseek');
 
 export function ModelSettingsPage({
   gateway = tauriModelSettingsGateway,
+  probeTimeoutMs = 30_000,
 }: {
   readonly gateway?: ModelSettingsGateway;
+  readonly probeTimeoutMs?: number;
 }) {
   const [snapshot, setSnapshot] = useState<ModelSettingsSnapshot | null>(null);
   const [presetKey, setPresetKey] = useState<PresetKey>('deepseek');
@@ -29,7 +38,13 @@ export function ModelSettingsPage({
   const [useAsDefault, setUseAsDefault] = useState(true);
   const [useAsFallback, setUseAsFallback] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [credentialBusy, setCredentialBusy] = useState(false);
+  const [binding, dispatchBinding] = useReducer(
+    reduceApiBindingState,
+    INITIAL_API_BINDING_STATE,
+  );
+  const operationSequence = useRef(0);
+  const activeOperation = useRef<number | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -52,12 +67,23 @@ export function ModelSettingsPage({
     setDisplayName(selected.name);
     setBaseUrl(selected.baseUrl);
     setModelName(selected.defaultModel);
+    setApiKey('');
     setModels([]);
     setProbeResult(null);
     setStatus(null);
+    activeOperation.current = null;
+    dispatchBinding({ type: 'CONFIG_CHANGED' });
   }
 
   const selectedProfile = getConnectionProfile(presetKey);
+
+  function configurationChanged() {
+    activeOperation.current = null;
+    setModels([]);
+    setProbeResult(null);
+    setStatus(null);
+    dispatchBinding({ type: 'CONFIG_CHANGED' });
+  }
 
   async function withCredential<T>(
     operation: (credentialRef: string | null, credentialAction: 'KEEP' | 'REPLACE') => Promise<T>,
@@ -77,36 +103,61 @@ export function ModelSettingsPage({
   }
 
   async function probe() {
-    setBusy(true);
+    const operationId = ++operationSequence.current;
+    const revision = binding.revision;
+    activeOperation.current = operationId;
+    dispatchBinding({ type: 'TEST_STARTED', operationId });
     setStatus(null);
-    let transientRef: string | null = null;
     try {
-      if (presetKey !== 'ollama' && apiKey.length > 0) {
-        transientRef = await gateway.saveSecret(apiKey);
-      }
-      const result = await gateway.probe({
-        presetKey,
-        baseUrl: baseUrl || null,
-        credentialRef: transientRef,
-      });
+      const operation = (async () => {
+        let transientRef: string | null = null;
+        try {
+          if (presetKey !== 'ollama' && apiKey.length > 0) {
+            transientRef = await gateway.saveSecret(apiKey);
+          }
+          return await gateway.probe({
+            presetKey,
+            baseUrl: baseUrl || null,
+            credentialRef: transientRef,
+          });
+        } finally {
+          if (transientRef !== null) await gateway.deleteSecret(transientRef);
+        }
+      })();
+      const result = await withApiBindingTimeout(operation, probeTimeoutMs);
+      if (activeOperation.current !== operationId) return;
       setProbeResult(result);
       setBaseUrl(result.normalizedBaseUrl);
       setModels(result.models);
       if (modelName.length === 0 && result.models[0] !== undefined)
         setModelName(result.models[0].name);
       setStatus(`连接成功，发现 ${result.models.length} 个模型。`);
-    } catch {
-      setStatus('连接失败，请检查服务地址、密钥和本地服务状态。');
+      dispatchBinding({ type: 'TEST_SUCCEEDED', operationId, revision });
+    } catch (error) {
+      if (activeOperation.current !== operationId) return;
+      const timeout = error instanceof ApiBindingTimeoutError;
+      setStatus(
+        timeout
+          ? '连接测试超时；配置仍可编辑，请检查服务后重试。'
+          : '连接失败，请检查服务地址、密钥和本地服务状态。',
+      );
+      dispatchBinding({
+        type: 'TEST_FAILED',
+        operationId,
+        revision,
+        failure: timeout ? 'timeout' : 'test_failed',
+      });
     } finally {
-      if (transientRef !== null) {
-        try {
-          await gateway.deleteSecret(transientRef);
-        } catch {
-          setStatus('连接测试已结束，但临时密钥清理失败，请检查系统凭据。');
-        }
-      }
-      setBusy(false);
+      if (activeOperation.current === operationId) activeOperation.current = null;
     }
+  }
+
+  function cancelProbe() {
+    const operationId = activeOperation.current;
+    if (binding.phase !== 'testing' || operationId === null) return;
+    activeOperation.current = null;
+    setStatus('已取消等待连接测试；迟到的结果不会用于保存。');
+    dispatchBinding({ type: 'CANCELLED', operationId });
   }
 
   async function save() {
@@ -135,7 +186,14 @@ export function ModelSettingsPage({
       setStatus('请先测试连接，并从服务返回的模型中选择。');
       return;
     }
-    setBusy(true);
+    if (binding.testedRevision !== binding.revision) {
+      setStatus('连接配置已变化，请重新测试后保存。');
+      return;
+    }
+    const operationId = ++operationSequence.current;
+    const revision = binding.revision;
+    activeOperation.current = operationId;
+    dispatchBinding({ type: 'SAVE_STARTED', operationId });
     setStatus(null);
     try {
       const saved = await withCredential((credentialRef, credentialAction) =>
@@ -156,6 +214,7 @@ export function ModelSettingsPage({
           useAsFallback,
         }),
       );
+      if (activeOperation.current !== operationId) return;
       setSnapshot(saved);
       setApiKey('');
       setStatus(
@@ -163,10 +222,13 @@ export function ModelSettingsPage({
           ? '模型设置已保存；现有存档事实未被修改。'
           : '模型设置已保存；旧凭据已停止使用，系统凭据清理将在稍后自动重试。',
       );
+      dispatchBinding({ type: 'SAVE_SUCCEEDED', operationId, revision });
     } catch {
+      if (activeOperation.current !== operationId) return;
       setStatus('模型设置未保存，请检查输入后重试。');
+      dispatchBinding({ type: 'SAVE_FAILED', operationId, revision });
     } finally {
-      setBusy(false);
+      if (activeOperation.current === operationId) activeOperation.current = null;
     }
   }
 
@@ -175,7 +237,7 @@ export function ModelSettingsPage({
       '删除后，该Provider的已保存API Key会从系统安全凭据库移除；模型配置仍会保留。确定继续吗？',
     );
     if (!accepted) return;
-    setBusy(true);
+    setCredentialBusy(true);
     setStatus(null);
     try {
       const updated = await gateway.forgetCredential(profileId);
@@ -188,7 +250,7 @@ export function ModelSettingsPage({
     } catch {
       setStatus('无法更新本地凭据状态，请稍后重试。');
     } finally {
-      setBusy(false);
+      setCredentialBusy(false);
     }
   }
 
@@ -211,10 +273,12 @@ export function ModelSettingsPage({
         </p>
       </section>
       <section className="model-settings__panel" aria-label="模型配置">
+        <p data-testid="api-binding-phase">连接状态：{binding.phase}</p>
         <label>
           Connection Profile
           <select
             value={presetKey}
+            disabled={binding.phase === 'saving'}
             onChange={(event) => choosePreset(event.target.value as PresetKey)}
           >
             {CONNECTION_PROFILES.map((profile) => (
@@ -226,17 +290,24 @@ export function ModelSettingsPage({
         </label>
         <label>
           配置名称
-          <input value={displayName} onChange={(event) => setDisplayName(event.target.value)} />
+          <input
+            value={displayName}
+            disabled={binding.phase === 'saving'}
+            onChange={(event) => {
+              setDisplayName(event.target.value);
+              configurationChanged();
+            }}
+          />
         </label>
         <label>
           Base URL
           <input
             value={baseUrl}
+            disabled={binding.phase === 'saving'}
             readOnly={selectedProfile.endpointMode === 'FIXED'}
             onChange={(event) => {
               setBaseUrl(event.target.value);
-              setModels([]);
-              setProbeResult(null);
+              configurationChanged();
             }}
           />
         </label>
@@ -246,8 +317,11 @@ export function ModelSettingsPage({
             type="password"
             autoComplete="off"
             value={apiKey}
-            disabled={selectedProfile.credentialMode === 'NONE'}
-            onChange={(event) => setApiKey(event.target.value)}
+            disabled={selectedProfile.credentialMode === 'NONE' || binding.phase === 'saving'}
+            onChange={(event) => {
+              setApiKey(event.target.value);
+              configurationChanged();
+            }}
           />
         </label>
         <label>
@@ -255,7 +329,11 @@ export function ModelSettingsPage({
           <input
             list="provider-models"
             value={modelName}
-            onChange={(event) => setModelName(event.target.value)}
+            disabled={binding.phase === 'saving'}
+            onChange={(event) => {
+              setModelName(event.target.value);
+              dispatchBinding({ type: 'MODEL_CHOSEN' });
+            }}
           />
           <datalist id="provider-models">
             {models.map((model) => (
@@ -270,6 +348,7 @@ export function ModelSettingsPage({
             <input
               type="checkbox"
               checked={useAsDefault}
+              disabled={binding.phase === 'saving'}
               onChange={(event) => setUseAsDefault(event.target.checked)}
             />
             默认模型
@@ -278,19 +357,29 @@ export function ModelSettingsPage({
             <input
               type="checkbox"
               checked={useAsFallback}
+              disabled={binding.phase === 'saving'}
               onChange={(event) => setUseAsFallback(event.target.checked)}
             />
             备用模型
           </label>
         </div>
         <div className="model-settings__actions">
-          <button type="button" disabled={busy} onClick={() => void probe()}>
+          <button
+            type="button"
+            disabled={binding.phase === 'testing' || binding.phase === 'saving'}
+            onClick={() => void probe()}
+          >
             测试连接并列出模型
           </button>
+          {binding.phase === 'testing' ? (
+            <button type="button" onClick={cancelProbe}>
+              取消测试
+            </button>
+          ) : null}
           <button
             type="button"
             className="primary-action"
-            disabled={busy}
+            disabled={binding.phase === 'testing' || binding.phase === 'saving'}
             onClick={() => void save()}
           >
             保存设置
@@ -318,7 +407,7 @@ export function ModelSettingsPage({
                   <button
                     className="danger-action danger-action--small"
                     type="button"
-                    disabled={busy}
+                    disabled={credentialBusy || binding.phase === 'saving'}
                     onClick={() => void forgetCredential(profile.id)}
                   >
                     删除凭据

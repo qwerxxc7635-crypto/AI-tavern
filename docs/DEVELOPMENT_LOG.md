@@ -2685,3 +2685,23 @@
 ### 结论
 
 - `V02-M3-T03`完成。下一项严格为`V02-M3-T04` API Binding State Machine。
+
+## 2026-08-08 — V02-M3-T04 建立 API Binding 显式状态机
+
+### 实现
+
+- 新增纯API Binding reducer，显式覆盖`editing`、`testing`、`choosing_model`、`saving`、`saved`和`failed`六态，页面不再以单一`busy`布尔值推断连接流程。
+- 每次端点、Profile、配置名或API Key变化都会递增revision、清空探测证据并废止当前operation；测试/保存返回必须同时匹配operation ID与revision，迟到结果不能恢复旧receipt。
+- 连接测试加入30秒默认逻辑超时与可见取消操作；取消后仍由原异步操作的`finally`清理临时credential，底层迟到结果不进入页面状态。
+- 保存期间锁定配置表单；保存失败进入`failed`但保留同revision已验证证据，允许用户显式重试，不自动更换Profile或模型。
+- 记录`DEC-066`，明确前端状态机与原生probe receipt安全门禁的职责边界。
+
+### 验证
+
+- 状态机5项测试覆盖完整成功路径、timeout、cancel与迟到结果、config changed、key replaced及save failed重试。
+- 页面3项测试新增六态可见转换和取消后忽略迟到Provider结果；相关8项测试、`pnpm typecheck`、`pnpm lint`及diff检查通过。
+- 未实现T05的凭据clear/remove/health界面，未调用真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M3-T04`完成。下一项严格为`V02-M3-T05` Credential UI。

@@ -1492,3 +1492,19 @@ Provider response仍不能直接写Candidate：调用方必须提供schema/domai
 ### 影响与边界
 
 应用启动继续读取SQLite状态投影，不重放Ledger。migration 5由TypeScript和Rust共同应用，native archive仍只接受本地schema 5但portable archive schema保持1；因此新Ledger目前是基础设施而非已承诺跨设备数据。在具体业务把Ledger作为持久审计依赖前，必须同步升级TS/Rust可移植格式，不能忽略导入类型、版本、revision连续性或资源预算。
+
+## DEC-066：API Binding以revision和operation拒绝迟到异步结果
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M3-T04`、目标架构显式状态机红线
+
+### 决定与理由
+
+API Binding使用独立纯状态机表达`editing`、`testing`、`choosing_model`、`saving`、`saved`和`failed`，不再以React `busy`布尔值推断流程。每次连接配置或Key变化递增revision并清除探测证据；测试和保存各自取得operation ID，完成事件只有同时匹配当前operation与revision才可改变状态。
+
+测试超时进入可重试的`failed`，主动取消回到`editing`并使迟到结果无效。保存失败保留同revision的已验证模型证据以允许显式重试；测试期间允许编辑并立即失效旧操作，保存期间锁定表单，避免已经可能提交的持久写入与界面配置分叉。
+
+### 影响与边界
+
+探测回执仍由原生短期registry逐值绑定端点、模型与能力，前端状态机不能替代安全门禁。逻辑取消无法中断已进入操作系统或HTTP栈的底层调用，但结果会被丢弃，临时credential清理由原异步操作的`finally`继续执行。T05将基于该状态机补充credential replace/clear/remove/cleanup health，不在本任务混入凭据生命周期界面。

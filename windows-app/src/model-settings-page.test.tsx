@@ -35,6 +35,7 @@ describe('model settings page', () => {
     };
 
     render(<ModelSettingsPage gateway={gateway} />);
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
     await screen.findByText('尚未配置模型。');
 
     const selector = screen.getByLabelText('Connection Profile') as HTMLSelectElement;
@@ -168,6 +169,7 @@ describe('model settings page', () => {
     fireEvent.click(screen.getByLabelText('备用模型'));
     fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
     expect(await screen.findByText('连接成功，发现 1 个模型。')).toBeTruthy();
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：choosing_model');
     expect(deleted).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
@@ -179,6 +181,7 @@ describe('model settings page', () => {
     expect(JSON.stringify(saved[0])).not.toContain('private-key');
     expect(screen.getByText('默认')).toBeTruthy();
     expect(screen.getByText('备用')).toBeTruthy();
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：saved');
     await waitFor(() =>
       expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe(''),
     );
@@ -192,5 +195,55 @@ describe('model settings page', () => {
     fireEvent.click(screen.getByRole('button', { name: '删除凭据' }));
     expect(await screen.findByText('已删除该Provider的系统凭据；模型配置仍保留。')).toBeTruthy();
     expect(screen.getByText('无已保存凭据')).toBeTruthy();
+  });
+
+  it('cancels an in-flight test and ignores its late provider result', async () => {
+    let resolveProbe!: (value: Awaited<ReturnType<ModelSettingsGateway['probe']>>) => void;
+    const pendingProbe = new Promise<Awaited<ReturnType<ModelSettingsGateway['probe']>>>(
+      (resolve) => {
+        resolveProbe = resolve;
+      },
+    );
+    const gateway: ModelSettingsGateway = {
+      async load() {
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: 0,
+        };
+      },
+      async save() {
+        throw new Error('not used');
+      },
+      async forgetCredential() {
+        throw new Error('not used');
+      },
+      async saveSecret() {
+        throw new Error('not used');
+      },
+      async deleteSecret() {},
+      async probe() {
+        return pendingProbe;
+      },
+    };
+
+    render(<ModelSettingsPage gateway={gateway} />);
+    await screen.findByText('尚未配置模型。');
+    fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：testing');
+    fireEvent.click(screen.getByRole('button', { name: '取消测试' }));
+    expect(await screen.findByText('已取消等待连接测试；迟到的结果不会用于保存。')).toBeTruthy();
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
+
+    resolveProbe({
+      receiptId: '00000000-0000-4000-8000-000000000002',
+      normalizedBaseUrl: 'https://api.deepseek.com/',
+      endpointFingerprint: 'a'.repeat(64),
+      models: [],
+    });
+    await Promise.resolve();
+    expect(screen.queryByText('连接成功，发现 0 个模型。')).toBeNull();
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
   });
 });
