@@ -15,6 +15,14 @@ const migrations = [
       import.meta.url,
     ),
   },
+  {
+    version: 3,
+    name: 'provider_probe_consistency',
+    source: new URL(
+      '../../../database/migrations/0003_provider_probe_consistency.sql',
+      import.meta.url,
+    ),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

@@ -31,10 +31,13 @@ describe('model settings page', () => {
               presetKey: update.presetKey,
               providerDisplayName: update.providerDisplayName,
               baseUrl: update.baseUrl,
+              endpointFingerprint: update.endpointFingerprint,
               hasCredential: update.credentialAction !== 'CLEAR',
               modelName: update.modelName,
               modelDisplayName: update.modelDisplayName,
               capabilities: update.capabilities,
+              capabilitySource: update.capabilitySource,
+              probeFingerprint: update.probeFingerprint,
             },
           ],
           defaultModelProfileId: 'profile-1',
@@ -52,10 +55,13 @@ describe('model settings page', () => {
               presetKey: 'deepseek',
               providerDisplayName: 'DeepSeek',
               baseUrl: 'https://api.deepseek.com/',
+              endpointFingerprint: null,
               hasCredential: false,
               modelName: 'deepseek-v4-flash',
               modelDisplayName: 'DeepSeek V4 Flash',
               capabilities: null,
+              capabilitySource: null,
+              probeFingerprint: null,
             },
           ],
           defaultModelProfileId: 'profile-1',
@@ -70,24 +76,31 @@ describe('model settings page', () => {
         deleted.push(reference);
       },
       async probe() {
-        return [
-          {
-            name: 'deepseek-v4-flash',
-            displayName: 'DeepSeek V4 Flash',
-            capabilities: {
-              text: true,
-              streaming: false,
-              systemMessages: true,
-              jsonMode: true,
-              jsonSchema: false,
-              toolCalling: false,
-              reasoning: true,
-              costStatus: 'PAID',
-              contextWindowTokens: 1048576,
-              checkedAt: '2026-08-01T00:00:00Z',
+        return {
+          receiptId: '00000000-0000-4000-8000-000000000002',
+          normalizedBaseUrl: 'https://api.deepseek.com/',
+          endpointFingerprint: 'a'.repeat(64),
+          models: [
+            {
+              name: 'deepseek-v4-flash',
+              displayName: 'DeepSeek V4 Flash',
+              capabilitySource: 'PRESET_METADATA',
+              probeFingerprint: 'b'.repeat(64),
+              capabilities: {
+                text: true,
+                streaming: false,
+                systemMessages: true,
+                jsonMode: true,
+                jsonSchema: false,
+                toolCalling: false,
+                reasoning: true,
+                costStatus: 'PAID',
+                contextWindowTokens: 1048576,
+                checkedAt: '2026-08-01T00:00:00Z',
+              },
             },
-          },
-        ];
+          ],
+        };
       },
     };
     render(<ModelSettingsPage gateway={gateway} />);
@@ -107,6 +120,7 @@ describe('model settings page', () => {
     expect(saved).toHaveLength(1);
     expect(saved[0]?.credentialRef).toMatch(/^credential:v1:/);
     expect(saved[0]?.credentialAction).toBe('REPLACE');
+    expect(saved[0]?.probeReceiptId).toBe('00000000-0000-4000-8000-000000000002');
     expect(JSON.stringify(saved[0])).not.toContain('private-key');
     expect(screen.getByText('默认')).toBeTruthy();
     expect(screen.getByText('备用')).toBeTruthy();

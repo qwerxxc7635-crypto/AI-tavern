@@ -12,8 +12,8 @@ const coreTables = [
   'adventures',
   'app_settings',
   'campaigns',
-  'credential_cleanup_queue',
   'conversations',
+  'credential_cleanup_queue',
   'game_events',
   'generation_records',
   'items',
@@ -98,6 +98,49 @@ test('enforces representative JSON, range, foreign-key, and secret-storage const
     assert.equal(
       providerColumns.some((column) => /api.?key|authorization|token/i.test(column.name)),
       false,
+    );
+    assert.equal(
+      providerColumns.some((column) => column.name === 'endpoint_fingerprint'),
+      true,
+    );
+    const profileColumns = database.prepare('PRAGMA table_info(model_profiles)').all();
+    assert.equal(
+      profileColumns.some((column) => column.name === 'capability_source'),
+      true,
+    );
+    assert.equal(
+      profileColumns.some((column) => column.name === 'probe_fingerprint'),
+      true,
+    );
+    const at = '2026-08-08T00:00:00.000Z';
+    assert.throws(() =>
+      database
+        .prepare(
+          `INSERT INTO provider_configs (
+             id, provider_type, preset_key, display_name, base_url, options_json,
+             enabled, created_at, updated_at, endpoint_fingerprint
+           ) VALUES (?, 'OpenAI-Compatible', 'custom', 'Bad fingerprint', ?, '{}', 1, ?, ?, ?)`,
+        )
+        .run('provider-bad-fingerprint', 'http://127.0.0.1:11434/v1/', at, at, 'short'),
+    );
+    database
+      .prepare(
+        `INSERT INTO provider_configs (
+           id, provider_type, preset_key, display_name, base_url, options_json,
+           enabled, created_at, updated_at, endpoint_fingerprint
+         ) VALUES (?, 'OpenAI-Compatible', 'custom', 'Probe constraints', ?, '{}', 1, ?, ?, ?)`,
+      )
+      .run('provider-probe-constraints', 'http://127.0.0.1:11434/v1/', at, at, 'a'.repeat(64));
+    assert.throws(() =>
+      database
+        .prepare(
+          `INSERT INTO model_profiles (
+             id, provider_config_id, model_name, display_name, capabilities_json,
+             task_options_json, enabled, created_at, updated_at, capability_source,
+             probe_fingerprint
+           ) VALUES (?, ?, 'model', 'Model', '{}', '{}', 1, ?, ?, 'INVENTED', ?)`,
+        )
+        .run('profile-bad-source', 'provider-probe-constraints', at, at, 'b'.repeat(64)),
     );
 
     database

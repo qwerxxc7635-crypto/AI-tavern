@@ -4,6 +4,7 @@ import {
   tauriModelSettingsGateway,
   type ModelSettingsGateway,
   type ModelSettingsSnapshot,
+  type ProbeResult,
   type PresetKey,
   type ProbeModel,
 } from './model-settings-service.js';
@@ -36,6 +37,7 @@ export function ModelSettingsPage({
   const [modelName, setModelName] = useState(PRESETS.deepseek.model);
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<readonly ProbeModel[]>([]);
+  const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
   const [useAsDefault, setUseAsDefault] = useState(true);
   const [useAsFallback, setUseAsFallback] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function ModelSettingsPage({
     setBaseUrl(selected.baseUrl);
     setModelName(selected.model);
     setModels([]);
+    setProbeResult(null);
     setStatus(null);
   }
 
@@ -91,14 +94,17 @@ export function ModelSettingsPage({
       if (presetKey !== 'ollama' && apiKey.length > 0) {
         transientRef = await gateway.saveSecret(apiKey);
       }
-      const listed = await gateway.probe({
+      const result = await gateway.probe({
         presetKey,
         baseUrl: baseUrl || null,
         credentialRef: transientRef,
       });
-      setModels(listed);
-      if (modelName.length === 0 && listed[0] !== undefined) setModelName(listed[0].name);
-      setStatus(`连接成功，发现 ${listed.length} 个模型。`);
+      setProbeResult(result);
+      setBaseUrl(result.normalizedBaseUrl);
+      setModels(result.models);
+      if (modelName.length === 0 && result.models[0] !== undefined)
+        setModelName(result.models[0].name);
+      setStatus(`连接成功，发现 ${result.models.length} 个模型。`);
     } catch {
       setStatus('连接失败，请检查服务地址、密钥和本地服务状态。');
     } finally {
@@ -134,8 +140,8 @@ export function ModelSettingsPage({
       setStatus('云模型需要API Key；密钥只会保存到系统凭据库。');
       return;
     }
-    const selectedModel = models.find((model) => model.name === modelName.trim());
-    if (selectedModel === undefined) {
+    const selectedModel = probeResult?.models.find((model) => model.name === modelName.trim());
+    if (selectedModel === undefined || probeResult === null) {
       setStatus('请先测试连接，并从服务返回的模型中选择。');
       return;
     }
@@ -147,11 +153,15 @@ export function ModelSettingsPage({
           presetKey,
           providerDisplayName: displayName.trim(),
           baseUrl: baseUrl.trim(),
+          endpointFingerprint: probeResult.endpointFingerprint,
           credentialRef,
           credentialAction,
           modelName: modelName.trim(),
           modelDisplayName: selectedModel.displayName,
           capabilities: selectedModel.capabilities,
+          capabilitySource: selectedModel.capabilitySource,
+          probeFingerprint: selectedModel.probeFingerprint,
+          probeReceiptId: probeResult.receiptId,
           useAsDefault,
           useAsFallback,
         }),
@@ -230,7 +240,17 @@ export function ModelSettingsPage({
         </label>
         <label>
           Base URL
-          <input value={baseUrl} onChange={(event) => setBaseUrl(event.target.value)} />
+          <input
+            value={baseUrl}
+            readOnly={
+              presetKey === 'deepseek' || presetKey === 'qwen' || presetKey === 'openrouter'
+            }
+            onChange={(event) => {
+              setBaseUrl(event.target.value);
+              setModels([]);
+              setProbeResult(null);
+            }}
+          />
         </label>
         <label>
           API Key

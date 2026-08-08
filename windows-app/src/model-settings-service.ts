@@ -8,11 +8,16 @@ export interface ModelProfile {
   readonly presetKey: PresetKey;
   readonly providerDisplayName: string;
   readonly baseUrl: string | null;
+  readonly endpointFingerprint: string | null;
   readonly hasCredential: boolean;
   readonly modelName: string;
   readonly modelDisplayName: string;
   readonly capabilities: ModelCapabilities | null;
+  readonly capabilitySource: CapabilitySource | null;
+  readonly probeFingerprint: string | null;
 }
+
+export type CapabilitySource = 'PROVIDER_RESPONSE' | 'PRESET_METADATA' | 'UNKNOWN';
 
 export interface ModelSettingsSnapshot {
   readonly profiles: readonly ModelProfile[];
@@ -25,11 +30,15 @@ export interface ModelSettingsUpdate {
   readonly presetKey: PresetKey;
   readonly providerDisplayName: string;
   readonly baseUrl: string | null;
+  readonly endpointFingerprint: string;
   readonly credentialRef: string | null;
   readonly credentialAction: 'KEEP' | 'REPLACE' | 'CLEAR';
   readonly modelName: string;
   readonly modelDisplayName: string;
   readonly capabilities: ModelCapabilities;
+  readonly capabilitySource: CapabilitySource;
+  readonly probeFingerprint: string;
+  readonly probeReceiptId: string;
   readonly useAsDefault: boolean;
   readonly useAsFallback: boolean;
 }
@@ -38,6 +47,15 @@ export interface ProbeModel {
   readonly name: string;
   readonly displayName: string;
   readonly capabilities: ModelCapabilities;
+  readonly capabilitySource: CapabilitySource;
+  readonly probeFingerprint: string;
+}
+
+export interface ProbeResult {
+  readonly receiptId: string;
+  readonly normalizedBaseUrl: string;
+  readonly endpointFingerprint: string;
+  readonly models: readonly ProbeModel[];
 }
 
 export interface ModelCapabilities {
@@ -63,7 +81,7 @@ export interface ModelSettingsGateway {
     readonly presetKey: PresetKey;
     readonly baseUrl: string | null;
     readonly credentialRef: string | null;
-  }): Promise<readonly ProbeModel[]>;
+  }): Promise<ProbeResult>;
 }
 
 export const tauriModelSettingsGateway: ModelSettingsGateway = {
@@ -90,7 +108,12 @@ export const tauriModelSettingsGateway: ModelSettingsGateway = {
   },
   async probe(input) {
     const value = requireRecord(await invoke<unknown>('provider_probe', { input }));
-    return requireArray(value['models']).map(parseProbeModel);
+    return Object.freeze({
+      receiptId: requireId(value['receiptId']),
+      normalizedBaseUrl: requireText(value['normalizedBaseUrl']),
+      endpointFingerprint: requireFingerprint(value['endpointFingerprint']),
+      models: Object.freeze(requireArray(value['models']).map(parseProbeModel)),
+    });
   },
 };
 
@@ -118,11 +141,17 @@ function parseProfile(value: unknown): ModelProfile {
     presetKey,
     providerDisplayName: requireText(record['providerDisplayName']),
     baseUrl: optionalText(record['baseUrl']),
+    endpointFingerprint: optionalFingerprint(record['endpointFingerprint']),
     hasCredential: requireBoolean(record['hasCredential']),
     modelName: requireText(record['modelName']),
     modelDisplayName: requireText(record['modelDisplayName']),
     capabilities:
       record['capabilities'] === null ? null : parseCapabilities(record['capabilities']),
+    capabilitySource:
+      record['capabilitySource'] === null
+        ? null
+        : requireCapabilitySource(record['capabilitySource']),
+    probeFingerprint: optionalFingerprint(record['probeFingerprint']),
   });
 }
 
@@ -132,6 +161,8 @@ function parseProbeModel(value: unknown): ProbeModel {
     name: requireText(record['name']),
     displayName: requireText(record['displayName']),
     capabilities: parseCapabilities(record['capabilities']),
+    capabilitySource: requireCapabilitySource(record['capabilitySource']),
+    probeFingerprint: requireFingerprint(record['probeFingerprint']),
   });
 }
 
@@ -184,6 +215,29 @@ function optionalText(value: unknown): string | null {
 
 function optionalId(value: unknown): string | null {
   return optionalText(value);
+}
+
+function requireId(value: unknown): string {
+  const id = requireText(value);
+  if (!/^[0-9a-f-]{36}$/.test(id)) throw new TypeError('Probe receipt is invalid');
+  return id;
+}
+
+function requireFingerprint(value: unknown): string {
+  const fingerprint = requireText(value);
+  if (!/^[0-9a-f]{64}$/.test(fingerprint)) throw new TypeError('Probe fingerprint is invalid');
+  return fingerprint;
+}
+
+function optionalFingerprint(value: unknown): string | null {
+  return value === null ? null : requireFingerprint(value);
+}
+
+function requireCapabilitySource(value: unknown): CapabilitySource {
+  if (value !== 'PROVIDER_RESPONSE' && value !== 'PRESET_METADATA' && value !== 'UNKNOWN') {
+    throw new TypeError('Capability source is invalid');
+  }
+  return value;
 }
 
 function requireBoolean(value: unknown): boolean {

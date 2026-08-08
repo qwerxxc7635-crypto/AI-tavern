@@ -39,7 +39,12 @@ describe('model settings contract', () => {
         calls.push(`delete:${reference}`);
       },
       async probe() {
-        return [];
+        return {
+          receiptId: '00000000-0000-4000-8000-000000000002',
+          normalizedBaseUrl: 'https://api.deepseek.com/',
+          endpointFingerprint: 'a'.repeat(64),
+          models: [],
+        };
       },
     };
 
@@ -48,6 +53,7 @@ describe('model settings contract', () => {
       presetKey: 'deepseek',
       providerDisplayName: 'DeepSeek',
       baseUrl: 'https://api.deepseek.com/',
+      endpointFingerprint: 'a'.repeat(64),
       credentialRef: reference,
       credentialAction: 'REPLACE',
       modelName: 'deepseek-v4-flash',
@@ -64,6 +70,9 @@ describe('model settings contract', () => {
         costStatus: 'UNKNOWN',
         checkedAt: '2026-08-01T00:00:00Z',
       },
+      capabilitySource: 'PRESET_METADATA',
+      probeFingerprint: 'b'.repeat(64),
+      probeReceiptId: '00000000-0000-4000-8000-000000000002',
       useAsDefault: true,
       useAsFallback: false,
     });
@@ -81,6 +90,7 @@ describe('model settings contract', () => {
             presetKey: 'custom',
             providerDisplayName: 'Local',
             baseUrl: 'http://127.0.0.1:11434/',
+            endpointFingerprint: null,
             hasCredential: false,
             modelName: 'local-model',
             modelDisplayName: 'Local Model',
@@ -96,6 +106,8 @@ describe('model settings contract', () => {
               costStatus: 'UNKNOWN',
               checkedAt: '2026-08-01 00:00:00Z',
             },
+            capabilitySource: null,
+            probeFingerprint: null,
           },
         ],
         defaultModelProfileId: null,

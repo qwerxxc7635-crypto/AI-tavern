@@ -2454,3 +2454,24 @@
 ### 结论
 
 - SR2-004 / `V02-M1-T04` 关闭。下一项严格为 `V02-M1-T05` Provider consistency。
+
+## 2026-08-08 — V02-M1-T05 关闭 Provider 配置漂移
+
+### 实现
+
+- DeepSeek、Qwen和OpenRouter探测只接受固定规范化端点，设置页地址只读；Ollama和自定义服务把实际探测地址规范化后回传并保存。
+- Tauri新增内存探测回执注册表：随机UUID回执最长15分钟、最多64项，精确绑定预设、端点指纹、模型、显示名、能力来源、能力值与探测指纹；保存前必须逐值匹配。
+- 能力来源新增`PROVIDER_RESPONSE`、`PRESET_METADATA`、`UNKNOWN`。只有DeepSeek/Qwen正式预设模型使用预设能力，OpenRouter有响应元数据时标为Provider响应，其余保持未知和保守能力。
+- SQLite migration 3新增`endpoint_fingerprint`、`capability_source`与`probe_fingerprint`；同一Provider更新时先禁用全部旧模型，默认/备用引用在同一事务先清空再按当前选择写入。
+- Campaign archive schema仍为1；Provider配置、回执和设备能力继续不进入`.emtavern`。
+
+### 验证
+
+- 60个Vitest文件、349项测试通过；Node migration/startup覆盖migration 3字段与约束。
+- Native model settings 11/11通过，覆盖端点切换、旧模型禁用、默认/备用清空、端点/能力指纹篡改拒绝。
+- Tauri单元测试覆盖固定预设端点替换拒绝，以及回执与端点、模型、能力逐值绑定。
+- 未访问真实Provider、付费API或正式用户数据；Provider探测测试只验证本地结构和既有回环合同。
+
+### 结论
+
+- SR2-005 / `V02-M1-T05` 关闭。下一项严格为 `V02-M1-T06` Destructive transaction lock。

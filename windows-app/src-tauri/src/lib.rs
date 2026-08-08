@@ -4,25 +4,38 @@
 
 mod platform_paths;
 
+use std::{
+    collections::HashMap,
+    sync::Mutex,
+    time::{Duration, Instant},
+};
+
 use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
     CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
-    CampaignStoreError, CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
-    CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
-    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
-    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
-    TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    CampaignStoreError, CampaignSummary, CapabilitySource, CharacterCompletionCommit,
+    CharacterCreationSnapshot, CharacterTraitGenerationCommit, CredentialAction,
+    CredentialCleanupReason, ModelCapabilitiesRegistration, ModelSettingsSnapshot,
+    ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot, NpcRosterGenerationCommit,
+    QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit, TavernSnapshot,
+    WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
+    model_probe_fingerprint,
 };
 use ember_provider_openai_compatible::{
-    CustomCompatibleConfig, DeepSeekPreset, ModelCostStatus, OllamaPreset, OpenAiCompatibleConfig,
-    OpenAiCompatibleProvider, OpenRouterPreset, ProviderError, QwenPreset,
+    DEEPSEEK_BASE_URL, DeepSeekPreset, ModelCostStatus, OLLAMA_BASE_URL, OPENROUTER_BASE_URL,
+    OpenAiCompatibleConfig, OpenAiCompatibleProvider, OpenRouterPreset, ProviderError,
+    QWEN_BASE_URL, QwenPreset,
 };
 use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use tokio_util::sync::CancellationToken;
+use uuid::Uuid;
+
+const PROBE_RECEIPT_TTL: Duration = Duration::from_secs(15 * 60);
+const MAX_PROBE_RECEIPTS: usize = 64;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -119,33 +132,84 @@ struct ProviderProbeInput {
     credential_ref: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ProviderProbeModel {
     name: String,
     display_name: String,
-    capabilities: ProbeCapabilities,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ProbeCapabilities {
-    text: bool,
-    streaming: bool,
-    system_messages: bool,
-    json_mode: bool,
-    json_schema: bool,
-    tool_calling: bool,
-    reasoning: bool,
-    context_window_tokens: Option<u64>,
-    cost_status: &'static str,
-    checked_at: String,
+    capabilities: ModelCapabilitiesRegistration,
+    capability_source: CapabilitySource,
+    probe_fingerprint: String,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ProviderProbeResult {
+    receipt_id: String,
+    normalized_base_url: String,
+    endpoint_fingerprint: String,
     models: Vec<ProviderProbeModel>,
+}
+
+#[derive(Clone)]
+struct StoredProbe {
+    preset_key: String,
+    normalized_base_url: String,
+    endpoint_fingerprint: String,
+    models: Vec<ProviderProbeModel>,
+    created_at: Instant,
+}
+
+#[derive(Default)]
+struct ProviderProbeRegistry(Mutex<HashMap<String, StoredProbe>>);
+
+impl ProviderProbeRegistry {
+    fn insert(&self, probe: StoredProbe) -> Result<String, CommandError> {
+        let mut entries = self.0.lock().map_err(|_| probe_stale())?;
+        entries.retain(|_, value| value.created_at.elapsed() <= PROBE_RECEIPT_TTL);
+        if entries.len() >= MAX_PROBE_RECEIPTS
+            && let Some(oldest) = entries
+                .iter()
+                .min_by_key(|(_, value)| value.created_at)
+                .map(|(key, _)| key.clone())
+        {
+            entries.remove(&oldest);
+        }
+        let receipt_id = Uuid::new_v4().to_string();
+        entries.insert(receipt_id.clone(), probe);
+        Ok(receipt_id)
+    }
+
+    fn validate(&self, update: &ModelSettingsUpdate) -> Result<(), CommandError> {
+        let mut entries = self.0.lock().map_err(|_| probe_stale())?;
+        entries.retain(|_, value| value.created_at.elapsed() <= PROBE_RECEIPT_TTL);
+        let probe = entries
+            .get(&update.probe_receipt_id)
+            .ok_or_else(probe_stale)?;
+        let base_url = update.base_url.as_deref().ok_or_else(probe_stale)?;
+        let model_matches = probe.models.iter().any(|model| {
+            model.name == update.model_name
+                && model.display_name == update.model_display_name
+                && model.capabilities == update.capabilities
+                && model.capability_source == update.capability_source
+                && model.probe_fingerprint == update.probe_fingerprint
+        });
+        if probe.preset_key != update.preset_key
+            || probe.normalized_base_url != base_url
+            || probe.endpoint_fingerprint != update.endpoint_fingerprint
+            || !model_matches
+        {
+            return Err(probe_stale());
+        }
+        Ok(())
+    }
+}
+
+fn probe_stale() -> CommandError {
+    CommandError {
+        code: "PROBE_STALE",
+        message: "连接测试结果已失效，请重新测试后保存。",
+    }
 }
 
 #[tauri::command]
@@ -160,7 +224,9 @@ fn model_settings_get(
 fn model_settings_save(
     command: ModelSettingsUpdate,
     store: State<'_, CampaignStore>,
+    probes: State<'_, ProviderProbeRegistry>,
 ) -> Result<ModelSettingsSnapshot, CommandError> {
+    probes.validate(&command)?;
     if command.credential_action == CredentialAction::Replace
         && let Some(value) = command.credential_ref.as_deref()
     {
@@ -212,68 +278,128 @@ fn retry_pending_credential_cleanup(
 }
 
 #[tauri::command]
-async fn provider_probe(input: ProviderProbeInput) -> Result<ProviderProbeResult, CommandError> {
+async fn provider_probe(
+    input: ProviderProbeInput,
+    probes: State<'_, ProviderProbeRegistry>,
+) -> Result<ProviderProbeResult, CommandError> {
     let credential = input
         .credential_ref
         .map(|value| value.parse::<CredentialRef>())
         .transpose()
         .map_err(|_| ProviderError::InvalidConfig)?;
+    let normalized_base_url = normalize_probe_url(&input.preset_key, input.base_url.as_deref())?;
     let config: OpenAiCompatibleConfig = match input.preset_key.as_str() {
         "deepseek" => DeepSeekPreset::config(credential.ok_or(ProviderError::InvalidConfig)?)?,
         "qwen" => QwenPreset::config(credential.ok_or(ProviderError::InvalidConfig)?)?,
         "openrouter" => OpenRouterPreset::config(credential.ok_or(ProviderError::InvalidConfig)?)?,
-        "ollama" => OllamaPreset::config()?,
-        "custom" => {
-            let custom = CustomCompatibleConfig::new(
-                input
-                    .base_url
-                    .as_deref()
-                    .ok_or(ProviderError::InvalidConfig)?,
-                "probe-model",
-                credential,
-                Vec::new(),
-            )?;
-            custom.provider_config().clone()
-        }
+        "ollama" => OpenAiCompatibleConfig::new(&normalized_base_url, None)?,
+        "custom" => OpenAiCompatibleConfig::new(&normalized_base_url, credential)?,
         _ => return Err(ProviderError::InvalidConfig.into()),
     };
     let checked_at = OffsetDateTime::now_utc()
         .format(&Rfc3339)
         .map_err(|_| ProviderError::InvalidResponse)?;
     let preset_key = input.preset_key;
+    let endpoint_fingerprint = model_endpoint_fingerprint(&preset_key, &normalized_base_url);
     let models = OpenAiCompatibleProvider::new()?
         .list_models(&config, CancellationToken::new())
         .await?
         .into_iter()
         .map(|model| {
-            let json_mode = match preset_key.as_str() {
-                "deepseek" | "qwen" | "ollama" => true,
-                "openrouter" => model.supports_json_mode.unwrap_or(false),
-                _ => false,
+            let preset = match preset_key.as_str() {
+                "deepseek" => DeepSeekPreset::model(&model.name),
+                "qwen" => QwenPreset::model(&model.name),
+                _ => None,
             };
-            ProviderProbeModel {
+            let capability_source = if preset.is_some() {
+                CapabilitySource::PresetMetadata
+            } else if preset_key == "openrouter"
+                && (model.supports_json_mode.is_some()
+                    || model.context_window_tokens.is_some()
+                    || model.cost_status != ModelCostStatus::Unknown)
+            {
+                CapabilitySource::ProviderResponse
+            } else {
+                CapabilitySource::Unknown
+            };
+            let capabilities = ModelCapabilitiesRegistration {
+                text: true,
+                streaming: false,
+                system_messages: false,
+                json_mode: preset
+                    .map(|value| value.json_mode)
+                    .or(model.supports_json_mode)
+                    .unwrap_or(false),
+                json_schema: false,
+                tool_calling: false,
+                reasoning: preset.is_some_and(|value| value.reasoning),
+                context_window_tokens: preset
+                    .map(|value| value.context_window_tokens)
+                    .or(model.context_window_tokens),
+                cost_status: match model.cost_status {
+                    ModelCostStatus::Free => "FREE".to_owned(),
+                    ModelCostStatus::Paid => "PAID".to_owned(),
+                    ModelCostStatus::Unknown => "UNKNOWN".to_owned(),
+                },
+                checked_at: checked_at.clone(),
+            };
+            let probe_fingerprint = model_probe_fingerprint(
+                &endpoint_fingerprint,
+                &model.name,
+                capability_source,
+                &capabilities,
+            )?;
+            Ok(ProviderProbeModel {
                 name: model.name,
                 display_name: model.display_name,
-                capabilities: ProbeCapabilities {
-                    text: true,
-                    streaming: false,
-                    system_messages: true,
-                    json_mode,
-                    json_schema: false,
-                    tool_calling: false,
-                    reasoning: matches!(preset_key.as_str(), "deepseek" | "qwen"),
-                    context_window_tokens: model.context_window_tokens,
-                    cost_status: match model.cost_status {
-                        ModelCostStatus::Free => "FREE",
-                        ModelCostStatus::Paid => "PAID",
-                        ModelCostStatus::Unknown => "UNKNOWN",
-                    },
-                    checked_at: checked_at.clone(),
-                },
-            }
+                capabilities,
+                capability_source,
+                probe_fingerprint,
+            })
         })
-        .collect();
-    Ok(ProviderProbeResult { models })
+        .collect::<Result<Vec<_>, CampaignStoreError>>()?;
+    let receipt_id = probes.insert(StoredProbe {
+        preset_key,
+        normalized_base_url: normalized_base_url.clone(),
+        endpoint_fingerprint: endpoint_fingerprint.clone(),
+        models: models.clone(),
+        created_at: Instant::now(),
+    })?;
+    Ok(ProviderProbeResult {
+        receipt_id,
+        normalized_base_url,
+        endpoint_fingerprint,
+        models,
+    })
+}
+
+fn normalize_probe_url(preset_key: &str, supplied: Option<&str>) -> Result<String, ProviderError> {
+    let canonical = match preset_key {
+        "deepseek" => Some(DEEPSEEK_BASE_URL),
+        "qwen" => Some(QWEN_BASE_URL),
+        "openrouter" => Some(OPENROUTER_BASE_URL),
+        "ollama" => None,
+        "custom" => None,
+        _ => return Err(ProviderError::InvalidConfig),
+    };
+    if let Some(canonical) = canonical {
+        if supplied.is_some_and(|value| normalize_url(value) != canonical) {
+            return Err(ProviderError::InvalidConfig);
+        }
+        return Ok(canonical.to_owned());
+    }
+    let supplied = supplied.or((preset_key == "ollama").then_some(OLLAMA_BASE_URL));
+    let normalized = normalize_url(supplied.ok_or(ProviderError::InvalidConfig)?);
+    OpenAiCompatibleConfig::new(&normalized, None)?;
+    Ok(normalized)
+}
+
+fn normalize_url(value: &str) -> String {
+    if value.ends_with('/') {
+        value.to_owned()
+    } else {
+        format!("{value}/")
+    }
 }
 
 #[tauri::command]
@@ -641,6 +767,7 @@ pub fn run() {
             let store = CampaignStore::open(database_path)?;
             retry_pending_credential_cleanup(&store, &SecretStore)?;
             app.manage(store);
+            app.manage(ProviderProbeRegistry::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -737,6 +864,75 @@ mod tests {
             assert_eq!(command_error.code, expected);
             assert!(!command_error.message.is_empty());
         }
+    }
+
+    #[test]
+    fn fixed_presets_reject_endpoint_substitution() {
+        assert_eq!(
+            normalize_probe_url("deepseek", Some(DEEPSEEK_BASE_URL)).unwrap(),
+            DEEPSEEK_BASE_URL
+        );
+        assert!(normalize_probe_url("deepseek", Some("https://attacker.invalid/v1/")).is_err());
+    }
+
+    #[test]
+    fn probe_receipt_is_bound_to_endpoint_model_and_capabilities() {
+        let registry = ProviderProbeRegistry::default();
+        let endpoint = model_endpoint_fingerprint("custom", "http://127.0.0.1:11434/v1/");
+        let capabilities = ModelCapabilitiesRegistration {
+            text: true,
+            streaming: false,
+            system_messages: false,
+            json_mode: false,
+            json_schema: false,
+            tool_calling: false,
+            reasoning: false,
+            context_window_tokens: Some(8192),
+            cost_status: "UNKNOWN".to_owned(),
+            checked_at: "2026-08-08T00:00:00Z".to_owned(),
+        };
+        let probe_fingerprint = model_probe_fingerprint(
+            &endpoint,
+            "local-model",
+            CapabilitySource::Unknown,
+            &capabilities,
+        )
+        .unwrap();
+        let model = ProviderProbeModel {
+            name: "local-model".to_owned(),
+            display_name: "Local Model".to_owned(),
+            capabilities: capabilities.clone(),
+            capability_source: CapabilitySource::Unknown,
+            probe_fingerprint: probe_fingerprint.clone(),
+        };
+        let receipt_id = registry
+            .insert(StoredProbe {
+                preset_key: "custom".to_owned(),
+                normalized_base_url: "http://127.0.0.1:11434/v1/".to_owned(),
+                endpoint_fingerprint: endpoint.clone(),
+                models: vec![model],
+                created_at: Instant::now(),
+            })
+            .unwrap();
+        let mut update = ModelSettingsUpdate {
+            preset_key: "custom".to_owned(),
+            provider_display_name: "Local".to_owned(),
+            base_url: Some("http://127.0.0.1:11434/v1/".to_owned()),
+            endpoint_fingerprint: endpoint,
+            credential_ref: None,
+            credential_action: CredentialAction::Keep,
+            model_name: "local-model".to_owned(),
+            model_display_name: "Local Model".to_owned(),
+            capabilities,
+            capability_source: CapabilitySource::Unknown,
+            probe_fingerprint,
+            probe_receipt_id: receipt_id,
+            use_as_default: false,
+            use_as_fallback: false,
+        };
+        registry.validate(&update).unwrap();
+        update.model_name = "forged-model".to_owned();
+        assert_eq!(registry.validate(&update).unwrap_err().code, "PROBE_STALE");
     }
 
     #[test]

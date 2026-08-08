@@ -1,6 +1,7 @@
 use ember_secure_http::ApprovedEndpoint;
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
 use uuid::Uuid;
 
@@ -9,6 +10,11 @@ use crate::{CampaignStore, CampaignStoreError, current_timestamp};
 const DEFAULT_MODEL_KEY: &str = "default_model_profile_id";
 const FALLBACK_MODEL_KEY: &str = "fallback_model_profile_id";
 const PRESETS: &[&str] = &["deepseek", "qwen", "openrouter", "ollama", "custom"];
+const FIXED_PRESET_ENDPOINTS: &[(&str, &str)] = &[
+    ("deepseek", "https://api.deepseek.com/"),
+    ("qwen", "https://dashscope.aliyuncs.com/compatible-mode/v1/"),
+    ("openrouter", "https://openrouter.ai/api/v1/"),
+];
 const MAX_SAFE_CONTEXT_TOKENS: u64 = 9_007_199_254_740_991;
 
 #[derive(Clone, Debug, Deserialize)]
@@ -17,13 +23,35 @@ pub struct ModelSettingsUpdate {
     pub preset_key: String,
     pub provider_display_name: String,
     pub base_url: Option<String>,
+    pub endpoint_fingerprint: String,
     pub credential_ref: Option<String>,
     pub credential_action: CredentialAction,
     pub model_name: String,
     pub model_display_name: String,
     pub capabilities: ModelCapabilitiesRegistration,
+    pub capability_source: CapabilitySource,
+    pub probe_fingerprint: String,
+    pub probe_receipt_id: String,
     pub use_as_default: bool,
     pub use_as_fallback: bool,
+}
+
+#[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CapabilitySource {
+    ProviderResponse,
+    PresetMetadata,
+    Unknown,
+}
+
+impl CapabilitySource {
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::ProviderResponse => "PROVIDER_RESPONSE",
+            Self::PresetMetadata => "PRESET_METADATA",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq, Eq)]
@@ -82,10 +110,13 @@ pub struct ModelProfileView {
     pub preset_key: String,
     pub provider_display_name: String,
     pub base_url: Option<String>,
+    pub endpoint_fingerprint: Option<String>,
     pub has_credential: bool,
     pub model_name: String,
     pub model_display_name: String,
     pub capabilities: Option<ModelCapabilitiesRegistration>,
+    pub capability_source: Option<CapabilitySource>,
+    pub probe_fingerprint: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -103,7 +134,8 @@ impl CampaignStore {
         let mut statement = connection.prepare(
             "SELECT m.id, p.id, p.preset_key, p.display_name, p.base_url,
                     p.credential_ref IS NOT NULL, m.model_name, m.display_name,
-                    m.capabilities_json, m.capabilities_checked_at
+                    m.capabilities_json, m.capabilities_checked_at,
+                    p.endpoint_fingerprint, m.capability_source, m.probe_fingerprint
              FROM model_profiles m
              JOIN provider_configs p ON p.id = m.provider_config_id
              WHERE p.enabled = 1 AND m.enabled = 1
@@ -127,16 +159,28 @@ impl CampaignStore {
                     }
                     Some(parsed)
                 };
+                let capability_source = row
+                    .get::<_, Option<String>>(11)?
+                    .map(|value| match value.as_str() {
+                        "PROVIDER_RESPONSE" => Ok(CapabilitySource::ProviderResponse),
+                        "PRESET_METADATA" => Ok(CapabilitySource::PresetMetadata),
+                        "UNKNOWN" => Ok(CapabilitySource::Unknown),
+                        _ => Err(rusqlite::Error::InvalidQuery),
+                    })
+                    .transpose()?;
                 Ok(ModelProfileView {
                     id: row.get(0)?,
                     provider_id: row.get(1)?,
                     preset_key: row.get(2)?,
                     provider_display_name: row.get(3)?,
                     base_url: row.get(4)?,
+                    endpoint_fingerprint: row.get(10)?,
                     has_credential: row.get(5)?,
                     model_name: row.get(6)?,
                     model_display_name: row.get(7)?,
                     capabilities,
+                    capability_source,
+                    probe_fingerprint: row.get(12)?,
                 })
             })?
             .collect::<Result<Vec<_>, _>>()?;
@@ -214,13 +258,29 @@ impl CampaignStore {
             "OpenAI-Compatible"
         };
         transaction.execute(
+            "UPDATE model_profiles SET enabled = 0, updated_at = ?1
+             WHERE provider_config_id = ?2 AND enabled = 1",
+            params![at, provider_id],
+        )?;
+        transaction.execute(
+            "DELETE FROM app_settings
+             WHERE key IN (?1, ?2)
+               AND EXISTS (
+                 SELECT 1 FROM model_profiles
+                 WHERE provider_config_id = ?3
+                   AND app_settings.value_json = json_quote(model_profiles.id)
+               )",
+            params![DEFAULT_MODEL_KEY, FALLBACK_MODEL_KEY, provider_id],
+        )?;
+        transaction.execute(
             "INSERT INTO provider_configs (
                id, provider_type, preset_key, display_name, base_url, credential_ref,
-               options_json, enabled, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, '{}', 1, ?7, ?7)
+               options_json, enabled, created_at, updated_at, endpoint_fingerprint
+             ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, '{}', 1, ?7, ?7, ?8)
              ON CONFLICT(preset_key, display_name) DO UPDATE SET
                base_url = excluded.base_url,
                credential_ref = excluded.credential_ref,
+               endpoint_fingerprint = excluded.endpoint_fingerprint,
                enabled = 1,
                updated_at = excluded.updated_at",
             params![
@@ -230,7 +290,8 @@ impl CampaignStore {
                 update.provider_display_name,
                 update.base_url,
                 next_credential_ref,
-                at
+                at,
+                update.endpoint_fingerprint
             ],
         )?;
         let existing_profile = transaction
@@ -246,12 +307,15 @@ impl CampaignStore {
         transaction.execute(
             "INSERT INTO model_profiles (
                id, provider_config_id, model_name, display_name, capabilities_json,
-               task_options_json, enabled, capabilities_checked_at, created_at, updated_at
-             ) VALUES (?1, ?2, ?3, ?4, ?5, '{}', 1, ?6, ?7, ?7)
+               task_options_json, enabled, capabilities_checked_at, created_at, updated_at,
+               capability_source, probe_fingerprint
+             ) VALUES (?1, ?2, ?3, ?4, ?5, '{}', 1, ?6, ?7, ?7, ?8, ?9)
              ON CONFLICT(provider_config_id, model_name) DO UPDATE SET
                display_name = excluded.display_name,
                capabilities_json = excluded.capabilities_json,
                capabilities_checked_at = excluded.capabilities_checked_at,
+               capability_source = excluded.capability_source,
+               probe_fingerprint = excluded.probe_fingerprint,
                enabled = 1,
                updated_at = excluded.updated_at",
             params![
@@ -261,7 +325,9 @@ impl CampaignStore {
                 update.model_display_name,
                 capabilities_json,
                 update.capabilities.checked_at,
-                at
+                at,
+                update.capability_source.as_str(),
+                update.probe_fingerprint
             ],
         )?;
         if update.use_as_default {
@@ -390,7 +456,7 @@ fn validate_update(update: &ModelSettingsUpdate) -> Result<(), CampaignStoreErro
         }
     }
     if !PRESETS.contains(&update.preset_key.as_str())
-        || (update.preset_key == "custom" && update.base_url.is_none())
+        || update.base_url.is_none()
         || update
             .credential_ref
             .as_deref()
@@ -399,6 +465,30 @@ fn validate_update(update: &ModelSettingsUpdate) -> Result<(), CampaignStoreErro
             .base_url
             .as_deref()
             .is_some_and(|value| value.trim() != value || value.len() > 2048)
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Uuid::parse_str(&update.probe_receipt_id).map_err(|_| CampaignStoreError::InvalidData)?;
+    if FIXED_PRESET_ENDPOINTS.iter().any(|(preset, endpoint)| {
+        update.preset_key == *preset && update.base_url.as_deref() != Some(*endpoint)
+    }) {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let expected_endpoint = model_endpoint_fingerprint(
+        &update.preset_key,
+        update
+            .base_url
+            .as_deref()
+            .ok_or(CampaignStoreError::InvalidData)?,
+    );
+    if update.endpoint_fingerprint != expected_endpoint
+        || update.probe_fingerprint
+            != model_probe_fingerprint(
+                &expected_endpoint,
+                &update.model_name,
+                update.capability_source,
+                &update.capabilities,
+            )?
     {
         return Err(CampaignStoreError::InvalidData);
     }
@@ -431,6 +521,34 @@ fn validate_update(update: &ModelSettingsUpdate) -> Result<(), CampaignStoreErro
         return Err(CampaignStoreError::InvalidData);
     }
     Ok(())
+}
+
+pub fn model_endpoint_fingerprint(preset_key: &str, normalized_base_url: &str) -> String {
+    hex_sha256(format!("endpoint:v1\n{preset_key}\n{normalized_base_url}").as_bytes())
+}
+
+pub fn model_probe_fingerprint(
+    endpoint_fingerprint: &str,
+    model_name: &str,
+    source: CapabilitySource,
+    capabilities: &ModelCapabilitiesRegistration,
+) -> Result<String, CampaignStoreError> {
+    let capabilities_json =
+        serde_json::to_string(capabilities).map_err(|_| CampaignStoreError::InvalidData)?;
+    Ok(hex_sha256(
+        format!(
+            "probe:v1\n{endpoint_fingerprint}\n{model_name}\n{}\n{capabilities_json}",
+            source.as_str()
+        )
+        .as_bytes(),
+    ))
+}
+
+fn hex_sha256(bytes: &[u8]) -> String {
+    Sha256::digest(bytes)
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn enqueue_cleanup(
@@ -541,31 +659,17 @@ mod tests {
         let campaign = store.create_campaign().unwrap();
         let before = store.continue_campaign(&campaign.id).unwrap();
         let credential_ref = format!("credential:v1:{}", Uuid::new_v4());
-        let saved = store
-            .save_model_settings(ModelSettingsUpdate {
-                preset_key: "deepseek".to_owned(),
-                provider_display_name: "DeepSeek primary".to_owned(),
-                base_url: Some("https://api.deepseek.com/".to_owned()),
-                credential_ref: Some(credential_ref),
-                credential_action: CredentialAction::Replace,
-                model_name: "deepseek-v4-flash".to_owned(),
-                model_display_name: "DeepSeek V4 Flash".to_owned(),
-                capabilities: ModelCapabilitiesRegistration {
-                    text: true,
-                    streaming: false,
-                    system_messages: true,
-                    json_mode: true,
-                    json_schema: false,
-                    tool_calling: false,
-                    reasoning: true,
-                    context_window_tokens: Some(1_048_576),
-                    cost_status: "UNKNOWN".to_owned(),
-                    checked_at: "2026-08-01T00:00:00Z".to_owned(),
-                },
-                use_as_default: true,
-                use_as_fallback: true,
-            })
-            .unwrap();
+        let mut update = settings_update("deepseek", "DeepSeek primary", "deepseek-v4-flash");
+        update.credential_ref = Some(credential_ref);
+        update.credential_action = CredentialAction::Replace;
+        update.model_display_name = "DeepSeek V4 Flash".to_owned();
+        update.capabilities.json_mode = true;
+        update.capabilities.reasoning = true;
+        update.capabilities.context_window_tokens = Some(1_048_576);
+        update.use_as_default = true;
+        update.use_as_fallback = true;
+        refresh_probe_metadata(&mut update);
+        let saved = store.save_model_settings(update).unwrap();
         assert_eq!(saved.profiles.len(), 1);
         assert_eq!(
             saved.default_model_profile_id,
@@ -594,6 +698,7 @@ mod tests {
         update.capabilities.json_mode = true;
         update.capabilities.json_schema = true;
         update.capabilities.checked_at = "2026-08-01T08:30:00+08:00".to_owned();
+        refresh_probe_metadata(&mut update);
 
         let saved = store.save_model_settings(update).unwrap();
         assert_eq!(saved.profiles.len(), 1);
@@ -655,6 +760,7 @@ mod tests {
             CampaignStore::open(directory.path().join("provider-capabilities.sqlite")).unwrap();
         let mut schema = settings_update("custom", "Schema Provider", "schema-model");
         schema.capabilities.json_schema = true;
+        refresh_probe_metadata(&mut schema);
         store.save_model_settings(schema).unwrap();
         let plain = settings_update("ollama", "Local Provider", "plain-model");
         store.save_model_settings(plain).unwrap();
@@ -740,6 +846,52 @@ mod tests {
             .query_row("SELECT COUNT(*) FROM model_profiles", [], |row| row.get(0))
             .unwrap();
         assert_eq!((providers, profiles), (0, 0));
+    }
+
+    #[test]
+    fn endpoint_switch_disables_old_profile_and_clears_default_and_fallback() {
+        let directory = tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("endpoint-switch.sqlite")).unwrap();
+        let mut original = settings_update("custom", "Switchable Provider", "old-model");
+        original.use_as_default = true;
+        original.use_as_fallback = true;
+        let original_profile = store.save_model_settings(original).unwrap().profiles[0]
+            .id
+            .clone();
+
+        let mut replacement = settings_update("custom", "Switchable Provider", "new-model");
+        replacement.base_url = Some("http://127.0.0.1:22445/v1/".to_owned());
+        refresh_probe_metadata(&mut replacement);
+        let saved = store.save_model_settings(replacement).unwrap();
+
+        assert_eq!(saved.profiles.len(), 1);
+        assert_eq!(saved.profiles[0].model_name, "new-model");
+        assert_ne!(saved.profiles[0].id, original_profile);
+        assert_eq!(saved.default_model_profile_id, None);
+        assert_eq!(saved.fallback_model_profile_id, None);
+        let connection = store.connect().unwrap();
+        let old_enabled: i64 = connection
+            .query_row(
+                "SELECT enabled FROM model_profiles WHERE id = ?1",
+                [original_profile],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(old_enabled, 0);
+    }
+
+    #[test]
+    fn stale_or_tampered_probe_fingerprints_are_rejected_before_writes() {
+        let directory = tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("stale-probe.sqlite")).unwrap();
+        let mut endpoint_changed = settings_update("custom", "Probe Provider", "model-a");
+        endpoint_changed.base_url = Some("http://127.0.0.1:22445/v1/".to_owned());
+        assert!(store.save_model_settings(endpoint_changed).is_err());
+
+        let mut capability_changed = settings_update("custom", "Probe Provider", "model-a");
+        capability_changed.capabilities.json_mode = true;
+        assert!(store.save_model_settings(capability_changed).is_err());
+        assert!(store.model_settings().unwrap().profiles.is_empty());
     }
 
     #[test]
@@ -897,10 +1049,19 @@ mod tests {
         provider_display_name: &str,
         model_name: &str,
     ) -> ModelSettingsUpdate {
-        ModelSettingsUpdate {
+        let base_url = match preset_key {
+            "deepseek" => "https://api.deepseek.com/",
+            "qwen" => "https://dashscope.aliyuncs.com/compatible-mode/v1/",
+            "openrouter" => "https://openrouter.ai/api/v1/",
+            "ollama" => "http://localhost:11434/v1/",
+            _ => "http://127.0.0.1:11434/",
+        }
+        .to_owned();
+        let mut update = ModelSettingsUpdate {
             preset_key: preset_key.to_owned(),
             provider_display_name: provider_display_name.to_owned(),
-            base_url: (preset_key == "custom").then(|| "http://127.0.0.1:11434/".to_owned()),
+            base_url: Some(base_url),
+            endpoint_fingerprint: String::new(),
             credential_ref: None,
             credential_action: CredentialAction::Keep,
             model_name: model_name.to_owned(),
@@ -917,8 +1078,25 @@ mod tests {
                 cost_status: "UNKNOWN".to_owned(),
                 checked_at: "2026-08-01T00:00:00Z".to_owned(),
             },
+            capability_source: CapabilitySource::Unknown,
+            probe_fingerprint: String::new(),
+            probe_receipt_id: Uuid::new_v4().to_string(),
             use_as_default: false,
             use_as_fallback: false,
-        }
+        };
+        refresh_probe_metadata(&mut update);
+        update
+    }
+
+    fn refresh_probe_metadata(update: &mut ModelSettingsUpdate) {
+        update.endpoint_fingerprint =
+            model_endpoint_fingerprint(&update.preset_key, update.base_url.as_deref().unwrap());
+        update.probe_fingerprint = model_probe_fingerprint(
+            &update.endpoint_fingerprint,
+            &update.model_name,
+            update.capability_source,
+            &update.capabilities,
+        )
+        .unwrap();
     }
 }

@@ -724,26 +724,41 @@ fn model_update(
     use_as_default: bool,
     use_as_fallback: bool,
 ) -> ModelSettingsUpdate {
+    let normalized_base_url = base_url.unwrap_or_else(|| "http://localhost:11434/v1/".to_owned());
+    let capabilities = ModelCapabilitiesRegistration {
+        text: true,
+        streaming: false,
+        system_messages: true,
+        json_mode: true,
+        json_schema: false,
+        tool_calling: false,
+        reasoning: false,
+        context_window_tokens: Some(32_768),
+        cost_status: "UNKNOWN".to_owned(),
+        checked_at: "2026-08-01T14:00:00Z".to_owned(),
+    };
+    let endpoint_fingerprint = model_endpoint_fingerprint(preset_key, &normalized_base_url);
+    let capability_source = CapabilitySource::Unknown;
+    let probe_fingerprint = model_probe_fingerprint(
+        &endpoint_fingerprint,
+        model_name,
+        capability_source,
+        &capabilities,
+    )
+    .unwrap();
     ModelSettingsUpdate {
         preset_key: preset_key.to_owned(),
         provider_display_name: display_name.to_owned(),
-        base_url,
+        base_url: Some(normalized_base_url),
+        endpoint_fingerprint,
         credential_ref: None,
         credential_action: CredentialAction::Keep,
         model_name: model_name.to_owned(),
         model_display_name: model_name.to_owned(),
-        capabilities: ModelCapabilitiesRegistration {
-            text: true,
-            streaming: false,
-            system_messages: true,
-            json_mode: true,
-            json_schema: false,
-            tool_calling: false,
-            reasoning: false,
-            context_window_tokens: Some(32_768),
-            cost_status: "UNKNOWN".to_owned(),
-            checked_at: "2026-08-01T14:00:00Z".to_owned(),
-        },
+        capabilities,
+        capability_source,
+        probe_fingerprint,
+        probe_receipt_id: Uuid::new_v4().to_string(),
         use_as_default,
         use_as_fallback,
     }
