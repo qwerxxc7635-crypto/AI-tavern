@@ -1,4 +1,4 @@
-import type { AITask } from '@ember-tavern/ai-core';
+import { canonicalJson, type AITask } from '@ember-tavern/ai-core';
 import type { JsonValue, PromptVersion } from '@ember-tavern/contracts';
 
 import { BASE_RULES } from './base-rules.js';
@@ -78,7 +78,7 @@ function freezeJson(value: JsonValue): JsonValue {
 
 export function renderStablePromptProfile(profile: StablePromptProfile): string {
   return profile.sections
-    .map((section) => `[${section.kind}]\n${JSON.stringify(section.content)}`)
+    .map((section) => `[${section.kind}]\n${canonicalJson(section.content)}`)
     .join('\n\n');
 }
 

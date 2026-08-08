@@ -1524,3 +1524,19 @@ Stable World Truths由调用方显式提供并在进入Profile时递归复制冻
 ### 影响与边界
 
 Profile结构适用于所有Provider-neutral prompt，DeepSeek可直接利用相同前缀；它不改变SQLite事实权威、schema验证或Provider capability选择。T02只固定语义段与版本，T03负责规范JSON的键、数组、空白、数值、枚举和换行字节；不得把T02现有`JSON.stringify`误写成已经满足最终确定性序列化。
+
+## DEC-068：Prompt与Context hash共享同一Canonical JSON字节规范
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T03`、ContextBlock确定性红线
+
+### 决定与理由
+
+稳定Prompt段和ContextBlock/hash统一调用`ai-core`的canonical JSON，不保留第二套缓存专用序列化。对象key先做NFC和换行归一化再按码点排序；Unicode等价重复key拒绝。对象/数组不插入多余空白，数组保留调用方给定的语义顺序，string及enum按NFC与LF规范化，finite number使用JavaScript JSON规范表示（含`-0 -> 0`），非有限数拒绝。
+
+Prompt每段固定为`[SECTION_ENUM] + LF + canonical JSON`，段间恰好两个LF，末尾无换行。这样同一语义对象不受属性插入顺序、Unicode组合形式或操作系统CRLF影响，同时不会擅自排序具有叙事/时间语义的数组。
+
+### 影响与边界
+
+共享canonical string规则会同时影响后续新建ContextBlock hash、token估算和ResolvedModelConfig fingerprint，这是有意统一而不是存档格式升级；现有已持久化hash仍是不可变审计值，不在启动时重写。序列化只保证输入相同得到相同字节，不保证不同Prompt Profile版本命中同一缓存；版本变化必须改变profile/hash。

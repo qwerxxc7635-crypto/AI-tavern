@@ -32,7 +32,8 @@
 - `V02-M3-T05`：DONE；Credential UI区分新建/替换、清空未保存Key、删除已保存引用、待清理重试与保守健康状态，Key始终不回显且不进入SQLite/日志。
 - `V02-M4-T01`：DONE；DeepSeek Flash Profile固定API ID `deepseek-v4-flash`与UI名`DeepSeek-V4-Flash-0731`分离，原生探测、新保存及旧本地显示均使用规范展示名。
 - `V02-M4-T02`：DONE；版本化Stable Prompt Profile固定System Contract、Game Rules、Output Schema、Prompt Profile、Stable World Truths五段顺序并拒绝易变请求元数据。
-- 下一执行项严格进入 `V02-M4-T03` Deterministic Serialization。
+- `V02-M4-T03`：DONE；Prompt与Context hash共享canonical JSON，稳定keys/whitespace/enums/numbers/LF并保留数组语义顺序，拒绝非有限数与Unicode等价重复key。
+- 下一执行项严格进入 `V02-M4-T04` Context Cache Layout。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

@@ -12,6 +12,7 @@ import {
   createStablePromptProfile,
   formatOutputRepairPrompt,
   formatTaskPrompt,
+  renderStablePromptProfile,
 } from './index.js';
 
 const checkedAt = isoTimestamp('2026-07-31T00:25:00.000Z');
@@ -166,5 +167,22 @@ describe('stable prompt profile', () => {
         world: '00000000-0000-4000-8000-000000000001',
       }),
     ).toThrow('UUID');
+  });
+
+  it('renders canonical JSON with fixed LF separators and no trailing newline', () => {
+    const profile = createStablePromptProfile(
+      TASK_PROMPTS.GENERATE_WORLD,
+      { required: ['z', 'a'], type: 'object' },
+      { z: 'line one\r\nline two', a: 1, enumValue: 'LOCKED' },
+    );
+    const rendered = renderStablePromptProfile(profile);
+    expect(rendered).not.toContain('\r');
+    expect(rendered.endsWith('\n')).toBe(false);
+    expect(rendered).toContain(
+      '[OUTPUT_SCHEMA]\n{"required":["z","a"],"type":"object"}',
+    );
+    expect(rendered).toContain(
+      '[STABLE_WORLD_TRUTHS]\n{"a":1,"enumValue":"LOCKED","z":"line one\\nline two"}',
+    );
   });
 });

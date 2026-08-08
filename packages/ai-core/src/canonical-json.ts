@@ -10,7 +10,7 @@ export async function sha256CanonicalJson(value: JsonValue): Promise<string> {
 
 export function canonicalJson(value: JsonValue): string {
   if (value === null || typeof value === 'boolean') return JSON.stringify(value);
-  if (typeof value === 'string') return JSON.stringify(value.normalize('NFC'));
+  if (typeof value === 'string') return JSON.stringify(canonicalText(value));
   if (typeof value === 'number') {
     if (!Number.isFinite(value)) throw new TypeError('Canonical JSON numbers must be finite');
     return JSON.stringify(value);
@@ -18,7 +18,7 @@ export function canonicalJson(value: JsonValue): string {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
   const normalized = new Map<string, JsonValue>();
   for (const [key, entry] of Object.entries(value)) {
-    const canonicalKey = key.normalize('NFC');
+    const canonicalKey = canonicalText(key);
     if (normalized.has(canonicalKey)) {
       throw new TypeError('Canonical JSON object contains Unicode-equivalent keys');
     }
@@ -28,4 +28,8 @@ export function canonicalJson(value: JsonValue): string {
     .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
     .join(',')}}`;
+}
+
+function canonicalText(value: string): string {
+  return value.normalize('NFC').replaceAll(/\r\n?/g, '\n');
 }

@@ -2762,3 +2762,22 @@
 ### 结论
 
 - `V02-M4-T02`完成。下一项严格为`V02-M4-T03` Deterministic Serialization。
+
+## 2026-08-08 — V02-M4-T03 统一确定性序列化
+
+### 实现
+
+- 导出并复用`ai-core`单一canonical JSON实现，Stable Prompt Profile不再调用普通`JSON.stringify`，与ContextBlock hash、token估算及ResolvedModelConfig fingerprint采用相同字节语义。
+- object key执行NFC/LF规范化后按码点排序且无额外空白；Unicode等价重复key拒绝，避免规范化后静默覆盖。
+- array严格保留调用方语义顺序；string与enum执行NFC和CRLF/CR到LF归一化；finite number使用JSON规范形式并把负零稳定为零，NaN/Infinity拒绝。
+- Prompt段固定为section enum、单LF、canonical JSON，段间双LF且末尾无换行；记录`DEC-068`并同步目标架构当前实现。
+
+### 验证
+
+- 新增2项canonical JSON测试，逐项覆盖乱序key、array、零、enum、Unicode组合、CRLF、UTF-8字节相等、非有限数及等价key拒绝。
+- Prompt目录新增精确字节片段测试；canonical/context/prompt共17项测试、`pnpm typecheck`及`pnpm lint`通过。
+- 未改变`.emtavern`格式、未重写已有审计hash、未访问外部API或正式用户数据。
+
+### 结论
+
+- `V02-M4-T03`完成。下一项严格为`V02-M4-T04` Context Cache Layout。

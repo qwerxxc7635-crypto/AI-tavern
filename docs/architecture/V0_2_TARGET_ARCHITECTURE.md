@@ -54,7 +54,7 @@ Orchestrator 产生 `AiOperation`：
 - `semi_stable`：世界/lore/角色状态；revision 改变即失效。
 - `dynamic`：当前场景、输入、骰点和未决后果；不进入 stable cache。
 
-序列化必须稳定：固定块顺序、对象键顺序、换行与 Unicode 归一化。相同输入必须得到相同 manifest/hash。
+序列化必须稳定：固定块顺序、对象键顺序、换行与 Unicode 归一化。相同输入必须得到相同 manifest/hash。当前共享canonical JSON按NFC后的key码点排序、对象无额外空白、数组保留语义顺序、有限number使用JSON规范表示、string/enum执行NFC及LF归一化，并拒绝Unicode等价重复key；Prompt段之间只用LF且末尾无换行。
 
 当前Prompt编译先构造版本化Stable Prompt Profile，固定`SYSTEM_CONTRACT -> GAME_RULES -> OUTPUT_SCHEMA -> PROMPT_PROFILE -> STABLE_WORLD_TRUTHS`五段；world truths进入前复制冻结，并拒绝request ID、timestamp、UUID、transient error、cache metrics和UI debug。后续summary/lore/history/scene/input不得插入这五段之间。
 

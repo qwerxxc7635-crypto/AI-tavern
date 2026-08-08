@@ -1,4 +1,5 @@
 export { AI_TASKS, PROVIDER_PRESET_KEYS, PROVIDER_TYPES } from './protocol.js';
+export { canonicalJson, sha256CanonicalJson } from './canonical-json.js';
 export {
   buildAdventureTurnContext,
   buildNpcDialogueContext,
