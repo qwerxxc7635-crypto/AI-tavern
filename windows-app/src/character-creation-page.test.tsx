@@ -8,6 +8,7 @@ import { CharacterCreationPage } from './character-creation-page.js';
 import type {
   CharacterCreationSnapshot,
   CharacterDraft,
+  CharacterGenerationObserver,
   CharacterTraitView,
 } from './character-creation-service.js';
 
@@ -21,6 +22,7 @@ describe('character creation page', () => {
     fireEvent.change(await screen.findByLabelText('姓名'), {
       target: { value: '林鸦' },
     });
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：编辑中');
     fireEvent.change(screen.getByLabelText('角色概念'), {
       target: { value: '追查失踪商队的荒野向导' },
     });
@@ -30,6 +32,7 @@ describe('character creation page', () => {
     fireEvent.click(screen.getByRole('button', { name: '生成六个候选特质' }));
 
     expect(await screen.findByText('敏锐观察')).toBeTruthy();
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：预览');
     expect(service.generatedDraft).toMatchObject({
       name: '林鸦',
       attributes: { physique: 3, agility: 3, knowledge: 2, charisma: 2 },
@@ -37,9 +40,11 @@ describe('character creation page', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: /敏锐观察/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /守信/ }));
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：编辑中');
     fireEvent.click(screen.getByRole('button', { name: '确认特质并生成背景' }));
 
     expect(await screen.findByRole('heading', { name: '背景' })).toBeTruthy();
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：已提交');
     expect(screen.getByText('灰湾')).toBeTruthy();
     expect(screen.getByText('体魄检定 +1')).toBeTruthy();
     expect(service.selectedTraits).toHaveLength(2);
@@ -122,8 +127,12 @@ class FakeCharacterService {
     return this.snapshot;
   }
 
-  public async generateTraits(draft: CharacterDraft): Promise<CharacterCreationSnapshot> {
+  public async generateTraits(
+    draft: CharacterDraft,
+    observer?: CharacterGenerationObserver,
+  ): Promise<CharacterCreationSnapshot> {
     this.generatedDraft = draft;
+    observer?.onValidationStarted();
     this.snapshot = {
       campaignState: 'CREATING_CHARACTER',
       draft,

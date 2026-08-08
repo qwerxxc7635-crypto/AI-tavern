@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import type { ClassArchetype, PlayerAttributesInput } from '@ember-tavern/contracts';
@@ -10,6 +10,12 @@ import {
   type WindowsCharacterCreationService,
 } from './character-creation-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import {
+  INITIAL_CHARACTER_AI_STATE,
+  reduceCharacterAIState,
+  type CharacterAIEvent,
+  type CharacterAIPhase,
+} from './character-ai-state-machine.js';
 import { playerText } from './localization/index.js';
 
 type CharacterCreationActions = Pick<
@@ -51,7 +57,9 @@ export function CharacterCreationPage({
   const [snapshot, setSnapshot] = useState<CharacterCreationSnapshot | null>(null);
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
   const [selectedTraitIds, setSelectedTraitIds] = useState<readonly string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [aiState, setAIState] = useState(INITIAL_CHARACTER_AI_STATE);
+  const aiStateRef = useRef(INITIAL_CHARACTER_AI_STATE);
+  const operationSequence = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
@@ -68,6 +76,15 @@ export function CharacterCreationPage({
         if (loaded.character !== null) {
           setSelectedTraitIds(loaded.character.traits.map(({ id }) => id));
         }
+        transition({
+          type: 'RESTORED',
+          phase:
+            loaded.character !== null
+              ? 'committed'
+              : loaded.traitCandidates.length > 0
+                ? 'preview'
+                : 'idle',
+        });
       })
       .catch(() => {
         if (active) setLoadError('无法读取这个存档的车卡进度。');
@@ -85,21 +102,48 @@ export function CharacterCreationPage({
     [draft],
   );
 
+  const busy = ['generating', 'validating', 'confirming'].includes(aiState.phase);
+
+  function transition(event: CharacterAIEvent): boolean {
+    const previous = aiStateRef.current;
+    const next = reduceCharacterAIState(previous, event);
+    aiStateRef.current = next;
+    setAIState(next);
+    return next !== previous;
+  }
+
+  function updateDraft(next: CharacterDraft) {
+    transition({ type: 'DRAFT_CHANGED' });
+    setDraft(next);
+  }
+
   async function generateTraits() {
     if (draft === null) return;
-    setBusy(true);
+    const operationId = ++operationSequence.current;
+    const revision = aiStateRef.current.revision;
+    if (!transition({ type: 'GENERATION_STARTED', operationId })) return;
     setAiError(null);
     setRetryAction(null);
     try {
-      const generated = await service.generateTraits(draft);
+      const generated = await service.generateTraits(draft, {
+        onValidationStarted: () => {
+          transition({ type: 'VALIDATION_STARTED', operationId, revision });
+        },
+      });
+      if (!transition({ type: 'PREVIEW_READY', operationId, revision })) return;
       setSnapshot(generated);
       setDraft(generated.draft ?? draft);
       setSelectedTraitIds([]);
     } catch (error) {
+      transition({
+        type: 'GENERATION_FAILED',
+        operationId,
+        revision,
+        failure:
+          aiStateRef.current.phase === 'validating' ? 'validation_failed' : 'generation_failed',
+      });
       setAiError(error);
       setRetryAction(() => generateTraits);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -112,16 +156,19 @@ export function CharacterCreationPage({
       return;
     }
     const selected = snapshot.traitCandidates.filter(({ id }) => selectedTraitIds.includes(id));
-    setBusy(true);
+    const operationId = ++operationSequence.current;
+    const revision = aiStateRef.current.revision;
+    if (!transition({ type: 'CONFIRM_STARTED', operationId })) return;
     setAiError(null);
     setRetryAction(null);
     try {
-      setSnapshot(await service.complete(draft, snapshot.traitGenerationRecordId, selected));
+      const completed = await service.complete(draft, snapshot.traitGenerationRecordId, selected);
+      if (!transition({ type: 'CONFIRM_SUCCEEDED', operationId, revision })) return;
+      setSnapshot(completed);
     } catch (error) {
+      transition({ type: 'CONFIRM_FAILED', operationId, revision });
       setAiError(error);
       setRetryAction(() => completeCharacter);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -144,6 +191,7 @@ export function CharacterCreationPage({
     return (
       <main className="character-studio">
         <CharacterTopline step="03 · 背景与装备" />
+        <CharacterAIStatus phase={aiState.phase} />
         <div className="character-review character-sheet" aria-label="完整角色卡">
           <section className="character-sheet__summary" data-character-section="summary">
             <p className="eyebrow">{playerText.coreUi.characterReady}</p>
@@ -253,6 +301,7 @@ export function CharacterCreationPage({
     return (
       <main className="character-studio">
         <CharacterTopline step="02 · 选择特质" />
+        <CharacterAIStatus phase={aiState.phase} />
         <section className="character-intro">
           <p className="eyebrow">{playerText.coreUi.chooseTwoTraits}</p>
           <h1>决定角色如何面对世界。</h1>
@@ -276,13 +325,14 @@ export function CharacterCreationPage({
                   type="checkbox"
                   checked={selected}
                   disabled={!selected && selectedTraitIds.length === 2}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    transition({ type: 'PREVIEW_EDITED' });
                     setSelectedTraitIds(
                       event.target.checked
                         ? [...selectedTraitIds, trait.id]
                         : selectedTraitIds.filter((id) => id !== trait.id),
-                    )
-                  }
+                    );
+                  }}
                 />
                 <span>{trait.name}</span>
                 <p>{trait.description}</p>
@@ -296,7 +346,7 @@ export function CharacterCreationPage({
           disabled={busy || selectedTraitIds.length !== 2}
           onClick={() => void completeCharacter()}
         >
-          {busy ? '正在生成背景…' : '确认特质并生成背景'}
+          {aiState.phase === 'confirming' ? '正在确认角色…' : '确认特质并生成背景'}
         </button>
       </main>
     );
@@ -305,6 +355,7 @@ export function CharacterCreationPage({
   return (
     <main className="character-studio">
       <CharacterTopline step="01 · 基础车卡" />
+      <CharacterAIStatus phase={aiState.phase} />
       <section className="character-intro">
         <p className="eyebrow">{playerText.coreUi.buildTraveler}</p>
         <h1>谁会推开酒馆的门？</h1>
@@ -330,14 +381,16 @@ export function CharacterCreationPage({
             <input
               required
               value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
             />
           </label>
           <label>
             <span>性别（可选）</span>
             <input
               value={draft.gender ?? ''}
-              onChange={(event) => setDraft({ ...draft, gender: emptyToNull(event.target.value) })}
+              onChange={(event) =>
+                updateDraft({ ...draft, gender: emptyToNull(event.target.value) })
+              }
             />
           </label>
           <label>
@@ -347,7 +400,7 @@ export function CharacterCreationPage({
               type="number"
               value={draft.age ?? ''}
               onChange={(event) =>
-                setDraft({
+                updateDraft({
                   ...draft,
                   age: event.target.value === '' ? null : Number(event.target.value),
                 })
@@ -360,7 +413,7 @@ export function CharacterCreationPage({
               required
               rows={3}
               value={draft.concept}
-              onChange={(event) => setDraft({ ...draft, concept: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, concept: event.target.value })}
             />
           </label>
           <label>
@@ -369,7 +422,7 @@ export function CharacterCreationPage({
               value={draft.classArchetype}
               onChange={(event) => {
                 const classArchetype = event.target.value as ClassArchetype;
-                setDraft({
+                updateDraft({
                   ...draft,
                   classArchetype,
                   classDisplayName: CLASS_NAMES[classArchetype],
@@ -388,7 +441,7 @@ export function CharacterCreationPage({
             <input
               required
               value={draft.classDisplayName}
-              onChange={(event) => setDraft({ ...draft, classDisplayName: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, classDisplayName: event.target.value })}
             />
           </label>
           <label className="character-form__wide">
@@ -397,7 +450,7 @@ export function CharacterCreationPage({
               required
               rows={2}
               value={draft.personalGoal}
-              onChange={(event) => setDraft({ ...draft, personalGoal: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, personalGoal: event.target.value })}
             />
           </label>
           <label className="character-form__wide">
@@ -406,7 +459,7 @@ export function CharacterCreationPage({
               rows={2}
               value={draft.storyPreferences.join('\n')}
               onChange={(event) =>
-                setDraft({ ...draft, storyPreferences: lines(event.target.value) })
+                updateDraft({ ...draft, storyPreferences: lines(event.target.value) })
               }
             />
           </label>
@@ -433,7 +486,7 @@ export function CharacterCreationPage({
                     type="number"
                     value={draft.attributes[name]}
                     onChange={(event) =>
-                      setDraft({
+                      updateDraft({
                         ...draft,
                         attributes: { ...draft.attributes, [name]: Number(event.target.value) },
                       })
@@ -451,14 +504,17 @@ export function CharacterCreationPage({
             label="允许恐怖元素"
             checked={draft.contentBoundaries.allowHorror}
             onChange={(allowHorror) =>
-              setDraft({ ...draft, contentBoundaries: { ...draft.contentBoundaries, allowHorror } })
+              updateDraft({
+                ...draft,
+                contentBoundaries: { ...draft.contentBoundaries, allowHorror },
+              })
             }
           />
           <Boundary
             label="允许永久死亡"
             checked={draft.contentBoundaries.allowPermanentDeath}
             onChange={(allowPermanentDeath) =>
-              setDraft({
+              updateDraft({
                 ...draft,
                 contentBoundaries: { ...draft.contentBoundaries, allowPermanentDeath },
               })
@@ -468,7 +524,7 @@ export function CharacterCreationPage({
             label="允许恋爱剧情"
             checked={draft.contentBoundaries.allowRomance}
             onChange={(allowRomance) =>
-              setDraft({
+              updateDraft({
                 ...draft,
                 contentBoundaries: { ...draft.contentBoundaries, allowRomance },
               })
@@ -478,7 +534,7 @@ export function CharacterCreationPage({
             label="允许背叛剧情"
             checked={draft.contentBoundaries.allowBetrayal}
             onChange={(allowBetrayal) =>
-              setDraft({
+              updateDraft({
                 ...draft,
                 contentBoundaries: { ...draft.contentBoundaries, allowBetrayal },
               })
@@ -490,7 +546,7 @@ export function CharacterCreationPage({
               rows={2}
               value={draft.contentBoundaries.excludedContent.join('\n')}
               onChange={(event) =>
-                setDraft({
+                updateDraft({
                   ...draft,
                   contentBoundaries: {
                     ...draft.contentBoundaries,
@@ -507,7 +563,11 @@ export function CharacterCreationPage({
           type="submit"
           disabled={busy || attributeTotal !== 10}
         >
-          {busy ? '正在生成特质…' : '生成六个候选特质'}
+          {aiState.phase === 'validating'
+            ? '正在验证特质…'
+            : aiState.phase === 'generating'
+              ? '正在生成特质…'
+              : '生成六个候选特质'}
         </button>
       </form>
     </main>
@@ -521,6 +581,33 @@ function CharacterTopline({ step }: { readonly step: string }) {
       <p>{step} · 本地离线</p>
     </header>
   );
+}
+
+function CharacterAIStatus({ phase }: { readonly phase: CharacterAIPhase }) {
+  return (
+    <p className="character-ai-status" data-testid="character-ai-phase" aria-live="polite">
+      AI 状态：{characterAIPhaseLabel(phase)}
+    </p>
+  );
+}
+
+function characterAIPhaseLabel(phase: CharacterAIPhase): string {
+  switch (phase) {
+    case 'idle':
+      return '待命';
+    case 'generating':
+      return '生成中';
+    case 'validating':
+      return '验证中';
+    case 'preview':
+      return '预览';
+    case 'editing':
+      return '编辑中';
+    case 'confirming':
+      return '确认中';
+    case 'committed':
+      return '已提交';
+  }
 }
 
 function CharacterMessage({ title }: { readonly title: string }) {

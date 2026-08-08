@@ -2977,3 +2977,24 @@
 ### 结论
 
 - `V02-M6-T02`完成。下一项严格为`V02-M6-T03` AI Character State Machine。
+
+## 2026-08-08 — V02-M6-T03 建立 AI 车卡显式状态机
+
+### 实现
+
+- 新增纯reducer覆盖idle、generating、validating、preview、editing、confirming、committed，并记录revision、active operation与生成/验证/确认失败种类。
+- 草稿和特质选择变化递增revision并失效当前操作；生成、验证、预览和确认结果必须同时匹配operation ID与revision，迟到结果不再更新当前UI。
+- Character service增加只读validation observer，在Provider身份核对后、结构验证前通知UI进入validating；不暴露raw response或绕过既有schema验证。
+- 页面移除独立busy state，busy由三个活动阶段派生；恢复本地进度映射idle/preview/committed，玩家看到中文live status和阶段化按钮文案。
+- 记录`DEC-078`并更新Changelog；明确T03只保证UI结果时序，旧命令的SQLite提交时机必须由T04 Candidate任务修复。
+
+### 验证
+
+- 新增3项状态机测试，覆盖完整阶段链、编辑使迟到验证失效、失败回到可重试编辑态；service/page/layout共11项定向测试通过。
+- 页面测试验证编辑、预览、再次编辑和已提交中文状态；`pnpm typecheck`、`pnpm lint`、英文回归门禁和`git diff --check`通过。
+- Windows前端生产构建、全量74个文件/405项Vitest、21项Node测试、发布同步/检查和格式检查通过。
+- 未改变SQLite schema、存档格式、Provider配置或正式用户数据，未提前实现Candidate原子确认。
+
+### 结论
+
+- `V02-M6-T03`完成。下一项严格为`V02-M6-T04` AI Character Candidate。

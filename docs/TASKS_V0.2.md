@@ -43,7 +43,8 @@
 - `V02-M5-T05`：DONE；AST门禁检查渲染文案、玩家属性、状态/确认消息、zh-CN资源及更新日志，仅放行文档定义的技术专名并已接入双平台CI。
 - `V02-M6-T01`：DONE；车卡拥有独立100dvh纵向滚动、无横向溢出、900px单/双栏断点、低高度压缩和安全区sticky主操作，12组尺寸/缩放合同与交互测试通过。
 - `V02-M6-T02`：DONE；已确认角色卡固定呈现summary、basics、attributes、background、personality、traits、equipment、AI controls八区，复用现有持久字段且无schema迁移。
-- 下一执行项严格进入 `V02-M6-T03` AI Character State Machine。
+- `V02-M6-T03`：DONE；纯状态机与UI显式覆盖idle/generating/validating/preview/editing/confirming/committed，以revision+operation拒绝编辑后的迟到结果并显示中文状态。
+- 下一执行项严格进入 `V02-M6-T04` AI Character Candidate。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

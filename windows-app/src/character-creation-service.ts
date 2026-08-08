@@ -87,6 +87,10 @@ export interface CharacterCreationSnapshot {
   readonly character: PlayerCharacterView | null;
 }
 
+export interface CharacterGenerationObserver {
+  onValidationStarted(): void;
+}
+
 export interface CharacterCreationGateway {
   load(campaignId: string): Promise<CharacterCreationSnapshot>;
   commitTraits(command: CharacterTraitCommit): Promise<CharacterCreationSnapshot>;
@@ -163,7 +167,10 @@ export class WindowsCharacterCreationService {
     return this.gateway.load(campaignIdValue);
   }
 
-  public async generateTraits(draft: CharacterDraft): Promise<CharacterCreationSnapshot> {
+  public async generateTraits(
+    draft: CharacterDraft,
+    observer?: CharacterGenerationObserver,
+  ): Promise<CharacterCreationSnapshot> {
     const character = validateDraft(draft);
     const input = GenerateCharacterTraitsInputSchema.parse({
       concept: character.concept,
@@ -171,9 +178,12 @@ export class WindowsCharacterCreationService {
       personalGoal: character.personalGoal,
       storyPreferences: character.storyPreferences,
     });
-    const generated = await this.generate('GENERATE_CHARACTER_TRAITS', input, {
-      character,
-    });
+    const generated = await this.generate(
+      'GENERATE_CHARACTER_TRAITS',
+      input,
+      { character },
+      observer,
+    );
     GenerateCharacterTraitsOutputSchema.parse(generated.validatedOutput);
     return this.gateway.commitTraits({
       campaignId: character.campaignId,
@@ -218,6 +228,7 @@ export class WindowsCharacterCreationService {
     task: CharacterTask,
     input: unknown,
     context: unknown,
+    observer?: CharacterGenerationObserver,
   ): Promise<GenerationAudit> {
     const identity = this.createIdentity(task);
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
@@ -238,6 +249,7 @@ export class WindowsCharacterCreationService {
     if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
       throw new CharacterCreationServiceError('PROVIDER_IDENTITY_MISMATCH');
     }
+    observer?.onValidationStarted();
     const validated = validateAIOutput(task, response.content);
     if (!validated.ok) throw new CharacterCreationServiceError(validated.error.code);
     return {

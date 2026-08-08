@@ -1684,3 +1684,19 @@ T03先迁移所有跨流程入口：品牌/导航、标题栏、加载/未知路
 ### 影响与边界
 
 基础区对可空性别/年龄显示“未填写”，属性区读取四项已验证值，背景/特质/装备均读取提交后的SQLite视图。八区重组不改变CharacterDraft、PlayerCharacter、原生命令、`.emtavern`或AI请求；未来若新增真实personality字段，必须按schema/migration/portable archive完整流程另行设计。
+
+## DEC-078：AI车卡状态以revision和operation拒绝迟到结果
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T03`、目标架构显式状态机红线
+
+### 决定与理由
+
+AI车卡以纯reducer表达idle、generating、validating、preview、editing、confirming、committed，不再用单一busy推断阶段。草稿或预览选择变化递增revision并清除active operation；Provider返回时通过observer在结构验证前进入validating，只有operation ID和revision同时匹配才可接受preview或commit结果。
+
+恢复已有trait candidates进入preview，恢复已确认角色进入committed；生成/验证失败和确认失败回到editing并保留明确失败种类供重试。页面busy只由generating/validating/confirming派生，中文live status不直接展示机器枚举。
+
+### 影响与边界
+
+该状态机阻止迟到结果更新当前React视图，但T03不改变旧`character_traits_commit`和`character_completion_commit`命令的持久化时机；如果编辑发生在底层命令已经提交后，UI拒绝不能撤回SQLite写入。T04必须把结构化候选改为未确认不落角色事实、确认时原子提交，不能把T03的UI门禁误当作数据门禁。
