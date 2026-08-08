@@ -1,0 +1,31 @@
+// @vitest-environment jsdom
+
+import { cleanup, render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
+import { afterEach, describe, expect, it } from 'vitest';
+
+import { MY_SECTIONS, MyPage } from './my-page.js';
+
+afterEach(cleanup);
+
+describe('My page information architecture', () => {
+  it('exposes all seven device-setting sections through one landmark', () => {
+    render(
+      <MemoryRouter>
+        <MyPage />
+      </MemoryRouter>,
+    );
+
+    const navigation = screen.getByRole('navigation', { name: '我的页面分区' });
+    expect(navigation.querySelectorAll('a')).toHaveLength(7);
+    for (const { id, label } of MY_SECTIONS) {
+      expect(screen.getByRole('link', { name: new RegExp(label, 'u') }).getAttribute('href')).toBe(
+        `#${id}`,
+      );
+      expect(screen.getByRole('heading', { name: label })).toBeTruthy();
+    }
+    expect(screen.getByRole('link', { name: '打开模型设置' }).getAttribute('href')).toBe(
+      '/settings',
+    );
+  });
+});

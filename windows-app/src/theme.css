@@ -2029,19 +2029,61 @@ textarea:disabled {
 
 .my-hub {
   align-content: start;
-  max-width: 70rem;
+  max-width: 78rem;
 }
 
-.my-hub > header h1 {
+.my-hub__header h1 {
   margin: 0.2rem 0 0.75rem;
   font-family: Georgia, 'Times New Roman', serif;
   font-size: clamp(2.5rem, 6vw, 5rem);
   font-weight: 400;
 }
 
-.my-hub > header p:last-child,
+.my-hub__header p:last-child,
 .my-hub__entry p {
   color: var(--muted);
+}
+
+.my-hub__layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 0.32fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 1.25rem;
+}
+
+.my-hub__sections {
+  position: sticky;
+  top: 1rem;
+  display: grid;
+  border: 1px solid var(--line);
+  background: rgb(10 18 25 / 82%);
+}
+
+.my-hub__sections a {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.85rem 1rem;
+  color: var(--ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.my-hub__sections a:last-child {
+  border-bottom: 0;
+}
+
+.my-hub__sections a:hover {
+  background: rgb(193 120 83 / 9%);
+}
+
+.my-hub__sections span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.my-hub__content {
+  display: grid;
+  gap: 1rem;
 }
 
 .my-hub__entry {
@@ -2061,6 +2103,21 @@ textarea:disabled {
 
 .my-hub__entry p {
   margin: 0;
+}
+
+@media (max-width: 760px) {
+  .my-hub__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .my-hub__sections {
+    position: static;
+  }
+
+  .my-hub__entry {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 
 .model-settings__panel,
