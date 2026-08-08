@@ -86,3 +86,15 @@ export {
   standardizeAIError,
 } from './standard-ai-error.js';
 export type { StandardAIErrorCode } from './standard-ai-error.js';
+export {
+  providerConfigFromResolved,
+  resolveModelConfig,
+  ResolvedModelConfigError,
+  verifyResolvedModelConfig,
+} from './resolved-model-config.js';
+export type {
+  FrozenGenerationParameters,
+  FrozenPromptProfile,
+  ResolvedModelConfig,
+  ResolveModelConfigInput,
+} from './resolved-model-config.js';

@@ -108,6 +108,7 @@ export class StructuredOutputRepairUseCases {
       requireSelectedModelProfile: true,
       repairSourceRequestId: source.id,
       routeKind: 'REPAIR',
+      requiredResolvedFingerprint: resolvedFingerprint(sourceGeneration.request),
       input: source.input,
       generationOptions: command.generationOptions,
       buildContext: () => source.context,
@@ -122,4 +123,21 @@ export class StructuredOutputRepairUseCases {
       validateDomainAndBuildCommit: command.validateDomainAndBuildCommit,
     });
   }
+}
+
+function resolvedFingerprint(request: JsonValue): string {
+  if (request === null || typeof request !== 'object' || Array.isArray(request)) {
+    throw new AIOrchestrationError(
+      'ORIGINAL_MODEL_CONFIG_MISSING',
+      'The original frozen model configuration is unavailable',
+    );
+  }
+  const value = (request as Readonly<Record<string, JsonValue>>)['resolvedModelFingerprint'];
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) {
+    throw new AIOrchestrationError(
+      'ORIGINAL_MODEL_CONFIG_MISSING',
+      'The original frozen model configuration is unavailable',
+    );
+  }
+  return value;
 }

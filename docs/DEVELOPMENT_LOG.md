@@ -2573,3 +2573,22 @@
 ### 结论
 
 - `V02-M2-T02`完成。下一项严格为`V02-M2-T03` ResolvedModelConfig。
+
+## 2026-08-08 — V02-M2-T03 冻结 ResolvedModelConfig
+
+### 实现
+
+- 新增ConnectionProfile到ResolvedModelConfig的单向解析，冻结规范化endpoint、Provider options、credential reference、模型档案/名称、能力、生成参数、prompt profile和cache profile。
+- 所有语义字段以Unicode NFC规范化JSON计算SHA-256；ContextBlock同时改用共享规范化器，使组合/分解Unicode得到同一hash并拒绝等价键冲突。
+- AITaskOrchestrator复算fingerprint并绑定route/request，Provider只接收冻结投影；可编辑配置对象在调用前变化不会影响实际endpoint、credential reference或options。
+- 回合GenerationRecord记录resolved fingerprint而不记录完整配置；结构修复要求与原fingerprint一致，temperature或任一配置漂移均在第二次Provider调用前失败。
+
+### 验证
+
+- 新增3项ResolvedModelConfig测试，覆盖深冻结、端点规范化、确定性fingerprint、参数差异、投影、禁用配置及含authority秘密/query的端点拒绝。
+- Orchestrator新增冻结投影测试；repair回归新增generation参数漂移拒绝并确认Provider仍只调用一次。
+- 完整`pnpm test`通过63个Vitest文件、367项测试及16项Node测试；`pnpm typecheck`通过。未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M2-T03`完成。下一项严格为`V02-M2-T04` AI Candidate Infrastructure。

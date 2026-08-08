@@ -1444,3 +1444,19 @@ AI UI不得持有或调用Provider。现有八类Application生成路径都通�
 ### 影响与边界
 
 现有NPC、冒险和世界事件builder继续负责知识边界与任务schema，它们的已过滤结果进入统一任务块，不把裸Repository对象交给Provider。manifest可用于后续Inspector和缓存判断，但默认不含content；secret块的展示和调试导出仍必须遵循隐私遮罩。Context token采用确定性UTF-8估算而非Provider账单值，实际usage仍以Provider归一响应为准。
+
+## DEC-063：Provider调用只消费带指纹的冻结模型配置
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T03`、目标架构Provider三层
+
+### 决定与理由
+
+每次请求在完成路由和prompt格式化后创建`ResolvedModelConfig`。规范化endpoint、Connection Profile身份/类型/options、credential reference、模型档案与名称、完整能力、temperature/max-output/timeout、prompt task/version/response format及cache profile全部进入规范化JSON SHA-256 fingerprint。
+
+Orchestrator在调用Provider前复算fingerprint并与route和ProviderRequest逐值核对，adapter只接收从冻结配置重新投影的ProviderConfig，不接收仍可编辑的原对象。结构修复读取原GenerationRecord中的fingerprint并要求新解析结果完全一致，防止同一次修复静默改变模型、能力、端点或生成参数。
+
+### 影响与边界
+
+GenerationRecord只保存fingerprint，不保存ResolvedModelConfig整体，避免credential reference进入可移植生成审计并触发秘密边界。真正的API Key仍只在原生SecureVault边界按reference解析；fingerprint既不是secret也不能反推出凭据。普通retry/fallback是新operation，可显式解析新配置；repair必须沿用原冻结配置，否则fail closed。

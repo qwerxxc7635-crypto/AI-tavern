@@ -2,14 +2,19 @@ import {
   assembleTaskContext,
   contextBudgetForTask,
   createContextBlock,
+  providerConfigFromResolved,
+  resolveModelConfig,
   standardizeAIError,
+  verifyResolvedModelConfig,
   type AIProvider,
   type AITask,
   type ContextAssembly,
+  type ModelCapabilities,
   type NormalizedAIRequest,
   type NormalizedAIResponse,
   type NormalizedTokenUsage,
   type ProviderConfig,
+  type ResolvedModelConfig,
   type StandardAIErrorCode,
 } from '@ember-tavern/ai-core';
 import {
@@ -53,6 +58,7 @@ export interface AITaskRequest {
   readonly campaignId: CampaignId;
   readonly actorId: string | null;
   readonly contextAssembly: ContextAssembly;
+  readonly resolvedModelConfig: ResolvedModelConfig;
   readonly route: AIExecutionRoute;
   readonly providerRequest: NormalizedAIRequest;
 }
@@ -63,6 +69,7 @@ export interface AITaskResult {
   readonly requestId: AiRequestId;
   readonly taskType: AITask;
   readonly contextManifest: ContextAssembly['manifest'];
+  readonly resolvedModelFingerprint: string;
   readonly route: AIExecutionRoute;
   readonly usage: NormalizedTokenUsage;
   readonly response: NormalizedAIResponse;
@@ -91,7 +98,10 @@ export class AITaskOrchestrator {
   public async execute(request: AITaskRequest): Promise<AITaskResult> {
     await validateTaskRequest(request, this.providerConfig);
     try {
-      const response = await this.provider.generate(request.providerRequest, this.providerConfig);
+      const response = await this.provider.generate(
+        request.providerRequest,
+        providerConfigFromResolved(request.resolvedModelConfig),
+      );
       if (
         response.requestId !== request.requestId ||
         response.modelName !== request.route.modelName
@@ -104,6 +114,7 @@ export class AITaskOrchestrator {
         requestId: request.requestId,
         taskType: request.taskType,
         contextManifest: request.contextAssembly.manifest,
+        resolvedModelFingerprint: request.resolvedModelConfig.fingerprint,
         route: Object.freeze({ ...request.route }),
         usage: normalizeUsage(response.usage),
         response,
@@ -129,6 +140,8 @@ export async function executePrimaryAITask(
   campaignId: CampaignId,
   request: NormalizedAIRequest,
   context: JsonValue,
+  modelProfileId: ModelProfileId | null,
+  capabilities: ModelCapabilities,
 ): Promise<NormalizedAIResponse> {
   const prepared = await assembleTaskContext(
     request.task,
@@ -137,6 +150,12 @@ export async function executePrimaryAITask(
     context,
     contextBudgetForTask(request.task).maxCharacters,
   );
+  const resolvedModelConfig = await resolveModelConfig({
+    connectionProfile: providerConfig,
+    modelProfileId,
+    capabilities,
+    request,
+  });
   const result = await new AITaskOrchestrator(provider, providerConfig).execute({
     operationId: aiOperationId(`operation:${request.requestId}`),
     requestId: request.requestId,
@@ -144,6 +163,7 @@ export async function executePrimaryAITask(
     campaignId,
     actorId: null,
     contextAssembly: prepared.assembly,
+    resolvedModelConfig,
     route: Object.freeze({
       kind: 'PRIMARY',
       attempt: 1,
@@ -196,6 +216,7 @@ async function validateTaskRequest(request: AITaskRequest, config: ProviderConfi
   const includedEntries = request.contextAssembly.manifest.entries.filter(
     ({ included }) => included,
   );
+  const resolved = request.resolvedModelConfig;
   if (
     request.providerRequest.requestId !== request.requestId ||
     request.providerRequest.task !== request.taskType ||
@@ -216,6 +237,32 @@ async function validateTaskRequest(request: AITaskRequest, config: ProviderConfi
       request.requestId,
       'configuration',
       'CONFIGURATION_ROUTE_INVALID',
+      false,
+    );
+  }
+  if (
+    !(await verifyResolvedModelConfig(resolved)) ||
+    resolved.connectionProfileId !== config.id ||
+    resolved.providerType !== config.providerType ||
+    resolved.presetKey !== config.presetKey ||
+    resolved.modelProfileId !== route.modelProfileId ||
+    resolved.modelName !== route.modelName ||
+    resolved.generation.temperature !== request.providerRequest.temperature ||
+    resolved.generation.maxOutputTokens !== request.providerRequest.maxOutputTokens ||
+    resolved.generation.timeoutMs !== request.providerRequest.timeoutMs ||
+    resolved.promptProfile.task !== request.taskType ||
+    resolved.promptProfile.promptVersion !== request.providerRequest.promptVersion ||
+    resolved.promptProfile.responseFormat !== request.providerRequest.responseFormat.kind ||
+    resolved.promptProfile.responseSchemaName !==
+      (request.providerRequest.responseFormat.kind === 'JSON_SCHEMA'
+        ? request.providerRequest.responseFormat.name
+        : null)
+  ) {
+    throw new AITaskExecutionError(
+      request.operationId,
+      request.requestId,
+      'configuration',
+      'CONFIGURATION_RESOLVED_MODEL_INVALID',
       false,
     );
   }

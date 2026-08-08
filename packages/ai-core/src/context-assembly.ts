@@ -1,5 +1,6 @@
 import type { JsonValue } from '@ember-tavern/contracts';
 
+import { canonicalJson, sha256CanonicalJson } from './canonical-json.js';
 import type { AITask } from './protocol.js';
 
 export const CONTEXT_BLOCK_TYPES = [
@@ -90,7 +91,7 @@ export class ContextAssemblyError extends Error {
 
 export async function createContextBlock(draft: ContextBlockDraft): Promise<ContextBlock> {
   validateDraft(draft);
-  const canonical = canonicalJson({
+  const fingerprintPayload = {
     id: draft.id,
     type: draft.type,
     content: draft.content,
@@ -101,12 +102,11 @@ export async function createContextBlock(draft: ContextBlockDraft): Promise<Cont
     tokenBudget: draft.tokenBudget,
     privacyClass: draft.privacyClass,
     version: draft.version,
+  } satisfies JsonValue;
+  return Object.freeze({
+    ...draft,
+    contentHash: await sha256CanonicalJson(fingerprintPayload),
   });
-  const digest = await globalThis.crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(canonical),
-  );
-  return Object.freeze({ ...draft, contentHash: toHex(new Uint8Array(digest)) });
 }
 
 export function assembleContextBlocks(
@@ -235,7 +235,7 @@ function validateDraft(draft: ContextBlockDraft): void {
     ['id', draft.id],
     ['sourceId', draft.sourceId],
   ] as const) {
-    if (value.length === 0 || value.trim() !== value) {
+    if (value.length === 0 || value.trim() !== value || value.normalize('NFC') !== value) {
       throw new ContextAssemblyError(`${label} must be non-empty canonical text`);
     }
   }
@@ -267,24 +267,4 @@ function validatePolicy(policy: ContextAssemblyPolicy): void {
   if (new Set(policy.typeOrder).size !== policy.typeOrder.length) {
     throw new ContextAssemblyError('typeOrder must not contain duplicates');
   }
-}
-
-function canonicalJson(value: JsonValue): string {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) throw new ContextAssemblyError('Context numbers must be finite');
-    return JSON.stringify(value);
-  }
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  const record = value as Readonly<Record<string, JsonValue>>;
-  return `{${Object.keys(record)
-    .sort()
-    .map((key) => `${JSON.stringify(key)}:${canonicalJson(record[key] ?? null)}`)
-    .join(',')}}`;
-}
-
-function toHex(bytes: Uint8Array): string {
-  return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
 }

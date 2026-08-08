@@ -126,7 +126,12 @@ describe('AITurnOrchestrator', () => {
           modelName: 'ember-fake-v1',
           responseFormat: { kind: 'TEXT' },
         }),
-        providerConfig,
+        expect.objectContaining({
+          id: providerConfig.id,
+          baseUrl: providerConfig.baseUrl,
+          credentialRef: providerConfig.credentialRef,
+          options: providerConfig.options,
+        }),
       );
       expect(new PendingAiRequestRepository(sqlite).get(command.requestId)).toMatchObject({
         status: 'COMMITTED',
@@ -395,6 +400,17 @@ describe('AITurnOrchestrator', () => {
         generationOptions: sourceCommand.generationOptions,
         validateDomainAndBuildCommit: (output: unknown) => commitFromOutput(sqlite, output),
       };
+
+      await expect(
+        repair.repairTurn({
+          ...repairCommand,
+          requestId: aiRequestId('request-orchestrator-drifted-repair'),
+          generationRecordId: generationRecordId('generation-orchestrator-drifted-repair'),
+          idempotencyKey: idempotencyKey('campaign-orchestrator:turn-1:drifted-repair'),
+          generationOptions: { ...repairCommand.generationOptions, temperature: 0.5 },
+        }),
+      ).rejects.toMatchObject({ code: 'RESOLVED_MODEL_CONFIG_DRIFT' });
+      expect(generate).toHaveBeenCalledTimes(1);
 
       await expect(repair.repairTurn(repairCommand)).resolves.toBe('COMMITTED');
       await expect(repair.repairTurn(repairCommand)).resolves.toBe('ALREADY_COMMITTED');

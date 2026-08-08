@@ -62,6 +62,8 @@ Orchestrator 产生 `AiOperation`：
 - `ResolvedModelConfig`：请求开始前解析和冻结的模型、端点、能力、超时、采样、cache profile 与 credential reference，并计算 fingerprint。
 - `ProviderRequest`：adapter 所需最小 HTTP 投影；只能在安全原生边界解析 secret，且不得落日志/存档。
 
+当前实现以规范化端点、Connection Profile身份与options、credential reference、模型档案/名称、完整能力、生成参数、prompt版本/响应格式及cache profile计算SHA-256 fingerprint。Orchestrator先复算fingerprint并逐值绑定route/request，再从ResolvedModelConfig投影ProviderConfig；调用期间不再读取可变设置对象。GenerationRecord只保存fingerprint，不复制credential reference；结构修复必须匹配原fingerprint。
+
 ## 候选和事务
 
 生成结果先进入 `AICandidate`：`candidate_id`、`operation_id`、`task_type`、结构化 payload、validation evidence、provenance、status、created_at。状态仅可 `proposed -> accepted|rejected|superseded`。接受时以 `expected_revision` 在单一 SQLite 写事务内重新执行 domain policy、写事实和 ledger；失败不产生部分状态。

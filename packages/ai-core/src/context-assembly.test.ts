@@ -28,6 +28,10 @@ describe('ContextBlock assembly', () => {
       reason: 'required',
     });
     expect(assembly.manifest.entries[0]).not.toHaveProperty('content');
+
+    const composed = await createContextBlock(draft('unicode', 'stable', { text: 'é' }));
+    const decomposed = await createContextBlock(draft('unicode', 'stable', { text: 'e\u0301' }));
+    expect(composed.contentHash).toBe(decomposed.contentHash);
   });
 
   it('orders stable, semi-stable and dynamic blocks deterministically', async () => {

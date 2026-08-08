@@ -1,8 +1,10 @@
 import {
   StandardAIError,
   createContextBlock,
+  resolveModelConfig,
   type AIProvider,
   type ContextAssembly,
+  type ModelCapabilities,
   type NormalizedAIRequest,
   type NormalizedAIResponse,
   type ProviderConfig,
@@ -48,6 +50,24 @@ const config: ProviderConfig = {
   options: {},
   enabled: true,
 };
+const capabilities: ModelCapabilities = {
+  text: true,
+  streaming: false,
+  systemMessages: true,
+  jsonMode: true,
+  jsonSchema: false,
+  toolCalling: false,
+  reasoning: false,
+  contextWindowTokens: 32_000,
+  costStatus: 'UNKNOWN',
+  checkedAt: isoTimestamp('2026-08-08T00:00:00.000Z'),
+};
+const resolvedModelConfig = await resolveModelConfig({
+  connectionProfile: config,
+  modelProfileId: modelProfileId('profile-a'),
+  capabilities,
+  request,
+});
 const contextBlock = await createContextBlock({
   id: 'context-a',
   type: 'task',
@@ -163,6 +183,45 @@ describe('AITaskOrchestrator', () => {
     });
   });
 
+  it('projects only the frozen configuration even when editable settings change', async () => {
+    const editable: ProviderConfig = {
+      ...config,
+      baseUrl: 'https://original.example/',
+      credentialRef: 'vault:original',
+      options: { mode: 'original' },
+    };
+    const frozen = await resolveModelConfig({
+      connectionProfile: editable,
+      modelProfileId: modelProfileId('profile-a'),
+      capabilities,
+      request,
+    });
+    let received: ProviderConfig | null = null;
+    const provider: AIProvider = {
+      ...providerReturning(responseFor(request)),
+      async generate(_request, providerConfig) {
+        received = providerConfig;
+        return responseFor(request);
+      },
+    };
+    const changed = {
+      ...editable,
+      baseUrl: 'https://changed.example/',
+      credentialRef: 'vault:changed',
+      options: { mode: 'changed' },
+    };
+
+    await new AITaskOrchestrator(provider, changed).execute({
+      ...taskRequest('PRIMARY', 1),
+      resolvedModelConfig: frozen,
+    });
+    expect(received).toMatchObject({
+      baseUrl: 'https://original.example/',
+      credentialRef: 'vault:original',
+      options: { mode: 'original' },
+    });
+  });
+
   it('exposes the complete stable application error taxonomy', () => {
     expect(AI_ERROR_CATEGORIES).toEqual([
       'configuration',
@@ -198,6 +257,7 @@ function taskRequest(kind: AIRouteKind, attempt: number) {
     campaignId: campaignId('campaign-task-orchestrator'),
     actorId: null,
     contextAssembly,
+    resolvedModelConfig,
     route: {
       kind,
       attempt,

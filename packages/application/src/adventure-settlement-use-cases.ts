@@ -495,6 +495,8 @@ export class AdventureSettlementUseCases {
         command.campaignId,
         request,
         inputJson,
+        command.modelProfileId,
+        model.capabilities,
       );
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
