@@ -1412,3 +1412,19 @@ CI必须显式运行交叉命令。修改任一导出格式时需要在同一变
 ### 影响与边界
 
 CI构建证明源码能在托管双平台环境编译和打包，不等同于M9实机启动、交互、视觉、签名或安装/卸载验收。失败日志仍要上传，且不能通过删除产物哈希、忽略退出码或转码丢失stderr来保持绿色。SR2-010必须由最终连续流程截图关闭。
+
+## DEC-061：AI生成统一使用显式任务执行信封
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T01`、Architecture Gate AI Pipeline
+
+### 决定与理由
+
+所有应用层Provider生成必须经过`AITaskOrchestrator`。执行信封同时绑定task type、request ID、operation ID、Campaign/Actor、route kind、attempt、Provider配置、模型档案和模型名；Provider调用前验证请求与route一致，返回后验证响应身份和token usage一致。
+
+重试、备用模型和结构修复不在adapter中隐式发生，而由Application分别以`RETRY`、`FALLBACK`和`REPAIR` route显式发起。Orchestrator把Provider错误归一到十类稳定应用错误，但保留具体code与retryable语义；网络传输失败归Provider类，只有SSRF/地址/DNS/重定向等边界拒绝归network-policy类。
+
+### 影响与边界
+
+AI UI不得持有或调用Provider。现有八类Application生成路径都通过统一入口，旧的请求生命周期和GenerationRecord仍保持兼容；M2后续任务将分别补入ContextBlock、ResolvedModelConfig、Candidate Pattern和Event Ledger，本决定不提前实现它们，也不自动连接真实模型或付费API。

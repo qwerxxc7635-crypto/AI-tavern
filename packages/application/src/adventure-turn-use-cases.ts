@@ -9,6 +9,7 @@ import {
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
+  aiOperationId,
   npcId,
   schemaVersion,
   transitionAdventureState,
@@ -649,6 +650,7 @@ function completedTurnSnapshotPrefix(adventure: AdventureId): string {
 
 function generation(command: ResolveAdventureTurnCommand) {
   return {
+    operationId: aiOperationId(command.idempotencyKey),
     requestId: command.requestId,
     generationRecordId: command.generationRecordId,
     campaignId: command.campaignId,

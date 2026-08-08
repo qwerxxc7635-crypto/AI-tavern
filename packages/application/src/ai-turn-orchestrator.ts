@@ -10,6 +10,7 @@ import {
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
+  type AiOperationId,
   type AiRequestError,
   type AiRequestId,
   type CampaignId,
@@ -31,6 +32,8 @@ import {
 } from '@ember-tavern/persistence';
 import { formatTaskPrompt, type FormattedTaskPrompt } from '@ember-tavern/prompts';
 
+import { AITaskOrchestrator, type AIRouteKind } from './ai-task-orchestrator.js';
+
 export interface AITurnGenerationOptions {
   readonly temperature: number;
   readonly maxOutputTokens: number;
@@ -41,6 +44,7 @@ export interface AITurnGenerationOptions {
 }
 
 export interface ExecuteAITurn {
+  readonly operationId: AiOperationId;
   readonly requestId: AiRequestId;
   readonly generationRecordId: GenerationRecordId;
   readonly campaignId: CampaignId;
@@ -51,6 +55,8 @@ export interface ExecuteAITurn {
   readonly modelName: string;
   readonly requireSelectedModelProfile?: boolean;
   readonly repairSourceRequestId?: AiRequestId;
+  readonly routeKind?: AIRouteKind;
+  readonly routeAttempt?: number;
   readonly input: JsonValue;
   readonly generationOptions: AITurnGenerationOptions;
   readonly buildContext: () => unknown | Promise<unknown>;
@@ -202,20 +208,37 @@ export class AITurnOrchestrator {
       task: command.task,
       modelProfileId: selectedModelProfileId,
       promptVersion: request.promptVersion,
-      request: requestJson(request, context, command.repairSourceRequestId),
+      request: requestJson(
+        request,
+        context,
+        command.operationId,
+        command.routeKind ?? 'PRIMARY',
+        command.routeAttempt ?? 1,
+        command.repairSourceRequestId,
+      ),
       startedAt: this.now(),
     });
     this.requests.startAttempt(command.requestId, this.now());
 
     let rawResponseText: string;
     try {
-      const response = await this.provider.generate(request, this.providerConfig);
-      if (response.requestId !== command.requestId || response.modelName !== request.modelName) {
-        throw new AIOrchestrationError(
-          'PROVIDER_RESPONSE_MISMATCH',
-          'Provider response does not match the normalized request',
-        );
-      }
+      const response = (
+        await new AITaskOrchestrator(this.provider, this.providerConfig).execute({
+          operationId: command.operationId,
+          requestId: command.requestId,
+          taskType: command.task,
+          campaignId: command.campaignId,
+          actorId: null,
+          route: {
+            kind: command.routeKind ?? 'PRIMARY',
+            attempt: command.routeAttempt ?? 1,
+            providerId: this.providerConfig.id,
+            modelProfileId: selectedModelProfileId,
+            modelName: request.modelName,
+          },
+          providerRequest: request,
+        })
+      ).response;
       rawResponseText = response.content;
       this.requests.markReceived(command.requestId, this.now());
       this.requests.markValidating(command.requestId, this.now());
@@ -318,10 +341,16 @@ export class AITurnOrchestrator {
 function requestJson(
   request: NormalizedAIRequest,
   context: JsonValue,
+  operationId: AiOperationId,
+  routeKind: AIRouteKind,
+  routeAttempt: number,
   repairSourceRequestId: AiRequestId | undefined,
 ): JsonValue {
   return Object.freeze({
     requestId: request.requestId,
+    operationId,
+    routeKind,
+    routeAttempt,
     task: request.task,
     promptVersion: request.promptVersion,
     modelName: request.modelName,

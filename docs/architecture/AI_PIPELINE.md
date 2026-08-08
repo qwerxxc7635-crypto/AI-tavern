@@ -39,6 +39,12 @@ proposed -> accepted | rejected | superseded
 6. 结构修复最多一次，使用同一 frozen config，并分别保留审计记录。
 7. 日志只记录 operation、fingerprint、耗时、token/cache 指标和错误分类，不记录 secret 或默认完整 prompt。
 
+## 当前统一执行信封
+
+`AITaskOrchestrator` 是应用层唯一的 Provider 生成入口。每次调用必须同时携带 `taskType`、`requestId`、`operationId`、Campaign/Actor 身份和不可变 route；route 显式标记 `PRIMARY`、`RETRY`、`FALLBACK` 或 `REPAIR` 及 attempt、Provider 配置、模型档案和模型名。执行前拒绝 request/route 漂移，执行后拒绝响应身份和 token usage 不一致。
+
+现有八类应用生成流程均已迁移至该入口；普通一次性生成从 request ID 派生稳定 operation ID，回合、恢复和结构修复流程传入其显式 operation/route。Orchestrator 只统一执行边界，不替 Router 自动决定重试或降级；相关策略仍由 Application 明确发起，避免隐式切换 Provider 或模型。
+
 ## 三类输出
 
 - **Hard Logic**：完全本地计算，模型无权覆盖，例如 D20、修正值、状态转移和权限。

@@ -1,5 +1,6 @@
 import type { AITask, ProviderConfig } from '@ember-tavern/ai-core';
 import {
+  aiOperationId,
   type AiRequestId,
   type GenerationRecordId,
   type IdempotencyKey,
@@ -95,6 +96,7 @@ export class StructuredOutputRepairUseCases {
     }
 
     return await this.originalModelOrchestrator.execute({
+      operationId: aiOperationId(command.idempotencyKey),
       requestId: command.requestId,
       generationRecordId: command.generationRecordId,
       campaignId: source.campaignId,
@@ -105,6 +107,7 @@ export class StructuredOutputRepairUseCases {
       modelName: profile.modelName,
       requireSelectedModelProfile: true,
       repairSourceRequestId: source.id,
+      routeKind: 'REPAIR',
       input: source.input,
       generationOptions: command.generationOptions,
       buildContext: () => source.context,

@@ -2535,3 +2535,22 @@
 ### 结论
 
 - SR2-008、SR2-009 / `V02-M1-T08` 关闭。SR2-010保留至最终连续流程截图；下一项严格为 `V02-M2-T01` AI Task Orchestrator。
+
+## 2026-08-08 — V02-M2-T01 统一 AI Task Orchestrator
+
+### 实现
+
+- 新增品牌化`AiOperationId`以及统一`AITaskRequest`/`AITaskResult`，在一次执行中绑定task、request、operation、Campaign/Actor、Provider配置、模型和attempt。
+- route显式区分`PRIMARY`、`RETRY`、`FALLBACK`与`REPAIR`；恢复流程分别标记fallback/retry，结构修复标记repair，禁止adapter内部隐式切换。
+- Provider调用前验证request/route身份，返回后验证request/model和token usage；错误归一为configuration、credential、capability、network-policy、timeout、provider、schema、domain-policy、stale-revision和cancelled十类。
+- 世界、角色、酒馆、任务、NPC对话、冒险开始/回合/结算共八类应用生成路径全部经过统一执行入口，UI继续只调用Application service。
+
+### 验证
+
+- 新增7项Orchestrator测试，覆盖四类route、attempt规则、调用前拒绝漂移、usage一致性、timeout和稳定错误分类。
+- 完整`pnpm test`通过：61个Vitest文件、358项测试，Node持久化与脚本测试同时通过；`pnpm typecheck`、`pnpm lint`和`git diff --check`通过。
+- 未访问真实Provider、付费API或正式用户数据；测试只使用Fake Provider和固定规范化响应。
+
+### 结论
+
+- `V02-M2-T01`完成。下一项严格为`V02-M2-T02` Context Assembly Pipeline。

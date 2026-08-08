@@ -124,6 +124,7 @@ export type {
 } from './campaign.js';
 export {
   actionOptionId,
+  aiOperationId,
   aiRequestId,
   adventureId,
   campaignId,
@@ -158,6 +159,7 @@ export {
 } from './foundation.js';
 export type {
   ActionOptionId,
+  AiOperationId,
   AiRequestId,
   AdventureId,
   CampaignId,

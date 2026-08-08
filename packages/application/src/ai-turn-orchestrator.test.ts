@@ -13,6 +13,7 @@ import {
 } from '@ember-tavern/ai-core';
 import {
   actionOptionId,
+  aiOperationId,
   adventureId,
   aiRequestId,
   campaignId,
@@ -511,6 +512,7 @@ describe('AITurnOrchestrator', () => {
 
 function executeCommand(database: TransactionalSqliteDatabase, buildContext: () => unknown) {
   return {
+    operationId: aiOperationId('operation-orchestrator'),
     requestId: aiRequestId('request-orchestrator'),
     generationRecordId: generationRecordId('generation-orchestrator'),
     campaignId: campaignKey,
