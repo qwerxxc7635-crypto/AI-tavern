@@ -1460,3 +1460,19 @@ Orchestrator在调用Provider前复算fingerprint并与route和ProviderRequest�
 ### 影响与边界
 
 GenerationRecord只保存fingerprint，不保存ResolvedModelConfig整体，避免credential reference进入可移植生成审计并触发秘密边界。真正的API Key仍只在原生SecureVault边界按reference解析；fingerprint既不是secret也不能反推出凭据。普通retry/fallback是新operation，可显式解析新配置；repair必须沿用原冻结配置，否则fail closed。
+
+## DEC-064：AI Candidate不可变修订并与领域提交原子确认
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T04`、目标架构Candidate Pattern
+
+### 决定与理由
+
+结构化AI结果在schema和domain检查均成功后才能创建`PROPOSED` Candidate。payload、validation evidence、request/provider/model、resolved/context fingerprint、expected revision和operation ID保存在SQLite；编辑与重新生成不覆盖原payload，而是创建`EDIT`或`REGENERATE`新项并原子把旧项转为`SUPERSEDED`。
+
+确认命令取得`BEGIN IMMEDIATE`，重新核对Campaign、`PROPOSED`状态和expected revision，调用本地领域commit后再转为`ACCEPTED`并一起提交。领域写入或状态转换任一失败都回滚；重复确认已accepted项不重复执行commit。拒绝只允许`PROPOSED -> REJECTED`。
+
+### 影响与边界
+
+Provider response仍不能直接写Candidate：调用方必须提供schema/domain成功证据，Candidate存储还会拒绝高置信credential字段和值。migration 4已由TypeScript和Rust启动路径共同应用。当前通用基础设施本身不扩大`.emtavern` schema 1；在具体功能切换为可跨会话的未确认Candidate前，必须同时定义其可移植策略，不能静默丢失用户确认中的提案。

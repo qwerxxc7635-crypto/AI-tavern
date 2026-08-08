@@ -2592,3 +2592,22 @@
 ### 结论
 
 - `V02-M2-T03`完成。下一项严格为`V02-M2-T04` AI Candidate Infrastructure。
+
+## 2026-08-08 — V02-M2-T04 建立 AI Candidate Infrastructure
+
+### 实现
+
+- SQLite migration 4新增`ai_candidates`，绑定Campaign、operation、GenerationRecord、payload、双重验证证据、无秘密provenance、expected revision、状态和修订链；TypeScript/Rust启动迁移同步升级。
+- 新增Candidate repository与Application use cases：propose、preview、edit/regenerate修订、reject及confirm；payload和provenance执行高置信credential扫描。
+- Candidate不可原地编辑；修订在同一事务创建新PROPOSED项并把旧项标为SUPERSEDED，保留双向链和独立operation。
+- confirm在`BEGIN IMMEDIATE`中核对Campaign/状态/revision，领域commit与ACCEPTED转换共同提交；失败共同回滚，重复确认不会重复领域写入。
+
+### 验证
+
+- 新增4项Candidate纵向测试，覆盖生成/验证/预览、编辑修订、无领域副作用、stale revision、原子确认、幂等重复确认、领域失败回滚、拒绝和credential拒绝。
+- 完整Vitest通过64个文件、371项测试；Node migration 4新库与重复应用通过，旧库升级断言更新并定向通过。
+- Rust native启动路径纳入migration 4，格式门禁及newer-schema拒绝测试通过；未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M2-T04`完成。下一项严格为`V02-M2-T05` Event Ledger。

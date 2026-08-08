@@ -29,6 +29,7 @@ export type MessageId = Branded<string, 'MessageId'>;
 export type GenerationRecordId = Branded<string, 'GenerationRecordId'>;
 export type AiRequestId = Branded<string, 'AiRequestId'>;
 export type AiOperationId = Branded<string, 'AiOperationId'>;
+export type AiCandidateId = Branded<string, 'AiCandidateId'>;
 export type IdempotencyKey = Branded<string, 'IdempotencyKey'>;
 export type ModelProfileId = Branded<string, 'ModelProfileId'>;
 export type SnapshotId = Branded<string, 'SnapshotId'>;
@@ -75,6 +76,7 @@ export const generationRecordId = (value: string): GenerationRecordId =>
   createId(value, 'GenerationRecordId');
 export const aiRequestId = (value: string): AiRequestId => createId(value, 'AiRequestId');
 export const aiOperationId = (value: string): AiOperationId => createId(value, 'AiOperationId');
+export const aiCandidateId = (value: string): AiCandidateId => createId(value, 'AiCandidateId');
 export const idempotencyKey = (value: string): IdempotencyKey => createId(value, 'IdempotencyKey');
 export const modelProfileId = (value: string): ModelProfileId => createId(value, 'ModelProfileId');
 export const snapshotId = (value: string): SnapshotId => createId(value, 'SnapshotId');

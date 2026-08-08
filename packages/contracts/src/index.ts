@@ -22,6 +22,13 @@ export type {
   JsonValue,
   PendingAiRequest,
 } from './pending-ai-request.js';
+export { AI_CANDIDATE_STATUSES } from './ai-candidate.js';
+export type {
+  AICandidate,
+  AICandidateProvenance,
+  AICandidateStatus,
+  AICandidateValidationEvidence,
+} from './ai-candidate.js';
 export {
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
@@ -124,6 +131,7 @@ export type {
 } from './campaign.js';
 export {
   actionOptionId,
+  aiCandidateId,
   aiOperationId,
   aiRequestId,
   adventureId,
@@ -159,6 +167,7 @@ export {
 } from './foundation.js';
 export type {
   ActionOptionId,
+  AiCandidateId,
   AiOperationId,
   AiRequestId,
   AdventureId,

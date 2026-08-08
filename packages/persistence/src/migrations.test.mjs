@@ -10,6 +10,7 @@ import { applyMigrations, migrationCount } from './migrations.mjs';
 const coreTables = [
   'adventure_turns',
   'adventures',
+  'ai_candidates',
   'app_settings',
   'campaigns',
   'conversations',

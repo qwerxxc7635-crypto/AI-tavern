@@ -23,6 +23,11 @@ const migrations = [
       import.meta.url,
     ),
   },
+  {
+    version: 4,
+    name: 'ai_candidates',
+    source: new URL('../../../database/migrations/0004_ai_candidates.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

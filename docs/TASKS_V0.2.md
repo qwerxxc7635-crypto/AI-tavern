@@ -23,7 +23,8 @@
 - `V02-M2-T01`：DONE；所有应用层AI生成统一经过AITaskOrchestrator，冻结task/request/operation/route身份，显式区分primary/retry/fallback/repair，归一usage与稳定错误分类。
 - `V02-M2-T02`：DONE；ContextBlock装配支持stable/semi-stable/dynamic、任务顺序、相关性、块/总预算、SHA-256与不含内容的provenance manifest；所有Provider执行均强制携带并复核装配结果。
 - `V02-M2-T03`：DONE；请求开始前冻结endpoint、credential ref、Provider options、model/capability、generation、prompt/cache profile并计算SHA-256，Provider只接收冻结投影，repair漂移fail closed。
-- 下一执行项严格进入 `V02-M2-T04` AI Candidate Infrastructure。
+- `V02-M2-T04`：DONE；migration 4与通用Candidate服务实现propose/preview/edit-regenerate/supersede/reject/confirm，并以expected revision在同一SQLite事务原子提交领域写入和ACCEPTED状态。
+- 下一执行项严格进入 `V02-M2-T05` Event Ledger。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

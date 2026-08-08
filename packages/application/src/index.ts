@@ -15,6 +15,12 @@ export type {
   AITaskResult,
 } from './ai-task-orchestrator.js';
 export { AIRequestRecoveryUseCases } from './ai-request-recovery-use-cases.js';
+export { AICandidateUseCases } from './ai-candidate-use-cases.js';
+export type {
+  ConfirmAICandidate,
+  ProposeAICandidate,
+  ReviseAICandidate,
+} from './ai-candidate-use-cases.js';
 export type { RecoverAITurnCommand } from './ai-request-recovery-use-cases.js';
 export { StructuredOutputRepairUseCases } from './structured-output-repair-use-cases.js';
 export type { RepairStructuredTurnOutputCommand } from './structured-output-repair-use-cases.js';

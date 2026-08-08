@@ -68,6 +68,8 @@ Orchestrator 产生 `AiOperation`：
 
 生成结果先进入 `AICandidate`：`candidate_id`、`operation_id`、`task_type`、结构化 payload、validation evidence、provenance、status、created_at。状态仅可 `proposed -> accepted|rejected|superseded`。接受时以 `expected_revision` 在单一 SQLite 写事务内重新执行 domain policy、写事实和 ledger；失败不产生部分状态。
 
+当前通用基础设施把Candidate作为不可变提案保存于SQLite migration 4。编辑或重新生成会创建带独立operation/provenance的新Candidate，并在同一事务把原项标为superseded；确认要求Campaign与expected revision匹配，在同一`BEGIN IMMEDIATE`中执行领域commit和accepted转换，任一步失败全部回滚。Candidate payload和provenance执行高置信credential扫描。
+
 ## Ports & Adapters
 
 必须存在并具备契约测试：
