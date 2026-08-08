@@ -50,6 +50,13 @@
 - 恢复操作持有同一协调锁直至SQLite事务提交/回滚；创建导入也在锁内取得立即事务并重新确认冲突。
 - 两个独立`CampaignStore`的确定性竞态测试分别在删除/覆盖备份后插入写入，均返回`CONCURRENT_MODIFICATION`并保留最新时间戳；独立文件锁adapter测试证明锁释放前第二持有者被拒绝。
 
+## SR2-007 — CLOSED
+
+- 新增`pnpm archive:interop`唯一生成/验证命令和`archive-fixtures.json`来源清单，记录两份夹具的producer、source test、固定创建时间与SHA-256。
+- 命令先用当前TypeScript exporter生成归档，当前Rust importer导入并检查Campaign/事实；同一个Rust门禁随后用当前exporter生成归档，再由当前TypeScript importer导入检查。
+- 生成结果与已提交夹具逐一比较五个固定ZIP条目的名称和字节内容；清单同时锁定提交文件原始SHA-256。ZIP平台`made by`头不作为内容漂移，避免Windows/macOS元数据造成伪差异。
+- `.github/workflows/ci.yml`显式执行该命令；任一当前实现交叉不兼容、来源哈希改变或夹具内容陈旧都会使CI失败。
+
 ## 待关闭
 
-- SR2-007～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。
+- SR2-008～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。

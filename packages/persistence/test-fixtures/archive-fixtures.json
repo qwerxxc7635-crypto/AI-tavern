@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "command": "pnpm archive:interop",
+  "fixtures": {
+    "typescript": {
+      "path": "packages/persistence/test-fixtures/typescript-export-v1.emtavern",
+      "producer": "packages/persistence/src/save-export.ts",
+      "sourceTest": "packages/persistence/src/save-export.test.ts",
+      "createdAt": "2026-08-01T13:00:00.000Z",
+      "sha256": "613d643c13398134c27ddcd0b4fa27bbf2bcc4f9fe920b607a3152eb52973c47"
+    },
+    "rust": {
+      "path": "packages/persistence/test-fixtures/rust-export-v1.emtavern",
+      "producer": "crates/native-bridge/src/save_archive.rs",
+      "sourceTest": "current_archive_interop_gate_imports_typescript_and_emits_rust",
+      "createdAt": "2026-08-02T00:59:25.584Z",
+      "sha256": "d1bd48a278a220f7741d56727b406070bc43218566b9aaa461f517e68a5ab467"
+    }
+  }
+}

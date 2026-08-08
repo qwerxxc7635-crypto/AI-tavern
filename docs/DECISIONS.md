@@ -1380,3 +1380,19 @@ SQLite migration 3只保存不含秘密的端点/探测指纹与能力来源，�
 ### 影响与边界
 
 跨进程锁负责协调正式实例和破坏性操作，SQLite事务负责事实写入原子性，data-version负责发现未遵守应用锁的旧实例或独立Store；三者不能互相替代。锁文件不含用户数据，进程退出由操作系统释放。并发冲突必须显式重试，不能绕过备份或降低事务级别。
+
+## DEC-059：存档互操作由当前实现交叉生成并锁定逻辑内容
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-007、`V02-M1-T07`
+
+### 决定与理由
+
+`.emtavern`兼容门禁不能只读取历史二进制样本。`pnpm archive:interop`必须用当前TypeScript exporter生成、当前Rust importer读取，再用当前Rust exporter生成、当前TypeScript importer读取；生成的五个条目还必须与提交夹具逐项比较。
+
+来源清单固定producer、source test、创建时间和提交文件SHA-256。regenerate-and-diff比较ZIP条目顺序、名称和完整内容，同时忽略ZIP central/local header中的平台`made by`差异，因为该字段在Windows和Unix由库生成且不属于存档协议。
+
+### 影响与边界
+
+CI必须显式运行交叉命令。修改任一导出格式时需要在同一变更中证明另一实现可导入，并审查更新两份夹具和来源哈希；不得只让同语言导入器跟随修改。archive schema仍为1，逻辑条目或内容改变必须走兼容策略而非静默更新夹具。

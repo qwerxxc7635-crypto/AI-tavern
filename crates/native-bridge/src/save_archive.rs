@@ -126,8 +126,18 @@ impl CampaignStore {
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
-        let created_at = current_timestamp()?;
-        let bytes = self.capture_archive(campaign_id, &created_at, generator_version)?;
+        self.export_campaign_archive_at(campaign_id, path, generator_version, &current_timestamp()?)
+    }
+
+    fn export_campaign_archive_at(
+        &self,
+        campaign_id: &str,
+        path: impl AsRef<Path>,
+        generator_version: &str,
+        created_at: &str,
+    ) -> Result<CampaignArchiveExportResult, CampaignStoreError> {
+        validate_timestamp(created_at)?;
+        let bytes = self.capture_archive(campaign_id, created_at, generator_version)?;
         let destination = validate_archive_destination(path.as_ref())?;
         publish_archive(&destination, &bytes)?;
         Ok(CampaignArchiveExportResult {
@@ -1575,6 +1585,65 @@ mod tests {
                 .expect("import snapshot count"),
             1
         );
+    }
+
+    #[test]
+    fn current_archive_interop_gate_imports_typescript_and_emits_rust() {
+        let fallback = tempfile::tempdir().unwrap();
+        let typescript_archive = std::env::var_os("EMBER_TS_ARCHIVE_INPUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../packages/persistence/test-fixtures/typescript-export-v1.emtavern")
+            });
+        let rust_archive = std::env::var_os("EMBER_RUST_ARCHIVE_OUTPUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fallback.path().join("rust-export-v1.emtavern"));
+        let work_directory = std::env::var_os("EMBER_ARCHIVE_INTEROP_WORK")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fallback.path().join("work"));
+        fs::create_dir_all(&work_directory).unwrap();
+
+        let importer = CampaignStore::open(work_directory.join("rust-import.sqlite")).unwrap();
+        let imported = importer
+            .import_campaign_archive(typescript_archive, CampaignArchiveImportMode::Create)
+            .unwrap();
+        assert_eq!(imported.id, "campaign-export");
+        let connection = importer.connect().unwrap();
+        let fact: String = connection
+            .query_row(
+                "SELECT statement FROM world_facts WHERE id = 'fact-export'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(fact, "The beacon is lit.");
+        drop(connection);
+
+        let exporter = CampaignStore::open(work_directory.join("rust-export.sqlite")).unwrap();
+        exporter
+            .create_at("campaign-transfer".to_owned(), FIRST_TIME.to_owned())
+            .unwrap();
+        let connection = exporter.connect().unwrap();
+        connection
+            .execute(
+                "INSERT INTO world_facts (
+                   id, campaign_id, kind, statement, location_id, faction_ids_json,
+                   detail_json, supersedes_fact_id, created_at
+                 ) VALUES ('fact-transfer', 'campaign-transfer', 'DEVELOPING_FACT',
+                   'The bell is ringing.', NULL, '[]', '{}', NULL, ?1)",
+                [FIRST_TIME],
+            )
+            .unwrap();
+        drop(connection);
+        exporter
+            .export_campaign_archive_at(
+                "campaign-transfer",
+                rust_archive,
+                "0.1.0",
+                "2026-08-02T00:59:25.584Z",
+            )
+            .unwrap();
     }
 
     #[test]

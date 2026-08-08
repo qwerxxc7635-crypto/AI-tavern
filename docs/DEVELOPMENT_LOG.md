@@ -2495,3 +2495,23 @@
 ### 结论
 
 - SR2-006 / `V02-M1-T06` 关闭。下一项严格为 `V02-M1-T07` TS/Rust bidirectional archive CI。
+
+## 2026-08-08 — V02-M1-T07 建立当前双实现存档门禁
+
+### 实现
+
+- 新增`pnpm archive:interop`跨平台命令：当前TypeScript exporter → 当前Rust importer，再执行当前Rust exporter → 当前TypeScript importer。
+- TypeScript门禁使用固定Campaign、事件、GenerationRecord和世界事实；Rust门禁使用固定Campaign与世界事实，两侧均检查导入后的SQLite事实且不携带设备Provider状态。
+- `archive-fixtures.json`记录两份v1夹具的路径、producer、source test、固定创建时间与SHA-256；生成结果对五个固定ZIP条目的名称和完整字节做regenerate-and-diff。
+- Windows/Unix由ZIP库写入的`made by`头允许不同，但提交夹具原始SHA-256仍由来源清单锁定；逻辑内容差异不能被忽略。
+- Windows CI新增独立互操作步骤，不再只依赖同语言测试或历史夹具读取。
+
+### 验证
+
+- `pnpm archive:interop`通过：TypeScript定向13/13、Rust当前交叉门禁1/1、Rust输出回交TypeScript定向13/13。
+- 两份重新生成归档的五个条目与提交夹具逐字节一致；提交文件SHA-256与来源清单一致。
+- 命令只使用临时SQLite与临时归档目录，结束后自动清理；未访问真实Provider、凭据或正式用户数据。
+
+### 结论
+
+- SR2-007 / `V02-M1-T07` 关闭。下一项严格为 `V02-M1-T08` CI / evidence。

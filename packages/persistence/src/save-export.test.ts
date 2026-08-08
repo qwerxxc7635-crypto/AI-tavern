@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
@@ -48,6 +48,16 @@ afterEach(() => {
 });
 
 describe('exportCampaignSave', () => {
+  it('emits the current TypeScript archive for the interop gate when requested', () => {
+    const output = process.env['EMBER_TS_ARCHIVE_OUTPUT'];
+    if (output === undefined) return;
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    writeFileSync(output, exported.bytes);
+  });
+
   it('exports complete campaign content and audit files without device credentials', () => {
     const exported = exportCampaignSave(database, campaignKey, {
       createdAt: at,
@@ -181,6 +191,20 @@ describe('exportCampaignSave', () => {
 });
 
 describe('importCampaignSave', () => {
+  it('imports the current Rust archive during the interop gate when provided', async () => {
+    const input = process.env['EMBER_RUST_ARCHIVE_INPUT'];
+    if (input === undefined) return;
+    const imported = await importCampaignSave(database, new Uint8Array(readFileSync(input)), {
+      mode: 'CREATE',
+      importedAt: isoTimestamp('2026-08-02T01:00:00.000Z'),
+      snapshotId: snapshotId('snapshot-current-rust-interop'),
+    });
+    expect(imported.campaign.id).toBe(campaignId('campaign-transfer'));
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-transfer'),
+    ).toEqual({ statement: 'The bell is ringing.' });
+  });
+
   it('imports the Rust v1 fixture without device state', async () => {
     const archive = new Uint8Array(
       readFileSync(new URL('../test-fixtures/rust-export-v1.emtavern', import.meta.url)),

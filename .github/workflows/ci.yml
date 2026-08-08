@@ -54,3 +54,6 @@ jobs:
 
       - name: Test Rust
         run: cargo test --workspace
+
+      - name: Verify current TypeScript and Rust save interoperability
+        run: pnpm archive:interop
