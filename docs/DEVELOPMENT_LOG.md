@@ -2389,3 +2389,27 @@
 ### 结论
 
 - SR2-001 / `V02-M1-T01` 关闭。下一项严格为 `V02-M1-T02` SecureVault。
+
+## 2026-08-08 — V02-M1-T02 完成 SecureVault 生命周期
+
+### 实现
+
+- `SecretStore` 实现共享 `SecureVault` port；Windows 继续使用 Credential Manager，macOS 新增原生 Keychain adapter 与 health check。
+- 模型设置协议新增 `KEEP`、`REPLACE`、`CLEAR`：空密钥保存保持旧引用，显式替换/清空才改变引用。
+- 新增本地 migration 2 `credential_cleanup_queue`。新秘密先登记为可回滚暂存项，成功设置事务原子认领；旧引用在替换/清空事务中入队。
+- 删除成功才完成队列项，失败增加 attempts 并保留；启动及模型设置命令自动重试。临时探测或保存回滚的删除失败同样持久化。
+- Campaign archive schema 继续为1，与设备级 SQLite migration 2解耦；现有 TypeScript/Rust v1 fixture 保持互操作。
+
+### 验证
+
+- `cargo test -p ember-secure-secrets`：3/3，通过 macOS Keychain 真实运行时秘密 round-trip、健康检查和幂等删除，测试秘密已清理。
+- `cargo test -p ember-native-bridge -p ember-tavern-windows`：38/38，通过替换、保持、清空、事务回滚、删除失败、重启恢复和成功重试。
+- macOS 上的 Provider 系统凭据集成测试通过：仅向本机回环测试服务发送 Keychain 中的随机运行时值，并完成清理。
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
+- `pnpm test`：340/340，通过 migration 2、archive schema 1互操作、UI不暴露秘密及空输入 `KEEP` 回归。
+- `pnpm check:shared` 与 `pnpm build:desktop` 通过；Vite 转换 179 modules。
+- 未访问真实 Provider、付费 API 或正式用户数据；系统库测试只使用随机运行时值。
+
+### 结论
+
+- SR2-002 / `V02-M1-T02` 关闭。下一项严格为 `V02-M1-T03` `.emtavern` resource limits。

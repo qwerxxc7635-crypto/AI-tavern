@@ -9,16 +9,16 @@ use ember_native_bridge::{
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
     CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
     CampaignStoreError, CampaignSummary, CharacterCompletionCommit, CharacterCreationSnapshot,
-    CharacterTraitGenerationCommit, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
-    NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
-    TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
-    WorldManualUpdate,
+    CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
+    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
+    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
+    TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
 };
 use ember_provider_openai_compatible::{
     CustomCompatibleConfig, DeepSeekPreset, ModelCostStatus, OllamaPreset, OpenAiCompatibleConfig,
     OpenAiCompatibleProvider, OpenRouterPreset, ProviderError, QwenPreset,
 };
-use ember_secure_secrets::{CredentialRef, SecretStore};
+use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
 use time::{OffsetDateTime, format_description::well_known::Rfc3339};
@@ -152,6 +152,7 @@ struct ProviderProbeResult {
 fn model_settings_get(
     store: State<'_, CampaignStore>,
 ) -> Result<ModelSettingsSnapshot, CommandError> {
+    retry_pending_credential_cleanup(&store, &SecretStore)?;
     store.model_settings().map_err(Into::into)
 }
 
@@ -160,7 +161,9 @@ fn model_settings_save(
     command: ModelSettingsUpdate,
     store: State<'_, CampaignStore>,
 ) -> Result<ModelSettingsSnapshot, CommandError> {
-    if let Some(value) = command.credential_ref.as_deref() {
+    if command.credential_action == CredentialAction::Replace
+        && let Some(value) = command.credential_ref.as_deref()
+    {
         let reference = value.parse::<CredentialRef>().map_err(|_| CommandError {
             code: "CREDENTIAL_INVALID",
             message: "密钥引用无效，请重新输入API Key。",
@@ -175,7 +178,9 @@ fn model_settings_save(
             });
         }
     }
-    store.save_model_settings(command).map_err(Into::into)
+    store.save_model_settings(command)?;
+    retry_pending_credential_cleanup(&store, &SecretStore)?;
+    store.model_settings().map_err(Into::into)
 }
 
 #[tauri::command]
@@ -183,18 +188,27 @@ fn model_settings_forget_credential(
     profile_id: String,
     store: State<'_, CampaignStore>,
 ) -> Result<ModelSettingsSnapshot, CommandError> {
-    let (snapshot, credential_ref) = store.forget_model_credential(&profile_id)?;
-    if let Some(value) = credential_ref {
-        let reference = value.parse::<CredentialRef>().map_err(|_| CommandError {
-            code: "CREDENTIAL_INVALID",
-            message: "密钥引用无效；模型配置已停止使用该凭据，请在Windows凭据管理器中检查残留项。",
-        })?;
-        SecretStore.delete(&reference).map_err(|_| CommandError {
-            code: "CREDENTIAL_UNAVAILABLE",
-            message: "模型配置已停止使用该凭据，但系统凭据删除失败，请在Windows凭据管理器中手工清理。",
-        })?;
+    store.forget_model_credential(&profile_id)?;
+    retry_pending_credential_cleanup(&store, &SecretStore)?;
+    store.model_settings().map_err(Into::into)
+}
+
+fn retry_pending_credential_cleanup(
+    store: &CampaignStore,
+    vault: &impl SecureVault,
+) -> Result<(), CampaignStoreError> {
+    for pending in store.pending_credential_cleanups()? {
+        let reference = pending
+            .credential_ref
+            .parse::<CredentialRef>()
+            .map_err(|_| CampaignStoreError::InvalidData)?;
+        if vault.delete(&reference).is_ok() {
+            store.complete_credential_cleanup(&pending.credential_ref)?;
+        } else {
+            store.record_credential_cleanup_failure(&pending.credential_ref)?;
+        }
     }
-    Ok(snapshot)
+    Ok(())
 }
 
 #[tauri::command]
@@ -568,11 +582,18 @@ fn adventure_archives_get(
 }
 
 #[tauri::command]
-fn secret_save(secret: String) -> Result<String, String> {
-    SecretStore
+fn secret_save(secret: String, store: State<'_, CampaignStore>) -> Result<String, String> {
+    let reference = SecretStore
         .save(secret)
-        .map(|reference| reference.to_string())
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string())?;
+    if let Err(error) = store.enqueue_credential_cleanup(
+        reference.expose_reference(),
+        CredentialCleanupReason::Rollback,
+    ) {
+        let _ = SecretStore.delete(&reference);
+        return Err(error.to_string());
+    }
+    Ok(reference.to_string())
 }
 
 #[tauri::command]
@@ -586,12 +607,28 @@ fn secret_exists(credential_ref: String) -> Result<bool, String> {
 }
 
 #[tauri::command]
-fn secret_delete(credential_ref: String) -> Result<(), String> {
+fn secret_delete(credential_ref: String, store: State<'_, CampaignStore>) -> Result<(), String> {
     let reference = credential_ref
         .parse::<CredentialRef>()
         .map_err(|error| error.to_string())?;
+    if let Err(error) = SecretStore.delete(&reference) {
+        store
+            .enqueue_credential_cleanup(
+                reference.expose_reference(),
+                CredentialCleanupReason::Transient,
+            )
+            .map_err(|queue_error| queue_error.to_string())?;
+        return Err(error.to_string());
+    }
+    store
+        .complete_credential_cleanup(reference.expose_reference())
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+fn secret_health() -> Result<(), String> {
     SecretStore
-        .delete(&reference)
+        .health_check()
         .map_err(|error| error.to_string())
 }
 
@@ -601,7 +638,9 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let database_path = platform_paths::database_path(app)?;
-            app.manage(CampaignStore::open(database_path)?);
+            let store = CampaignStore::open(database_path)?;
+            retry_pending_credential_cleanup(&store, &SecretStore)?;
+            app.manage(store);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -642,6 +681,7 @@ pub fn run() {
             secret_save,
             secret_exists,
             secret_delete,
+            secret_health,
             model_settings_get,
             model_settings_save,
             model_settings_forget_credential,
@@ -654,6 +694,33 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ember_secure_secrets::SecretStoreError;
+
+    struct DeleteVault {
+        fail: bool,
+    }
+
+    impl SecureVault for DeleteVault {
+        fn save(&self, _: String) -> Result<CredentialRef, SecretStoreError> {
+            Err(SecretStoreError::Unavailable)
+        }
+
+        fn exists(&self, _: &CredentialRef) -> Result<bool, SecretStoreError> {
+            Err(SecretStoreError::Unavailable)
+        }
+
+        fn delete(&self, _: &CredentialRef) -> Result<(), SecretStoreError> {
+            if self.fail {
+                Err(SecretStoreError::Unavailable)
+            } else {
+                Ok(())
+            }
+        }
+
+        fn health_check(&self) -> Result<(), SecretStoreError> {
+            Ok(())
+        }
+    }
 
     #[test]
     fn provider_command_errors_keep_actionable_standard_codes() {
@@ -670,5 +737,27 @@ mod tests {
             assert_eq!(command_error.code, expected);
             assert!(!command_error.message.is_empty());
         }
+    }
+
+    #[test]
+    fn failed_cleanup_is_retained_for_restart_retry() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("cleanup-retry.sqlite");
+        let reference = CredentialRef::generate();
+        let store = CampaignStore::open(&path).unwrap();
+        store
+            .enqueue_credential_cleanup(
+                reference.expose_reference(),
+                CredentialCleanupReason::Transient,
+            )
+            .unwrap();
+
+        retry_pending_credential_cleanup(&store, &DeleteVault { fail: true }).unwrap();
+        assert_eq!(store.pending_credential_cleanups().unwrap()[0].attempts, 1);
+        drop(store);
+
+        let reopened = CampaignStore::open(path).unwrap();
+        retry_pending_credential_cleanup(&reopened, &DeleteVault { fail: false }).unwrap();
+        assert!(reopened.pending_credential_cleanups().unwrap().is_empty());
     }
 }

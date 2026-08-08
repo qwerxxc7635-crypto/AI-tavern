@@ -7,14 +7,29 @@ describe('model settings contract', () => {
     const calls: string[] = [];
     const gateway: ModelSettingsGateway = {
       async load() {
-        return { profiles: [], defaultModelProfileId: null, fallbackModelProfileId: null };
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: 0,
+        };
       },
       async save(update) {
         calls.push(JSON.stringify(update));
-        return { profiles: [], defaultModelProfileId: null, fallbackModelProfileId: null };
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: 0,
+        };
       },
       async forgetCredential() {
-        return { profiles: [], defaultModelProfileId: null, fallbackModelProfileId: null };
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: 0,
+        };
       },
       async saveSecret(secret) {
         expect(secret).toBe('runtime-secret');
@@ -34,6 +49,7 @@ describe('model settings contract', () => {
       providerDisplayName: 'DeepSeek',
       baseUrl: 'https://api.deepseek.com/',
       credentialRef: reference,
+      credentialAction: 'REPLACE',
       modelName: 'deepseek-v4-flash',
       modelDisplayName: 'DeepSeek V4 Flash',
       capabilities: {
@@ -84,6 +100,7 @@ describe('model settings contract', () => {
         ],
         defaultModelProfileId: null,
         fallbackModelProfileId: null,
+        pendingCredentialCleanupCount: 0,
       }),
     ).toThrow('timestamp');
   });

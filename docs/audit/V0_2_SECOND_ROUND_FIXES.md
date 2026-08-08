@@ -10,6 +10,14 @@
 - reqwest redirect policy 继续为 `none`，不存在跳转到私网的第二连接。
 - 11 项 `ember-secure-http` 测试通过；新增 IPv4/IPv6 special-use、mapped/compatible、NAT64、6to4、Teredo、混合 DNS矩阵。
 
+## SR2-002 — CLOSED
+
+- `SecretStore` 通过共享 `SecureVault` port 使用 Windows Credential Manager 或 macOS Keychain；SQLite 仍只保存不透明 `credential:v1:<UUID>`，不保存秘密。
+- 设置更新显式区分 `KEEP`、`REPLACE` 与 `CLEAR`。空输入不再用 `null` 覆盖既有引用；替换或清空会在同一 SQLite 事务中登记旧引用。
+- 新建秘密先作为 `ROLLBACK` 清理项持久化，设置事务成功时原子认领；因此秘密写入后进程退出也能在下次启动恢复。
+- 系统库删除成功才移除清理项；失败会保留引用并增加重试次数。启动、设置读取、保存和清空均会重试，UI 只显示待清理数量，不暴露历史引用。
+- 回归测试覆盖新增、保留、替换、清空、事务回滚、删除失败、临时探测清理失败、数据库重开与成功重试；macOS Keychain 实际 round-trip 与幂等删除通过。
+
 ## 待关闭
 
-- SR2-002～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。
+- SR2-003～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。

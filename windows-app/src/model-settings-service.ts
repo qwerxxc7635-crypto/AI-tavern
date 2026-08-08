@@ -18,6 +18,7 @@ export interface ModelSettingsSnapshot {
   readonly profiles: readonly ModelProfile[];
   readonly defaultModelProfileId: string | null;
   readonly fallbackModelProfileId: string | null;
+  readonly pendingCredentialCleanupCount: number;
 }
 
 export interface ModelSettingsUpdate {
@@ -25,6 +26,7 @@ export interface ModelSettingsUpdate {
   readonly providerDisplayName: string;
   readonly baseUrl: string | null;
   readonly credentialRef: string | null;
+  readonly credentialAction: 'KEEP' | 'REPLACE' | 'CLEAR';
   readonly modelName: string;
   readonly modelDisplayName: string;
   readonly capabilities: ModelCapabilities;
@@ -98,6 +100,9 @@ export function parseModelSettingsSnapshot(value: unknown): ModelSettingsSnapsho
     profiles: Object.freeze(requireArray(record['profiles']).map(parseProfile)),
     defaultModelProfileId: optionalId(record['defaultModelProfileId']),
     fallbackModelProfileId: optionalId(record['fallbackModelProfileId']),
+    pendingCredentialCleanupCount: requireNonNegativeInteger(
+      record['pendingCredentialCleanupCount'],
+    ),
   });
 }
 
@@ -184,6 +189,13 @@ function optionalId(value: unknown): string | null {
 function requireBoolean(value: unknown): boolean {
   if (typeof value !== 'boolean') throw new TypeError('Model settings flag is invalid');
   return value;
+}
+
+function requireNonNegativeInteger(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw new TypeError('Model settings count is invalid');
+  }
+  return value as number;
 }
 
 function requireTimestamp(value: unknown): string {

@@ -13,7 +13,8 @@
 - `V02-COMP-T01`～`V02-COMP-T07`：DONE；三仓库固定 SHA、源码可用性、矩阵、Gap、Borrow/Reject 均已记录在 `docs/research/`。
 - `V02-ARCH-T01`～`V02-ARCH-T09`：DESIGN DONE / GATE PASS；实现约束见 `docs/architecture/`。Gate 通过只批准实现，不把 M0/M1/M2 代码任务标为完成。
 - `V02-M1-T01`：DONE；完整特殊用途地址矩阵与证据见 `docs/audit/V0_2_SECOND_ROUND_FIXES.md`。
-- 下一执行项：严格进入 `V02-M1-T02`。
+- `V02-M1-T02`：DONE；Windows Credential Manager、macOS Keychain、KEEP/REPLACE/CLEAR、持久清理队列、重启恢复和 health check 已通过回归测试。
+- 下一执行项：严格进入 `V02-M1-T03`。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

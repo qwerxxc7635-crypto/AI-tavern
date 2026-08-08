@@ -22,6 +22,7 @@ use super::{
 
 const FORMAT_VERSION: u64 = 1;
 const DATABASE_SCHEMA_VERSION: u64 = 1;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 2;
 const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 1024 * 1024 * 1024;
 const ENTRY_NAMES: [&str; 5] = [
@@ -1024,7 +1025,7 @@ fn assert_database_ready(connection: &Connection) -> Result<(), CampaignStoreErr
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if schema != DATABASE_SCHEMA_VERSION as i64 {
+    if schema != LOCAL_DATABASE_SCHEMA_VERSION {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
     Ok(())

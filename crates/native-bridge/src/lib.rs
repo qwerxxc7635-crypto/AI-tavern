@@ -37,6 +37,8 @@ use time::macros::format_description;
 use uuid::Uuid;
 
 const INITIAL_MIGRATION: &str = include_str!("../../../database/migrations/0001_initial.sql");
+const CREDENTIAL_CLEANUP_MIGRATION: &str =
+    include_str!("../../../database/migrations/0002_credential_cleanup_queue.sql");
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -419,32 +421,41 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if latest_version > 1 {
+    if latest_version > 2 {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
-    let applied_name = connection
-        .query_row(
-            "SELECT name FROM schema_migrations WHERE version = 1",
-            [],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?;
-    if let Some(name) = applied_name {
-        return if name == "initial" {
-            Ok(())
-        } else {
-            Err(CampaignStoreError::IncompatibleSchema)
-        };
-    }
 
-    let applied_at = current_timestamp()?;
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(INITIAL_MIGRATION)?;
-    transaction.execute(
-        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (1, 'initial', ?1)",
-        [applied_at],
-    )?;
-    transaction.commit()?;
+    for (version, name, sql) in [
+        (1_i64, "initial", INITIAL_MIGRATION),
+        (
+            2_i64,
+            "credential_cleanup_queue",
+            CREDENTIAL_CLEANUP_MIGRATION,
+        ),
+    ] {
+        let applied_name = connection
+            .query_row(
+                "SELECT name FROM schema_migrations WHERE version = ?1",
+                [version],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if let Some(applied_name) = applied_name {
+            if applied_name != name {
+                return Err(CampaignStoreError::IncompatibleSchema);
+            }
+            continue;
+        }
+
+        let applied_at = current_timestamp()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute_batch(sql)?;
+        transaction.execute(
+            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
+            params![version, name, applied_at],
+        )?;
+        transaction.commit()?;
+    }
     Ok(())
 }
 
@@ -765,7 +776,7 @@ mod tests {
                    name TEXT NOT NULL,
                    applied_at TEXT NOT NULL
                  );
-                 INSERT INTO schema_migrations VALUES (2, 'future', '2026-07-31T01:02:03.004Z');",
+                 INSERT INTO schema_migrations VALUES (3, 'future', '2026-07-31T01:02:03.004Z');",
             )
             .expect("seed future schema");
         drop(connection);

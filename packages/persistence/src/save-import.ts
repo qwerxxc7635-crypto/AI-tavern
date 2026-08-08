@@ -29,7 +29,6 @@ import {
 } from './conversation-item-clock-repository.js';
 import { GameEventRepository } from './game-event-repository.js';
 import { GenerationRecordRepository } from './generation-record-repository.js';
-import { currentSchemaVersion } from './migrations.mjs';
 import { PlayerCharacterRepository } from './player-character-repository.js';
 import { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 import { SnapshotRepository } from './snapshot-repository.js';
@@ -42,6 +41,7 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 type ImportMode = 'CREATE' | 'OVERWRITE';
 
 const FORMAT_VERSION = 1;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
 const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024;
 const ENTRY_NAMES = [
@@ -242,10 +242,10 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     manifest['databaseSchemaVersion'],
     'manifest.databaseSchemaVersion',
   );
-  if (databaseVersion !== currentSchemaVersion) {
+  if (databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION) {
     throw new PersistenceDataError(
-      databaseVersion > currentSchemaVersion
-        ? `Save schema ${databaseVersion} is newer than supported schema ${currentSchemaVersion}`
+      databaseVersion > ARCHIVE_DATABASE_SCHEMA_VERSION
+        ? `Save schema ${databaseVersion} is newer than supported schema ${ARCHIVE_DATABASE_SCHEMA_VERSION}`
         : `Save schema ${databaseVersion} requires an unavailable migration`,
     );
   }

@@ -729,6 +729,7 @@ fn model_update(
         provider_display_name: display_name.to_owned(),
         base_url,
         credential_ref: None,
+        credential_action: CredentialAction::Keep,
         model_name: model_name.to_owned(),
         model_display_name: model_name.to_owned(),
         capabilities: ModelCapabilitiesRegistration {

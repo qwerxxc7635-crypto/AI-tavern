@@ -12,6 +12,7 @@ const coreTables = [
   'adventures',
   'app_settings',
   'campaigns',
+  'credential_cleanup_queue',
   'conversations',
   'game_events',
   'generation_records',
@@ -70,16 +71,17 @@ test('migrates a new database to the complete initial schema', async () => {
 test('skips an already applied migration on repeated startup', async () => {
   await withDatabase(async (database) => {
     await applyMigrations(database);
-    const firstAppliedAt = database
-      .prepare('SELECT applied_at FROM schema_migrations WHERE version = 1')
-      .get().applied_at;
+    const firstRows = database
+      .prepare('SELECT version, name, applied_at FROM schema_migrations ORDER BY version')
+      .all()
+      .map((row) => ({ ...row }));
 
     await applyMigrations(database);
 
     const rows = database.prepare('SELECT version, name, applied_at FROM schema_migrations').all();
     assert.deepEqual(
       rows.map((row) => ({ ...row })),
-      [{ version: 1, name: 'initial', applied_at: firstAppliedAt }],
+      firstRows,
     );
     assert.equal(
       database.prepare(`SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table'`).get()
@@ -96,6 +98,31 @@ test('enforces representative JSON, range, foreign-key, and secret-storage const
     assert.equal(
       providerColumns.some((column) => /api.?key|authorization|token/i.test(column.name)),
       false,
+    );
+
+    database
+      .prepare(
+        `INSERT INTO credential_cleanup_queue (
+           credential_ref, reason, attempts, created_at, updated_at
+         ) VALUES (?, 'REPLACED', 0, ?, ?)`,
+      )
+      .run(
+        'credential:v1:00000000-0000-0000-0000-000000000001',
+        '2026-08-08T00:00:00.000Z',
+        '2026-08-08T00:00:00.000Z',
+      );
+    assert.throws(() =>
+      database
+        .prepare(
+          `INSERT INTO credential_cleanup_queue (
+             credential_ref, reason, attempts, created_at, updated_at
+           ) VALUES (?, 'INVALID', 0, ?, ?)`,
+        )
+        .run(
+          'credential:v1:00000000-0000-0000-0000-000000000002',
+          '2026-08-08T00:00:00.000Z',
+          '2026-08-08T00:00:00.000Z',
+        ),
     );
 
     assert.throws(() =>

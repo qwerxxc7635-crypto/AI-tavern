@@ -22,11 +22,13 @@
 格式使用两个独立版本：
 
 - `formatVersion`：`.emtavern` 容器及文件结构版本；本文固定为 `1`。
-- `databaseSchemaVersion`：导出数据对应的 SQLite 迁移版本；当前为 `1`，权威来源是 `packages/persistence/src/migrations.mjs` 的 `currentSchemaVersion`。
+- `databaseSchemaVersion`：可移植 Campaign 行集合的Schema版本；v1固定为 `1`，对应 `database/migrations/0001_initial.sql` 中允许进入档案的游戏数据列。
+
+活动设备的 SQLite 迁移版本可以高于档案的 `databaseSchemaVersion`。例如凭据清理队列属于设备级状态，不进入档案，也不得仅因它新增本地迁移就改变 v1 档案版本。写入方必须先确认活动数据库已经迁移到自己支持的最新本地版本，再按本文固定的 Campaign Schema 1投影导出。
 
 Campaign、世界圣经和事件行中已有的 `schema_version` 是各领域对象的协议版本，必须原样保留，不能替代上述两个版本。
 
-读取方必须拒绝高于自身支持值的 `formatVersion` 或 `databaseSchemaVersion`。较旧数据库Schema必须先在隔离数据上迁移到当前版本，全部验证通过后才能写入正式 SQLite。
+读取方必须拒绝高于自身支持值的 `formatVersion` 或档案 `databaseSchemaVersion`。档案数据的版本迁移必须在隔离数据上完成，全部验证通过后才能写入已经就绪的正式 SQLite。
 
 ## 3. 容器规则
 
@@ -76,7 +78,7 @@ SQLite 的 `*_json` 文本列仍以字符串字段保存。导出前必须解析
 | --- | --- |
 | `application` | 必须等于 `ember-tavern` |
 | `formatVersion` | v1必须等于 `1` |
-| `databaseSchemaVersion` | 正整数，等于导出事务读取的数据库Schema |
+| `databaseSchemaVersion` | 正整数；v1固定为 Campaign archive schema `1`，不等于设备级迁移上限 |
 | `campaignId` | 非空不透明ID，并与其余四个文件一致 |
 | `createdAt` | UTC RFC3339时间 |
 | `generatorVersion` | 生成该文件的应用版本，非兼容性判断依据 |
@@ -282,7 +284,7 @@ M8-T03 的读取方必须按以下顺序处理，且在最终提交前只操作�
 
 ## 13. v1 兼容性规则
 
-- 写入方只生成自己完整支持的 `formatVersion` 和当前 `databaseSchemaVersion`。
+- 写入方只生成自己完整支持的 `formatVersion` 和 Campaign archive schema；设备级迁移不得隐式抬高档案版本。
 - 读取方不得忽略未知顶层字段、缺失固定表或额外ZIP条目；格式升级必须显式增加迁移。
 - ID在新建导入中默认保持不变。若与本地其他Campaign内容冲突，必须整体拒绝或执行覆盖模式，v1不得局部改写ID。
 - 同一 `campaignId` 已存在时必须由用户明确选择“新建副本”或“覆盖”；新建副本若需要重写ID属于M8-T03的显式全图迁移，不在格式层隐式发生。

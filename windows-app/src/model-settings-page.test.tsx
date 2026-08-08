@@ -14,7 +14,12 @@ describe('model settings page', () => {
     const deleted: string[] = [];
     const gateway: ModelSettingsGateway = {
       async load() {
-        return { profiles: [], defaultModelProfileId: null, fallbackModelProfileId: null };
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: 0,
+        };
       },
       async save(update) {
         saved.push(update);
@@ -26,7 +31,7 @@ describe('model settings page', () => {
               presetKey: update.presetKey,
               providerDisplayName: update.providerDisplayName,
               baseUrl: update.baseUrl,
-              hasCredential: update.credentialRef !== null,
+              hasCredential: update.credentialAction !== 'CLEAR',
               modelName: update.modelName,
               modelDisplayName: update.modelDisplayName,
               capabilities: update.capabilities,
@@ -34,6 +39,7 @@ describe('model settings page', () => {
           ],
           defaultModelProfileId: 'profile-1',
           fallbackModelProfileId: 'profile-1',
+          pendingCredentialCleanupCount: 0,
         };
       },
       async forgetCredential(profileId) {
@@ -54,6 +60,7 @@ describe('model settings page', () => {
           ],
           defaultModelProfileId: 'profile-1',
           fallbackModelProfileId: 'profile-1',
+          pendingCredentialCleanupCount: 0,
         };
       },
       async saveSecret() {
@@ -99,12 +106,18 @@ describe('model settings page', () => {
     expect(await screen.findByText('模型设置已保存；现有存档事实未被修改。')).toBeTruthy();
     expect(saved).toHaveLength(1);
     expect(saved[0]?.credentialRef).toMatch(/^credential:v1:/);
+    expect(saved[0]?.credentialAction).toBe('REPLACE');
     expect(JSON.stringify(saved[0])).not.toContain('private-key');
     expect(screen.getByText('默认')).toBeTruthy();
     expect(screen.getByText('备用')).toBeTruthy();
     await waitFor(() =>
       expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe(''),
     );
+
+    fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
+    await waitFor(() => expect(saved).toHaveLength(2));
+    expect(saved[1]?.credentialAction).toBe('KEEP');
+    expect(saved[1]?.credentialRef).toBeNull();
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     fireEvent.click(screen.getByRole('button', { name: '删除凭据' }));

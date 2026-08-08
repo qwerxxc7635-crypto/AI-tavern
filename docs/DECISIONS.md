@@ -1300,3 +1300,19 @@ Windows 仍是 v0.2.0 正式候选平台；macOS 必须能构建、启动和完�
 ### 影响与边界
 
 Architecture Gate 后先完成 M0 路径和脚本治理，再关闭 M1 安全问题。任何散落平台条件或平台 API 进入 domain/application 都视为 Gate 回归。
+
+## DEC-054：凭据采用暂存认领与持久清理队列
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-002、`V02-M1-T02`
+
+### 决定与理由
+
+系统安全凭据库是秘密的唯一存储；SQLite 只保存不透明引用和不含秘密的 `credential_cleanup_queue`。新秘密写入系统库后立即登记为 `ROLLBACK` 待清理项，模型设置的 `REPLACE` 事务负责认领新引用并同时把旧引用登记为 `REPLACED`。`CLEAR` 或用户删除则在清空当前引用的同一事务登记 `CLEARED`。
+
+删除系统项成功后才移除队列；失败保留任务并增加 attempts，应用重启后继续恢复。设置协议显式区分 `KEEP`、`REPLACE`、`CLEAR`，禁止用含混的 `null` 表示“保持还是清空”。
+
+### 影响与边界
+
+UI 不得到历史引用，只能看到待清理数量和平台中立状态。`.emtavern` 不导出设备级清理队列；因此活动 SQLite migration 2 与 Campaign archive schema 1 独立演进。macOS 使用 Keychain，Windows 使用 Credential Manager，domain/application 不依赖任何平台 API。

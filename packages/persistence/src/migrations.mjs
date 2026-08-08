@@ -7,6 +7,14 @@ const migrations = [
     name: 'initial',
     source: new URL('../../../database/migrations/0001_initial.sql', import.meta.url),
   },
+  {
+    version: 2,
+    name: 'credential_cleanup_queue',
+    source: new URL(
+      '../../../database/migrations/0002_credential_cleanup_queue.sql',
+      import.meta.url,
+    ),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

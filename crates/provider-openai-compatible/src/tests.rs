@@ -19,13 +19,13 @@ struct CapturedRequest {
     body: Vec<u8>,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 struct CredentialCleanup {
     store: SecretStore,
     reference: CredentialRef,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 impl Drop for CredentialCleanup {
     fn drop(&mut self) {
         let _ = self.store.delete(&self.reference);
@@ -257,7 +257,7 @@ enabled_provider_contract_test!(
     EnabledProviderContract::Custom
 );
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 #[tokio::test]
 async fn contract_generates_text_with_an_os_stored_credential() {
     let response = r#"{"id":"provider-1","model":"ember-model","choices":[{"message":{"content":"A quiet coast."},"finish_reason":"stop"}],"usage":{"prompt_tokens":9,"completion_tokens":4,"total_tokens":13}}"#;
@@ -288,7 +288,18 @@ async fn contract_generates_text_with_an_os_stored_credential() {
     let mut requests = captured.lock().await;
     let head = String::from_utf8_lossy(&requests[0].head);
     assert!(head.starts_with("POST /v1/chat/completions HTTP/1.1"));
-    assert!(head.contains("authorization: Bearer "));
+    let authorization = head
+        .lines()
+        .find(|line| line.to_ascii_lowercase().starts_with("authorization:"))
+        .unwrap();
+    assert!(
+        authorization
+            .split_once(':')
+            .unwrap()
+            .1
+            .trim()
+            .starts_with("Bearer ")
+    );
     let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(body["messages"][0]["role"], "system");
     assert!(body.get("response_format").is_none());

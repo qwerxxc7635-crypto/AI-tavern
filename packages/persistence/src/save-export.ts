@@ -10,6 +10,9 @@ type StoredScalar = string | number | null;
 type StoredRow = Readonly<Record<string, StoredScalar>>;
 
 const FORMAT_VERSION = 1;
+// Device-only schema migrations (for example, credential cleanup bookkeeping)
+// must not change the portable campaign archive contract.
+const ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
 const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
 const ENTRY_NAMES = [
   'manifest.json',
@@ -232,7 +235,7 @@ function captureSave(
     application: 'ember-tavern',
     campaignId,
     createdAt: options.createdAt,
-    databaseSchemaVersion: currentSchemaVersion,
+    databaseSchemaVersion: ARCHIVE_DATABASE_SCHEMA_VERSION,
     files: Object.freeze({
       'campaign.json': Object.freeze({ mediaType: 'application/json', records: 1 }),
       'events.ndjson': Object.freeze({
@@ -252,14 +255,14 @@ function captureSave(
     campaignDocument: Object.freeze({
       campaign: normalizedCampaign,
       campaignId,
-      databaseSchemaVersion: currentSchemaVersion,
+      databaseSchemaVersion: ARCHIVE_DATABASE_SCHEMA_VERSION,
       formatVersion: FORMAT_VERSION,
       tables,
     }),
     eventRows,
     generationDocument: Object.freeze({
       campaignId,
-      databaseSchemaVersion: currentSchemaVersion,
+      databaseSchemaVersion: ARCHIVE_DATABASE_SCHEMA_VERSION,
       formatVersion: FORMAT_VERSION,
       records: normalizedGenerations,
     }),

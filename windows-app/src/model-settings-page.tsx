@@ -66,13 +66,19 @@ export function ModelSettingsPage({
     setStatus(null);
   }
 
-  async function withCredential<T>(operation: (credentialRef: string | null) => Promise<T>) {
-    if (presetKey === 'ollama' || apiKey.length === 0) return operation(null);
+  async function withCredential<T>(
+    operation: (credentialRef: string | null, credentialAction: 'KEEP' | 'REPLACE') => Promise<T>,
+  ) {
+    if (presetKey === 'ollama' || apiKey.length === 0) return operation(null, 'KEEP');
     const reference = await gateway.saveSecret(apiKey);
     try {
-      return await operation(reference);
+      return await operation(reference, 'REPLACE');
     } catch (error) {
-      await gateway.deleteSecret(reference);
+      try {
+        await gateway.deleteSecret(reference);
+      } catch {
+        // Native code has durably queued the opaque reference for a later retry.
+      }
       throw error;
     }
   }
@@ -112,7 +118,19 @@ export function ModelSettingsPage({
       setStatus('请填写服务名称、Base URL和模型名。');
       return;
     }
-    if (presetKey !== 'ollama' && presetKey !== 'custom' && apiKey.length === 0) {
+    const canKeepStoredCredential = snapshot?.profiles.some(
+      (profile) =>
+        profile.presetKey === presetKey &&
+        profile.providerDisplayName === displayName.trim() &&
+        profile.baseUrl === baseUrl.trim() &&
+        profile.hasCredential,
+    );
+    if (
+      presetKey !== 'ollama' &&
+      presetKey !== 'custom' &&
+      apiKey.length === 0 &&
+      !canKeepStoredCredential
+    ) {
       setStatus('云模型需要API Key；密钥只会保存到系统凭据库。');
       return;
     }
@@ -124,12 +142,13 @@ export function ModelSettingsPage({
     setBusy(true);
     setStatus(null);
     try {
-      const saved = await withCredential((credentialRef) =>
+      const saved = await withCredential((credentialRef, credentialAction) =>
         gateway.save({
           presetKey,
           providerDisplayName: displayName.trim(),
           baseUrl: baseUrl.trim(),
           credentialRef,
+          credentialAction,
           modelName: modelName.trim(),
           modelDisplayName: selectedModel.displayName,
           capabilities: selectedModel.capabilities,
@@ -139,7 +158,11 @@ export function ModelSettingsPage({
       );
       setSnapshot(saved);
       setApiKey('');
-      setStatus('模型设置已保存；现有存档事实未被修改。');
+      setStatus(
+        saved.pendingCredentialCleanupCount === 0
+          ? '模型设置已保存；现有存档事实未被修改。'
+          : '模型设置已保存；旧凭据已停止使用，系统凭据清理将在稍后自动重试。',
+      );
     } catch {
       setStatus('模型设置未保存，请检查输入后重试。');
     } finally {
@@ -149,16 +172,21 @@ export function ModelSettingsPage({
 
   async function forgetCredential(profileId: string) {
     const accepted = window.confirm(
-      '删除后，该Provider的已保存API Key会从Windows系统凭据库移除；模型配置仍会保留。确定继续吗？',
+      '删除后，该Provider的已保存API Key会从系统安全凭据库移除；模型配置仍会保留。确定继续吗？',
     );
     if (!accepted) return;
     setBusy(true);
     setStatus(null);
     try {
-      setSnapshot(await gateway.forgetCredential(profileId));
-      setStatus('已删除该Provider的系统凭据；模型配置仍保留。');
+      const updated = await gateway.forgetCredential(profileId);
+      setSnapshot(updated);
+      setStatus(
+        updated.pendingCredentialCleanupCount === 0
+          ? '已删除该Provider的系统凭据；模型配置仍保留。'
+          : '该Provider已停止使用原凭据；系统安全凭据清理将在稍后自动重试。',
+      );
     } catch {
-      setStatus('凭据没有完全删除，请重试或在Windows凭据管理器中手工清理。');
+      setStatus('无法更新本地凭据状态，请稍后重试。');
     } finally {
       setBusy(false);
     }
