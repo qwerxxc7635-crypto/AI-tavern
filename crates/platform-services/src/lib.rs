@@ -2,7 +2,105 @@
 
 #![forbid(unsafe_code)]
 
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{File, OpenOptions},
+    path::{Path, PathBuf},
+};
+
+use fs2::FileExt;
+
+pub trait AppInstanceLock: Send + Sync {
+    fn acquire(&self) -> Result<AppInstanceLockGuard, AppInstanceLockError>;
+    fn try_acquire(&self) -> Result<AppInstanceLockGuard, AppInstanceLockError>;
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct FileAppInstanceLock {
+    path: PathBuf,
+}
+
+impl FileAppInstanceLock {
+    pub fn new(path: impl Into<PathBuf>) -> Result<Self, AppInstanceLockError> {
+        let path = path.into();
+        if !path.is_absolute() || path.file_name().is_none() {
+            return Err(AppInstanceLockError::InvalidPath);
+        }
+        Ok(Self { path })
+    }
+
+    fn open(&self) -> Result<File, AppInstanceLockError> {
+        if let Some(parent) = self.path.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        Ok(OpenOptions::new()
+            .create(true)
+            .read(true)
+            .write(true)
+            .truncate(false)
+            .open(&self.path)?)
+    }
+}
+
+impl AppInstanceLock for FileAppInstanceLock {
+    fn acquire(&self) -> Result<AppInstanceLockGuard, AppInstanceLockError> {
+        let file = self.open()?;
+        file.lock_exclusive()?;
+        Ok(AppInstanceLockGuard { file })
+    }
+
+    fn try_acquire(&self) -> Result<AppInstanceLockGuard, AppInstanceLockError> {
+        let file = self.open()?;
+        file.try_lock_exclusive()
+            .map_err(|error| match error.kind() {
+                std::io::ErrorKind::WouldBlock => AppInstanceLockError::AlreadyLocked,
+                _ => AppInstanceLockError::Io(error),
+            })?;
+        Ok(AppInstanceLockGuard { file })
+    }
+}
+
+#[derive(Debug)]
+pub struct AppInstanceLockGuard {
+    file: File,
+}
+
+impl Drop for AppInstanceLockGuard {
+    fn drop(&mut self) {
+        let _ = FileExt::unlock(&self.file);
+    }
+}
+
+#[derive(Debug)]
+pub enum AppInstanceLockError {
+    InvalidPath,
+    AlreadyLocked,
+    Io(std::io::Error),
+}
+
+impl std::fmt::Display for AppInstanceLockError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::InvalidPath => formatter.write_str("application lock path is invalid"),
+            Self::AlreadyLocked => formatter.write_str("another application instance is active"),
+            Self::Io(_) => formatter.write_str("application lock is unavailable"),
+        }
+    }
+}
+
+impl std::error::Error for AppInstanceLockError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::InvalidPath | Self::AlreadyLocked => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for AppInstanceLockError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io(error)
+    }
+}
 
 /// Platform-owned locations consumed by composition roots and persistence adapters.
 ///
@@ -189,5 +287,21 @@ mod tests {
             error,
             PlatformPathError::NotAbsolute(PlatformPathKind::Data)
         );
+    }
+
+    #[test]
+    fn file_lock_coordinates_independent_adapters() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("ember-tavern.lock");
+        let first = FileAppInstanceLock::new(&path).unwrap();
+        let second = FileAppInstanceLock::new(&path).unwrap();
+
+        let guard = first.try_acquire().unwrap();
+        assert!(matches!(
+            second.try_acquire(),
+            Err(AppInstanceLockError::AlreadyLocked)
+        ));
+        drop(guard);
+        second.try_acquire().unwrap();
     }
 }

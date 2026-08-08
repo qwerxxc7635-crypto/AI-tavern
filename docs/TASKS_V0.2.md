@@ -17,7 +17,8 @@
 - `V02-M1-T03`：DONE；archive/expanded/entry/ratio/JSON/record 全部硬上限及逐条目有界解压已在 TypeScript/Rust 双实现完成。
 - `V02-M1-T04`：DONE；字段名/值、纯文本、请求响应错误审计、数据文件和最终ZIP字节均执行高置信秘密扫描，并提供诊断redaction路径。
 - `V02-M1-T05`：DONE；Provider探测回执绑定规范化端点、模型、能力来源与能力指纹，端点切换会原子禁用旧模型并清理默认/备用引用。
-- 下一执行项：严格进入 `V02-M1-T06`。
+- `V02-M1-T06`：DONE；跨进程操作锁、桌面单实例锁与SQLite data-version重确认共同关闭备份后删除/覆盖的并发窗口。
+- 下一执行项：严格进入 `V02-M1-T07`。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

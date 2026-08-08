@@ -25,8 +25,10 @@ pub use world_creation::*;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use ember_platform_services::{AppInstanceLock, AppInstanceLockError, FileAppInstanceLock};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
 use thiserror::Error;
@@ -108,12 +110,17 @@ pub enum CampaignStoreError {
     ArchiveConflict,
     #[error("save archive path is invalid")]
     ArchivePathInvalid,
+    #[error("application coordination lock is unavailable")]
+    AppLock(#[from] AppInstanceLockError),
+    #[error("database changed while a destructive backup was being created")]
+    ConcurrentModification,
 }
 
 /// Owns a platform database path without exposing SQL or file access to the WebView.
 #[derive(Debug, Clone)]
 pub struct CampaignStore {
     pub(crate) database_path: PathBuf,
+    operation_lock: Arc<FileAppInstanceLock>,
 }
 
 impl CampaignStore {
@@ -122,10 +129,17 @@ impl CampaignStore {
         if let Some(parent) = database_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        let operation_lock = Arc::new(FileAppInstanceLock::new(operation_lock_path(
+            &database_path,
+        ))?);
+        let _guard = operation_lock.acquire()?;
         if database_path.exists() {
             create_consistent_backup(&database_path)?;
         }
-        let store = Self { database_path };
+        let store = Self {
+            database_path,
+            operation_lock,
+        };
         let mut connection = store.connect()?;
         apply_migrations(&mut connection)?;
         Ok(store)
@@ -184,16 +198,30 @@ impl CampaignStore {
     }
 
     pub fn delete_campaign(&self, id: &str) -> Result<(), CampaignStoreError> {
+        self.delete_campaign_with_backup_hook(id, || {})
+    }
+
+    fn delete_campaign_with_backup_hook(
+        &self,
+        id: &str,
+        after_backup: impl FnOnce(),
+    ) -> Result<(), CampaignStoreError> {
         validate_id(id)?;
-        let connection = self.connect()?;
+        let _guard = self.operation_lock.acquire()?;
+        let mut connection = self.connect()?;
         if campaign_state(&connection, id)?.is_none() {
             return Err(CampaignStoreError::NotFound);
         }
-        drop(connection);
-
+        let before_backup = database_data_version(&connection)?;
         create_consistent_backup(&self.database_path)?;
-        let mut connection = self.connect()?;
+        after_backup();
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if database_data_version(&transaction)? != before_backup {
+            return Err(CampaignStoreError::ConcurrentModification);
+        }
+        if campaign_state(&transaction, id)?.is_none() {
+            return Err(CampaignStoreError::NotFound);
+        }
         let changed = transaction.execute("DELETE FROM campaigns WHERE id = ?1", [id])?;
         if changed != 1 {
             return Err(CampaignStoreError::NotFound);
@@ -255,6 +283,7 @@ impl CampaignStore {
         id: &str,
     ) -> Result<CampaignSummary, CampaignStoreError> {
         validate_id(id)?;
+        let _guard = self.operation_lock.acquire()?;
         let at = current_timestamp()?;
         let mut connection = self.connect()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -373,6 +402,16 @@ fn create_consistent_backup(database_path: &Path) -> Result<PathBuf, CampaignSto
         let _ = std::fs::remove_file(&final_path);
     }
     result
+}
+
+fn database_data_version(connection: &Connection) -> Result<i64, CampaignStoreError> {
+    Ok(connection.query_row("PRAGMA data_version", [], |row| row.get(0))?)
+}
+
+fn operation_lock_path(database_path: &Path) -> PathBuf {
+    let mut path = OsString::from(database_path.as_os_str());
+    path.push(".operation.lock");
+    PathBuf::from(path)
 }
 
 fn backup_directory(database_path: &Path) -> PathBuf {
@@ -716,6 +755,38 @@ mod tests {
                     .extension()
                     .is_some_and(|ext| ext == "sqlite"))
         );
+    }
+
+    #[test]
+    fn permanent_delete_aborts_when_another_store_writes_after_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("delete-concurrency.sqlite");
+        let first = CampaignStore::open(&database_path).unwrap();
+        first
+            .create_at("campaign-race".to_owned(), FIRST_TIME.to_owned())
+            .unwrap();
+        let second = CampaignStore::open(&database_path).unwrap();
+        let concurrent_time = "2026-07-31T03:04:05.006Z";
+
+        let result = first.delete_campaign_with_backup_hook("campaign-race", || {
+            second
+                .touch_at("campaign-race", concurrent_time.to_owned())
+                .unwrap();
+        });
+
+        assert!(matches!(
+            result,
+            Err(CampaignStoreError::ConcurrentModification)
+        ));
+        let connection = first.connect().unwrap();
+        let preserved: String = connection
+            .query_row(
+                "SELECT updated_at FROM campaigns WHERE id = 'campaign-race'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, concurrent_time);
     }
 
     #[test]

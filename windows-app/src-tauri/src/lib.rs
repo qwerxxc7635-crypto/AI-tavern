@@ -22,6 +22,7 @@ use ember_native_bridge::{
     WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
     model_probe_fingerprint,
 };
+use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
     DEEPSEEK_BASE_URL, DeepSeekPreset, ModelCostStatus, OLLAMA_BASE_URL, OPENROUTER_BASE_URL,
     OpenAiCompatibleConfig, OpenAiCompatibleProvider, OpenRouterPreset, ProviderError,
@@ -74,6 +75,14 @@ impl From<CampaignStoreError> for CommandError {
             CampaignStoreError::ArchivePathInvalid => Self {
                 code: "SAVE_PATH_INVALID",
                 message: "请选择有效的.emtavern文件位置。",
+            },
+            CampaignStoreError::ConcurrentModification => Self {
+                code: "CONCURRENT_MODIFICATION",
+                message: "本地存档在备份后发生变化，本次操作已取消，请刷新后重试。",
+            },
+            CampaignStoreError::AppLock(_) => Self {
+                code: "APP_LOCK_UNAVAILABLE",
+                message: "另一个操作或应用实例正在使用本地存档，请稍后重试。",
             },
             CampaignStoreError::InvalidSystemTime
             | CampaignStoreError::Database(_)
@@ -764,8 +773,12 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             let database_path = platform_paths::database_path(app)?;
+            let instance_lock =
+                FileAppInstanceLock::new(platform_paths::instance_lock_path(&database_path))?;
+            let instance_guard = instance_lock.try_acquire()?;
             let store = CampaignStore::open(database_path)?;
             retry_pending_credential_cleanup(&store, &SecretStore)?;
+            app.manage(instance_guard);
             app.manage(store);
             app.manage(ProviderProbeRegistry::default());
             Ok(())
@@ -864,6 +877,13 @@ mod tests {
             assert_eq!(command_error.code, expected);
             assert!(!command_error.message.is_empty());
         }
+    }
+
+    #[test]
+    fn concurrent_destructive_write_has_a_retryable_command_error() {
+        let error = CommandError::from(CampaignStoreError::ConcurrentModification);
+        assert_eq!(error.code, "CONCURRENT_MODIFICATION");
+        assert!(error.message.contains("取消"));
     }
 
     #[test]

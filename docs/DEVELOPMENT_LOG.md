@@ -2475,3 +2475,23 @@
 ### 结论
 
 - SR2-005 / `V02-M1-T05` 关闭。下一项严格为 `V02-M1-T06` Destructive transaction lock。
+
+## 2026-08-08 — V02-M1-T06 关闭破坏性备份并发窗口
+
+### 实现
+
+- `ember-platform-services`新增`AppInstanceLock` port和基于`fs2`的跨平台文件锁adapter，支持阻塞操作锁与非阻塞实例锁。
+- Tauri在打开SQLite前取得全生命周期实例锁；第二应用实例不能进入运行期。`CampaignStore`的启动备份、恢复、永久删除和导入使用数据库相邻的操作锁。
+- 永久删除与覆盖导入在同一连接记录`PRAGMA data_version`，备份后取得`BEGIN IMMEDIATE`并重新检查版本与目标；期间任一独立连接提交都会返回`CONCURRENT_MODIFICATION`，正式数据不变。
+- 创建导入和恢复同样把协调锁保持到事务提交/回滚；备份失败继续阻断删除或覆盖。
+
+### 验证
+
+- 两个独立`CampaignStore`测试在永久删除和覆盖导入完成备份后提交新时间戳；两项破坏性操作均取消，最新Campaign保留。
+- 两个独立文件锁adapter测试确认第二个非阻塞持有者在首个guard释放前返回`AlreadyLocked`，释放后可以取得。
+- 既有永久删除、覆盖导入、备份失败、恢复、导入回滚与Windows纵向E2E继续纳入完整workspace门禁。
+- 未访问正式用户数据；所有并发和备份测试使用自动清理的临时SQLite、锁文件与归档。
+
+### 结论
+
+- SR2-006 / `V02-M1-T06` 关闭。下一项严格为 `V02-M1-T07` TS/Rust bidirectional archive CI。

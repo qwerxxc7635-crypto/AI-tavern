@@ -4,6 +4,7 @@ use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
+use ember_platform_services::AppInstanceLock;
 use regex::Regex;
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{
@@ -19,7 +20,7 @@ use zip::{CompressionMethod, ZipWriter};
 
 use super::{
     CampaignStore, CampaignStoreError, CampaignSummary, create_consistent_backup,
-    current_timestamp, load_campaign, validate_id, validate_timestamp,
+    current_timestamp, database_data_version, load_campaign, validate_id, validate_timestamp,
 };
 
 const FORMAT_VERSION: u64 = 1;
@@ -140,9 +141,19 @@ impl CampaignStore {
         path: impl AsRef<Path>,
         mode: CampaignArchiveImportMode,
     ) -> Result<CampaignSummary, CampaignStoreError> {
+        self.import_campaign_archive_with_backup_hook(path, mode, || {})
+    }
+
+    fn import_campaign_archive_with_backup_hook(
+        &self,
+        path: impl AsRef<Path>,
+        mode: CampaignArchiveImportMode,
+        after_backup: impl FnOnce(),
+    ) -> Result<CampaignSummary, CampaignStoreError> {
         let bytes = read_archive_path(path.as_ref())?;
         let parsed = parse_archive(&bytes)?;
         let imported_at = current_timestamp()?;
+        let _guard = self.operation_lock.acquire()?;
         let mut connection = self.connect()?;
         let exists = campaign_exists(&connection, &parsed.campaign_id)?;
         match mode {
@@ -152,15 +163,23 @@ impl CampaignStore {
             CampaignArchiveImportMode::Overwrite if !exists => {
                 return Err(CampaignStoreError::ArchiveConflict);
             }
-            CampaignArchiveImportMode::Overwrite => {
-                drop(connection);
-                create_consistent_backup(&self.database_path)?;
-                connection = self.connect()?;
-            }
-            CampaignArchiveImportMode::Create => {}
+            CampaignArchiveImportMode::Overwrite | CampaignArchiveImportMode::Create => {}
+        }
+        let before_backup = if matches!(mode, CampaignArchiveImportMode::Overwrite) {
+            let version = database_data_version(&connection)?;
+            create_consistent_backup(&self.database_path)?;
+            after_backup();
+            Some(version)
+        } else {
+            None
+        };
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if let Some(version) = before_backup
+            && database_data_version(&transaction)? != version
+        {
+            return Err(CampaignStoreError::ConcurrentModification);
         }
 
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current_exists = campaign_exists(&transaction, &parsed.campaign_id)?;
         if current_exists != matches!(mode, CampaignArchiveImportMode::Overwrite) {
             return Err(CampaignStoreError::ArchiveConflict);
@@ -1682,6 +1701,46 @@ mod tests {
             })
             .count();
         assert_eq!(backup_count, 1);
+    }
+
+    #[test]
+    fn overwrite_import_aborts_when_another_store_writes_after_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("overwrite-concurrency.sqlite");
+        let archive_path = directory.path().join("campaign.emtavern");
+        let first = CampaignStore::open(&database_path).unwrap();
+        first
+            .create_at("campaign-transfer".to_owned(), FIRST_TIME.to_owned())
+            .unwrap();
+        first
+            .export_campaign_archive("campaign-transfer", &archive_path, "0.1.0")
+            .unwrap();
+        let second = CampaignStore::open(&database_path).unwrap();
+        let concurrent_time = "2026-08-01T14:04:05.006Z";
+
+        let result = first.import_campaign_archive_with_backup_hook(
+            &archive_path,
+            CampaignArchiveImportMode::Overwrite,
+            || {
+                second
+                    .touch_at("campaign-transfer", concurrent_time.to_owned())
+                    .unwrap();
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(CampaignStoreError::ConcurrentModification)
+        ));
+        let connection = first.connect().unwrap();
+        let preserved: String = connection
+            .query_row(
+                "SELECT updated_at FROM campaigns WHERE id = 'campaign-transfer'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, concurrent_time);
     }
 
     #[test]

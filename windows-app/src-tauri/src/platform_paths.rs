@@ -19,6 +19,12 @@ pub(crate) fn database_path(app: &App) -> tauri::Result<std::path::PathBuf> {
     Ok(paths.data_dir().join("ember-tavern.sqlite"))
 }
 
+pub(crate) fn instance_lock_path(database_path: &std::path::Path) -> std::path::PathBuf {
+    let mut path = database_path.as_os_str().to_os_string();
+    path.push(".instance.lock");
+    path.into()
+}
+
 #[cfg(target_os = "windows")]
 fn current_platform_adapter(roots: PlatformPathRoots) -> Box<dyn PlatformPaths> {
     Box::new(WindowsPlatformPaths::from_platform_roots(roots))
