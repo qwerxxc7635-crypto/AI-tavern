@@ -144,17 +144,41 @@ export function CharacterCreationPage({
     return (
       <main className="character-studio">
         <CharacterTopline step="03 · 背景与装备" />
-        <section className="character-intro">
-          <p className="eyebrow">{playerText.coreUi.characterReady}</p>
-          <h1>{character.name}</h1>
-          <p>
-            {character.classDisplayName} · {character.concept}
-          </p>
-        </section>
-        <div className="character-review">
-          <section>
+        <div className="character-review character-sheet" aria-label="完整角色卡">
+          <section className="character-sheet__summary" data-character-section="summary">
+            <p className="eyebrow">{playerText.coreUi.characterReady}</p>
+            <h1>{character.name}</h1>
+            <p>
+              {character.classDisplayName} · {character.concept}
+            </p>
+          </section>
+          <section data-character-section="basics">
+            <p className="eyebrow">基础</p>
+            <h2>基础信息</h2>
+            <Description label="姓名" value={character.name} />
+            <Description label="性别" value={character.gender ?? '未填写'} />
+            <Description
+              label="年龄"
+              value={character.age === null ? '未填写' : String(character.age)}
+            />
+            <Description label="职业" value={character.classDisplayName} />
+            <Description label="角色概念" value={character.concept} />
+          </section>
+          <section data-character-section="attributes">
+            <p className="eyebrow">能力</p>
+            <h2>属性</h2>
+            <dl className="character-sheet__attributes">
+              {Object.entries(ATTRIBUTE_LABELS).map(([attribute, label]) => (
+                <div key={attribute}>
+                  <dt>{label}</dt>
+                  <dd>{character.attributes[attribute as keyof PlayerAttributesInput]}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <section data-character-section="background">
             <p className="eyebrow">{playerText.coreUi.background}</p>
-            <h2>人物背景</h2>
+            <h2>背景</h2>
             <Description label="出生地" value={character.background.birthplace} />
             <Description label="成长经历" value={character.background.formativeExperience} />
             <Description label="冒险动机" value={character.background.adventureMotivation} />
@@ -162,9 +186,38 @@ export function CharacterCreationPage({
             <Description label="重要人物" value={character.background.importantPerson} />
             <Description label="来到酒馆" value={character.background.tavernArrivalReason} />
           </section>
-          <section>
+          <section data-character-section="personality">
+            <p className="eyebrow">选择与边界</p>
+            <h2>个性与偏好</h2>
+            <Description label="个人目标" value={character.personalGoal} />
+            <Description
+              label="故事偏好"
+              value={
+                character.storyPreferences.length === 0
+                  ? '未填写'
+                  : character.storyPreferences.join('、')
+              }
+            />
+            <Description
+              label="内容边界"
+              value={contentBoundaryLabel(character.contentBoundaries)}
+            />
+          </section>
+          <section data-character-section="traits">
+            <p className="eyebrow">特征</p>
+            <h2>特质</h2>
+            <ul className="character-sheet__traits">
+              {character.traits.map((trait) => (
+                <li key={trait.id}>
+                  <strong>{trait.name}</strong>
+                  <p>{trait.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section data-character-section="equipment">
             <p className="eyebrow">{playerText.coreUi.startingKit}</p>
-            <h2>初始装备</h2>
+            <h2>装备</h2>
             <ul className="equipment-list">
               {character.initialEquipment.map((item) => (
                 <li key={item.id}>
@@ -175,14 +228,21 @@ export function CharacterCreationPage({
               ))}
             </ul>
           </section>
+          <section className="character-sheet__ai-controls" data-character-section="ai-controls">
+            <div>
+              <p className="eyebrow">本地确认边界</p>
+              <h2>AI 控制</h2>
+              <p>角色已经确认并写入本地存档；AI 不会自动覆盖已提交的角色事实。</p>
+            </div>
+            <button
+              className="primary-action character-next"
+              type="button"
+              onClick={() => navigate(`/tavern?campaignId=${encodeURIComponent(campaignId)}`)}
+            >
+              进入酒馆生成流程
+            </button>
+          </section>
         </div>
-        <button
-          className="primary-action character-next"
-          type="button"
-          onClick={() => navigate(`/tavern?campaignId=${encodeURIComponent(campaignId)}`)}
-        >
-          进入酒馆生成流程
-        </button>
       </main>
     );
   }
@@ -517,6 +577,20 @@ function effectLabel(
   return effect.kind === 'NONE'
     ? '叙事装备'
     : `${ATTRIBUTE_LABELS[effect.attribute]}检定 ${effect.modifier > 0 ? '+' : ''}${effect.modifier}`;
+}
+
+function contentBoundaryLabel(boundaries: CharacterDraft['contentBoundaries']): string {
+  const allowed = [
+    boundaries.allowHorror ? '恐怖元素' : null,
+    boundaries.allowPermanentDeath ? '永久死亡' : null,
+    boundaries.allowRomance ? '恋爱剧情' : null,
+    boundaries.allowBetrayal ? '背叛剧情' : null,
+  ].filter((value): value is string => value !== null);
+  const exclusions =
+    boundaries.excludedContent.length === 0
+      ? '无额外排除内容'
+      : `排除：${boundaries.excludedContent.join('、')}`;
+  return `${allowed.length === 0 ? '未允许特殊内容' : `允许：${allowed.join('、')}`}；${exclusions}`;
 }
 
 function newDraft(campaignId: string): CharacterDraft {

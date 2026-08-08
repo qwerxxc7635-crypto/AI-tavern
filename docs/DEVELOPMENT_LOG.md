@@ -2957,3 +2957,23 @@
 ### 结论
 
 - `V02-M6-T01`完成。下一项严格为`V02-M6-T02` Character Structure。
+
+## 2026-08-08 — V02-M6-T02 建立车卡八分区
+
+### 实现
+
+- 已确认角色卡固定为summary、basics、attributes、background、personality、traits、equipment、AI controls八个语义区，并以稳定`data-character-section`顺序标识。
+- 基础区显示姓名、性别、年龄、职业与概念；属性区显示四项数值；背景、特质和装备继续读取已提交视图。
+- 领域模型没有独立personality字段，个性区仅投影个人目标、故事偏好和内容边界；未新增schema、migration或伪造字段。
+- AI控制区只说明本地确认边界并保留进入酒馆操作，不加入生成/校验/预览/编辑/确认状态；新增响应式八区样式并记录`DEC-077`。
+- 更新Changelog并通过release sync把车卡布局/八分区摘要送入“我的 → 版本与更新记录”。
+
+### 验证
+
+- 车卡交互测试新增八区精确顺序及七个内容标题断言；与布局合同共5项测试通过。
+- 发布同步/检查、Windows前端生产构建、全量73个文件/402项Vitest与21项Node测试、`pnpm typecheck`、`pnpm lint`、玩家可见英文门禁及格式检查通过。
+- 未修改SQLite、存档格式、AI请求、Provider或正式用户数据，未开始iOS。
+
+### 结论
+
+- `V02-M6-T02`完成。下一项严格为`V02-M6-T03` AI Character State Machine。

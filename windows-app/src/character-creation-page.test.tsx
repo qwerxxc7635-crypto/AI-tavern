@@ -39,10 +39,27 @@ describe('character creation page', () => {
     fireEvent.click(screen.getByRole('checkbox', { name: /守信/ }));
     fireEvent.click(screen.getByRole('button', { name: '确认特质并生成背景' }));
 
-    expect(await screen.findByRole('heading', { name: '人物背景' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: '背景' })).toBeTruthy();
     expect(screen.getByText('灰湾')).toBeTruthy();
     expect(screen.getByText('体魄检定 +1')).toBeTruthy();
     expect(service.selectedTraits).toHaveLength(2);
+    expect(
+      [...document.querySelectorAll<HTMLElement>('[data-character-section]')].map(
+        ({ dataset }) => dataset['characterSection'],
+      ),
+    ).toEqual([
+      'summary',
+      'basics',
+      'attributes',
+      'background',
+      'personality',
+      'traits',
+      'equipment',
+      'ai-controls',
+    ]);
+    for (const heading of ['基础信息', '属性', '背景', '个性与偏好', '特质', '装备', 'AI 控制']) {
+      expect(screen.getByRole('heading', { name: heading })).toBeTruthy();
+    }
 
     fireEvent.click(screen.getByRole('button', { name: '进入酒馆生成流程' }));
     expect(await screen.findByText('等待酒馆生成 campaign-character')).toBeTruthy();

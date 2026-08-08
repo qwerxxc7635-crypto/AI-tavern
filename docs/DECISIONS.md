@@ -1668,3 +1668,19 @@ T03先迁移所有跨流程入口：品牌/导航、标题栏、加载/未知路
 ### 影响与边界
 
 本任务只改变布局和滚动，不新增summary/basics/attributes等T02结构，也不改变车卡生成、验证或SQLite提交。自动合同覆盖四个指定物理尺寸乘100%/125%/150%共12组（含低高度分支）；真实Windows/macOS渲染矩阵仍需在M9环境验收中留存截图证据，不能以静态合同冒充实机证据。
+
+## DEC-077：车卡八分区是现有角色事实的只读投影
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T02`、SQLite唯一真相源与任务边界
+
+### 决定与理由
+
+已确认角色卡按固定顺序呈现summary、basics、attributes、background、personality、traits、equipment和AI controls八区。每区以`data-character-section`稳定标识并有玩家可见中文标题，便于布局和后续状态接线测试，不把展示分区名写入数据库。
+
+当前领域模型没有独立personality字段，因此个性区只投影已持久化的personalGoal、storyPreferences和contentBoundaries；不得为了匹配页面标题虚构新事实或迁移存档。AI controls区只披露已确认角色不会被AI自动覆盖并提供既有“进入酒馆”操作，不提前加入T03状态机或T04候选提交。
+
+### 影响与边界
+
+基础区对可空性别/年龄显示“未填写”，属性区读取四项已验证值，背景/特质/装备均读取提交后的SQLite视图。八区重组不改变CharacterDraft、PlayerCharacter、原生命令、`.emtavern`或AI请求；未来若新增真实personality字段，必须按schema/migration/portable archive完整流程另行设计。
