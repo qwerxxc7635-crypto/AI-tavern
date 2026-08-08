@@ -2743,3 +2743,22 @@
 ### 结论
 
 - `V02-M4-T01`完成。下一项严格为`V02-M4-T02` Stable Prompt Profile。
+
+## 2026-08-08 — V02-M4-T02 建立 Stable Prompt Profile
+
+### 实现
+
+- 新增`deepseek-v4-flash-prefix` version 1，固定System Contract、Game Rules、Output Schema、Prompt Profile、Stable World Truths五段及其不可插队顺序。
+- Prompt Profile显式冻结task、逻辑角色、任务指令、schema名、任务prompt版本和stable profile版本；完整输出schema进入稳定消息前缀，不再只存在于Provider response format参数。
+- Stable World Truths进入前递归复制冻结，并拒绝timestamp、request ID、UUID、transient error、cache metrics及UI debug字段/值；当前调用默认空事实段，等待T04按ContextBlock知识边界接线。
+- 现有`formatTaskPrompt`统一携带profile并在动态Task Input JSON之前渲染；不支持system message的模型仍按原能力折入单一USER消息。
+- 记录`DEC-067`并同步目标架构当前实现边界，明确T03才负责最终确定性字节序列化。
+
+### 验证
+
+- Prompt目录9项测试通过，新增断言五段准确顺序、profile/task双版本、实际输出schema、前缀位置，以及request ID与UUID拒绝。
+- `pnpm typecheck`和`pnpm lint`通过；未发送真实请求或使用正式用户数据。
+
+### 结论
+
+- `V02-M4-T02`完成。下一项严格为`V02-M4-T03` Deterministic Serialization。

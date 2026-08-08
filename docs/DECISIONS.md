@@ -1508,3 +1508,19 @@ API Binding使用独立纯状态机表达`editing`、`testing`、`choosing_model
 ### 影响与边界
 
 探测回执仍由原生短期registry逐值绑定端点、模型与能力，前端状态机不能替代安全门禁。逻辑取消无法中断已进入操作系统或HTTP栈的底层调用，但结果会被丢弃，临时credential清理由原异步操作的`finally`继续执行。T05将基于该状态机补充credential replace/clear/remove/cleanup health，不在本任务混入凭据生命周期界面。
+
+## DEC-067：DeepSeek稳定前缀由版本化五段Profile定义
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T02`、DeepSeek缓存前缀约束
+
+### 决定与理由
+
+Prompt编译在任何动态task input之前构造`deepseek-v4-flash-prefix` version 1，段序固定为System Contract、Game Rules、Output Schema、Prompt Profile和Stable World Truths。Prompt Profile显式包含task、逻辑角色、任务指令、schema名、任务prompt version和stable profile version；实际输出schema进入固定段，而不只依赖Provider response format参数。
+
+Stable World Truths由调用方显式提供并在进入Profile时递归复制冻结。字段或值含timestamp、request ID、UUID、transient error、cache metrics或UI debug时拒绝；请求输入继续位于稳定Profile之后。当前通用formatter以空world truths保持现有调用兼容，M4-T04接入ContextBlock布局时再传入经知识边界过滤的稳定事实。
+
+### 影响与边界
+
+Profile结构适用于所有Provider-neutral prompt，DeepSeek可直接利用相同前缀；它不改变SQLite事实权威、schema验证或Provider capability选择。T02只固定语义段与版本，T03负责规范JSON的键、数组、空白、数值、枚举和换行字节；不得把T02现有`JSON.stringify`误写成已经满足最终确定性序列化。

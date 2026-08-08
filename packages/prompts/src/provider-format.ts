@@ -9,13 +9,18 @@ import {
 import type { JsonValue, PromptVersion } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
-import { BASE_SYSTEM_PROMPT } from './base-rules.js';
+import {
+  createStablePromptProfile,
+  renderStablePromptProfile,
+  type StablePromptProfile,
+} from './stable-prompt-profile.js';
 import { taskPrompt } from './task-prompts.js';
 
 export interface FormattedTaskPrompt {
   readonly promptVersion: PromptVersion;
   readonly messages: readonly NormalizedMessage[];
   readonly responseFormat: NormalizedResponseFormat;
+  readonly stableProfile: StablePromptProfile;
 }
 
 export interface StructuralRepairError {
@@ -35,11 +40,9 @@ export function formatTaskPrompt(
   const schemas = AI_TASK_SCHEMAS[task];
   const validatedInput = schemas.input.parse(input);
   const definition = taskPrompt(task);
-  const system = [
-    BASE_SYSTEM_PROMPT,
-    `Logical role: ${definition.role}.`,
-    `Task instruction: ${definition.instruction}`,
-  ].join('\n\n');
+  const outputSchema = jsonRecord(z.toJSONSchema(schemas.output));
+  const stableProfile = createStablePromptProfile(definition, outputSchema);
+  const system = renderStablePromptProfile(stableProfile);
   const user = `Task input JSON:\n${JSON.stringify(validatedInput)}`;
   const messages: readonly NormalizedMessage[] = capabilities.systemMessages
     ? [
@@ -52,6 +55,7 @@ export function formatTaskPrompt(
     promptVersion: definition.version,
     messages: Object.freeze(messages),
     responseFormat: responseFormat(definition.outputSchemaName, schemas.output, capabilities),
+    stableProfile,
   });
 }
 

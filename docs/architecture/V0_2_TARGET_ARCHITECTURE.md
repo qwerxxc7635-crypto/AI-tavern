@@ -56,6 +56,8 @@ Orchestrator 产生 `AiOperation`：
 
 序列化必须稳定：固定块顺序、对象键顺序、换行与 Unicode 归一化。相同输入必须得到相同 manifest/hash。
 
+当前Prompt编译先构造版本化Stable Prompt Profile，固定`SYSTEM_CONTRACT -> GAME_RULES -> OUTPUT_SCHEMA -> PROMPT_PROFILE -> STABLE_WORLD_TRUTHS`五段；world truths进入前复制冻结，并拒绝request ID、timestamp、UUID、transient error、cache metrics和UI debug。后续summary/lore/history/scene/input不得插入这五段之间。
+
 ## Provider 三层
 
 - `ConnectionProfile`：用户可编辑的持久设置；密钥只保存 vault reference。

@@ -5,7 +5,11 @@ import { describe, expect, it } from 'vitest';
 import {
   BASE_RULES,
   PROMPT_HISTORY,
+  STABLE_PROMPT_PROFILE_ID,
+  STABLE_PROMPT_PROFILE_VERSION,
+  STABLE_PROMPT_SECTION_KINDS,
   TASK_PROMPTS,
+  createStablePromptProfile,
   formatOutputRepairPrompt,
   formatTaskPrompt,
 } from './index.js';
@@ -72,6 +76,8 @@ describe('provider-neutral prompt formatting', () => {
     expect(formatted.promptVersion).toBe(1);
     expect(formatted.messages.map(({ role }) => role)).toEqual(['SYSTEM', 'USER']);
     expect(formatted.messages[0]?.content).toContain('WORLD_DESIGNER');
+    expect(formatted.messages[0]?.content).toContain('[SYSTEM_CONTRACT]');
+    expect(formatted.messages[0]?.content).toContain('[STABLE_WORLD_TRUTHS]');
     expect(formatted.messages[1]?.content).toContain(JSON.stringify(worldInput));
     expect(formatted.responseFormat).toMatchObject({
       kind: 'JSON_SCHEMA',
@@ -125,5 +131,40 @@ describe('provider-neutral prompt formatting', () => {
     expect(formatted.messages.at(-1)?.content).toMatch(/Do not add new story facts/);
     expect(formatted.messages.at(-1)?.content).toContain('INVALID_JSON');
     expect(formatted.responseFormat.kind).toBe('JSON_SCHEMA');
+  });
+});
+
+describe('stable prompt profile', () => {
+  it('fixes the five required prefix sections and versions the profile', () => {
+    const formatted = formatTaskPrompt('GENERATE_WORLD', worldInput, capabilities);
+    expect(formatted.stableProfile).toMatchObject({
+      id: STABLE_PROMPT_PROFILE_ID,
+      version: STABLE_PROMPT_PROFILE_VERSION,
+      task: 'GENERATE_WORLD',
+      promptVersion: 1,
+    });
+    expect(formatted.stableProfile.sections.map(({ kind }) => kind)).toEqual(
+      STABLE_PROMPT_SECTION_KINDS,
+    );
+    expect(formatted.stableProfile.sections[2]?.content).toMatchObject({ type: 'object' });
+    expect(formatted.stableProfile.sections[3]?.content).toMatchObject({
+      task: 'GENERATE_WORLD',
+      logicalRole: 'WORLD_DESIGNER',
+      stableProfileVersion: 1,
+    });
+  });
+
+  it('rejects volatile request metadata and UUIDs from stable world truths', () => {
+    const schema = { type: 'object' } as const;
+    expect(() =>
+      createStablePromptProfile(TASK_PROMPTS.GENERATE_WORLD, schema, {
+        requestId: 'request-1',
+      }),
+    ).toThrow('not allowed');
+    expect(() =>
+      createStablePromptProfile(TASK_PROMPTS.GENERATE_WORLD, schema, {
+        world: '00000000-0000-4000-8000-000000000001',
+      }),
+    ).toThrow('UUID');
   });
 });
