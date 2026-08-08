@@ -2351,3 +2351,22 @@
 ### 下一项
 
 - 严格执行 `V02-M0-T02`，随后 `V02-M0-T03`；完成后进入 `V02-M1-T01`。不启动 iOS，不访问真实付费 API 或正式用户数据。
+
+## 2026-08-08 — v0.2 M0 跨平台路径与共享脚本完成
+
+### 实现
+
+- 新增 `ember-platform-services` crate，以 `PlatformPaths` port 暴露 data/cache/log/temp，Windows 与 macOS adapters 只接受平台 composition root 解析出的绝对路径。
+- Tauri 启动不再直接拼接 `app_data_dir`，而是经当前平台 adapter 获取 SQLite data dir；测试可注入临时根目录。
+- 用既有 `app-icon.svg` 补齐桌面 PNG/ICNS，未纳入生成器产生的 iOS/Android 资产。
+- 新增跨平台 Node build/shared gate/release metadata 入口；保留 Windows E2E 为明确专项脚本。
+
+### 验证
+
+- PlatformPaths tests：3/3；Node release metadata tests：2/2。
+- macOS `cargo check -p ember-tavern-windows` 通过；既有 `secure-secrets` 非 Windows dead-code warning 归入下一项 `V02-M1-T02`，不在 M0 隐藏。
+- `pnpm build:desktop` 通过，Vite 转换 179 modules；metadata 命令输出当前版本、提交、darwin/arm64。
+
+### 结论
+
+- `V02-M0-T02` 与 `V02-M0-T03` 完成。下一项严格为 `V02-M1-T01` SSRF IPv4/IPv6；Windows 和 macOS 的最终实机/CI 证据仍由 M9 重新验收。

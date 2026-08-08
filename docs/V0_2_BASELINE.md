@@ -29,5 +29,12 @@
 
 ## M0 执行边界
 
-`V02-M0-T01` 已完成。依据总执行提示词，Architecture Gate 前只允许研究和架构文档变更，因此 `V02-M0-T02/T03` 在 Gate 前只形成约束与实施计划，Gate 通过后立即实现，且必须先于 M1。
+`V02-M0-T01` 已完成。依据总执行提示词，Architecture Gate 前只允许研究和架构文档变更，因此 `V02-M0-T02/T03` 在 Gate 前只形成约束与实施计划，Gate 通过后再实施，且先于 M1。
 
+## Gate 后实施结果
+
+- 新增 `ember-platform-services`：`PlatformPaths` port、经 Tauri 路径解析器注入的 Windows/macOS adapters、绝对路径校验和隔离测试根目录。
+- SQLite 文件名只在桌面 composition root 与平台 data dir 组合；domain/application 不引入平台路径。
+- 从现有 SVG 生成 Windows ICO 与 macOS PNG/ICNS；移动平台衍生资产未纳入仓库，也未启动 iOS 开发。
+- 新增跨平台 Node 入口：`build:desktop`、`release:metadata`、`check:shared`；Windows 专项 E2E 仍保持明确的平台专属边界。
+- macOS 上 adapter 契约测试 3/3、release metadata 测试 2/2、Tauri Rust desktop `cargo check` 和 179-module 前端生产构建通过。Windows adapter 使用同一契约夹具；实际 Windows 全门禁仍在 M9 强制复验。

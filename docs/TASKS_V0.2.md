@@ -9,10 +9,10 @@
 
 ## 当前执行状态（2026-08-08）
 
-- `V02-M0-T01`：DONE；起始证据和恢复位置见 `docs/V0_2_BASELINE.md`。
+- `V02-M0-T01`～`V02-M0-T03`：DONE；起始证据、PlatformPaths 与跨平台脚本验证见 `docs/V0_2_BASELINE.md`。
 - `V02-COMP-T01`～`V02-COMP-T07`：DONE；三仓库固定 SHA、源码可用性、矩阵、Gap、Borrow/Reject 均已记录在 `docs/research/`。
 - `V02-ARCH-T01`～`V02-ARCH-T09`：DESIGN DONE / GATE PASS；实现约束见 `docs/architecture/`。Gate 通过只批准实现，不把 M0/M1/M2 代码任务标为完成。
-- 下一执行项：`V02-M0-T02`，随后 `V02-M0-T03`；完成后严格进入 `V02-M1-T01`。
+- 下一执行项：严格进入 `V02-M1-T01`。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

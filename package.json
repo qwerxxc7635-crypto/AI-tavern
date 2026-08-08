@@ -4,16 +4,19 @@
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
+    "build:desktop": "node scripts/desktop-build.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint . --max-warnings 0",
-    "test": "vitest run --passWithNoTests && node --test packages/persistence/src/*.test.mjs",
+    "release:metadata": "node scripts/release-metadata.mjs",
+    "test": "vitest run --passWithNoTests && node --test packages/persistence/src/*.test.mjs scripts/*.test.mjs",
     "test:windows-e2e": "cargo test -p ember-native-bridge windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
     "rust:test": "cargo test --workspace",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm rust:fmt && pnpm rust:clippy && pnpm rust:test"
+    "check:shared": "node scripts/shared-check.mjs",
+    "check": "pnpm check:shared"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

@@ -13,6 +13,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 ember-native-bridge = { path = "../../crates/native-bridge" }
+ember-platform-services = { path = "../../crates/platform-services" }
 ember-provider-openai-compatible = { path = "../../crates/provider-openai-compatible" }
 ember-secure-secrets = { path = "../../crates/secure-secrets" }
 serde = { version = "1.0.228", features = ["derive"] }

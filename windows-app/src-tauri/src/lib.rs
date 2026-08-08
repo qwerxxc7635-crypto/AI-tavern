@@ -2,6 +2,8 @@
 
 #![forbid(unsafe_code)]
 
+mod platform_paths;
+
 use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
@@ -598,7 +600,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
-            let database_path = app.path().app_data_dir()?.join("ember-tavern.sqlite");
+            let database_path = platform_paths::database_path(app)?;
             app.manage(CampaignStore::open(database_path)?);
             Ok(())
         })

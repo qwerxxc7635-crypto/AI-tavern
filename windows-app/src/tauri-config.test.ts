@@ -45,8 +45,8 @@ interface TauriCapability {
 const sourceDirectory = dirname(fileURLToPath(import.meta.url));
 const tauriDirectory = resolve(sourceDirectory, '../src-tauri');
 
-describe('Windows release configuration', () => {
-  it('produces a current-user NSIS installer from bundled frontend assets', () => {
+describe('Desktop release configuration', () => {
+  it('keeps current-user NSIS settings and provides cross-platform desktop icons', () => {
     const config = JSON.parse(
       readFileSync(resolve(tauriDirectory, 'tauri.conf.json'), 'utf8'),
     ) as TauriConfig;
@@ -74,8 +74,15 @@ describe('Windows release configuration', () => {
     expect(config.bundle.windows.nsis.installMode).toBe('currentUser');
     expect(config.bundle.windows.nsis.languages).toEqual(['SimpChinese', 'English']);
 
+    expect(config.bundle.icon.some((icon) => icon.endsWith('.ico'))).toBe(true);
+    expect(config.bundle.icon.some((icon) => icon.endsWith('.icns'))).toBe(true);
+    expect(config.bundle.icon.some((icon) => icon.endsWith('.png'))).toBe(true);
+
+    for (const icon of config.bundle.icon) {
+      expect(existsSync(resolve(tauriDirectory, icon))).toBe(true);
+    }
+
     for (const icon of [
-      ...config.bundle.icon,
       config.bundle.windows.nsis.installerIcon,
       config.bundle.windows.nsis.uninstallerIcon,
     ]) {

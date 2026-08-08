@@ -14,6 +14,15 @@ export default tseslint.config(
     ],
   },
   eslint.configs.recommended,
+  {
+    files: ['scripts/**/*.mjs'],
+    languageOptions: {
+      globals: {
+        process: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
   ...tseslint.configs.strict,
   {
     files: ['**/*.{ts,tsx}'],

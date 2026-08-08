@@ -778,6 +778,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember-platform-services"
+version = "0.1.0"
+dependencies = [
+ "tempfile",
+]
+
+[[package]]
 name = "ember-provider-openai-compatible"
 version = "0.1.0"
 dependencies = [
@@ -821,6 +828,7 @@ name = "ember-tavern-windows"
 version = "0.1.0"
 dependencies = [
  "ember-native-bridge",
+ "ember-platform-services",
  "ember-provider-openai-compatible",
  "ember-secure-secrets",
  "serde",
