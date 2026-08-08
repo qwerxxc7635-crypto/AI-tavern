@@ -2,6 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type PresetKey = 'deepseek' | 'qwen' | 'openrouter' | 'ollama' | 'custom';
 
+export const DEEPSEEK_FLASH_PROFILE = Object.freeze({
+  apiModelId: 'deepseek-v4-flash',
+  uiDisplayName: 'DeepSeek-V4-Flash-0731',
+});
+
 export interface ConnectionProfileDefinition {
   readonly key: PresetKey;
   readonly name: string;
@@ -16,7 +21,7 @@ export const CONNECTION_PROFILES: readonly ConnectionProfileDefinition[] = Objec
     key: 'deepseek',
     name: 'DeepSeek',
     baseUrl: 'https://api.deepseek.com/',
-    defaultModel: 'deepseek-v4-flash',
+    defaultModel: DEEPSEEK_FLASH_PROFILE.apiModelId,
     endpointMode: 'FIXED',
     credentialMode: 'REQUIRED',
   }),
@@ -170,7 +175,9 @@ export const tauriModelSettingsGateway: ModelSettingsGateway = {
       receiptId: requireId(value['receiptId']),
       normalizedBaseUrl: requireText(value['normalizedBaseUrl']),
       endpointFingerprint: requireFingerprint(value['endpointFingerprint']),
-      models: Object.freeze(requireArray(value['models']).map(parseProbeModel)),
+      models: Object.freeze(
+        requireArray(value['models']).map((model) => parseProbeModel(model, input.presetKey)),
+      ),
     });
   },
 };
@@ -193,6 +200,7 @@ function parseProfile(value: unknown): ModelProfile {
   if (!['deepseek', 'qwen', 'openrouter', 'ollama', 'custom'].includes(presetKey)) {
     throw new TypeError('Provider preset is invalid');
   }
+  const modelName = requireText(record['modelName']);
   return Object.freeze({
     id: requireText(record['id']),
     providerId: requireText(record['providerId']),
@@ -201,8 +209,12 @@ function parseProfile(value: unknown): ModelProfile {
     baseUrl: optionalText(record['baseUrl']),
     endpointFingerprint: optionalFingerprint(record['endpointFingerprint']),
     hasCredential: requireBoolean(record['hasCredential']),
-    modelName: requireText(record['modelName']),
-    modelDisplayName: requireText(record['modelDisplayName']),
+    modelName,
+    modelDisplayName: canonicalModelDisplayName(
+      presetKey,
+      modelName,
+      requireText(record['modelDisplayName']),
+    ),
     capabilities:
       record['capabilities'] === null ? null : parseCapabilities(record['capabilities']),
     capabilitySource:
@@ -213,15 +225,30 @@ function parseProfile(value: unknown): ModelProfile {
   });
 }
 
-function parseProbeModel(value: unknown): ProbeModel {
+function parseProbeModel(value: unknown, presetKey: PresetKey): ProbeModel {
   const record = requireRecord(value);
+  const modelName = requireText(record['name']);
   return Object.freeze({
-    name: requireText(record['name']),
-    displayName: requireText(record['displayName']),
+    name: modelName,
+    displayName: canonicalModelDisplayName(
+      presetKey,
+      modelName,
+      requireText(record['displayName']),
+    ),
     capabilities: parseCapabilities(record['capabilities']),
     capabilitySource: requireCapabilitySource(record['capabilitySource']),
     probeFingerprint: requireFingerprint(record['probeFingerprint']),
   });
+}
+
+function canonicalModelDisplayName(
+  presetKey: PresetKey,
+  modelName: string,
+  providerDisplayName: string,
+): string {
+  return presetKey === 'deepseek' && modelName === DEEPSEEK_FLASH_PROFILE.apiModelId
+    ? DEEPSEEK_FLASH_PROFILE.uiDisplayName
+    : providerDisplayName;
 }
 
 function parseCapabilities(value: unknown): ModelCapabilities {

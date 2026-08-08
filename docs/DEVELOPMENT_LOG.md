@@ -2725,3 +2725,21 @@
 ### 结论
 
 - `V02-M3-T05`完成，M3 Settings & Profile UX实现任务结束。下一项严格为`V02-M4-T01` DeepSeek Profile。
+
+## 2026-08-08 — V02-M4-T01 固定 DeepSeek Flash Profile 身份
+
+### 实现
+
+- Provider preset继续只向API发送模型ID `deepseek-v4-flash`，并把对应玩家可见名称固定为`DeepSeek-V4-Flash-0731`；二者以独立常量表达，避免展示名进入请求model字段。
+- Tauri模型探测通过DeepSeek preset元数据返回规范UI名，新保存档案持久化该名称；原生档案测试同步锁定准确字符串。
+- 前端Profile默认值引用API ID常量，probe解析和已有档案解析对该精确preset/model组合规范化UI名，因此旧本地记录无需数据库迁移也不会继续展示旧名称。
+- DeepSeek V4 Pro及其他Provider显示名不受影响；本项未加入缓存序列化或Prompt内容。
+
+### 验证
+
+- Rust DeepSeek契约测试同时断言API ID和UI名并完成本地mock模型列表/生成；TypeScript契约测试证明旧显示名读入后API ID不变、UI名被规范化。
+- 模型设置相关7项测试、`pnpm typecheck`和`pnpm lint`通过；未访问真实DeepSeek或付费API。
+
+### 结论
+
+- `V02-M4-T01`完成。下一项严格为`V02-M4-T02` Stable Prompt Profile。

@@ -662,7 +662,7 @@ mod tests {
         let mut update = settings_update("deepseek", "DeepSeek primary", "deepseek-v4-flash");
         update.credential_ref = Some(credential_ref);
         update.credential_action = CredentialAction::Replace;
-        update.model_display_name = "DeepSeek V4 Flash".to_owned();
+        update.model_display_name = "DeepSeek-V4-Flash-0731".to_owned();
         update.capabilities.json_mode = true;
         update.capabilities.reasoning = true;
         update.capabilities.context_window_tokens = Some(1_048_576);
@@ -671,6 +671,10 @@ mod tests {
         refresh_probe_metadata(&mut update);
         let saved = store.save_model_settings(update).unwrap();
         assert_eq!(saved.profiles.len(), 1);
+        assert_eq!(
+            saved.profiles[0].model_display_name,
+            "DeepSeek-V4-Flash-0731"
+        );
         assert_eq!(
             saved.default_model_profile_id,
             Some(saved.profiles[0].id.clone())

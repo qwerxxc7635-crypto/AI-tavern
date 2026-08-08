@@ -1,8 +1,39 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseModelSettingsSnapshot, type ModelSettingsGateway } from './model-settings-service.js';
+import {
+  DEEPSEEK_FLASH_PROFILE,
+  parseModelSettingsSnapshot,
+  type ModelSettingsGateway,
+} from './model-settings-service.js';
 
 describe('model settings contract', () => {
+  it('keeps the DeepSeek API id separate from its required UI label', () => {
+    const snapshot = parseModelSettingsSnapshot({
+      profiles: [
+        {
+          id: 'profile-1',
+          providerId: 'provider-1',
+          presetKey: 'deepseek',
+          providerDisplayName: 'DeepSeek',
+          baseUrl: 'https://api.deepseek.com/',
+          endpointFingerprint: null,
+          hasCredential: true,
+          modelName: 'deepseek-v4-flash',
+          modelDisplayName: 'DeepSeek V4 Flash',
+          capabilities: null,
+          capabilitySource: null,
+          probeFingerprint: null,
+        },
+      ],
+      defaultModelProfileId: 'profile-1',
+      fallbackModelProfileId: null,
+      pendingCredentialCleanupCount: 0,
+    });
+
+    expect(snapshot.profiles[0]?.modelName).toBe(DEEPSEEK_FLASH_PROFILE.apiModelId);
+    expect(snapshot.profiles[0]?.modelDisplayName).toBe(DEEPSEEK_FLASH_PROFILE.uiDisplayName);
+  });
+
   it('keeps API keys outside saved provider settings', async () => {
     const calls: string[] = [];
     const gateway: ModelSettingsGateway = {
@@ -57,7 +88,7 @@ describe('model settings contract', () => {
       credentialRef: reference,
       credentialAction: 'REPLACE',
       modelName: 'deepseek-v4-flash',
-      modelDisplayName: 'DeepSeek V4 Flash',
+      modelDisplayName: DEEPSEEK_FLASH_PROFILE.uiDisplayName,
       capabilities: {
         text: true,
         streaming: false,

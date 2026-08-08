@@ -15,6 +15,7 @@ const RESPONSE_LIMIT: usize = 4 * 1024 * 1024;
 
 pub const DEEPSEEK_BASE_URL: &str = "https://api.deepseek.com/";
 pub const DEEPSEEK_DEFAULT_MODEL: &str = "deepseek-v4-flash";
+pub const DEEPSEEK_FLASH_DISPLAY_NAME: &str = "DeepSeek-V4-Flash-0731";
 pub const QWEN_BASE_URL: &str = "https://dashscope.aliyuncs.com/compatible-mode/v1/";
 pub const QWEN_DEFAULT_MODEL: &str = "qwen3.7-plus";
 pub const OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1/";
@@ -66,7 +67,7 @@ impl DeepSeekPreset {
     pub const MODELS: [PresetModel; 2] = [
         PresetModel {
             name: "deepseek-v4-flash",
-            display_name: "DeepSeek V4 Flash",
+            display_name: DEEPSEEK_FLASH_DISPLAY_NAME,
             json_mode: true,
             reasoning: true,
             context_window_tokens: 1_048_576,

@@ -114,7 +114,7 @@ describe('model settings page', () => {
               endpointFingerprint: null,
               hasCredential: false,
               modelName: 'deepseek-v4-flash',
-              modelDisplayName: 'DeepSeek V4 Flash',
+              modelDisplayName: 'DeepSeek-V4-Flash-0731',
               capabilities: null,
               capabilitySource: null,
               probeFingerprint: null,
@@ -139,7 +139,7 @@ describe('model settings page', () => {
           models: [
             {
               name: 'deepseek-v4-flash',
-              displayName: 'DeepSeek V4 Flash',
+              displayName: 'DeepSeek-V4-Flash-0731',
               capabilitySource: 'PRESET_METADATA',
               probeFingerprint: 'b'.repeat(64),
               capabilities: {
@@ -207,6 +207,7 @@ describe('model settings page', () => {
 
     vi.spyOn(window, 'confirm').mockReturnValue(true);
     expect(screen.getByText('凭据状态：已保存引用，需连接测试确认当前可用性')).toBeTruthy();
+    expect(screen.getAllByText('DeepSeek-V4-Flash-0731')).toHaveLength(2);
     expect(screen.getByText('最近连接测试：2026-08-01T00:00:00Z')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '删除已保存凭据' }));
     expect(await screen.findByText('已删除该Provider的系统凭据；模型配置仍保留。')).toBeTruthy();

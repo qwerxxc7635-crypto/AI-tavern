@@ -441,6 +441,13 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
     assert_eq!(DeepSeekPreset::KEY, "deepseek");
     assert_eq!(DEEPSEEK_BASE_URL, "https://api.deepseek.com/");
     assert_eq!(DEEPSEEK_DEFAULT_MODEL, "deepseek-v4-flash");
+    assert_eq!(DEEPSEEK_FLASH_DISPLAY_NAME, "DeepSeek-V4-Flash-0731");
+    assert_eq!(
+        DeepSeekPreset::model(DEEPSEEK_DEFAULT_MODEL)
+            .unwrap()
+            .display_name,
+        DEEPSEEK_FLASH_DISPLAY_NAME
+    );
     assert_eq!(
         DeepSeekPreset::model("deepseek-v4-pro"),
         Some(PresetModel {
