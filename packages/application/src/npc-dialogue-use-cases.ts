@@ -353,6 +353,7 @@ export class NpcDialogueUseCases {
         this.providerConfig,
         command.campaignId,
         request,
+        inputJson,
       );
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');

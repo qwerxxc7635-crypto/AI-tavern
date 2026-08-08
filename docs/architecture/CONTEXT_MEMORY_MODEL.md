@@ -21,6 +21,8 @@ type ContextBlock = {
 
 `content_hash` 对规范化的内容与语义字段计算，不包含运行时间。`id + source_revision + version + content_hash` 是缓存有效性的充分检查，不能只看 id。
 
+当前实现使用规范化JSON的SHA-256作为`content_hash`。创建块时会验证ID、revision、版本、预算和枚举；进入Provider前Orchestrator重新计算hash，并逐项核对included manifest与块的source/revision/version/hash，拒绝调用后篡改。
+
 ## 装配和裁剪
 
 1. 任务合同声明所需类型和总预算。
@@ -29,6 +31,8 @@ type ContextBlock = {
 4. 先保留不可裁剪的规则、任务、当前输入和 hard-logic 结果。
 5. 其余按优先级与每块预算裁剪；不得截断 JSON 结构。
 6. 输出 `ContextManifest`，记录 included/excluded 原因、估算 token、hash 和隐私遮罩。
+
+装配器按`stable → semi_stable → dynamic`、任务声明type顺序、priority降序、id升序产生确定顺序。候选携带0～1 relevance和required标记；低相关或超块/总预算的可选块整块排除，required块无法容纳时整体失败，禁止截断JSON。现有任务schema builder先完成知识过滤和历史裁剪，再把其结果封装为game-private任务块；manifest只含元数据，不含块内容。
 
 ## 真相、主张、知识、记忆
 

@@ -1428,3 +1428,19 @@ CI构建证明源码能在托管双平台环境编译和打包，不等同于M9�
 ### 影响与边界
 
 AI UI不得持有或调用Provider。现有八类Application生成路径都通过统一入口，旧的请求生命周期和GenerationRecord仍保持兼容；M2后续任务将分别补入ContextBlock、ResolvedModelConfig、Candidate Pattern和Event Ledger，本决定不提前实现它们，也不自动连接真实模型或付费API。
+
+## DEC-062：Context装配使用不可截断块与可复核manifest
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T02`、Architecture Gate Context/Memory Model
+
+### 决定与理由
+
+所有Provider执行必须携带`ContextAssembly`，其中只有完整`ContextBlock`和不含content的`ContextManifest`。块包含类型、来源及revision、stable/semi-stable/dynamic阶段、priority、token budget、privacy class、版本和对规范化内容及语义字段计算的SHA-256。
+
+装配顺序固定为阶段、任务type顺序、priority降序、id升序；relevance低于任务阈值或超出块/总预算的可选块整体排除，required块放不下则失败。Orchestrator在调用Provider前重新计算hash并核对manifest，禁止把裁剪后的无效JSON或被替换内容送入模型。
+
+### 影响与边界
+
+现有NPC、冒险和世界事件builder继续负责知识边界与任务schema，它们的已过滤结果进入统一任务块，不把裸Repository对象交给Provider。manifest可用于后续Inspector和缓存判断，但默认不含content；secret块的展示和调试导出仍必须遵循隐私遮罩。Context token采用确定性UTF-8估算而非Provider账单值，实际usage仍以Provider归一响应为准。

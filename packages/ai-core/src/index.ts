@@ -18,6 +18,29 @@ export type {
   WorldEventContext,
   WorldEventContextSource,
 } from './context-builder.js';
+export {
+  assembleContextBlocks,
+  assembleTaskContext,
+  CONTEXT_BLOCK_TYPES,
+  CONTEXT_PRIVACY_CLASSES,
+  CONTEXT_STABILITIES,
+  ContextAssemblyError,
+  createContextBlock,
+  estimateContextTokens,
+} from './context-assembly.js';
+export type {
+  ContextAssembly,
+  ContextAssemblyPolicy,
+  ContextBlock,
+  ContextBlockDraft,
+  ContextBlockType,
+  ContextCandidate,
+  ContextExclusionReason,
+  ContextManifest,
+  ContextManifestEntry,
+  ContextPrivacyClass,
+  ContextStability,
+} from './context-assembly.js';
 export { FakeAIProvider, FakeAIProviderError } from './fake-ai-provider.js';
 export { FAKE_TASK_OUTPUTS } from './fake-task-outputs.js';
 export { validateAIOutput } from './output-validator.js';

@@ -1,10 +1,13 @@
 import {
+  assembleTaskContext,
+  contextBudgetForTask,
   routeModel,
   StandardAIError,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
   type AITask,
+  type ContextManifest,
   type ModelCapabilities,
   type NormalizedAIRequest,
   type ProviderConfig,
@@ -114,8 +117,18 @@ export class AITurnOrchestrator {
     }
 
     let context: JsonValue;
+    let contextAssembly: Awaited<ReturnType<typeof assembleTaskContext>>['assembly'];
     try {
       context = toJsonValue(await command.buildContext(), '$context');
+      const prepared = await assembleTaskContext(
+        command.task,
+        command.requestId,
+        1,
+        context,
+        contextBudgetForTask(command.task).maxCharacters,
+      );
+      context = prepared.content;
+      contextAssembly = prepared.assembly;
       this.requests.setContext(command.requestId, context, this.now());
     } catch (error) {
       this.failPending(command.requestId, {
@@ -214,6 +227,7 @@ export class AITurnOrchestrator {
         command.operationId,
         command.routeKind ?? 'PRIMARY',
         command.routeAttempt ?? 1,
+        contextAssembly.manifest,
         command.repairSourceRequestId,
       ),
       startedAt: this.now(),
@@ -229,6 +243,7 @@ export class AITurnOrchestrator {
           taskType: command.task,
           campaignId: command.campaignId,
           actorId: null,
+          contextAssembly,
           route: {
             kind: command.routeKind ?? 'PRIMARY',
             attempt: command.routeAttempt ?? 1,
@@ -344,6 +359,7 @@ function requestJson(
   operationId: AiOperationId,
   routeKind: AIRouteKind,
   routeAttempt: number,
+  contextManifest: ContextManifest,
   repairSourceRequestId: AiRequestId | undefined,
 ): JsonValue {
   return Object.freeze({
@@ -351,6 +367,7 @@ function requestJson(
     operationId,
     routeKind,
     routeAttempt,
+    contextManifest: toJsonValue(contextManifest, '$contextManifest'),
     task: request.task,
     promptVersion: request.promptVersion,
     modelName: request.modelName,

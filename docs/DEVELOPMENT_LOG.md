@@ -2554,3 +2554,22 @@
 ### 结论
 
 - `V02-M2-T01`完成。下一项严格为`V02-M2-T02` Context Assembly Pipeline。
+
+## 2026-08-08 — V02-M2-T02 完成 Context Assembly Pipeline
+
+### 实现
+
+- 新增完整ContextBlock schema：12种类型、stable/semi-stable/dynamic、priority、块预算、privacy class、source/revision、version及规范化JSON SHA-256。
+- 装配器按阶段、任务type顺序、priority和ID确定性排序；支持0～1 relevance、required块、块预算与总预算，可选块按not-relevant/block-budget/total-budget记录排除原因且不截断JSON。
+- ContextManifest只保存来源、版本、hash、隐私级别、估算token和纳入原因，不复制块内容；required块无法装入时fail closed。
+- 所有普通应用生成和回合Orchestrator都在Provider前创建任务块；AITaskOrchestrator重新计算hash并核对included manifest，context或provenance漂移时不调用Provider。
+
+### 验证
+
+- 新增5项装配测试，覆盖规范化hash、provenance隐私、三阶段确定顺序、相关性/双层预算、整块排除、required失败与UTF-8估算。
+- Orchestrator测试新增context篡改拒绝；完整`pnpm test`通过62个Vitest文件、363项测试，并通过Node持久化/脚本测试。
+- `pnpm lint`、`pnpm typecheck`与`git diff --check`通过；未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M2-T02`完成。下一项严格为`V02-M2-T03` ResolvedModelConfig。

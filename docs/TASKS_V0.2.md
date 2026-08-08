@@ -21,7 +21,8 @@
 - `V02-M1-T07`：DONE；`pnpm archive:interop`从当前双实现生成归档、交叉导入、校验来源清单并对提交夹具执行逐条目regenerate-and-diff，CI已接入。
 - `V02-M1-T08`：DONE；CI共享门禁覆盖Windows/macOS，Windows构建NSIS并跑纵向测试，macOS构建app；关键命令和产物均输出结构化UTF-8证据与SHA-256。
 - `V02-M2-T01`：DONE；所有应用层AI生成统一经过AITaskOrchestrator，冻结task/request/operation/route身份，显式区分primary/retry/fallback/repair，归一usage与稳定错误分类。
-- 下一执行项严格进入 `V02-M2-T02` Context Assembly Pipeline。
+- `V02-M2-T02`：DONE；ContextBlock装配支持stable/semi-stable/dynamic、任务顺序、相关性、块/总预算、SHA-256与不含内容的provenance manifest；所有Provider执行均强制携带并复核装配结果。
+- 下一执行项严格进入 `V02-M2-T03` ResolvedModelConfig。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

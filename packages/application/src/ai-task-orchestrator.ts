@@ -1,7 +1,11 @@
 import {
+  assembleTaskContext,
+  contextBudgetForTask,
+  createContextBlock,
   standardizeAIError,
   type AIProvider,
   type AITask,
+  type ContextAssembly,
   type NormalizedAIRequest,
   type NormalizedAIResponse,
   type NormalizedTokenUsage,
@@ -13,6 +17,7 @@ import {
   type AiOperationId,
   type AiRequestId,
   type CampaignId,
+  type JsonValue,
   type ModelProfileId,
 } from '@ember-tavern/contracts';
 
@@ -47,6 +52,7 @@ export interface AITaskRequest {
   readonly taskType: AITask;
   readonly campaignId: CampaignId;
   readonly actorId: string | null;
+  readonly contextAssembly: ContextAssembly;
   readonly route: AIExecutionRoute;
   readonly providerRequest: NormalizedAIRequest;
 }
@@ -56,6 +62,7 @@ export interface AITaskResult {
   readonly operationId: AiOperationId;
   readonly requestId: AiRequestId;
   readonly taskType: AITask;
+  readonly contextManifest: ContextAssembly['manifest'];
   readonly route: AIExecutionRoute;
   readonly usage: NormalizedTokenUsage;
   readonly response: NormalizedAIResponse;
@@ -82,7 +89,7 @@ export class AITaskOrchestrator {
   ) {}
 
   public async execute(request: AITaskRequest): Promise<AITaskResult> {
-    validateTaskRequest(request, this.providerConfig);
+    await validateTaskRequest(request, this.providerConfig);
     try {
       const response = await this.provider.generate(request.providerRequest, this.providerConfig);
       if (
@@ -96,6 +103,7 @@ export class AITaskOrchestrator {
         operationId: request.operationId,
         requestId: request.requestId,
         taskType: request.taskType,
+        contextManifest: request.contextAssembly.manifest,
         route: Object.freeze({ ...request.route }),
         usage: normalizeUsage(response.usage),
         response,
@@ -120,13 +128,22 @@ export async function executePrimaryAITask(
   providerConfig: ProviderConfig,
   campaignId: CampaignId,
   request: NormalizedAIRequest,
+  context: JsonValue,
 ): Promise<NormalizedAIResponse> {
+  const prepared = await assembleTaskContext(
+    request.task,
+    request.requestId,
+    1,
+    context,
+    contextBudgetForTask(request.task).maxCharacters,
+  );
   const result = await new AITaskOrchestrator(provider, providerConfig).execute({
     operationId: aiOperationId(`operation:${request.requestId}`),
     requestId: request.requestId,
     taskType: request.task,
     campaignId,
     actorId: null,
+    contextAssembly: prepared.assembly,
     route: Object.freeze({
       kind: 'PRIMARY',
       attempt: 1,
@@ -174,13 +191,21 @@ export function classifyAIOrchestrationError(error: unknown): Readonly<{
   });
 }
 
-function validateTaskRequest(request: AITaskRequest, config: ProviderConfig): void {
+async function validateTaskRequest(request: AITaskRequest, config: ProviderConfig): Promise<void> {
   const route = request.route;
+  const includedEntries = request.contextAssembly.manifest.entries.filter(
+    ({ included }) => included,
+  );
   if (
     request.providerRequest.requestId !== request.requestId ||
     request.providerRequest.task !== request.taskType ||
     route.providerId !== config.id ||
     route.modelName !== request.providerRequest.modelName ||
+    request.contextAssembly.blocks.length === 0 ||
+    includedEntries.length !== request.contextAssembly.blocks.length ||
+    request.contextAssembly.manifest.estimatedTokens !==
+      includedEntries.reduce((total, entry) => total + entry.estimatedTokens, 0) ||
+    request.contextAssembly.manifest.estimatedTokens > request.contextAssembly.manifest.maxTokens ||
     !Number.isSafeInteger(route.attempt) ||
     route.attempt < 1 ||
     (route.kind === 'PRIMARY' && route.attempt !== 1) ||
@@ -193,6 +218,27 @@ function validateTaskRequest(request: AITaskRequest, config: ProviderConfig): vo
       'CONFIGURATION_ROUTE_INVALID',
       false,
     );
+  }
+  for (const [index, block] of request.contextAssembly.blocks.entries()) {
+    const entry = includedEntries[index];
+    const recalculated = await createContextBlock(block);
+    if (
+      entry === undefined ||
+      entry.blockId !== block.id ||
+      entry.sourceId !== block.sourceId ||
+      entry.sourceRevision !== block.sourceRevision ||
+      entry.version !== block.version ||
+      entry.contentHash !== block.contentHash ||
+      recalculated.contentHash !== block.contentHash
+    ) {
+      throw new AITaskExecutionError(
+        request.operationId,
+        request.requestId,
+        'configuration',
+        'CONFIGURATION_CONTEXT_INVALID',
+        false,
+      );
+    }
   }
 }
 

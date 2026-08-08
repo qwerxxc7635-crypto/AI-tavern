@@ -1,6 +1,8 @@
 import {
   StandardAIError,
+  createContextBlock,
   type AIProvider,
+  type ContextAssembly,
   type NormalizedAIRequest,
   type NormalizedAIResponse,
   type ProviderConfig,
@@ -46,6 +48,41 @@ const config: ProviderConfig = {
   options: {},
   enabled: true,
 };
+const contextBlock = await createContextBlock({
+  id: 'context-a',
+  type: 'task',
+  content: { world: 'Ember Coast' },
+  sourceId: requestId,
+  sourceRevision: 1,
+  stability: 'dynamic',
+  priority: 100,
+  tokenBudget: 100,
+  privacyClass: 'game_private',
+  version: 1,
+});
+const contextAssembly: ContextAssembly = {
+  blocks: [contextBlock],
+  manifest: {
+    maxTokens: 100,
+    estimatedTokens: 6,
+    entries: [
+      {
+        blockId: 'context-a',
+        type: 'task',
+        sourceId: requestId,
+        sourceRevision: 1,
+        version: 1,
+        contentHash: contextBlock.contentHash,
+        privacyClass: 'game_private',
+        estimatedTokens: 6,
+        relevance: 1,
+        required: true,
+        included: true,
+        reason: 'required',
+      },
+    ],
+  },
+};
 
 describe('AITaskOrchestrator', () => {
   it.each([
@@ -83,6 +120,22 @@ describe('AITaskOrchestrator', () => {
     await expect(new AITaskOrchestrator(provider, config).execute(invalid)).rejects.toMatchObject({
       category: 'configuration',
       code: 'CONFIGURATION_ROUTE_INVALID',
+      retryable: false,
+    });
+    expect(calls).toBe(0);
+
+    const forgedContext = {
+      ...taskRequest('PRIMARY', 1),
+      contextAssembly: {
+        ...contextAssembly,
+        blocks: [{ ...contextBlock, content: { world: 'Forged Coast' } }],
+      },
+    };
+    await expect(
+      new AITaskOrchestrator(provider, config).execute(forgedContext),
+    ).rejects.toMatchObject({
+      category: 'configuration',
+      code: 'CONFIGURATION_CONTEXT_INVALID',
       retryable: false,
     });
     expect(calls).toBe(0);
@@ -144,6 +197,7 @@ function taskRequest(kind: AIRouteKind, attempt: number) {
     taskType: 'GENERATE_WORLD' as const,
     campaignId: campaignId('campaign-task-orchestrator'),
     actorId: null,
+    contextAssembly,
     route: {
       kind,
       attempt,
