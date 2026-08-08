@@ -16,6 +16,7 @@ import {
   validateJsonValueResources,
   validateRecordCount,
 } from './save-resource-limits.js';
+import { findSecretInJson, findSecretInText } from './save-secret-scanner.js';
 import type { TransactionalSqliteDatabase } from './sqlite-port.js';
 
 type StoredScalar = string | number | null;
@@ -180,6 +181,9 @@ export function exportCampaignSave(
   }
 
   const encoded = encodeFiles(captured);
+  for (const entry of encoded.entries) {
+    assertNoSecretText(new TextDecoder().decode(entry.data), `export.${entry.name}`);
+  }
   const uncompressedSize = encoded.entries.reduce((total, entry) => total + entry.data.length, 0);
   if (
     uncompressedSize > MAX_UNCOMPRESSED_BYTES ||
@@ -191,6 +195,7 @@ export function exportCampaignSave(
   if (bytes.length > MAX_ARCHIVE_BYTES) {
     throw new PersistenceDataError('Exported save exceeds the 32 MiB archive limit');
   }
+  assertNoSecretText(new TextDecoder().decode(bytes), 'export archive bytes');
   return Object.freeze({
     fileName: `${safeFileStem(campaignId)}.emtavern`,
     bytes,
@@ -374,6 +379,7 @@ function normalizeRow(table: string, value: unknown): StoredRow {
           }
           if (typeof entry === 'string') {
             validateJsonValueResources(entry, `${table}.${column}`);
+            assertNoSecretText(entry, `${table}.${column}`);
           }
           return [column, entry];
         }
@@ -411,32 +417,18 @@ function scanJsonTextIfPresent(value: StoredScalar): void {
 }
 
 function assertNoSecretKeys(value: unknown, path: string): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoSecretKeys(entry, `${path}[${index}]`));
-    return;
-  }
-  if (value === null || typeof value !== 'object') return;
-  for (const [key, entry] of Object.entries(value)) {
-    if (isForbiddenSecretKey(key)) {
-      throw new PersistenceDataError(`Save export contains forbidden secret field at ${path}`);
-    }
-    assertNoSecretKeys(entry, `${path}.${key}`);
+  const detection = findSecretInJson(value, path);
+  if (detection !== null) {
+    throw new PersistenceDataError(
+      `Save export contains forbidden secret material at ${detection.path}`,
+    );
   }
 }
 
-function isForbiddenSecretKey(key: string): boolean {
-  const normalized = key.replaceAll(/[_-]/g, '').toLowerCase();
-  return (
-    normalized.includes('apikey') ||
-    normalized === 'authorization' ||
-    normalized === 'bearer' ||
-    normalized.includes('accesstoken') ||
-    normalized.includes('secretkey') ||
-    normalized.includes('credentialref') ||
-    normalized === 'cookie' ||
-    normalized === 'password' ||
-    normalized === 'token'
-  );
+function assertNoSecretText(value: string, path: string): void {
+  if (findSecretInText(value, path) !== null) {
+    throw new PersistenceDataError(`Save export contains forbidden secret text at ${path}`);
+  }
 }
 
 function readRecord(value: unknown, label: string): Record<string, unknown> {

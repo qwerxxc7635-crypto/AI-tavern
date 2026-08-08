@@ -26,6 +26,14 @@
 - TypeScript先扫描ZIP目录，仅在使用条目时以`maxOutputLength`有界展开；Rust先扫描`ZipArchive`元数据，再逐条目读取并立即校验SHA-256/解析，不再同时持有五个展开文件。
 - 双实现测试覆盖压缩比炸弹、单条目/展开总量、极深JSON、超长数组/字符串和记录数；所有拒绝发生在正式SQLite写事务之前。
 
+## SR2-004 — CLOSED
+
+- TypeScript/Rust 双实现不再只看敏感键名；所有字符串值、嵌套JSON、普通叙事文本、`request_json`、`validation_error_json`和`raw_response_text`都经过相同高置信扫描。
+- 显式识别 Bearer/Basic Authorization、常见 `sk-` Provider Key、JWT、Google/AWS/GitHub/Slack前缀、credential引用和测试密钥；普通“secret”叙事词不会单独命中。
+- 导出在编码前扫描四个数据文件，并再次扫描最终ZIP字节；任一命中整体失败，不修改数据库或发布目标文件。
+- 共享诊断redaction函数把已知敏感材料替换为`[REDACTED]`；隐私说明同时保留对任意变形/未知秘密无法绝对识别的诚实边界。
+- 回归测试覆盖嵌套普通字段值、纯文本Provider回显、请求、响应、错误、普通叙事字段、已知测试密钥与无害叙事文本。
+
 ## 待关闭
 
-- SR2-004～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。
+- SR2-005～SR2-010：按 `docs/TASKS_V0.2.md` 的 M1 顺序执行。

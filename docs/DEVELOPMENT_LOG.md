@@ -2434,3 +2434,23 @@
 ### 结论
 
 - SR2-003 / `V02-M1-T03` 关闭。下一项严格为 `V02-M1-T04` Secret scanning。
+
+## 2026-08-08 — V02-M1-T04 完成全字符串秘密扫描
+
+### 实现
+
+- 新增共享 TypeScript 存档秘密扫描器，Rust native实现同一高置信模式；扫描敏感字段名及所有嵌套字符串值。
+- 覆盖普通文本、请求JSON、原始响应、验证错误、四个数据文件和最终ZIP字节；识别Authorization、常见Provider Key/JWT、credential引用和显式测试密钥。
+- 命中时导出/导入整体拒绝，不修改游戏状态、不发布目标文件，也不把命中原文写入错误消息。
+- 诊断文本新增显式redaction函数，以`[REDACTED]`替换已知模式；隐私文档说明高置信扫描并非任意秘密识别的数学保证。
+
+### 验证
+
+- TypeScript scanner/export tests：14/14；覆盖嵌套值、纯文本Header、请求、响应、错误、普通叙事字段、JWT、测试密钥、redaction和无害叙事。
+- Rust native archive tests：8/8；真实SQLite导出对嵌套请求值与纯文本Provider回显均拒绝。
+- `pnpm check:shared`：60 files / 349 tests 全部通过。
+- `cargo test --workspace` 全部通过，native bridge 38/38；`cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
+
+### 结论
+
+- SR2-004 / `V02-M1-T04` 关闭。下一项严格为 `V02-M1-T05` Provider consistency。

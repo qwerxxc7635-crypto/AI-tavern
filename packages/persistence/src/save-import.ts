@@ -46,6 +46,7 @@ import {
   validateJsonValueResources,
   validateRecordCount,
 } from './save-resource-limits.js';
+import { findSecretInJson, findSecretInText } from './save-secret-scanner.js';
 import type { SqliteValue, TransactionalSqliteDatabase } from './sqlite-port.js';
 import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 import { WorldRepository } from './world-repository.js';
@@ -570,6 +571,9 @@ function parseStoredRow(value: unknown, label: string): StoredRow {
         if (label === 'generation_records' && key === 'raw_response_text') {
           scanJsonTextIfPresent(entry);
         }
+        if (typeof entry === 'string' && findSecretInText(entry, `${label}.${key}`) !== null) {
+          throw new PersistenceDataError('Imported save contains forbidden secret text');
+        }
         return [key, entry];
       }),
     ),
@@ -578,6 +582,9 @@ function parseStoredRow(value: unknown, label: string): StoredRow {
 
 function scanJsonTextIfPresent(value: StoredScalar): void {
   if (typeof value !== 'string') return;
+  if (findSecretInText(value, 'generation_records.raw_response_text') !== null) {
+    throw new PersistenceDataError('Imported save contains forbidden secret text');
+  }
   const trimmed = value.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return;
   try {
@@ -609,27 +616,11 @@ function parseJson(text: string, label: string): unknown {
 }
 
 function assertNoSecretKeys(value: unknown, path: string): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoSecretKeys(entry, `${path}[${index}]`));
-    return;
-  }
-  if (value === null || typeof value !== 'object') return;
-  for (const [key, entry] of Object.entries(value)) {
-    const normalized = key.replaceAll(/[_-]/g, '').toLowerCase();
-    if (
-      normalized.includes('apikey') ||
-      normalized === 'authorization' ||
-      normalized === 'bearer' ||
-      normalized.includes('accesstoken') ||
-      normalized.includes('secretkey') ||
-      normalized.includes('credentialref') ||
-      normalized === 'cookie' ||
-      normalized === 'password' ||
-      normalized === 'token'
-    ) {
-      throw new PersistenceDataError(`Imported save contains a forbidden secret field at ${path}`);
-    }
-    assertNoSecretKeys(entry, `${path}.${key}`);
+  const detection = findSecretInJson(value, path);
+  if (detection !== null) {
+    throw new PersistenceDataError(
+      `Imported save contains forbidden secret material at ${detection.path}`,
+    );
   }
 }
 

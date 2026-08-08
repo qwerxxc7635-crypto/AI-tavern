@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
 use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
+use regex::Regex;
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{
     Connection, OptionalExtension, Transaction, TransactionBehavior, params, params_from_iter,
@@ -418,6 +420,9 @@ fn encode_zip(files: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, CampaignStor
     let mut uncompressed_total = 0_u64;
     for name in ENTRY_NAMES {
         let bytes = files.get(name).ok_or(CampaignStoreError::ArchiveInvalid)?;
+        assert_no_secret_text(
+            std::str::from_utf8(bytes).map_err(|_| CampaignStoreError::ArchiveInvalid)?,
+        )?;
         validate_archive_entry_resources(name, bytes.len() as u64, bytes.len() as u64)?;
         uncompressed_total = add_expanded_bytes(uncompressed_total, bytes.len() as u64)?;
     }
@@ -437,6 +442,7 @@ fn encode_zip(files: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, CampaignStor
     if bytes.len() as u64 > MAX_ARCHIVE_BYTES {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
+    assert_no_secret_text(&String::from_utf8_lossy(&bytes))?;
     Ok(bytes)
 }
 
@@ -750,6 +756,9 @@ fn parse_stored_row(
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        if let Some(text) = value.as_str() {
+            assert_no_secret_text(text)?;
+        }
         if is_json_column(table, column) && !value.is_null() {
             let text = value.as_str().ok_or(CampaignStoreError::ArchiveInvalid)?;
             if normalize_json_text(text, table, column)? != text {
@@ -821,6 +830,7 @@ fn validate_json_container(
 }
 
 fn scan_json_text_if_present(text: &str) -> Result<(), CampaignStoreError> {
+    assert_no_secret_text(text)?;
     let trimmed = text.trim();
     if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
         return Ok(());
@@ -861,9 +871,42 @@ fn assert_no_secret_keys(value: &Value) -> Result<(), CampaignStoreError> {
                 assert_no_secret_keys(value)?;
             }
         }
+        Value::String(text) => assert_no_secret_text(text)?,
         _ => {}
     }
     Ok(())
+}
+
+fn assert_no_secret_text(text: &str) -> Result<(), CampaignStoreError> {
+    if secret_patterns()
+        .iter()
+        .any(|pattern| pattern.is_match(text))
+    {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(())
+}
+
+fn secret_patterns() -> &'static [Regex] {
+    static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        [
+            r"(?i)\bcredential:v1:[0-9a-f]{8}-[0-9a-f-]{27,}\b",
+            r"(?i)\bsk-(?:or-v1-|ant-api\d{2}-)?[a-z0-9_-]{8,}\b",
+            r"(?i)\bAIza[0-9a-z_-]{20,}\b",
+            r"\bAKIA[0-9A-Z]{16}\b",
+            r"(?i)\bgh[pousr]_[0-9a-z]{20,}\b",
+            r"(?i)\bxox[baprs]-[0-9a-z-]{12,}\b",
+            r"(?i)\beyJ[0-9a-z_-]{8,}\.[0-9a-z_-]{8,}\.[0-9a-z_-]{8,}\b",
+            r"(?i)\b(?:authorization|proxy-authorization)\s*[:=]\s*(?:bearer|basic)\s+[0-9a-z._~+/-]{8,}={0,2}",
+            r"(?i)\bbearer\s+[0-9a-z._~+/-]{12,}={0,2}",
+            r"(?i)\b(?:api[_ -]?key|access[_ -]?token|secret[_ -]?key|password|cookie)\s*[:=]\s*[0-9a-z._~+/-]{8,}={0,2}",
+            r"\bTOP_SECRET_[0-9A-Z_]{8,}\b",
+        ]
+        .into_iter()
+        .map(|pattern| Regex::new(pattern).expect("static secret pattern"))
+        .collect()
+    })
 }
 
 fn is_json_column(table: &str, column: &str) -> bool {
@@ -1780,6 +1823,68 @@ mod tests {
         assert!(bomb.len() < 32 * 1024);
         assert!(matches!(
             parse_archive(&bomb),
+            Err(CampaignStoreError::ArchiveInvalid)
+        ));
+    }
+
+    #[test]
+    fn secret_scanner_rejects_nested_values_plain_text_and_debug_material() {
+        for secret in [
+            "provider returned sk-or-v1-1234567890abcdef",
+            "Provider echoed Authorization: Bearer abcdefghijklmnop",
+            "eyJabcdefghijk.abcdefghijkl.abcdefghijkl",
+            "TOP_SECRET_API_KEY_SHOULD_NOT_EXPORT",
+        ] {
+            assert!(assert_no_secret_text(secret).is_err());
+        }
+        assert!(
+            assert_no_secret_keys(&json!({
+                "message": {"detail": "sk-ant-api03-abcdefghijklmnop"}
+            }))
+            .is_err()
+        );
+        assert!(assert_no_secret_text("The innkeeper keeps a secret behind the hearth.").is_ok());
+
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store = CampaignStore::open(directory.path().join("secret-scan.sqlite"))
+            .expect("open database");
+        store
+            .create_at("campaign-secret-scan".to_owned(), FIRST_TIME.to_owned())
+            .expect("create campaign");
+        let connection = store.connect().expect("connect");
+        connection
+            .execute(
+                "INSERT INTO generation_records (
+                   id, campaign_id, request_id, task, model_profile_id, prompt_version,
+                   request_json, raw_response_text, validated_output_json,
+                   validation_error_json, started_at, completed_at
+                 ) VALUES (
+                   'generation-value-secret', 'campaign-secret-scan', 'request-value-secret',
+                   'GENERATE_WORLD', NULL, 1,
+                   '{\"message\":\"sk-or-v1-1234567890abcdef\"}', NULL, NULL, NULL, ?1, NULL
+                 )",
+                [FIRST_TIME],
+            )
+            .expect("seed nested secret value");
+        drop(connection);
+        assert!(matches!(
+            store.capture_archive("campaign-secret-scan", FIRST_TIME, "0.2.0"),
+            Err(CampaignStoreError::ArchiveInvalid)
+        ));
+
+        let connection = store.connect().expect("reconnect");
+        connection
+            .execute(
+                "UPDATE generation_records
+                 SET request_json = '{}',
+                     raw_response_text = 'Authorization: Bearer abcdefghijklmnop'
+                 WHERE id = 'generation-value-secret'",
+                [],
+            )
+            .expect("seed plain response secret");
+        drop(connection);
+        assert!(matches!(
+            store.capture_archive("campaign-secret-scan", FIRST_TIME, "0.2.0"),
             Err(CampaignStoreError::ArchiveInvalid)
         ));
     }

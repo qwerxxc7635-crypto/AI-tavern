@@ -788,6 +788,7 @@ name = "ember-native-bridge"
 version = "0.1.0"
 dependencies = [
  "ember-secure-http",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

@@ -131,6 +131,43 @@ describe('exportCampaignSave', () => {
     expect(native.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   });
 
+  it('rejects secret material in request, response and diagnostic values', () => {
+    for (const [column, value] of [
+      ['request_json', '{"message":"provider returned sk-or-v1-1234567890abcdef"}'],
+      ['raw_response_text', 'Provider echoed Authorization: Bearer abcdefghijklmnop'],
+      ['validation_error_json', '{"message":"API key: abcdefghijklmnop"}'],
+    ] as const) {
+      native
+        .prepare(
+          `UPDATE generation_records
+           SET request_json = '{}', raw_response_text = NULL, validation_error_json = NULL
+           WHERE id = ?`,
+        )
+        .run(generationRecordId('generation-export'));
+      native
+        .prepare(`UPDATE generation_records SET ${column} = ? WHERE id = ?`)
+        .run(value, generationRecordId('generation-export'));
+      expect(() =>
+        exportCampaignSave(database, campaignKey, {
+          createdAt: at,
+          generatorVersion: '0.1.0',
+        }),
+      ).toThrow(/secret/u);
+    }
+  });
+
+  it('rejects a known test secret in an ordinary narrative field', () => {
+    native
+      .prepare('UPDATE world_facts SET statement = ? WHERE id = ?')
+      .run('TOP_SECRET_API_KEY_SHOULD_NOT_EXPORT', worldFactId('fact-export'));
+    expect(() =>
+      exportCampaignSave(database, campaignKey, {
+        createdAt: at,
+        generatorVersion: '0.1.0',
+      }),
+    ).toThrow(/secret/u);
+  });
+
   it('rejects a missing campaign without leaving the connection in a transaction', () => {
     expect(() =>
       exportCampaignSave(database, campaignId('campaign-missing'), {

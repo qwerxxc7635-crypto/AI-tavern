@@ -248,7 +248,9 @@ Provider和模型档案是设备级配置，不属于可移植游戏事实。导
 - `save_snapshots` 及其 BLOB payload；成功导入后创建新的 `IMPORT` 快照；
 - SQLite文件、WAL/SHM、完整备份、应用日志、临时文件和缓存。
 
-写入方必须对所有待导出键名执行大小写不敏感的拒绝列表扫描，至少拒绝 `api_key`、`apiKey`、`authorization`、`cookie`、`token`、`password`、`secretKey` 和 `credential_ref`。命中时导出整体失败，不得静默删字段后生成看似完整的档案。玩家在剧情文本中自行输入的普通单词不按键名扫描；应用不能保证识别用户主动写入叙事文本的秘密。
+写入方必须扫描字段名、所有字符串字段值、嵌套JSON、`request_json`、`validation_error_json`、`raw_response_text`、四个待导出数据文件及最终ZIP字节。字段名至少拒绝 `api_key`、`apiKey`、`authorization`、`cookie`、`token`、`password`、`secretKey` 和 `credential_ref`；值扫描至少识别 Bearer/Basic Authorization、常见 `sk-` Provider Key、JWT、Google/AWS/GitHub/Slack高置信前缀、不透明credential引用和显式测试密钥。命中时导出整体失败，不得静默删字段后生成看似完整的档案。
+
+诊断展示若处理同类文本必须走共享 redaction 函数，以 `[REDACTED]` 替换命中值。高置信扫描不能识别没有结构或已被任意变形的所有秘密；玩家仍不应把凭据输入叙事字段，分享前应把存档视为私人内容。
 
 ## 11. 一致性快照
 
