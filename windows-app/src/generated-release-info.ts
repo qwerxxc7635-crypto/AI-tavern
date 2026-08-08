@@ -5,10 +5,11 @@ export const RELEASE_INFO = Object.freeze({
   channel: 'development',
   status: 'unreleased',
   changelogPath: 'CHANGELOG.md',
-  changelogHeading: '[0.2.0] - Unreleased',
+  changelogHeading: '[0.2.0] - 未发布',
   highlights: Object.freeze([
     '建立 Windows 与 macOS 双平台基线、统一 AI 编排、ContextBlock、Candidate 与 Event Ledger。',
-    '新增“我的”、五类 Connection Profile、显式 API Binding 状态机与安全凭据生命周期界面。',
+    '新增“我的”、五类连接配置、显式 API 绑定状态机与安全凭据生命周期界面。',
     '建立 DeepSeek-V4-Flash-0731 稳定前缀、确定性序列化、缓存布局与隐私受限指标。',
+    '建立 zh-CN 玩家资源层，并完成核心流程、错误恢复、API/隐私、投骰与更新记录中文化。',
   ]),
 });

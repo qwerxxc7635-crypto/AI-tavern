@@ -35,10 +35,10 @@ describe('model settings page', () => {
     };
 
     render(<ModelSettingsPage gateway={gateway} />);
-    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：编辑中');
     await screen.findByText('尚未配置模型。');
 
-    const selector = screen.getByLabelText('Connection Profile') as HTMLSelectElement;
+    const selector = screen.getByLabelText('连接配置') as HTMLSelectElement;
     expect(Array.from(selector.options).map((option) => option.text)).toEqual([
       'DeepSeek',
       'Qwen',
@@ -161,7 +161,7 @@ describe('model settings page', () => {
     };
     render(<ModelSettingsPage gateway={gateway} />);
     expect(screen.getByRole('heading', { name: '隐私与联网' })).toBeTruthy();
-    expect(screen.getByText(/保存默认或备用模型不会发送Campaign内容/)).toBeTruthy();
+    expect(screen.getByText(/保存默认或备用模型不会发送游戏存档内容/)).toBeTruthy();
     expect(screen.getByText(/“测试连接”会向所选Base URL发送API Key/)).toBeTruthy();
     expect(screen.getByText(/发送必要游戏上下文前必须另行确认/)).toBeTruthy();
     await screen.findByText('尚未配置模型。');
@@ -169,7 +169,7 @@ describe('model settings page', () => {
     fireEvent.click(screen.getByLabelText('备用模型'));
     fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
     expect(await screen.findByText('连接成功，发现 1 个模型。')).toBeTruthy();
-    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：choosing_model');
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：选择模型');
     expect(deleted).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
@@ -181,7 +181,7 @@ describe('model settings page', () => {
     expect(JSON.stringify(saved[0])).not.toContain('private-key');
     expect(screen.getByText('默认')).toBeTruthy();
     expect(screen.getByText('备用')).toBeTruthy();
-    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：saved');
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：已保存');
     await waitFor(() =>
       expect((screen.getByLabelText(/API Key/) as HTMLInputElement).value).toBe(''),
     );
@@ -196,7 +196,7 @@ describe('model settings page', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
     await waitFor(() =>
-      expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：choosing_model'),
+      expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：选择模型'),
     );
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
     await waitFor(() => expect(saved).toHaveLength(3));
@@ -247,10 +247,10 @@ describe('model settings page', () => {
     render(<ModelSettingsPage gateway={gateway} />);
     await screen.findByText('尚未配置模型。');
     fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
-    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：testing');
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：测试连接中');
     fireEvent.click(screen.getByRole('button', { name: '取消测试' }));
     expect(await screen.findByText('已取消等待连接测试；迟到的结果不会用于保存。')).toBeTruthy();
-    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：编辑中');
 
     resolveProbe({
       receiptId: '00000000-0000-4000-8000-000000000002',
@@ -260,7 +260,7 @@ describe('model settings page', () => {
     });
     await Promise.resolve();
     expect(screen.queryByText('连接成功，发现 0 个模型。')).toBeNull();
-    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
+    expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：编辑中');
   });
 
   it('clears a draft key and retries pending credential cleanup without exposing references', async () => {

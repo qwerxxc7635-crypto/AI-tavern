@@ -17,6 +17,7 @@ import {
   type PresetKey,
   type ProbeModel,
 } from './model-settings-service.js';
+import { playerText } from './localization/index.js';
 
 const DEFAULT_PROFILE = getConnectionProfile('deepseek');
 
@@ -273,13 +274,13 @@ export function ModelSettingsPage({
   return (
     <main className="model-settings">
       <header>
-        <p className="eyebrow">Model workshop</p>
+        <p className="eyebrow">{playerText.coreUi.modelWorkshop}</p>
         <h1>设置</h1>
         <p>配置模型服务、默认模型与备用模型。API Key只保存到系统凭据库。</p>
       </header>
       <section className="model-settings__privacy" aria-label="隐私与联网说明">
         <h2>隐私与联网</h2>
-        <p>当前0.1候选的游戏内容由本地演示模型生成；保存默认或备用模型不会发送Campaign内容。</p>
+        <p>{playerText.coreUi.modelPrivacySummary}</p>
         <p>
           “测试连接”会向所选Base URL发送API
           Key（若填写）并读取模型列表；自定义地址就是本次连接的数据接收方。远程地址只允许HTTPS，本机回环服务可使用HTTP。
@@ -289,9 +290,11 @@ export function ModelSettingsPage({
         </p>
       </section>
       <section className="model-settings__panel" aria-label="模型配置">
-        <p data-testid="api-binding-phase">连接状态：{binding.phase}</p>
+        <p data-testid="api-binding-phase">
+          连接状态：{playerText.coreUi.apiBindingPhase(binding.phase)}
+        </p>
         <label>
-          Connection Profile
+          {playerText.coreUi.connectionProfileLabel}
           <select
             value={presetKey}
             disabled={binding.phase === 'saving'}

@@ -3,6 +3,8 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { format, resolveConfig } from 'prettier';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packagePaths = [
   'package.json',
@@ -42,7 +44,7 @@ export function expectedReleaseInfo(version, highlights = []) {
     channel: 'development',
     status: 'unreleased',
     changelogPath: 'CHANGELOG.md',
-    changelogHeading: `[${version}] - Unreleased`,
+    changelogHeading: `[${version}] - 未发布`,
     highlights,
   };
 }
@@ -75,8 +77,8 @@ export function releaseStateErrors(state) {
   if (state.generatedReleaseInfo !== renderGeneratedReleaseInfo(expected)) {
     errors.push('generated release info is not synchronized');
   }
-  if (!state.changelog.includes(`## [${version}] - Unreleased`)) {
-    errors.push(`CHANGELOG.md has no current ${version} Unreleased heading`);
+  if (!state.changelog.includes(`## [${version}] - 未发布`)) {
+    errors.push(`CHANGELOG.md has no current ${version} 未发布 heading`);
   }
   return errors;
 }
@@ -115,10 +117,10 @@ export async function syncReleaseVersion() {
 
   const changelog = await readText('CHANGELOG.md');
   const synchronizedChangelog = changelog.replace(
-    /(<!-- current-release:start -->\s*\n)## \[[^\]]+\] - Unreleased/u,
-    `$1## [${version}] - Unreleased`,
+    /(<!-- current-release:start -->\s*\n)## \[[^\]]+\] - 未发布/u,
+    `$1## [${version}] - 未发布`,
   );
-  if (synchronizedChangelog === changelog && !changelog.includes(`## [${version}] - Unreleased`)) {
+  if (synchronizedChangelog === changelog && !changelog.includes(`## [${version}] - 未发布`)) {
     throw new Error('CHANGELOG.md current release marker is missing');
   }
   await writeText('CHANGELOG.md', synchronizedChangelog);
@@ -172,7 +174,7 @@ async function readReleaseState() {
 
 export function currentReleaseHighlights(changelog, version) {
   requireVersion(version);
-  const heading = `## [${version}] - Unreleased`;
+  const heading = `## [${version}] - 未发布`;
   const start = changelog.indexOf(heading);
   if (start < 0) return [];
   const afterHeading = changelog.slice(start + heading.length);
@@ -202,7 +204,10 @@ async function readJson(path) {
 }
 
 async function writeJson(path, value) {
-  await writeText(path, `${JSON.stringify(value, null, 2)}\n`);
+  const serialized = `${JSON.stringify(value, null, 2)}\n`;
+  const filepath = resolve(root, path);
+  const config = (await resolveConfig(filepath)) ?? {};
+  await writeText(path, await format(serialized, { ...config, filepath, parser: 'json' }));
 }
 
 async function readText(path) {

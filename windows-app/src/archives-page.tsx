@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { playerText } from './localization/index.js';
 import {
   windowsSettlementService,
   type AdventureArchive,
@@ -51,7 +52,7 @@ export function ArchivesPage({
   return (
     <main className="archive-page">
       <header>
-        <p className="eyebrow">Story archive</p>
+        <p className="eyebrow">{playerText.coreUi.storyArchive}</p>
         <h1>冒险档案</h1>
         <p>全部内容来自已提交的 SQLite 事实。</p>
       </header>

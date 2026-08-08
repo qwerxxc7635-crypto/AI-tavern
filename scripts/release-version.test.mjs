@@ -17,12 +17,12 @@ test('builds deterministic unreleased metadata from the authority version', () =
     channel: 'development',
     status: 'unreleased',
     changelogPath: 'CHANGELOG.md',
-    changelogHeading: '[0.2.0] - Unreleased',
+    changelogHeading: '[0.2.0] - 未发布',
     highlights,
   });
   assert.deepEqual(
-    currentReleaseHighlights('## [0.2.0] - Unreleased\n\n- First change\n\n## [0.1.0]\n', '0.2.0'),
-    highlights,
+    currentReleaseHighlights('## [0.2.0] - 未发布\n\n- 第一项变化\n\n## [0.1.0]\n', '0.2.0'),
+    ['第一项变化'],
   );
   assert.match(renderGeneratedReleaseInfo(info), /First change/);
 });

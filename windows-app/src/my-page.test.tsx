@@ -34,9 +34,9 @@ describe('My page information architecture', () => {
       '/settings',
     );
     expect(await screen.findByText('当前版本：0.2.0')).toBeTruthy();
-    expect(screen.getByText('发布状态：development / unreleased')).toBeTruthy();
+    expect(screen.getByText('发布状态：开发频道 / 未发布')).toBeTruthy();
     expect(
       screen.getByRole('list', { name: '当前版本更新记录' }).querySelectorAll('li'),
-    ).toHaveLength(3);
+    ).toHaveLength(4);
   });
 });

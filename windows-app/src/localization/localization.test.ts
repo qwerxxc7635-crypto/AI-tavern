@@ -9,6 +9,8 @@ describe('zh-CN player resource layer', () => {
     expect(ACTIVE_LOCALE).toBe('zh-CN');
     expect(playerText.navigation.tavern).toBe('酒馆');
     expect(playerText.titlebar.campaign('12345678')).toBe('存档 12345678');
+    expect(playerText.coreUi.releaseState('development', 'unreleased')).toBe('开发频道 / 未发布');
+    expect(playerText.coreUi.releaseState('preview', 'published')).toBe('未知频道 / 未知状态');
     expect(collectStaticMessages(playerText).every((message) => message.trim().length > 0)).toBe(
       true,
     );

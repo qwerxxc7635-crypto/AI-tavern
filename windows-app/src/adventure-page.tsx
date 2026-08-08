@@ -8,6 +8,7 @@ import {
 } from './adventure-service.js';
 import { windowsSettlementService, type WindowsSettlementService } from './settlement-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { playerText } from './localization/index.js';
 
 type AdventureActions = Pick<
   WindowsAdventureService,
@@ -84,7 +85,7 @@ export function AdventurePage({
   if (snapshot === null) {
     return loadError === null ? (
       <main className="adventure-page adventure-page--loading" aria-busy="true">
-        <p className="eyebrow">Preparing the road</p>
+        <p className="eyebrow">{playerText.coreUi.preparingRoad}</p>
         <h1>正在整理冒险记录…</h1>
       </main>
     ) : (
@@ -98,7 +99,7 @@ export function AdventurePage({
   if (snapshot.state === 'PREPARING') {
     return (
       <main className="adventure-page adventure-preparation">
-        <p className="eyebrow">Adventure ready</p>
+        <p className="eyebrow">{playerText.coreUi.adventureReady}</p>
         <h1>{snapshot.quest.content.title}</h1>
         <p>{snapshot.quest.content.summary}</p>
         <dl>
@@ -141,7 +142,7 @@ export function AdventurePage({
     <main className="adventure-page">
       <header className="adventure-header">
         <div>
-          <p className="eyebrow">Turn {snapshot.currentTurnNumber} · Local chronicle</p>
+          <p className="eyebrow">{playerText.coreUi.adventureTurn(snapshot.currentTurnNumber)}</p>
           <h1>{snapshot.quest.content.title}</h1>
         </div>
         <span className={`adventure-state adventure-state--${snapshot.state.toLowerCase()}`}>
@@ -152,7 +153,7 @@ export function AdventurePage({
       <div className="adventure-columns">
         <aside className="adventure-column adventure-character" aria-label="角色与目标">
           <section>
-            <p className="eyebrow">Character</p>
+            <p className="eyebrow">{playerText.coreUi.character}</p>
             <h2>{snapshot.player.name}</h2>
             <p>{snapshot.player.classDisplayName}</p>
             <div className="attribute-grid">
@@ -165,12 +166,12 @@ export function AdventurePage({
             </div>
           </section>
           <section>
-            <p className="eyebrow">Objective</p>
+            <p className="eyebrow">{playerText.coreUi.objective}</p>
             <h3>{snapshot.quest.content.objective}</h3>
             <p>{snapshot.player.personalGoal}</p>
           </section>
           <section>
-            <p className="eyebrow">World clocks</p>
+            <p className="eyebrow">{playerText.coreUi.worldClocks}</p>
             {snapshot.clocks.length === 0 ? (
               <p className="adventure-muted">暂无推进中的时钟</p>
             ) : (
@@ -208,7 +209,7 @@ export function AdventurePage({
 
           {snapshot.state === 'ENDING' ? (
             <div className="adventure-ending">
-              <p className="eyebrow">Adventure ending</p>
+              <p className="eyebrow">{playerText.coreUi.adventureEnding}</p>
               <h2>冒险已抵达结局</h2>
               <p>本轮记录已保存。结算将原子更新任务、人物、奖励与世界状态。</p>
               <button
@@ -286,7 +287,7 @@ export function AdventurePage({
 
         <aside className="adventure-column adventure-ledger" aria-label="物品线索与骰子">
           <section>
-            <p className="eyebrow">Items</p>
+            <p className="eyebrow">{playerText.coreUi.items}</p>
             {snapshot.items.length === 0 ? (
               <p className="adventure-muted">行囊为空</p>
             ) : (
@@ -299,7 +300,7 @@ export function AdventurePage({
             )}
           </section>
           <section>
-            <p className="eyebrow">Clues</p>
+            <p className="eyebrow">{playerText.coreUi.clues}</p>
             {snapshot.clues.filter(({ discoveredInTurnId }) => discoveredInTurnId !== null)
               .length === 0 ? (
               <p className="adventure-muted">尚未发现线索</p>
@@ -315,7 +316,7 @@ export function AdventurePage({
             )}
           </section>
           <section className="dice-ledger">
-            <p className="eyebrow">Last roll</p>
+            <p className="eyebrow">{playerText.coreUi.lastRoll}</p>
             {dice === null ? (
               <p className="adventure-muted">等待检定</p>
             ) : (
@@ -354,7 +355,7 @@ function stateLabel(state: Exclude<AdventureSnapshot['state'], null>): string {
 function AdventureMessage({ title, detail }: { readonly title: string; readonly detail?: string }) {
   return (
     <main className="adventure-page adventure-preparation">
-      <p className="eyebrow">Adventure unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.adventureUnavailable}</p>
       <h1>{title}</h1>
       {detail === undefined ? null : <p>{detail}</p>}
       <Link className="text-link" to="/quests">

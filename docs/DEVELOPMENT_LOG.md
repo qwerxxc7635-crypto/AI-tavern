@@ -2899,3 +2899,23 @@
 ### 结论
 
 - `V02-M5-T03`完成。下一项严格为`V02-M5-T04` Core UI Localization。
+
+## 2026-08-08 — V02-M5-T04 完成核心 UI 中文覆盖
+
+### 实现
+
+- 存档、世界构筑、车卡、酒馆、NPC对话、任务告示、冒险/D20、档案、恢复、模型设置与“我的”全部核心流程清除英文页面眉题并接入zh-CN资源。
+- API Binding的editing/testing/choosing_model/saving/saved/failed转为中文展示；连接配置表单不再显示`Connection Profile`，发布channel/status也不再直接显示`development / unreleased`，未知值使用中文保守状态。
+- 更新日志标题、当前版本“未发布”状态及连接配置/API绑定摘要改为中文；release sync/check同步适配中文标题，机器协议中的`unreleased`保持不变。
+- 修正模型隐私说明仍引用0.1候选及`Campaign`的过期文本；明确保留Provider/模型名、model ID、API字段、URL、代码标识与玩家/AI专名。
+- 发布同步JSON改用仓库Prettier配置确定性写入，修复`release:sync`后Tauri配置立刻产生格式漂移的问题；记录`DEC-074`。
+
+### 验证
+
+- 13个核心页面/资源测试文件共35项定向测试通过，覆盖导航、存档、世界、车卡、酒馆、NPC、任务、冒险、档案、恢复、模型与更新记录。
+- 中文Changelog同步后`release:sync`、只读`release:check`、发布脚本4项测试及仓库级`format:check`通过；同步本身不再制造格式差异。
+- `pnpm typecheck`、`pnpm lint`与`git diff --check`通过；未访问真实Provider、正式用户数据或iOS代码。
+
+### 结论
+
+- `V02-M5-T04`完成。下一项严格为`V02-M5-T05` English Regression Gate。

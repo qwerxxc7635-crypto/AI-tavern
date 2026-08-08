@@ -7,6 +7,7 @@ import {
   type CampaignSummary,
 } from './campaign-gateway.js';
 import { tauriSaveTransferGateway, type SaveTransferGateway } from './save-transfer-gateway.js';
+import { playerText } from './localization/index.js';
 
 const STATE_LABELS: Readonly<Record<CampaignSummary['state'], string>> = {
   CREATING_WORLD: '构筑世界',
@@ -222,7 +223,7 @@ export function SaveHomePage({
           <span />
         </div>
         <div>
-          <p className="eyebrow">Local chronicles</p>
+          <p className="eyebrow">{playerText.coreUi.localChronicles}</p>
           <h1>选择一段旅程</h1>
           <p>每一页都保存在这台设备的 SQLite 存档中。</p>
         </div>
@@ -255,7 +256,7 @@ export function SaveHomePage({
 
       <section className="save-transfer" aria-label="存档导入与导出">
         <div>
-          <p className="eyebrow">Portable archive</p>
+          <p className="eyebrow">{playerText.coreUi.portableArchive}</p>
           <h2>迁移你的旅程</h2>
           <p>选择或拖入一个 .emtavern 文件。设备模型与 API Key 不会随存档迁移。</p>
         </div>
@@ -278,7 +279,7 @@ export function SaveHomePage({
 
       {campaigns?.length === 0 ? (
         <section className="save-home__empty">
-          <p className="eyebrow">No chronicles yet</p>
+          <p className="eyebrow">{playerText.coreUi.noChroniclesYet}</p>
           <h2>炉边还没有你的故事。</h2>
           <p>新建存档后，世界构筑会从这里开始。归档内容仍保留在本地数据库中。</p>
         </section>

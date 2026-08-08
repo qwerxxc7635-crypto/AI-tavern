@@ -10,6 +10,7 @@ import {
   type WindowsCharacterCreationService,
 } from './character-creation-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { playerText } from './localization/index.js';
 
 type CharacterCreationActions = Pick<
   WindowsCharacterCreationService,
@@ -131,7 +132,7 @@ export function CharacterCreationPage({
     return loadError === null ? (
       <main className="character-studio character-studio--message" aria-busy="true">
         <span className="loading-glyph" aria-hidden="true" />
-        <p className="eyebrow">Reading the character sheet</p>
+        <p className="eyebrow">{playerText.coreUi.readingCharacterSheet}</p>
         <h1>正在铺开车卡…</h1>
       </main>
     ) : (
@@ -144,7 +145,7 @@ export function CharacterCreationPage({
       <main className="character-studio">
         <CharacterTopline step="03 · 背景与装备" />
         <section className="character-intro">
-          <p className="eyebrow">Character ready</p>
+          <p className="eyebrow">{playerText.coreUi.characterReady}</p>
           <h1>{character.name}</h1>
           <p>
             {character.classDisplayName} · {character.concept}
@@ -152,7 +153,7 @@ export function CharacterCreationPage({
         </section>
         <div className="character-review">
           <section>
-            <p className="eyebrow">Background</p>
+            <p className="eyebrow">{playerText.coreUi.background}</p>
             <h2>人物背景</h2>
             <Description label="出生地" value={character.background.birthplace} />
             <Description label="成长经历" value={character.background.formativeExperience} />
@@ -162,7 +163,7 @@ export function CharacterCreationPage({
             <Description label="来到酒馆" value={character.background.tavernArrivalReason} />
           </section>
           <section>
-            <p className="eyebrow">Starting kit</p>
+            <p className="eyebrow">{playerText.coreUi.startingKit}</p>
             <h2>初始装备</h2>
             <ul className="equipment-list">
               {character.initialEquipment.map((item) => (
@@ -193,7 +194,7 @@ export function CharacterCreationPage({
       <main className="character-studio">
         <CharacterTopline step="02 · 选择特质" />
         <section className="character-intro">
-          <p className="eyebrow">Choose two traits</p>
+          <p className="eyebrow">{playerText.coreUi.chooseTwoTraits}</p>
           <h1>决定角色如何面对世界。</h1>
           <p>从经过验证的六个候选特质中选择两个。重新打开应用后，本地进度仍会保留。</p>
         </section>
@@ -245,7 +246,7 @@ export function CharacterCreationPage({
     <main className="character-studio">
       <CharacterTopline step="01 · 基础车卡" />
       <section className="character-intro">
-        <p className="eyebrow">Build your traveler</p>
+        <p className="eyebrow">{playerText.coreUi.buildTraveler}</p>
         <h1>谁会推开酒馆的门？</h1>
         <p>基础事实由你决定；Fake Provider 只负责生成候选特质与背景文本。</p>
       </section>
@@ -465,7 +466,7 @@ function CharacterTopline({ step }: { readonly step: string }) {
 function CharacterMessage({ title }: { readonly title: string }) {
   return (
     <main className="character-studio character-studio--message" role="alert">
-      <p className="eyebrow">Character stage unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.characterStageUnavailable}</p>
       <h1>{title}</h1>
       <Link className="text-link" to="/saves">
         返回存档首页

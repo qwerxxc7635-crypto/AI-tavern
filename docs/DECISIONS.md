@@ -1620,3 +1620,19 @@ T03先迁移所有跨流程入口：品牌/导航、标题栏、加载/未知路
 ### 影响与边界
 
 本任务不引入第三方i18n运行时、locale自动侦测或用户切换，也不创建未要求的英文资源。内部协议枚举、Provider/模型产品名和开发诊断不属于玩家句式，但一旦进入UI仍须由zh-CN资源提供展示文本。iOS保持DEFERRED。
+
+## DEC-074：核心UI中文化但保留明确技术专名
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T04`、全中文化允许项
+
+### 决定与理由
+
+核心Windows流程的页面眉题、按钮、表单、空/错/确认/恢复状态、D20、API/隐私说明、Changelog与accessibility label均以中文呈现。`editing/testing/choosing_model/saving/saved/failed`和`development/unreleased`等机器值必须经zh-CN资源映射，未知值显示中文未知状态，不把原值回落给玩家。
+
+允许保留的英文只限Provider/模型名称、model ID、API字段、URL、代码标识及玩家/AI专有名词，例如DeepSeek、OpenRouter、API Key、Base URL、SQLite、D20和NPC；Connection Profile、Campaign、页面eyebrow和发布状态不属于允许直接展示的机器词，分别改为连接配置、游戏存档和中文状态。
+
+### 影响与边界
+
+资源层继续是新玩家文案的入口；T04清除现有核心流程的可见英文并补齐Changelog中文标题，但不引入第二locale或iOS实现。T05必须建立自动化英文回归门禁，区分允许的技术专名与意外新增的玩家句式，不能只依赖本次人工扫描。
