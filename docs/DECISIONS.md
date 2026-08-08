@@ -1252,3 +1252,51 @@ Tauri只暴露按Campaign ID调用的命令；React负责显示待取消数量�
 ### 可逆性
 
 未来如需支持显式企业内网 Provider，必须新增独立、可见、可测试的用户授权策略，不能放宽默认公网策略。新增 Tauri 能力或资源来源必须由具体功能和配置回归测试证明必要性，不得恢复宽泛默认集合。
+
+## DEC-051：v0.2 AI 生成统一经过任务编排器和候选边界
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.2 总执行提示词、竞品研究与 `docs/architecture/AI_PIPELINE.md`
+
+### 决定与理由
+
+所有 AI 功能统一走 UI → Application → AI Task Orchestrator → Context/Router/Provider/Schema/Domain → Candidate/Narrative。UI 不得构造或调用 Provider；模型响应先形成可验证候选，只有接受命令能在 revision-guarded SQLite 事务中修改状态。D20、数值、合法性、知识可见性和事务继续是本地 hard logic。
+
+这使 prompt preview、重试、错误分类、provider 路由和审计共享同一条实际执行路径，并阻止新功能继续复制 Windows 前端中的 provider 调用。
+
+### 影响与边界
+
+M2 必须先建立任务注册表、orchestrator 和 candidate infrastructure，M3～M8 才能接入。v0.2 不引入完整 Event Sourcing、自治 agent 或 UI provider SDK。
+
+## DEC-052：ContextBlock、轻量 Event Ledger 与四层知识模型共同构成连续性边界
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：RePoG 因果/知识/恢复研究、TavernAI prompt 可解释性、SillyTavern context 预算研究
+
+### 决定与理由
+
+所有 AI 上下文使用带来源、revision、稳定性、预算、隐私与 hash 的 ContextBlock；稳定、半稳定和动态块分别序列化，preview 与实际发送共享 manifest。SQLite 聚合仍保存当前状态，最小 Event Ledger 只承担幂等、revision、审计和连续性，不成为完整事件溯源系统。
+
+WorldTruth、Claim、Knowledge 与 Memory 正式分离。SceneFrame 持久化地点、参与者、压力、可行动作、未决后果和恢复点。Memory 或模型摘要不能反向创建 Truth。
+
+### 影响与边界
+
+Context Inspector 默认遮罩 secret、完整系统 prompt 和未公开世界真相。完整 World Voices、Session 0 和聊天分支树延期。
+
+## DEC-053：双平台通过 ports/adapters 达成，Windows 发布优先且 macOS 是强制开发门禁
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`docs/architecture/V0_2_TARGET_ARCHITECTURE.md` 与 v0.2 Architecture Gate
+
+### 决定与理由
+
+SecureVault、PlatformPaths、FileDialog、AppInstanceLock、AppLifecycle 与 ReleaseMetadata 定义为共享 ports，Windows 和 macOS 以 adapters 实现。业务层不得硬编码 `%APPDATA%`、Keychain、Credential Manager 或平台路径。测试可注入隔离根目录。
+
+Windows 仍是 v0.2.0 正式候选平台；macOS 必须能构建、启动和完成核心开发验收，但本轮不承诺签名发行。iOS 继续延期。
+
+### 影响与边界
+
+Architecture Gate 后先完成 M0 路径和脚本治理，再关闭 M1 安全问题。任何散落平台条件或平台 API 进入 domain/application 都视为 Gate 回归。

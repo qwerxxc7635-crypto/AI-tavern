@@ -1,0 +1,82 @@
+# Ember Tavern v0.2 目标架构
+
+状态：Architecture Gate 基线。若本文与实现冲突，实现必须整改；若与总执行提示词冲突，以总执行提示词为准。
+
+## 不变量
+
+1. SQLite 是游戏状态唯一真实数据源。
+2. UI 不导入、构造或调用 Provider；UI 只能发送 application command、订阅状态并展示候选。
+3. AI 只能生成结构化建议或叙事候选；通过 schema 与 domain policy 前不得写入状态。
+4. 骰点、数值、合法性、权限、事务、知识可见性和秘密处理均为本地 hard logic。
+5. Domain 不依赖 Tauri、Windows、macOS、HTTP、系统钥匙串或文件对话框。
+6. 平台能力只能经 ports & adapters 进入；不得用散落的 `cfg`/路径条件污染业务层。
+7. 每次 provider 调用都使用 frozen `ResolvedModelConfig`，不能在请求期间读取可变 UI 设置。
+8. WorldTruth、Claim、Knowledge、Memory 不可互相冒充。
+9. 新增能力围绕 Windows 优先纵向切片和 macOS 开发门禁，不启动 iOS。
+
+## 分层与依赖方向
+
+```text
+UI
+  -> Application command/query
+    -> AI Task Orchestrator
+      -> Context Assembler
+      -> Model Router
+      -> Provider Port
+      -> Output Schema Validator
+      -> Domain Policy
+      -> Candidate Store / Narrative Projection
+    -> Domain Transaction
+      -> Repository Ports
+        -> SQLite / platform adapters
+```
+
+依赖只向内。Provider adapter、SQLite adapter、Windows/macOS adapter 可以依赖 ports；ports 不依赖 adapters。
+
+## AI 任务合同
+
+每种任务在注册表中声明：`task_type`、输入 schema、需要的 ContextBlock 类型、预算、router policy、输出 schema、domain validator、candidate policy、failure policy。UI 不能动态拼出隐式任务。
+
+Orchestrator 产生 `AiOperation`：
+
+- `operation_id`：全链路幂等键；
+- `task_type`、`aggregate_id`、`expected_revision`；
+- `context_manifest_hash`；
+- `resolved_model_fingerprint`；
+- `state` 与稳定错误分类；
+- provider attempt/repair attempt 审计引用。
+
+## ContextBlock
+
+统一字段：`id`、`type`、`content`、`source_id`、`source_revision`、`stability`、`priority`、`token_budget`、`privacy_class`、`version`、`content_hash`。
+
+- `stable`：规则、schema、固定角色定义；允许跨请求缓存。
+- `semi_stable`：世界/lore/角色状态；revision 改变即失效。
+- `dynamic`：当前场景、输入、骰点和未决后果；不进入 stable cache。
+
+序列化必须稳定：固定块顺序、对象键顺序、换行与 Unicode 归一化。相同输入必须得到相同 manifest/hash。
+
+## Provider 三层
+
+- `ConnectionProfile`：用户可编辑的持久设置；密钥只保存 vault reference。
+- `ResolvedModelConfig`：请求开始前解析和冻结的模型、端点、能力、超时、采样、cache profile 与 credential reference，并计算 fingerprint。
+- `ProviderRequest`：adapter 所需最小 HTTP 投影；只能在安全原生边界解析 secret，且不得落日志/存档。
+
+## 候选和事务
+
+生成结果先进入 `AICandidate`：`candidate_id`、`operation_id`、`task_type`、结构化 payload、validation evidence、provenance、status、created_at。状态仅可 `proposed -> accepted|rejected|superseded`。接受时以 `expected_revision` 在单一 SQLite 写事务内重新执行 domain policy、写事实和 ledger；失败不产生部分状态。
+
+## Ports & Adapters
+
+必须存在并具备契约测试：
+
+- `SecureVault`：put/get/delete、pending cleanup、health；Windows Credential Manager 与 macOS Keychain adapters。
+- `PlatformPaths`：data/cache/log/temp 路径；测试可注入隔离根目录。
+- `FileDialog`：只返回用户明确选择的路径。
+- `AppInstanceLock`：破坏性操作持有跨进程锁。
+- `AppLifecycle`：启动恢复、关闭清理与取消。
+- `ReleaseMetadata`：统一版本、channel、commit、build time。
+
+## 明确不做
+
+不做完整事件溯源、插件市场、MultiChat、World Voices、AI Companion、iOS、真实付费 API 或正式用户数据迁移。

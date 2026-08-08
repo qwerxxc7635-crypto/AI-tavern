@@ -2295,6 +2295,7 @@
 
 - M10-T06 Windows范围验收通过，完整证据见`docs/WINDOWS_ACCEPTANCE_0.1.md`。Windows 0.1内部候选已完成；未签名仍是外部发布限制，不影响内部候选结论。
 - M9与M10-T04继续`DEFERRED`；未自动开始iOS工作。
+
 ## 2026-08-02 — Windows v0.1 第一轮独立发布审查
 
 ### 独立发现与修复
@@ -2313,3 +2314,40 @@
 
 - 真实 Edge/Playwright 复核 860×600、1180×760、1366×768 与 1920×1080，并检查设置、导入导出和恢复中心；未发现横向溢出或新增阻断性 UI 问题。
 - 完整门禁结果、正式产物哈希、签名状态、剩余风险与移交包位置在最终审查报告中记录。
+
+## 2026-08-08 — v0.2 M0 仓库与双平台基线
+
+### 完成
+
+- 自动确认仓库、`main`、起始 HEAD `2010448f3be953bb2ebb2c1dcf7ef23a8697e022` 与 `origin/main` 对齐。
+- 保护既有 `.gitignore` 修改；在 `.local/recovery/20260808_122928/` 保存 HEAD、status、tracked/staged diff、untracked 和元数据，不执行 destructive git。
+- 记录 macOS/Xcode、Node/pnpm、Rust、当前 Windows-only CI、Windows Tauri 入口和缺失 macOS adapters，形成 `docs/V0_2_BASELINE.md`。
+
+### 边界
+
+- 本项完成 `V02-M0-T01`。Architecture Gate 前没有修改生产代码；`V02-M0-T02/T03` 在 Gate 后实施。
+
+## 2026-08-08 — v0.2 M0.5 竞品研究与 Gap Analysis
+
+### 完成
+
+- 自行把 RePoG、TavernAI、SillyTavern clone 到 `.local/research/third_party` 并固定 branch/SHA/license/source availability。
+- 逐项分析因果 GM、玩家作者权、知识边界、冷热记忆、Prompt Manager、connection profile、world info、persona、context 预算、本地化和扩展边界。
+- 明确 TavernAI 固定仓库为 `SOURCE_NOT_PUBLIC_IN_THIS_REPO`，SillyTavern 只做 clean-room 行为研究，不复制 AGPL 源码。
+- 生成 baseline、三份分析、横向矩阵、Gap、Borrow Plan 与 Rejected Ideas；将 MUST/SHOULD/LATER/REJECT 映射到 `docs/TASKS_V0.2.md`。
+
+### 结论
+
+- `V02-COMP-T01`～`V02-COMP-T07` 完成。默认拒绝插件市场、完整 MultiChat/World Voices、AI Companion、浏览器服务替换桌面边界和非 SQLite 真实数据源。
+
+## 2026-08-08 — v0.2 M0.6 Architecture Gate
+
+### 完成
+
+- 定义单一 AI pipeline、ContextBlock、三层 provider 配置、Candidate Pattern、最小 Event Ledger、四层知识模型、SceneFrame 和六个平台 ports。
+- Architecture Gate 逐项证明 UI 无 provider 直连、domain 无平台依赖、AI 不直接写状态、context 统一、hard logic 本地、config frozen、knowledge/truth 分离且范围未膨胀。
+- Gate 结论为 `PASS FOR IMPLEMENTATION`；实现违反不变量时自动失效。
+
+### 下一项
+
+- 严格执行 `V02-M0-T02`，随后 `V02-M0-T03`；完成后进入 `V02-M1-T01`。不启动 iOS，不访问真实付费 API 或正式用户数据。
