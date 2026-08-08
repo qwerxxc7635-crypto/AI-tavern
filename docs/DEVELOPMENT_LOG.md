@@ -2705,3 +2705,23 @@
 ### 结论
 
 - `V02-M3-T04`完成。下一项严格为`V02-M3-T05` Credential UI。
+
+## 2026-08-08 — V02-M3-T05 完成 Credential UI
+
+### 实现
+
+- API Key输入根据当前匹配档案明确显示新建或替换语义；留空保留已有reference，输入新Key经连接测试后使用既有原子REPLACE流程，保存完成立即清空且永不回显。
+- 新增“清空未保存的 Key”，只清除React草稿并使旧探测证据失效；已保存档案提供带确认的“删除已保存凭据”，配置和模型继续保留。
+- 已保存档案显示三类保守健康信息：Ollama无需Key、远端档案已保存reference但需连接测试确认当前可用性、或未保存；最近探测时间仅取已持久化capability checkedAt，不宣称实时有效。
+- 全局显示credential cleanup queue健康；有待处理项时明确旧引用已停用并可调用设置读取路径重试安全库清理，仍失败则保留数量供后续启动重试。
+- 复用M1已验收的系统安全凭据、opaque reference、事务后清理队列和持久重试，没有把秘密、reference值或真实Key加入页面、SQLite游戏事实或日志。
+
+### 验证
+
+- 页面4项测试覆盖新Key保存、留空KEEP、Key替换REPLACE、草稿clear、带确认remove、cleanup pending/重试恢复、健康文案及DOM不含草稿Key。
+- 定向测试、`pnpm typecheck`、`pnpm lint`及diff检查通过。
+- 未调用真实Provider、付费API或正式用户数据；未提前实现M4 DeepSeek缓存功能。
+
+### 结论
+
+- `V02-M3-T05`完成，M3 Settings & Profile UX实现任务结束。下一项严格为`V02-M4-T01` DeepSeek Profile。

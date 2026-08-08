@@ -76,6 +76,14 @@ export function ModelSettingsPage({
   }
 
   const selectedProfile = getConnectionProfile(presetKey);
+  const hasMatchingStoredCredential =
+    snapshot?.profiles.some(
+      (profile) =>
+        profile.presetKey === presetKey &&
+        profile.providerDisplayName === displayName.trim() &&
+        profile.baseUrl === baseUrl.trim() &&
+        profile.hasCredential,
+    ) ?? false;
 
   function configurationChanged() {
     activeOperation.current = null;
@@ -165,18 +173,11 @@ export function ModelSettingsPage({
       setStatus('请填写服务名称、Base URL和模型名。');
       return;
     }
-    const canKeepStoredCredential = snapshot?.profiles.some(
-      (profile) =>
-        profile.presetKey === presetKey &&
-        profile.providerDisplayName === displayName.trim() &&
-        profile.baseUrl === baseUrl.trim() &&
-        profile.hasCredential,
-    );
     if (
       presetKey !== 'ollama' &&
       presetKey !== 'custom' &&
       apiKey.length === 0 &&
-      !canKeepStoredCredential
+      !hasMatchingStoredCredential
     ) {
       setStatus('云模型需要API Key；密钥只会保存到系统凭据库。');
       return;
@@ -254,6 +255,24 @@ export function ModelSettingsPage({
     }
   }
 
+  async function refreshCredentialHealth() {
+    setCredentialBusy(true);
+    setStatus(null);
+    try {
+      const updated = await gateway.load();
+      setSnapshot(updated);
+      setStatus(
+        updated.pendingCredentialCleanupCount === 0
+          ? '系统凭据清理队列已恢复健康。'
+          : `系统凭据库仍不可完成清理，${updated.pendingCredentialCleanupCount} 项将在稍后重试。`,
+      );
+    } catch {
+      setStatus('无法检查系统凭据健康状态，请稍后重试。');
+    } finally {
+      setCredentialBusy(false);
+    }
+  }
+
   return (
     <main className="model-settings">
       <header>
@@ -312,7 +331,7 @@ export function ModelSettingsPage({
           />
         </label>
         <label>
-          API Key
+          {hasMatchingStoredCredential ? '替换 API Key（留空则保留）' : 'API Key'}
           <input
             type="password"
             autoComplete="off"
@@ -324,6 +343,19 @@ export function ModelSettingsPage({
             }}
           />
         </label>
+        <div className="model-settings__credential-tools">
+          <button
+            type="button"
+            disabled={apiKey.length === 0 || binding.phase === 'saving'}
+            onClick={() => {
+              setApiKey('');
+              configurationChanged();
+            }}
+          >
+            清空未保存的 Key
+          </button>
+          <span>Key仅作为临时输入；保存后界面不会回显。</span>
+        </div>
         <label>
           模型
           <input
@@ -389,6 +421,21 @@ export function ModelSettingsPage({
       </section>
       <section className="model-settings__saved" aria-label="已保存模型">
         <h2>已保存模型</h2>
+        {snapshot !== null && snapshot.pendingCredentialCleanupCount > 0 ? (
+          <div className="model-settings__credential-warning" role="alert">
+            <strong>凭据清理待重试：{snapshot.pendingCredentialCleanupCount} 项</strong>
+            <span>旧引用已停止使用；系统将在读取设置时继续尝试从安全凭据库删除。</span>
+            <button
+              type="button"
+              disabled={credentialBusy || binding.phase === 'saving'}
+              onClick={() => void refreshCredentialHealth()}
+            >
+              重试并检查凭据健康
+            </button>
+          </div>
+        ) : snapshot === null ? null : (
+          <p className="model-settings__credential-health">凭据清理健康：无待处理项</p>
+        )}
         {snapshot === null ? (
           <p>正在读取…</p>
         ) : snapshot.profiles.length === 0 ? (
@@ -401,6 +448,16 @@ export function ModelSettingsPage({
                 <span>{profile.providerDisplayName}</span>
                 <span>{getConnectionProfile(profile.presetKey).name}</span>
                 {profile.baseUrl === null ? null : <span>{profile.baseUrl}</span>}
+                <span>
+                  {profile.presetKey === 'ollama'
+                    ? '凭据状态：本地服务无需 Key'
+                    : profile.hasCredential
+                      ? '凭据状态：已保存引用，需连接测试确认当前可用性'
+                      : '凭据状态：未保存'}
+                </span>
+                {profile.capabilities === null ? null : (
+                  <span>最近连接测试：{profile.capabilities.checkedAt}</span>
+                )}
                 {snapshot.defaultModelProfileId === profile.id ? <em>默认</em> : null}
                 {snapshot.fallbackModelProfileId === profile.id ? <em>备用</em> : null}
                 {profile.hasCredential ? (
@@ -410,7 +467,7 @@ export function ModelSettingsPage({
                     disabled={credentialBusy || binding.phase === 'saving'}
                     onClick={() => void forgetCredential(profile.id)}
                   >
-                    删除凭据
+                    删除已保存凭据
                   </button>
                 ) : (
                   <span>无已保存凭据</span>

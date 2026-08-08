@@ -29,7 +29,8 @@
 - `V02-M3-T02`：DONE；“我的”页面建立API、默认/备用、生成参数、DeepSeek缓存、上下文、隐私、版本/更新记录七分区，具备响应式分区导航且不伪造未接线状态值。
 - `V02-M3-T03`：DONE；模型设置以单一闭集支持DeepSeek、Qwen、OpenRouter、Ollama与OpenAI-Compatible，固定/可配置端点和凭据模式显式化，已保存项显示Profile与实际端点。
 - `V02-M3-T04`：DONE；API Binding显式覆盖editing/testing/choosing_model/saving/saved/failed，以revision+operation拒绝配置/Key变化后的迟到结果，并支持测试超时、取消与保存失败重试。
-- 下一执行项严格进入 `V02-M3-T05` Credential UI。
+- `V02-M3-T05`：DONE；Credential UI区分新建/替换、清空未保存Key、删除已保存引用、待清理重试与保守健康状态，Key始终不回显且不进入SQLite/日志。
+- 下一执行项严格进入 `V02-M4-T01` DeepSeek Profile。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

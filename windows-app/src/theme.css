@@ -2156,11 +2156,25 @@ textarea:disabled {
 
 .model-settings__checks,
 .model-settings__actions,
+.model-settings__credential-tools,
 .model-settings__saved li {
   display: flex;
   gap: 1rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.model-settings__credential-tools span,
+.model-settings__credential-health,
+.model-settings__credential-warning span {
+  color: var(--muted);
+}
+
+.model-settings__credential-warning {
+  display: grid;
+  gap: 0.65rem;
+  border: 1px solid var(--ember);
+  padding: 0.85rem;
 }
 
 .model-settings__actions button {

@@ -183,7 +183,7 @@ describe('model settings page', () => {
     expect(screen.getByText('备用')).toBeTruthy();
     expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：saved');
     await waitFor(() =>
-      expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe(''),
+      expect((screen.getByLabelText(/API Key/) as HTMLInputElement).value).toBe(''),
     );
 
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
@@ -191,10 +191,27 @@ describe('model settings page', () => {
     expect(saved[1]?.credentialAction).toBe('KEEP');
     expect(saved[1]?.credentialRef).toBeNull();
 
+    fireEvent.change(screen.getByLabelText(/替换 API Key/), {
+      target: { value: 'replacement-key' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
+    await waitFor(() =>
+      expect(screen.getByTestId('api-binding-phase').textContent).toBe(
+        '连接状态：choosing_model',
+      ),
+    );
+    fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
+    await waitFor(() => expect(saved).toHaveLength(3));
+    expect(saved[2]?.credentialAction).toBe('REPLACE');
+    expect(JSON.stringify(saved[2])).not.toContain('replacement-key');
+
     vi.spyOn(window, 'confirm').mockReturnValue(true);
-    fireEvent.click(screen.getByRole('button', { name: '删除凭据' }));
+    expect(screen.getByText('凭据状态：已保存引用，需连接测试确认当前可用性')).toBeTruthy();
+    expect(screen.getByText('最近连接测试：2026-08-01T00:00:00Z')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '删除已保存凭据' }));
     expect(await screen.findByText('已删除该Provider的系统凭据；模型配置仍保留。')).toBeTruthy();
     expect(screen.getByText('无已保存凭据')).toBeTruthy();
+    expect(screen.getByText('凭据状态：未保存')).toBeTruthy();
   });
 
   it('cancels an in-flight test and ignores its late provider result', async () => {
@@ -245,5 +262,45 @@ describe('model settings page', () => {
     await Promise.resolve();
     expect(screen.queryByText('连接成功，发现 0 个模型。')).toBeNull();
     expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：editing');
+  });
+
+  it('clears a draft key and retries pending credential cleanup without exposing references', async () => {
+    let loads = 0;
+    const gateway: ModelSettingsGateway = {
+      async load() {
+        loads += 1;
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: loads === 1 ? 2 : 0,
+        };
+      },
+      async save() {
+        throw new Error('not used');
+      },
+      async forgetCredential() {
+        throw new Error('not used');
+      },
+      async saveSecret() {
+        throw new Error('not used');
+      },
+      async deleteSecret() {},
+      async probe() {
+        throw new Error('not used');
+      },
+    };
+
+    render(<ModelSettingsPage gateway={gateway} />);
+    expect(await screen.findByText('凭据清理待重试：2 项')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('API Key'), { target: { value: 'draft-secret' } });
+    fireEvent.click(screen.getByRole('button', { name: '清空未保存的 Key' }));
+    expect((screen.getByLabelText('API Key') as HTMLInputElement).value).toBe('');
+    expect(document.body.textContent).not.toContain('draft-secret');
+
+    fireEvent.click(screen.getByRole('button', { name: '重试并检查凭据健康' }));
+    expect(await screen.findByText('系统凭据清理队列已恢复健康。')).toBeTruthy();
+    expect(screen.getByText('凭据清理健康：无待处理项')).toBeTruthy();
+    expect(loads).toBe(2);
   });
 });
