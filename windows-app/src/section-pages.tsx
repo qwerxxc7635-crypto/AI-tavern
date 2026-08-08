@@ -10,7 +10,7 @@ export function TavernPage() {
       eyebrow={playerText.coreUi.homeFire}
       title="酒馆"
       description="这里将成为旅途之间的落脚点。存档入口会在下一项任务接入。"
-      note={`共享协议 Schema v${sharedSchema}`}
+      note={`共享协议模式版本 ${sharedSchema}`}
     />
   );
 }

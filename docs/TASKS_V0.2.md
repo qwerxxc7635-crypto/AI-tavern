@@ -40,7 +40,8 @@
 - `V02-M5-T02`：DONE；根版本自动同步到npm/Tauri/Cargo/Changelog/release-info，生成玩家可读发布摘要，只读漂移检查已接入双平台CI。
 - `V02-M5-T03`：DONE；建立单一`zh-CN`类型安全资源入口，应用根语言、导航壳层、全局状态和原生存档对话框已接入且无静默英文fallback。
 - `V02-M5-T04`：DONE；存档、世界、车卡、酒馆、NPC、任务、冒险/D20、档案、恢复、模型/API/隐私与更新记录完成中文覆盖，机器状态不再直接展示。
-- 下一执行项严格进入 `V02-M5-T05` English Regression Gate。
+- `V02-M5-T05`：DONE；AST门禁检查渲染文案、玩家属性、状态/确认消息、zh-CN资源及更新日志，仅放行文档定义的技术专名并已接入双平台CI。
+- 下一执行项严格进入 `V02-M6-T01` Scroll / Layout。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

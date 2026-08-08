@@ -73,7 +73,7 @@ export function MyPage({
 
           <section id="generation" className="my-hub__entry">
             <SectionCopy eyebrow={playerText.coreUi.generationProfile} title="生成参数">
-              管理temperature、最大输出和超时等设备级默认值；每次请求会冻结实际配置。
+              管理温度参数、最大输出和超时等设备级默认值；每次请求会冻结实际配置。
             </SectionCopy>
           </section>
 
@@ -85,7 +85,7 @@ export function MyPage({
 
           <section id="context" className="my-hub__entry">
             <SectionCopy eyebrow={playerText.coreUi.contextAssembly} title="上下文">
-              查看ContextBlock预算、来源、版本与纳入原因；秘密内容默认不在Inspector中展示。
+              查看ContextBlock预算、来源、版本与纳入原因；秘密内容默认不在检查器中展示。
             </SectionCopy>
           </section>
 
@@ -97,7 +97,7 @@ export function MyPage({
 
           <section id="version" className="my-hub__entry">
             <SectionCopy eyebrow={playerText.coreUi.releaseMetadata} title="版本与更新记录">
-              查看应用版本、发布渠道、构建信息与本轮变更；版本值由统一ReleaseMetadata提供。
+              查看应用版本、发布渠道、构建信息与本轮变更；版本值由统一发布信息提供。
             </SectionCopy>
             <strong>当前版本：{version ?? '读取中…'}</strong>
             <span>

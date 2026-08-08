@@ -11,6 +11,7 @@
     "release:metadata": "node scripts/release-metadata.mjs",
     "release:sync": "node scripts/sync-release-info.mjs",
     "release:check": "node scripts/check-release-info.mjs",
+    "i18n:check": "node scripts/check-player-language.mjs",
     "test": "vitest run --passWithNoTests && node --test packages/persistence/src/*.test.mjs scripts/*.test.mjs",
     "test:windows-e2e": "cargo test -p ember-native-bridge windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save",
     "archive:interop": "node scripts/archive-interop.mjs",

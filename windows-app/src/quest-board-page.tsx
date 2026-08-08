@@ -101,7 +101,7 @@ export function QuestBoardPage({
     <main className="quest-board-page">
       <header className="quest-board-header">
         <div>
-          <p className="eyebrow">{snapshot.source.tavernName} · Notice board</p>
+          <p className="eyebrow">{snapshot.source.tavernName} · 任务告示</p>
           <h1>任务告示</h1>
           <p>选择一份委托，先确认风险、目标和推荐能力。</p>
         </div>
@@ -132,7 +132,7 @@ export function QuestBoardPage({
           <article className="quest-detail" aria-live="polite">
             <div className="quest-detail__heading">
               <div>
-                <p className="eyebrow">Posted by {selected.publisherName}</p>
+                <p className="eyebrow">发布者：{selected.publisherName}</p>
                 <h2>{selected.content.title}</h2>
               </div>
               <span className={`risk-badge risk-badge--${selected.risk.toLowerCase()}`}>

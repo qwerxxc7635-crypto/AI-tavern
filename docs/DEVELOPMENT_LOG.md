@@ -2919,3 +2919,22 @@
 ### 结论
 
 - `V02-M5-T04`完成。下一项严格为`V02-M5-T05` English Regression Gate。
+
+## 2026-08-08 — V02-M5-T05 建立玩家可见英文回归门禁
+
+### 实现
+
+- 新增TypeScript AST检查器，扫描生产TSX的渲染正文、玩家属性、confirm和状态/错误消息，并检查zh-CN资源、Changelog与release-info highlights。
+- 明确跳过className、key、路由、内部枚举、测试夹具与服务诊断；仅放行Provider/模型名、model ID、API字段、URL、代码标识、玩家/AI专名及`.emtavern`格式名。
+- 首次扫描修复`Notice board`、`Posted by`、`temperature`、`Inspector`、`ReleaseMetadata`、`Schema`等真实遗漏；误报修正通过AST父节点边界完成，没有扩大普通英文允许范围。
+- 新增`pnpm i18n:check`并接入Windows/macOS共享CI；更新日志同步记录英文回归门禁，记录`DEC-075`。
+
+### 验证
+
+- 新增3项Node测试，证明渲染正文/accessibility label/状态消息会失败，允许技术专名可通过，资源与Changelog可检出且机器case不误报。
+- 当前仓库`pnpm i18n:check`通过；My/任务/路由5项定向UI测试、`pnpm typecheck`、`pnpm lint`和`git diff --check`通过。
+- 未扫描或修改模型生成的玩家内容、正式用户数据或iOS代码，未访问网络。
+
+### 结论
+
+- `V02-M5-T05`完成，M5版本/Changelog/zh-CN任务结束。下一项严格为`V02-M6-T01` Scroll / Layout。

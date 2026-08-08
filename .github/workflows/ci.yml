@@ -44,6 +44,9 @@ jobs:
       - name: Check release metadata synchronization
         run: pnpm release:check
 
+      - name: Check player-facing zh-CN resources
+        run: pnpm i18n:check
+
       - name: Lint TypeScript
         run: pnpm lint
 

@@ -1636,3 +1636,19 @@ T03先迁移所有跨流程入口：品牌/导航、标题栏、加载/未知路
 ### 影响与边界
 
 资源层继续是新玩家文案的入口；T04清除现有核心流程的可见英文并补齐Changelog中文标题，但不引入第二locale或iOS实现。T05必须建立自动化英文回归门禁，区分允许的技术专名与意外新增的玩家句式，不能只依赖本次人工扫描。
+
+## DEC-075：英文回归门禁按玩家可见AST边界检查
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T05`、全中文化允许项
+
+### 决定与理由
+
+英文门禁解析生产TSX AST，只检查JSX正文、title/label/description/detail/note/eyebrow/placeholder/alt/aria-label等玩家属性，以及confirm和setError/setLoadError/setStatus/setTransferNotice消息；同时检查zh-CN资源值、Changelog和release-info highlights。className、key、路由、内部条件枚举、测试夹具与服务诊断不属于玩家显示面，不进入扫描。
+
+允许词表封闭在Provider/模型名、model ID、API字段、URL、代码标识及玩家/AI专名范围，文件扩展名`.emtavern`作为存档格式标识放行。门禁不以“字符串含中文”作为通过条件；同一字符串里的意外英文词仍会报出文件、行号、词和原文。CI在Windows/macOS共享quality job执行`pnpm i18n:check`。
+
+### 影响与边界
+
+首轮运行发现并修复任务告示、发布者、温度参数、检查器、统一发布信息和Schema等真实遗漏，同时排除CSS类名/路由误报。后续新增玩家消息若通过新的调用方式进入UI，必须扩展AST抽取测试，不得靠扩大允许词表隐藏普通英文句式。此门禁不扫描玩家生成内容或模型专名。
