@@ -52,7 +52,7 @@ describe('Desktop release configuration', () => {
     ) as TauriConfig;
 
     expect(config.productName).toBe('Ember Tavern');
-    expect(config.version).toBe('0.1.0');
+    expect(config.version).toBe('0.2.0');
     expect(config.identifier).toBe('com.embertavern.windows');
     expect(config.build.devUrl).toBe('http://127.0.0.1:1420');
     expect(config.build.frontendDist).toBe('../dist');

@@ -785,7 +785,7 @@ checksum = "4ef6b89e5b37196644d8796de5268852ff179b44e96276cf4290264843743bb7"
 
 [[package]]
 name = "ember-native-bridge"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ember-platform-services",
  "ember-secure-http",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "ember-platform-services"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "fs2",
  "tempfile",
@@ -811,7 +811,7 @@ dependencies = [
 
 [[package]]
 name = "ember-provider-openai-compatible"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ember-secure-http",
  "ember-secure-secrets",
@@ -827,7 +827,7 @@ dependencies = [
 
 [[package]]
 name = "ember-secure-http"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "antissrf",
  "bytes",
@@ -840,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "ember-secure-secrets"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "apple-native-keyring-store",
  "keyring-core",
@@ -852,7 +852,7 @@ dependencies = [
 
 [[package]]
 name = "ember-tavern-windows"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "ember-native-bridge",
  "ember-platform-services",

@@ -1,4 +1,7 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
+
+import { tauriVersionGateway, type VersionGateway } from './version-service.js';
 
 export const MY_SECTIONS = [
   { id: 'api', label: 'API', description: '连接与模型档案' },
@@ -10,7 +13,28 @@ export const MY_SECTIONS = [
   { id: 'version', label: '版本与更新记录', description: '版本、渠道与变更说明' },
 ] as const;
 
-export function MyPage() {
+export function MyPage({
+  versionGateway = tauriVersionGateway,
+}: {
+  readonly versionGateway?: VersionGateway;
+}) {
+  const [version, setVersion] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    void versionGateway
+      .getVersion()
+      .then((value) => {
+        if (active) setVersion(value);
+      })
+      .catch(() => {
+        if (active) setVersion('不可用');
+      });
+    return () => {
+      active = false;
+    };
+  }, [versionGateway]);
+
   return (
     <main className="my-hub">
       <header className="my-hub__header">
@@ -73,6 +97,7 @@ export function MyPage() {
             <SectionCopy eyebrow="Release metadata" title="版本与更新记录">
               查看应用版本、发布渠道、构建信息与本轮变更；版本值由统一ReleaseMetadata提供。
             </SectionCopy>
+            <strong>当前版本：{version ?? '读取中…'}</strong>
           </section>
         </div>
       </div>

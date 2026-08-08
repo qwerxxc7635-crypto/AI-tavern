@@ -2840,3 +2840,23 @@
 ### 结论
 
 - `V02-M4-T06`完成，M4 DeepSeek Cache实现任务结束。下一项严格为`V02-M5-T01` Single Version Source。
+
+## 2026-08-08 — V02-M5-T01 建立 0.2.0 单一版本源
+
+### 实现
+
+- 根`package.json.version`升级为产品权威版本`0.2.0`；Windows、全部共享npm workspace及iOS占位manifest同步对齐，未开展iOS功能。
+- 根Cargo workspace新增`workspace.package.version = 0.2.0`，五个共享crate和Tauri crate全部改为`version.workspace = true`；Cargo.lock由Cargo重新解析为0.2.0。
+- Tauri bundle配置升级到0.2.0；存档导出原有`CARGO_PKG_VERSION`路径自然使用同一Rust workspace版本。
+- “我的 → 版本与更新记录”通过`@tauri-apps/api/app.getVersion()`读取打包metadata并显示，不在玩家UI源码另写版本常量。
+- 记录`DEC-071`；历史v0.1验收文档、安装包路径及存档兼容测试值保持历史事实，不做机械替换。
+
+### 验证
+
+- My页面与Tauri配置3项测试通过，release metadata 2项Node测试通过并在当前darwin/arm64输出version 0.2.0。
+- Cargo workspace全套81项测试通过，输出确认六个内部crate均编译为0.2.0；TypeScript完整71个文件/398项测试、16项Node测试、`pnpm typecheck`和`pnpm lint`通过。
+- 未发布、签名或上传产物，未访问真实API或正式用户数据。
+
+### 结论
+
+- `V02-M5-T01`完成。下一项严格为`V02-M5-T02` Changelog Automation。

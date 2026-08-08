@@ -9,10 +9,10 @@ import { MY_SECTIONS, MyPage } from './my-page.js';
 afterEach(cleanup);
 
 describe('My page information architecture', () => {
-  it('exposes all seven device-setting sections through one landmark', () => {
+  it('exposes all seven device-setting sections and the release version', async () => {
     render(
       <MemoryRouter>
-        <MyPage />
+        <MyPage versionGateway={{ async getVersion() { return '0.2.0'; } }} />
       </MemoryRouter>,
     );
 
@@ -27,5 +27,6 @@ describe('My page information architecture', () => {
     expect(screen.getByRole('link', { name: '打开模型设置' }).getAttribute('href')).toBe(
       '/settings',
     );
+    expect(await screen.findByText('当前版本：0.2.0')).toBeTruthy();
   });
 });

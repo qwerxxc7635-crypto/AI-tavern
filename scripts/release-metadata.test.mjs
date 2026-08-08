@@ -5,8 +5,8 @@ import { buildReleaseMetadata } from './release-metadata.mjs';
 
 test('builds deterministic cross-platform release metadata', () => {
   const metadata = buildReleaseMetadata({
-    packageJson: { version: '0.1.0' },
-    tauriConfig: { productName: 'Ember Tavern', version: '0.1.0' },
+    packageJson: { version: '0.2.0' },
+    tauriConfig: { productName: 'Ember Tavern', version: '0.2.0' },
     gitCommit: 'abc123',
     platform: 'darwin',
     arch: 'arm64',
@@ -14,7 +14,7 @@ test('builds deterministic cross-platform release metadata', () => {
 
   assert.deepEqual(metadata, {
     productName: 'Ember Tavern',
-    version: '0.1.0',
+    version: '0.2.0',
     gitCommit: 'abc123',
     platform: 'darwin',
     arch: 'arm64',

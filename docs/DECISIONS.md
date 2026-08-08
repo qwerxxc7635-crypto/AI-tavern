@@ -1572,3 +1572,19 @@ OpenAI-compatible usage增加可选`prompt_cache_hit_tokens`与`prompt_cache_mis
 ### 影响与边界
 
 指标是设备观测而非游戏事实，不随Campaign导出；ratio为当次Provider usage的描述，不承诺固定命中率。当前Provider adapter已能解析真实响应字段，但测试只使用本地mock HTTP；云游戏生成尚未启用时不会伪造指标。若未来多进程写入，仍必须在`BEGIN IMMEDIATE`内读改写，不能用无锁JSON覆盖。
+
+## DEC-071：产品版本以根package.json为权威源
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T01`、双平台发布一致性
+
+### 决定与理由
+
+产品版本权威值为根`package.json.version`，当前固定`0.2.0`。Rust workspace只在根`Cargo.toml [workspace.package]`声明镜像值，所有内部crate改用`version.workspace = true`，消除六个独立Rust版本源；Tauri config、Windows/npm workspace及iOS占位manifest同步为0.2.0。
+
+运行时“我的”页面通过Tauri app metadata读取打包版本，不在React源码重复硬编码。存档导出继续使用编译期`CARGO_PKG_VERSION`；release metadata现有门禁要求根package与Tauri相等。历史v0.1验收文档和存档兼容夹具保持原版本，不因当前产品版本更新而改写历史。
+
+### 影响与边界
+
+T01先建立权威源并对齐所有消费者；T02必须提供从根版本同步/校验Tauri、Cargo workspace及npm manifests的脚本和CI门禁，避免人工漂移。iOS仅更新占位manifest，不开始iOS功能开发或构建验收。
