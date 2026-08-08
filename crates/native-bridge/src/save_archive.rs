@@ -233,6 +233,17 @@ impl CampaignStore {
         let mut connection = self.connect()?;
         let transaction = connection.transaction()?;
         assert_database_ready(&transaction)?;
+        let has_unconfirmed_candidate = transaction
+            .query_row(
+                "SELECT 1 FROM ai_candidates WHERE campaign_id = ?1 AND status = 'PROPOSED' LIMIT 1",
+                [campaign_id],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if has_unconfirmed_candidate {
+            return Err(CampaignStoreError::UnconfirmedCandidate);
+        }
         let mut campaign = query_one_row(
             &transaction,
             "campaigns",

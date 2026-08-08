@@ -2998,3 +2998,23 @@
 ### 结论
 
 - `V02-M6-T03`完成。下一项严格为`V02-M6-T04` AI Character Candidate。
+
+## 2026-08-08 — V02-M6-T04 建立可恢复的 AI 角色候选与原子确认
+
+### 实现
+
+- 原生角色流程复用migration 4的`ai_candidates`：特质生成建立PROPOSED候选，重新生成以SUPERSEDED修订链替代旧候选；完整背景生成建立包含草稿、六个候选、两个选择、背景、程序拥有装备效果及两次生成审计的完整候选。
+- `character_completion_commit`不再写`player_characters`、`items`、`pending_ai_requests`、`generation_records`或推进Campaign，只返回可跨重启恢复的完整候选；页面增加明确的候选预览与“确认角色并写入存档”操作。
+- 新增`character_candidate_confirm`固定语义命令，在`BEGIN IMMEDIATE`内复核Candidate状态/版本/Campaign、结构与领域规则、AI响应一致性和输入/上下文绑定，再原子写角色、装备、两次生成审计、ACCEPTED状态及下一Campaign阶段。
+- 确认失败整笔回滚，重复确认同一ACCEPTED候选幂等返回；Candidate不包含凭据。`.emtavern`格式未携带PROPOSED Candidate，因此导出在存在未确认候选时明确报错，避免静默丢进度。
+- 记录`DEC-079`并更新Changelog/release摘要；未新增schema、真实Provider/付费调用、正式用户数据或iOS代码。
+
+### 验证
+
+- Rust边界测试证明完整候选生成后角色、物品、已提交生成记录均为0，未确认归档导出被阻止；确认后恰有两条生成记录、候选为ACCEPTED，重复确认不重复写入，关闭重开后角色继续存在。
+- Native bridge 43项全量测试（含Windows纵向E2E）通过；Tauri Windows crate `cargo check`通过。
+- 车卡service/page/state/layout 11项定向Vitest通过，覆盖候选预览提示、独立确认及committed状态；`pnpm typecheck`通过。
+
+### 结论
+
+- `V02-M6-T04`完成，M6车卡AI任务结束。下一项严格为`V02-M7-T01` SceneFrame。

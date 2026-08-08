@@ -79,11 +79,23 @@ export interface PlayerCharacterView extends CharacterDraft {
   readonly updatedAt: string;
 }
 
+export interface CharacterCandidateView {
+  readonly id: string;
+  readonly kind: 'CHARACTER_TRAITS' | 'COMPLETE_CHARACTER';
+  readonly draft: CharacterDraft;
+  readonly traitGenerationRecordId: string;
+  readonly traitCandidates: readonly CharacterTraitView[];
+  readonly selectedTraits: readonly CharacterTraitView[];
+  readonly background: CharacterBackgroundView | null;
+  readonly initialEquipment: readonly EquipmentView[];
+}
+
 export interface CharacterCreationSnapshot {
   readonly campaignState: string;
   readonly draft: CharacterDraft | null;
   readonly traitGenerationRecordId: string | null;
   readonly traitCandidates: readonly CharacterTraitView[];
+  readonly candidate: CharacterCandidateView | null;
   readonly character: PlayerCharacterView | null;
 }
 
@@ -95,6 +107,7 @@ export interface CharacterCreationGateway {
   load(campaignId: string): Promise<CharacterCreationSnapshot>;
   commitTraits(command: CharacterTraitCommit): Promise<CharacterCreationSnapshot>;
   commitCompletion(command: CharacterCompletionCommit): Promise<CharacterCreationSnapshot>;
+  confirmCandidate(campaignId: string, candidateId: string): Promise<CharacterCreationSnapshot>;
 }
 
 interface GenerationAudit {
@@ -153,6 +166,14 @@ export const tauriCharacterCreationGateway: CharacterCreationGateway = {
       command.campaignId,
     );
   },
+  async confirmCandidate(campaignIdValue, candidateId) {
+    return parseSnapshot(
+      await invoke<unknown>('character_candidate_confirm', {
+        command: { campaignId: campaignIdValue, candidateId },
+      }),
+      campaignIdValue,
+    );
+  },
 };
 
 export class WindowsCharacterCreationService {
@@ -196,6 +217,7 @@ export class WindowsCharacterCreationService {
     draft: CharacterDraft,
     traitGenerationRecordId: string,
     selectedTraits: readonly CharacterTraitView[],
+    observer?: CharacterGenerationObserver,
   ): Promise<CharacterCreationSnapshot> {
     const character = validateDraft(draft);
     generationRecordId(traitGenerationRecordId);
@@ -209,11 +231,16 @@ export class WindowsCharacterCreationService {
       personalGoal: character.personalGoal,
       traits: selectedTraits.map(({ name, description }) => ({ name, description })),
     });
-    const generated = await this.generate('COMPLETE_CHARACTER_BACKGROUND', input, {
-      character,
-      selectedTraits,
-      traitGenerationRecordId,
-    });
+    const generated = await this.generate(
+      'COMPLETE_CHARACTER_BACKGROUND',
+      input,
+      {
+        character,
+        selectedTraits,
+        traitGenerationRecordId,
+      },
+      observer,
+    );
     CompleteCharacterBackgroundOutputSchema.parse(generated.validatedOutput);
     return this.gateway.commitCompletion({
       campaignId: character.campaignId,
@@ -222,6 +249,14 @@ export class WindowsCharacterCreationService {
       selectedTraits,
       generation: generated,
     });
+  }
+
+  public confirm(campaignIdValue: string, candidateId: string): Promise<CharacterCreationSnapshot> {
+    campaignId(campaignIdValue);
+    if (candidateId.length === 0 || candidateId.trim() !== candidateId) {
+      throw new TypeError('Character candidate id is invalid');
+    }
+    return this.gateway.confirmCandidate(campaignIdValue, candidateId);
   }
 
   private async generate(
@@ -333,12 +368,56 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): CharacterCre
   const character = rawCharacter === null ? null : parseCharacter(rawCharacter, expectedCampaignId);
   const rawDraft = record['draft'];
   const draft = rawDraft === null ? null : parseDraft(rawDraft, expectedCampaignId);
+  const rawCandidate = record['candidate'];
+  const candidate = rawCandidate === null ? null : parseCandidate(rawCandidate, expectedCampaignId);
   return Object.freeze({
     campaignState: requireString(record['campaignState']),
     draft,
     traitGenerationRecordId: traitRecord === null ? null : generationRecordId(traitRecord),
     traitCandidates,
+    candidate,
     character,
+  });
+}
+
+function parseCandidate(value: unknown, expectedCampaignId: string): CharacterCandidateView {
+  const record = requireRecord(value);
+  const kind = requireString(record['kind']);
+  if (kind !== 'CHARACTER_TRAITS' && kind !== 'COMPLETE_CHARACTER') {
+    throw new TypeError('Character candidate kind is invalid');
+  }
+  const traitCandidates = record['traitCandidates'];
+  const selectedTraits = record['selectedTraits'];
+  const equipment = record['initialEquipment'];
+  if (
+    !Array.isArray(traitCandidates) ||
+    !Array.isArray(selectedTraits) ||
+    !Array.isArray(equipment)
+  ) {
+    throw new TypeError('Character candidate collections are invalid');
+  }
+  const background = record['background'];
+  return Object.freeze({
+    id: requireString(record['id']),
+    kind,
+    draft: parseDraft(record['draft'], expectedCampaignId),
+    traitGenerationRecordId: generationRecordId(requireString(record['traitGenerationRecordId'])),
+    traitCandidates: Object.freeze(traitCandidates.map(parseTrait)),
+    selectedTraits: Object.freeze(selectedTraits.map(parseTrait)),
+    background: background === null ? null : parseBackground(background),
+    initialEquipment: Object.freeze(equipment.map(parseEquipment)),
+  });
+}
+
+function parseBackground(value: unknown): CharacterBackgroundView {
+  const background = requireRecord(value);
+  return Object.freeze({
+    birthplace: requireString(background['birthplace']),
+    formativeExperience: requireString(background['formativeExperience']),
+    adventureMotivation: requireString(background['adventureMotivation']),
+    secret: requireString(background['secret']),
+    importantPerson: requireString(background['importantPerson']),
+    tavernArrivalReason: requireString(background['tavernArrivalReason']),
   });
 }
 
@@ -359,7 +438,7 @@ function parseCharacter(value: unknown, expectedCampaignId: string): PlayerChara
   if (!Array.isArray(traits) || traits.length !== 2 || !Array.isArray(equipment)) {
     throw new TypeError('Character collections are invalid');
   }
-  const background = requireRecord(record['background']);
+  const background = parseBackground(record['background']);
   const createdAt = isoTimestamp(requireString(record['createdAt']));
   const updatedAt = isoTimestamp(requireString(record['updatedAt']));
   if (updatedAt < createdAt) throw new TypeError('Character timestamps are out of order');
@@ -367,14 +446,7 @@ function parseCharacter(value: unknown, expectedCampaignId: string): PlayerChara
     ...draft,
     traits: Object.freeze(traits.map(parseTrait)),
     personalGoal: requireString(record['personalGoal']),
-    background: {
-      birthplace: requireString(background['birthplace']),
-      formativeExperience: requireString(background['formativeExperience']),
-      adventureMotivation: requireString(background['adventureMotivation']),
-      secret: requireString(background['secret']),
-      importantPerson: requireString(background['importantPerson']),
-      tavernArrivalReason: requireString(background['tavernArrivalReason']),
-    },
+    background,
     initialEquipment: Object.freeze(equipment.map(parseEquipment)),
     createdAt,
     updatedAt,

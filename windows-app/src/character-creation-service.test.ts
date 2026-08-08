@@ -27,7 +27,7 @@ describe('WindowsCharacterCreationService', () => {
     });
   });
 
-  it('uses exactly two persisted candidates to generate and commit background and equipment', async () => {
+  it('uses exactly two persisted traits to propose then confirm a complete character', async () => {
     const gateway = new FakeCharacterGateway();
     const service = new WindowsCharacterCreationService(gateway, undefined, identityFactory());
     const traits = await service.generateTraits(characterDraft());
@@ -39,10 +39,14 @@ describe('WindowsCharacterCreationService', () => {
     );
 
     expect(completed).toMatchObject({
-      campaignState: 'GENERATING_TAVERN',
-      character: {
-        name: '林鸦',
-        traits: [{ id: traits.traitCandidates[0]?.id }, { id: traits.traitCandidates[1]?.id }],
+      campaignState: 'CREATING_CHARACTER',
+      character: null,
+      candidate: {
+        kind: 'COMPLETE_CHARACTER',
+        selectedTraits: [
+          { id: traits.traitCandidates[0]?.id },
+          { id: traits.traitCandidates[1]?.id },
+        ],
       },
     });
     expect(gateway.completionCommits[0]).toMatchObject({
@@ -52,6 +56,12 @@ describe('WindowsCharacterCreationService', () => {
         requestId: 'character-request-2',
         promptVersion: 2,
       },
+    });
+    const committed = await service.confirm('campaign-character', 'candidate-complete');
+    expect(committed).toMatchObject({
+      campaignState: 'GENERATING_TAVERN',
+      candidate: null,
+      character: { name: '林鸦' },
     });
   });
 
@@ -75,6 +85,7 @@ class FakeCharacterGateway implements CharacterCreationGateway {
     draft: null,
     traitGenerationRecordId: null,
     traitCandidates: [],
+    candidate: null,
     character: null,
   };
   public readonly traitCommits: Array<Parameters<CharacterCreationGateway['commitTraits']>[0]> = [];
@@ -101,6 +112,19 @@ class FakeCharacterGateway implements CharacterCreationGateway {
         id: `${command.generation.generationRecordId}:trait:${index}`,
         ...trait,
       })),
+      candidate: {
+        id: 'candidate-traits',
+        kind: 'CHARACTER_TRAITS',
+        draft: command.character,
+        traitGenerationRecordId: command.generation.generationRecordId,
+        traitCandidates: validated.traits.map((trait, index) => ({
+          id: `${command.generation.generationRecordId}:trait:${index}`,
+          ...trait,
+        })),
+        selectedTraits: [],
+        background: null,
+        initialEquipment: [],
+      },
       character: null,
     };
     return this.snapshot;
@@ -125,13 +149,17 @@ class FakeCharacterGateway implements CharacterCreationGateway {
       }[];
     };
     this.snapshot = {
-      campaignState: 'GENERATING_TAVERN',
-      draft: null,
+      campaignState: 'CREATING_CHARACTER',
+      draft: command.character,
       traitGenerationRecordId: command.traitGenerationRecordId,
-      traitCandidates: command.selectedTraits,
-      character: {
-        ...command.character,
-        traits: command.selectedTraits,
+      traitCandidates: this.snapshot.traitCandidates,
+      candidate: {
+        id: 'candidate-complete',
+        kind: 'COMPLETE_CHARACTER',
+        draft: command.character,
+        traitGenerationRecordId: command.traitGenerationRecordId,
+        traitCandidates: this.snapshot.traitCandidates,
+        selectedTraits: command.selectedTraits,
         background: validated.background,
         initialEquipment: validated.initialEquipment.map((item, index) => ({
           id: `item-${index}`,
@@ -141,6 +169,26 @@ class FakeCharacterGateway implements CharacterCreationGateway {
               ? { kind: 'CHECK_MODIFIER', attribute: 'physique', modifier: 1 }
               : { kind: 'NONE' },
         })),
+      },
+      character: null,
+    };
+    return this.snapshot;
+  }
+
+  public async confirmCandidate(): Promise<CharacterCreationSnapshot> {
+    const candidate = this.snapshot.candidate;
+    if (candidate === null || candidate.background === null) throw new Error('candidate missing');
+    this.snapshot = {
+      campaignState: 'GENERATING_TAVERN',
+      draft: candidate.draft,
+      traitGenerationRecordId: null,
+      traitCandidates: [],
+      candidate: null,
+      character: {
+        ...candidate.draft,
+        traits: candidate.selectedTraits,
+        background: candidate.background,
+        initialEquipment: candidate.initialEquipment,
         createdAt: '2026-07-31T12:00:00.000Z',
         updatedAt: '2026-07-31T12:00:00.000Z',
       },

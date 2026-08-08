@@ -114,6 +114,8 @@ pub enum CampaignStoreError {
     ArchiveConflict,
     #[error("save archive path is invalid")]
     ArchivePathInvalid,
+    #[error("campaign has an unconfirmed AI candidate")]
+    UnconfirmedCandidate,
     #[error("application coordination lock is unavailable")]
     AppLock(#[from] AppInstanceLockError),
     #[error("database changed while a destructive backup was being created")]

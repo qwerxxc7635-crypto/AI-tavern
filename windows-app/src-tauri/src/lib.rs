@@ -14,13 +14,13 @@ use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
     CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
-    CampaignStoreError, CampaignSummary, CapabilitySource, CharacterCompletionCommit,
-    CharacterCreationSnapshot, CharacterTraitGenerationCommit, CredentialAction,
-    CredentialCleanupReason, ModelCapabilitiesRegistration, ModelSettingsSnapshot,
-    ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot, NpcRosterGenerationCommit,
-    QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit, TavernSnapshot,
-    WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
-    model_probe_fingerprint,
+    CampaignStoreError, CampaignSummary, CapabilitySource, CharacterCandidateConfirm,
+    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterTraitGenerationCommit,
+    CredentialAction, CredentialCleanupReason, ModelCapabilitiesRegistration,
+    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
+    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
+    TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -75,6 +75,10 @@ impl From<CampaignStoreError> for CommandError {
             CampaignStoreError::ArchivePathInvalid => Self {
                 code: "SAVE_PATH_INVALID",
                 message: "请选择有效的.emtavern文件位置。",
+            },
+            CampaignStoreError::UnconfirmedCandidate => Self {
+                code: "UNCONFIRMED_CANDIDATE",
+                message: "请先确认当前AI候选，再导出存档。",
             },
             CampaignStoreError::ConcurrentModification => Self {
                 code: "CONCURRENT_MODIFICATION",
@@ -563,6 +567,16 @@ fn character_completion_commit(
 }
 
 #[tauri::command]
+fn character_candidate_confirm(
+    command: CharacterCandidateConfirm,
+    store: State<'_, CampaignStore>,
+) -> Result<CharacterCreationSnapshot, CommandError> {
+    store
+        .confirm_character_candidate(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn tavern_get(id: String, store: State<'_, CampaignStore>) -> Result<TavernSnapshot, CommandError> {
     store.tavern_snapshot(&id).map_err(Into::into)
 }
@@ -801,6 +815,7 @@ pub fn run() {
             character_creation_get,
             character_traits_commit,
             character_completion_commit,
+            character_candidate_confirm,
             tavern_get,
             tavern_generation_commit,
             tavern_npcs_commit,

@@ -106,7 +106,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             "description": value.description,
         })).collect::<Vec<_>>(),
     });
-    let completed_character = store
+    let proposed_character = store
         .commit_character_completion(CharacterCompletionCommit {
             campaign_id: CAMPAIGN_ID.to_owned(),
             character: character.clone(),
@@ -124,7 +124,17 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                 background_output,
             ),
         })
-        .expect("complete character");
+        .expect("propose complete character");
+    assert_eq!(proposed_character.campaign_state, "CREATING_CHARACTER");
+    let completed_character = store
+        .confirm_character_candidate(CharacterCandidateConfirm {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            candidate_id: proposed_character
+                .candidate
+                .expect("complete character candidate")
+                .id,
+        })
+        .expect("confirm character");
     assert_eq!(completed_character.campaign_state, "GENERATING_TAVERN");
 
     let source = store

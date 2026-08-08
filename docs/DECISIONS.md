@@ -1700,3 +1700,19 @@ AI车卡以纯reducer表达idle、generating、validating、preview、editing、
 ### 影响与边界
 
 该状态机阻止迟到结果更新当前React视图，但T03不改变旧`character_traits_commit`和`character_completion_commit`命令的持久化时机；如果编辑发生在底层命令已经提交后，UI拒绝不能撤回SQLite写入。T04必须把结构化候选改为未确认不落角色事实、确认时原子提交，不能把T03的UI门禁误当作数据门禁。
+
+## DEC-079：AI角色候选持久化但未确认不进入游戏事实
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T04`、`V02-M2-T04` Candidate Pattern与SQLite唯一真相源
+
+### 决定与理由
+
+特质生成和完整角色生成都写入既有`ai_candidates`控制面，以便重启后恢复、追踪结构/领域验证证据并用修订链取代旧候选；这类PROPOSED记录不是已确认游戏事实。完整候选包含用户草稿、六个已验证特质、两个已选特质、背景、程序生成的装备效果及两次生成审计，页面必须先展示“未确认候选”，再由独立操作确认。
+
+确认命令在`BEGIN IMMEDIATE`内重新读取PROPOSED候选、复核Campaign归属、expected revision、结构、领域规则、AI原始响应与validated output、输入/上下文绑定，再一次性写入`pending_ai_requests`、`generation_records`、`player_characters`、`items`，把候选转为ACCEPTED并推进Campaign。任一步失败均回滚；已接受候选的同ID确认返回当前快照，不重复写入。
+
+### 影响与边界
+
+“未确认不落库”在本架构中指不落角色、装备、Campaign阶段和已提交生成事实；Candidate自身必须留在本地SQLite，不能退化为易失React内存。当前`.emtavern`格式尚未携带PROPOSED Candidate，因此导出遇到未确认候选时明确失败并提示先完成确认，禁止静默生成缺失进度的归档。没有引入新migration、真实Provider调用、付费API或iOS实现。

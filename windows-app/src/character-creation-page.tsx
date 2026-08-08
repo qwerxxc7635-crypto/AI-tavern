@@ -20,7 +20,7 @@ import { playerText } from './localization/index.js';
 
 type CharacterCreationActions = Pick<
   WindowsCharacterCreationService,
-  'load' | 'generateTraits' | 'complete'
+  'load' | 'generateTraits' | 'complete' | 'confirm'
 >;
 
 interface CharacterCreationPageProps {
@@ -81,7 +81,7 @@ export function CharacterCreationPage({
           phase:
             loaded.character !== null
               ? 'committed'
-              : loaded.traitCandidates.length > 0
+              : loaded.candidate !== null
                 ? 'preview'
                 : 'idle',
         });
@@ -158,17 +158,45 @@ export function CharacterCreationPage({
     const selected = snapshot.traitCandidates.filter(({ id }) => selectedTraitIds.includes(id));
     const operationId = ++operationSequence.current;
     const revision = aiStateRef.current.revision;
+    if (!transition({ type: 'GENERATION_STARTED', operationId })) return;
+    setAiError(null);
+    setRetryAction(null);
+    try {
+      const completed = await service.complete(draft, snapshot.traitGenerationRecordId, selected, {
+        onValidationStarted: () => {
+          transition({ type: 'VALIDATION_STARTED', operationId, revision });
+        },
+      });
+      if (!transition({ type: 'PREVIEW_READY', operationId, revision })) return;
+      setSnapshot(completed);
+    } catch (error) {
+      transition({
+        type: 'GENERATION_FAILED',
+        operationId,
+        revision,
+        failure:
+          aiStateRef.current.phase === 'validating' ? 'validation_failed' : 'generation_failed',
+      });
+      setAiError(error);
+      setRetryAction(() => completeCharacter);
+    }
+  }
+
+  async function confirmCharacter() {
+    if (campaignId === null || snapshot?.candidate?.kind !== 'COMPLETE_CHARACTER') return;
+    const operationId = ++operationSequence.current;
+    const revision = aiStateRef.current.revision;
     if (!transition({ type: 'CONFIRM_STARTED', operationId })) return;
     setAiError(null);
     setRetryAction(null);
     try {
-      const completed = await service.complete(draft, snapshot.traitGenerationRecordId, selected);
+      const committed = await service.confirm(campaignId, snapshot.candidate.id);
       if (!transition({ type: 'CONFIRM_SUCCEEDED', operationId, revision })) return;
-      setSnapshot(completed);
+      setSnapshot(committed);
     } catch (error) {
       transition({ type: 'CONFIRM_FAILED', operationId, revision });
       setAiError(error);
-      setRetryAction(() => completeCharacter);
+      setRetryAction(() => confirmCharacter);
     }
   }
 
@@ -297,6 +325,84 @@ export function CharacterCreationPage({
   if (snapshot.campaignState !== 'CREATING_CHARACTER') {
     return <CharacterMessage title="这个存档不在创建角色阶段。" />;
   }
+  if (snapshot.candidate?.kind === 'COMPLETE_CHARACTER') {
+    const candidate = snapshot.candidate;
+    const background = candidate.background;
+    if (background === null) return <CharacterMessage title="角色候选数据不完整。" />;
+    return (
+      <main className="character-studio">
+        <CharacterTopline step="03 · 确认完整角色" />
+        <CharacterAIStatus phase={aiState.phase} />
+        <section className="character-intro">
+          <p className="eyebrow">结构化角色候选</p>
+          <h1>{candidate.draft.name} 已准备好供你确认。</h1>
+          <p>以下内容只是本地候选预览；确认前不会写入角色、装备或推进存档阶段。</p>
+        </section>
+        {aiError === null ? null : (
+          <AIErrorNotice
+            error={aiError}
+            onRetry={retryAction === null ? undefined : () => void retryAction()}
+          />
+        )}
+        <div className="character-review character-sheet" aria-label="未确认角色候选">
+          <section className="character-sheet__summary" data-character-section="summary">
+            <p className="eyebrow">未确认候选</p>
+            <h2>{candidate.draft.name}</h2>
+            <p>
+              {candidate.draft.classDisplayName} · {candidate.draft.concept}
+            </p>
+          </section>
+          <section data-character-section="background">
+            <h2>背景</h2>
+            <Description label="出生地" value={background.birthplace} />
+            <Description label="成长经历" value={background.formativeExperience} />
+            <Description label="冒险动机" value={background.adventureMotivation} />
+            <Description label="秘密" value={background.secret} />
+            <Description label="重要人物" value={background.importantPerson} />
+            <Description label="来到酒馆" value={background.tavernArrivalReason} />
+          </section>
+          <section data-character-section="traits">
+            <h2>已选特质</h2>
+            <ul className="character-sheet__traits">
+              {candidate.selectedTraits.map((trait) => (
+                <li key={trait.id}>
+                  <strong>{trait.name}</strong>
+                  <p>{trait.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section data-character-section="equipment">
+            <h2>初始装备</h2>
+            <ul className="equipment-list">
+              {candidate.initialEquipment.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.name}</strong>
+                  <p>{item.description}</p>
+                  <span>{effectLabel(item.effect)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="character-sheet__ai-controls" data-character-section="ai-controls">
+            <div>
+              <p className="eyebrow">原子确认边界</p>
+              <h2>写入本地存档</h2>
+              <p>确认会在一个事务中写入角色、装备和生成审计；失败不会留下半成品。</p>
+            </div>
+            <button
+              className="primary-action character-next"
+              type="button"
+              disabled={busy}
+              onClick={() => void confirmCharacter()}
+            >
+              {aiState.phase === 'confirming' ? '正在原子确认…' : '确认角色并写入存档'}
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
   if (snapshot.traitCandidates.length > 0) {
     return (
       <main className="character-studio">
@@ -346,7 +452,9 @@ export function CharacterCreationPage({
           disabled={busy || selectedTraitIds.length !== 2}
           onClick={() => void completeCharacter()}
         >
-          {aiState.phase === 'confirming' ? '正在确认角色…' : '确认特质并生成背景'}
+          {['generating', 'validating'].includes(aiState.phase)
+            ? '正在生成完整候选…'
+            : '确认特质并生成背景候选'}
         </button>
       </main>
     );
