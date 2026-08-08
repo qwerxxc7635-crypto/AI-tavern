@@ -1,10 +1,5 @@
 export type ApiBindingPhase =
-  | 'editing'
-  | 'testing'
-  | 'choosing_model'
-  | 'saving'
-  | 'saved'
-  | 'failed';
+  'editing' | 'testing' | 'choosing_model' | 'saving' | 'saved' | 'failed';
 
 export type ApiBindingFailureKind = 'timeout' | 'test_failed' | 'save_failed';
 

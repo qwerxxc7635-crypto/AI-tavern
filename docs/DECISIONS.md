@@ -1588,3 +1588,19 @@ OpenAI-compatible usage增加可选`prompt_cache_hit_tokens`与`prompt_cache_mis
 ### 影响与边界
 
 T01先建立权威源并对齐所有消费者；T02必须提供从根版本同步/校验Tauri、Cargo workspace及npm manifests的脚本和CI门禁，避免人工漂移。iOS仅更新占位manifest，不开始iOS功能开发或构建验收。
+
+## DEC-072：发布信息由Changelog当前区段确定性生成
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T02`、单一版本源与双平台发布门禁
+
+### 决定与理由
+
+根`package.json.version`继续是版本权威源；`CHANGELOG.md`以显式current-release标记圈定尚未发布的当前区段，`release:sync`将版本同步到全部npm manifests、Tauri、Cargo workspace与成员声明，并从该区段的条目确定性生成`release-info.json`和前端只读模块。Cargo metadata负责刷新lockfile，避免Rust镜像只改manifest而遗漏锁文件。
+
+`release:check`严格只读，逐项核对npm、Tauri、Cargo workspace/成员/lockfile、Changelog标题、release-info及生成模块，并在Windows/macOS共享CI中执行。运行时版本仍从Tauri metadata读取；生成模块只提供channel、status和更新摘要，避免建立第二个版本源。
+
+### 影响与边界
+
+当前版本保持`development / unreleased`，不在未完成双平台发布验收前伪造发布日期、签名或发布状态。正式发布任务必须显式把current-release区段冻结为真实日期与发布状态，并再次运行同步/检查；历史`0.1.0`记录不补造未知日期。脚本只管理发布元数据，不访问Provider、正式用户数据或iOS功能实现。

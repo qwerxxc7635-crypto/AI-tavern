@@ -1,5 +1,10 @@
 import { PersistenceDataError } from './campaign-repository.js';
-import { requireArray, requireNumber, requireRecord, requireString } from './persistence-validation.js';
+import {
+  requireArray,
+  requireNumber,
+  requireRecord,
+  requireString,
+} from './persistence-validation.js';
 import type { TransactionalSqliteDatabase } from './sqlite-port.js';
 
 const SETTINGS_KEY = 'deepseek_cache_metrics_v1';

@@ -196,9 +196,7 @@ describe('model settings page', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: '测试连接并列出模型' }));
     await waitFor(() =>
-      expect(screen.getByTestId('api-binding-phase').textContent).toBe(
-        '连接状态：choosing_model',
-      ),
+      expect(screen.getByTestId('api-binding-phase').textContent).toBe('连接状态：choosing_model'),
     );
     fireEvent.click(screen.getByRole('button', { name: '保存设置' }));
     await waitFor(() => expect(saved).toHaveLength(3));

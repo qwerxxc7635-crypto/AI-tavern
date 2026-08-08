@@ -41,6 +41,9 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Check release metadata synchronization
+        run: pnpm release:check
+
       - name: Lint TypeScript
         run: pnpm lint
 

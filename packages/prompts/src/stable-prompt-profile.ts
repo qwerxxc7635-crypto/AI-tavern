@@ -32,7 +32,8 @@ export interface StablePromptProfile {
 
 const SYSTEM_CONTRACT = Object.freeze({
   authority: 'Local game rules and SQLite state are authoritative.',
-  output: 'The model returns a proposal only; local validation and transaction commit decide facts.',
+  output:
+    'The model returns a proposal only; local validation and transaction commit decide facts.',
 });
 
 export function createStablePromptProfile(
@@ -113,7 +114,5 @@ function visitStableValue(value: JsonValue, path: string): void {
 }
 
 function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }

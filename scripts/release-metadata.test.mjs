@@ -7,6 +7,7 @@ test('builds deterministic cross-platform release metadata', () => {
   const metadata = buildReleaseMetadata({
     packageJson: { version: '0.2.0' },
     tauriConfig: { productName: 'Ember Tavern', version: '0.2.0' },
+    releaseInfo: { version: '0.2.0', channel: 'development', status: 'unreleased' },
     gitCommit: 'abc123',
     platform: 'darwin',
     arch: 'arm64',
@@ -15,6 +16,8 @@ test('builds deterministic cross-platform release metadata', () => {
   assert.deepEqual(metadata, {
     productName: 'Ember Tavern',
     version: '0.2.0',
+    channel: 'development',
+    status: 'unreleased',
     gitCommit: 'abc123',
     platform: 'darwin',
     arch: 'arm64',
@@ -27,6 +30,7 @@ test('rejects inconsistent version sources', () => {
       buildReleaseMetadata({
         packageJson: { version: '0.1.0' },
         tauriConfig: { productName: 'Ember Tavern', version: '0.2.0' },
+        releaseInfo: { version: '0.2.0', channel: 'development', status: 'unreleased' },
         gitCommit: 'abc123',
         platform: 'win32',
         arch: 'x64',

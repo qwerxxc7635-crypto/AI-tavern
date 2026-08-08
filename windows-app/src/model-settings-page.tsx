@@ -39,10 +39,7 @@ export function ModelSettingsPage({
   const [useAsFallback, setUseAsFallback] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [credentialBusy, setCredentialBusy] = useState(false);
-  const [binding, dispatchBinding] = useReducer(
-    reduceApiBindingState,
-    INITIAL_API_BINDING_STATE,
-  );
+  const [binding, dispatchBinding] = useReducer(reduceApiBindingState, INITIAL_API_BINDING_STATE);
   const operationSequence = useRef(0);
   const activeOperation = useRef<number | null>(null);
 

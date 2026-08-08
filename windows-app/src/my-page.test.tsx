@@ -12,7 +12,13 @@ describe('My page information architecture', () => {
   it('exposes all seven device-setting sections and the release version', async () => {
     render(
       <MemoryRouter>
-        <MyPage versionGateway={{ async getVersion() { return '0.2.0'; } }} />
+        <MyPage
+          versionGateway={{
+            async getVersion() {
+              return '0.2.0';
+            },
+          }}
+        />
       </MemoryRouter>,
     );
 
@@ -28,5 +34,9 @@ describe('My page information architecture', () => {
       '/settings',
     );
     expect(await screen.findByText('当前版本：0.2.0')).toBeTruthy();
+    expect(screen.getByText('发布状态：development / unreleased')).toBeTruthy();
+    expect(
+      screen.getByRole('list', { name: '当前版本更新记录' }).querySelectorAll('li'),
+    ).toHaveLength(3);
   });
 });

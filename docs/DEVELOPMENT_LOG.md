@@ -2860,3 +2860,23 @@
 ### 结论
 
 - `V02-M5-T01`完成。下一项严格为`V02-M5-T02` Changelog Automation。
+
+## 2026-08-08 — V02-M5-T02 自动化 Changelog 与发布信息
+
+### 实现
+
+- 新建根`CHANGELOG.md`，以current-release标记维护`0.2.0 Unreleased`区段；保留历史`0.1.0`但不虚构未知发布日期。
+- 新增`release-info.json`及前端生成模块，包含schema、版本、development/unreleased状态、Changelog定位和当前更新摘要；“我的 → 版本与更新记录”显示Tauri运行时版本及生成的发布状态/摘要。
+- 新增`release:sync`，从根版本权威源同步全部npm manifests、Tauri、Cargo workspace/成员、Cargo.lock及Changelog标题，再确定性生成两份release-info消费者格式。
+- 新增严格只读`release:check`，检测全部版本镜像、Cargo继承、lockfile、Changelog、JSON和前端生成模块漂移；CI在Windows/macOS共享门禁执行该检查。
+- release metadata产物增加channel/status；记录`DEC-072`。为恢复仓库级Prettier门禁，仅机械格式化此前已提交但未符合现行规则的v0.2文件，不改变逻辑。
+
+### 验证
+
+- `pnpm release:sync`后`pnpm release:check`通过，并验证再次检查不写文件；Node发布脚本4项测试覆盖确定性生成及8类镜像漂移。
+- My页面与Tauri配置3项定向测试、`pnpm typecheck`、`pnpm lint`、全仓`pnpm format:check`及`git diff --check`通过。
+- 当前发布状态仍为unreleased；未构建、签名、上传或发布产物，未访问真实API、正式用户数据或开展iOS功能。
+
+### 结论
+
+- `V02-M5-T02`完成。下一项严格为`V02-M5-T03` zh-CN Resource Layer。

@@ -19,7 +19,10 @@ describe('context cache layout', () => {
     ]);
     const assembly = assembleContextBlocks(
       blocks.reverse().map((entry) => ({ block: entry, relevance: 1, required: true })),
-      { maxTokens: 1_000, typeOrder: ['summary', 'lore', 'knowledge', 'history', 'state', 'action'] },
+      {
+        maxTokens: 1_000,
+        typeOrder: ['summary', 'lore', 'knowledge', 'history', 'state', 'action'],
+      },
     );
     const layout = createContextCacheLayout(assembly);
 
@@ -45,10 +48,10 @@ describe('context cache layout', () => {
     const dynamicLore = await block('lore', 'dynamic', 1);
     const unsupported = await block('world', 'semi_stable', 1);
     for (const entry of [dynamicLore, unsupported]) {
-      const assembly = assembleContextBlocks(
-        [{ block: entry, relevance: 1, required: true }],
-        { maxTokens: 100, typeOrder: [entry.type] },
-      );
+      const assembly = assembleContextBlocks([{ block: entry, relevance: 1, required: true }], {
+        maxTokens: 100,
+        typeOrder: [entry.type],
+      });
       expect(() => createContextCacheLayout(assembly)).toThrow(ContextCacheLayoutError);
     }
   });

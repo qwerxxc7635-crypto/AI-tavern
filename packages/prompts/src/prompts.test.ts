@@ -186,9 +186,7 @@ describe('stable prompt profile', () => {
     const rendered = renderStablePromptProfile(profile);
     expect(rendered).not.toContain('\r');
     expect(rendered.endsWith('\n')).toBe(false);
-    expect(rendered).toContain(
-      '[OUTPUT_SCHEMA]\n{"required":["z","a"],"type":"object"}',
-    );
+    expect(rendered).toContain('[OUTPUT_SCHEMA]\n{"required":["z","a"],"type":"object"}');
     expect(rendered).toContain(
       '[STABLE_WORLD_TRUTHS]\n{"a":1,"enumValue":"LOCKED","z":"line one\\nline two"}',
     );

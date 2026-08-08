@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
 import { tauriVersionGateway, type VersionGateway } from './version-service.js';
+import { RELEASE_INFO } from './generated-release-info.js';
 
 export const MY_SECTIONS = [
   { id: 'api', label: 'API', description: '连接与模型档案' },
@@ -98,6 +99,14 @@ export function MyPage({
               查看应用版本、发布渠道、构建信息与本轮变更；版本值由统一ReleaseMetadata提供。
             </SectionCopy>
             <strong>当前版本：{version ?? '读取中…'}</strong>
+            <span>
+              发布状态：{RELEASE_INFO.channel} / {RELEASE_INFO.status}
+            </span>
+            <ul aria-label="当前版本更新记录">
+              {RELEASE_INFO.highlights.map((highlight) => (
+                <li key={highlight}>{highlight}</li>
+              ))}
+            </ul>
           </section>
         </div>
       </div>

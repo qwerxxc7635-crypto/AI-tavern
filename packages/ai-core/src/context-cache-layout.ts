@@ -1,10 +1,6 @@
 import type { JsonValue } from '@ember-tavern/contracts';
 
-import type {
-  ContextAssembly,
-  ContextBlock,
-  ContextBlockType,
-} from './context-assembly.js';
+import type { ContextAssembly, ContextBlock, ContextBlockType } from './context-assembly.js';
 
 export const CONTEXT_CACHE_SECTION_KINDS = [
   'LONG_TERM_SUMMARY',
