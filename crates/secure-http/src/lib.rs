@@ -11,6 +11,7 @@ use std::{
     time::Duration,
 };
 
+use antissrf::{AntiSSRFPolicy, PolicyConfigOptions};
 use bytes::Bytes;
 use futures_util::{Stream, StreamExt};
 use reqwest::{Method, StatusCode, Url, header::HeaderName};
@@ -118,41 +119,49 @@ fn validate_resolved_addresses(
 }
 
 fn address_is_public(address: IpAddr) -> bool {
-    match address {
-        IpAddr::V4(address) => ipv4_is_public(address),
-        IpAddr::V6(address) => ipv6_is_public(address),
+    if let IpAddr::V6(address) = address
+        && let Some(embedded) = address.to_ipv4()
+    {
+        return address_is_public(embedded.into());
     }
+
+    let mut policy = AntiSSRFPolicy::new(PolicyConfigOptions::ExternalOnlyLatest);
+    let rendered = address.to_string();
+    policy
+        .is_network_connection_allowed(&[rendered.as_str()])
+        .unwrap_or(false)
+        && match address {
+            IpAddr::V4(_) => true,
+            IpAddr::V6(address) => embedded_transition_ipv4(address)
+                .is_none_or(|embedded| address_is_public(embedded.into())),
+        }
 }
 
-fn ipv4_is_public(address: Ipv4Addr) -> bool {
-    let [first, second, third, _] = address.octets();
-    !(first == 0
-        || first == 10
-        || first == 127
-        || first >= 224
-        || first == 100 && (64..=127).contains(&second)
-        || first == 169 && second == 254
-        || first == 172 && (16..=31).contains(&second)
-        || first == 192 && second == 0 && third == 0
-        || first == 192 && second == 0 && third == 2
-        || first == 192 && second == 168
-        || first == 198 && (second == 18 || second == 19)
-        || first == 198 && second == 51 && third == 100
-        || first == 203 && second == 0 && third == 113)
-}
+fn embedded_transition_ipv4(address: Ipv6Addr) -> Option<Ipv4Addr> {
+    let octets = address.octets();
 
-fn ipv6_is_public(address: Ipv6Addr) -> bool {
-    if let Some(mapped) = address.to_ipv4_mapped() {
-        return ipv4_is_public(mapped);
+    if octets[..12] == [0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0]
+        || octets[..6] == [0x00, 0x64, 0xff, 0x9b, 0x00, 0x01]
+    {
+        return Some(Ipv4Addr::new(
+            octets[12], octets[13], octets[14], octets[15],
+        ));
     }
-    let segments = address.segments();
-    !(address.is_unspecified()
-        || address.is_loopback()
-        || address.is_multicast()
-        || segments[0] & 0xfe00 == 0xfc00
-        || segments[0] & 0xffc0 == 0xfe80
-        || segments[0] & 0xffc0 == 0xfec0
-        || segments[0] == 0x2001 && segments[1] == 0x0db8)
+
+    if octets[..2] == [0x20, 0x02] {
+        return Some(Ipv4Addr::new(octets[2], octets[3], octets[4], octets[5]));
+    }
+
+    if octets[..4] == [0x20, 0x01, 0x00, 0x00] {
+        return Some(Ipv4Addr::new(
+            !octets[12],
+            !octets[13],
+            !octets[14],
+            !octets[15],
+        ));
+    }
+
+    None
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

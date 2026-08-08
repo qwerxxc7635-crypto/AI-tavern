@@ -42,6 +42,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "antissrf"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "84ee79db890511a6c8f91e39fe302e33f73c1530fec3ff171b4ce1fee1798059"
+dependencies = [
+ "ipnetwork",
+ "thiserror 2.0.19",
+ "url",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -804,6 +815,7 @@ dependencies = [
 name = "ember-secure-http"
 version = "0.1.0"
 dependencies = [
+ "antissrf",
  "bytes",
  "futures-util",
  "reqwest",
@@ -1676,6 +1688,12 @@ name = "ipnet"
 version = "2.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d98f6fed1fde3f8c21bc40a1abb88dd75e67924f9cffc3ef95607bad8017f8e2"
+
+[[package]]
+name = "ipnetwork"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cf370abdafd54d13e54a620e8c3e1145f28e46cc9d704bc6d94414559df41763"
 
 [[package]]
 name = "itoa"

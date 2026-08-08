@@ -5,6 +5,7 @@ edition = "2024"
 publish = false
 
 [dependencies]
+antissrf = { version = "0.1.1", default-features = false }
 bytes = "1.11.1"
 futures-util = "0.3.32"
 reqwest = { version = "0.13.4", default-features = false, features = ["rustls", "stream"] }

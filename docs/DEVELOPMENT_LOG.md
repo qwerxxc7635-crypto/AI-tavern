@@ -2370,3 +2370,22 @@
 ### 结论
 
 - `V02-M0-T02` 与 `V02-M0-T03` 完成。下一项严格为 `V02-M1-T01` SSRF IPv4/IPv6；Windows 和 macOS 的最终实机/CI 证据仍由 M9 重新验收。
+
+## 2026-08-08 — V02-M1-T01 关闭 SSRF IPv4/IPv6 绕过
+
+### 实现
+
+- 删除自维护的 IPv4/IPv6 “公网”网段判断，改用 `antissrf` 的 `ExternalOnlyLatest` 地址策略；依赖关闭默认 reqwest integration，不替换现有受限 HTTP transport。
+- 对 IPv4-mapped、IPv4-compatible、NAT64、6to4 与 Teredo 解析内嵌 IPv4，并在外层策略之外复用同一 IPv4 安全判断。
+- 保留全 DNS answer 校验、混合结果拒绝、解析地址固定、禁重定向和 URL host 驱动 Host/SNI 的既有边界。
+
+### 验证
+
+- `cargo test -p ember-secure-http`：11/11 通过。
+- `cargo clippy -p ember-secure-http --all-targets -- -D warnings` 通过；全 workspace tests 继续执行到 `ember-secure-secrets`，仅因 macOS adapter 尚未实现而在既有 round-trip 测试返回 `Unavailable`，该失败正是下一项 SR2-002，不属于本次网络边界回归。
+- 新矩阵覆盖 IPv4 private/CGNAT/link-local/documentation/benchmark/multicast/reserved，以及审查列出的 `64:ff9b:1::`、`100::`、`2001::`、`2001:2::`、`2001:10::`、6to4 和旧 compatible 形式。
+- 未访问真实 Provider；所有网络测试仅使用回环临时服务。
+
+### 结论
+
+- SR2-001 / `V02-M1-T01` 关闭。下一项严格为 `V02-M1-T02` SecureVault。
