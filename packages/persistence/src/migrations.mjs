@@ -28,6 +28,11 @@ const migrations = [
     name: 'ai_candidates',
     source: new URL('../../../database/migrations/0004_ai_candidates.sql', import.meta.url),
   },
+  {
+    version: 5,
+    name: 'event_ledger',
+    source: new URL('../../../database/migrations/0005_event_ledger.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

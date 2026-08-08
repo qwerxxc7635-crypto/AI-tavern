@@ -2611,3 +2611,22 @@
 ### 结论
 
 - `V02-M2-T04`完成。下一项严格为`V02-M2-T05` Event Ledger。
+
+## 2026-08-08 — V02-M2-T05 建立最小 Event Ledger
+
+### 实现
+
+- SQLite migration 5新增独立`event_ledger`，覆盖character、quest、turn、dice、scene、knowledge、snapshot和recovery八类注册事件/聚合。
+- 每项绑定全局event ID、operation ID、aggregate ID/type、连续revision、版本化payload、source和数据库生成时间；唯一约束阻止operation元组重放与revision重复。
+- 数据库触发器要求同一aggregate从revision 1严格连续；Repository校验注册表、正整数、JSON和高置信credential，并提供Campaign/aggregate确定性查询。
+- Candidate确认纵向测试在同一事务写领域投影、QUEST ledger和ACCEPTED状态；领域失败时三者共同回滚，证明Ledger不脱离状态事务。
+
+### 验证
+
+- 新增3项Ledger测试，逐项覆盖八类首批事件、数据库时间、连续revision、operation幂等、aggregate顺序和秘密拒绝。
+- Candidate 4项纵向测试继续通过并新增Ledger原子提交/回滚断言；migration 5新库、重复应用与旧库升级纳入门禁。
+- Rust native 43/43通过，包含Windows纵向切片、存档和newer-schema拒绝；`pnpm lint`、`pnpm typecheck`及格式检查通过。未访问正式用户数据或外部API。
+
+### 结论
+
+- `V02-M2-T05`完成，M2 Core AI Architecture实现任务结束。下一项严格为`V02-M3-T01` “我的”入口。

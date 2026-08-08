@@ -1476,3 +1476,19 @@ GenerationRecord只保存fingerprint，不保存ResolvedModelConfig整体，避�
 ### 影响与边界
 
 Provider response仍不能直接写Candidate：调用方必须提供schema/domain成功证据，Candidate存储还会拒绝高置信credential字段和值。migration 4已由TypeScript和Rust启动路径共同应用。当前通用基础设施本身不扩大`.emtavern` schema 1；在具体功能切换为可跨会话的未确认Candidate前，必须同时定义其可移植策略，不能静默丢失用户确认中的提案。
+
+## DEC-065：最小Event Ledger独立于状态投影并强制连续revision
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T05`、Architecture Gate State/Events
+
+### 决定与理由
+
+新增独立`event_ledger`而不把现有`game_events`改造成完整Event Sourcing。Ledger字段固定为event/operation/aggregate、提交后revision、版本化payload、source和数据库时间；首批封闭注册character、quest、turn、dice、scene、knowledge、snapshot与recovery。
+
+数据库唯一约束锁定`operation_id + event_type + aggregate_id`和aggregate revision，触发器要求每个aggregate从1开始连续递增；Repository再校验正整数版本、注册枚举、规范aggregate ID和高置信credential。Candidate确认的领域commit回调可在同一事务写ledger，失败时投影、ledger和Candidate状态共同回滚。
+
+### 影响与边界
+
+应用启动继续读取SQLite状态投影，不重放Ledger。migration 5由TypeScript和Rust共同应用，native archive仍只接受本地schema 5但portable archive schema保持1；因此新Ledger目前是基础设施而非已承诺跨设备数据。在具体业务把Ledger作为持久审计依赖前，必须同步升级TS/Rust可移植格式，不能忽略导入类型、版本、revision连续性或资源预算。

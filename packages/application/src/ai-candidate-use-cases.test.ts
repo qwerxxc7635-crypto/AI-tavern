@@ -5,11 +5,13 @@ import {
   aiOperationId,
   aiRequestId,
   campaignId,
+  eventLedgerId,
   isoTimestamp,
   type JsonValue,
 } from '@ember-tavern/contracts';
 import {
   AICandidateTransitionError,
+  EventLedgerRepository,
   type TransactionalSqliteDatabase,
 } from '@ember-tavern/persistence';
 import { describe, expect, it, vi } from 'vitest';
@@ -66,10 +68,23 @@ describe('AICandidateUseCases', () => {
     try {
       const useCases = new AICandidateUseCases(database, () => at);
       const candidate = useCases.propose(proposal('candidate-confirm', 'operation-confirm'));
+      const ledger = new EventLedgerRepository(database);
       const commit = vi.fn((payload: JsonValue) => {
         database
           .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
           .run('candidate-result', JSON.stringify(payload), at);
+        ledger.append({
+          id: eventLedgerId('ledger-candidate-confirm'),
+          campaignId: campaign,
+          eventType: 'QUEST_COMMITTED',
+          operationId: candidate.operationId,
+          aggregateType: 'QUEST',
+          aggregateId: 'quest-candidate',
+          revision: 1,
+          payload: { candidateId: candidate.id },
+          payloadVersion: 1,
+          source: 'USER_ACCEPTANCE',
+        });
       });
 
       expect(() =>
@@ -84,6 +99,7 @@ describe('AICandidateUseCases', () => {
       ).toBe('ALREADY_COMMITTED');
       expect(commit).toHaveBeenCalledTimes(1);
       expect(useCases.preview(candidate.id).status).toBe('ACCEPTED');
+      expect(ledger.listAggregate('QUEST', 'quest-candidate')).toHaveLength(1);
     } finally {
       database.close();
     }
@@ -94,6 +110,7 @@ describe('AICandidateUseCases', () => {
     try {
       const useCases = new AICandidateUseCases(database, () => at);
       const candidate = useCases.propose(proposal('candidate-rollback', 'operation-rollback'));
+      const ledger = new EventLedgerRepository(database);
       expect(() =>
         useCases.confirm({
           id: candidate.id,
@@ -103,6 +120,18 @@ describe('AICandidateUseCases', () => {
             database
               .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
               .run('must-rollback', '{}', at);
+            ledger.append({
+              id: eventLedgerId('ledger-must-rollback'),
+              campaignId: campaign,
+              eventType: 'QUEST_COMMITTED',
+              operationId: candidate.operationId,
+              aggregateType: 'QUEST',
+              aggregateId: 'quest-rollback',
+              revision: 1,
+              payload: {},
+              payloadVersion: 1,
+              source: 'USER_ACCEPTANCE',
+            });
             throw new Error('domain commit failed');
           },
         }),
@@ -111,6 +140,7 @@ describe('AICandidateUseCases', () => {
       expect(database.prepare("SELECT * FROM app_settings WHERE key = 'must-rollback'").get()).toBe(
         undefined,
       );
+      expect(ledger.listAggregate('QUEST', 'quest-rollback')).toEqual([]);
     } finally {
       database.close();
     }

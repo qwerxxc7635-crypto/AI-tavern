@@ -15,6 +15,7 @@ const coreTables = [
   'campaigns',
   'conversations',
   'credential_cleanup_queue',
+  'event_ledger',
   'game_events',
   'generation_records',
   'items',

@@ -45,6 +45,8 @@ const PROVIDER_PROBE_CONSISTENCY_MIGRATION: &str =
     include_str!("../../../database/migrations/0003_provider_probe_consistency.sql");
 const AI_CANDIDATES_MIGRATION: &str =
     include_str!("../../../database/migrations/0004_ai_candidates.sql");
+const EVENT_LEDGER_MIGRATION: &str =
+    include_str!("../../../database/migrations/0005_event_ledger.sql");
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -464,7 +466,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if latest_version > 4 {
+    if latest_version > 5 {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
 
@@ -481,6 +483,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             PROVIDER_PROBE_CONSISTENCY_MIGRATION,
         ),
         (4_i64, "ai_candidates", AI_CANDIDATES_MIGRATION),
+        (5_i64, "event_ledger", EVENT_LEDGER_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(
@@ -857,7 +860,7 @@ mod tests {
                    name TEXT NOT NULL,
                    applied_at TEXT NOT NULL
                  );
-                 INSERT INTO schema_migrations VALUES (5, 'future', '2026-07-31T01:02:03.004Z');",
+                 INSERT INTO schema_migrations VALUES (6, 'future', '2026-07-31T01:02:03.004Z');",
             )
             .expect("seed future schema");
         drop(connection);

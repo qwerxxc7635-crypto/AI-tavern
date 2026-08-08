@@ -29,6 +29,13 @@ export type {
   AICandidateStatus,
   AICandidateValidationEvidence,
 } from './ai-candidate.js';
+export { LEDGER_AGGREGATE_TYPES, LEDGER_EVENT_TYPES, LEDGER_SOURCES } from './event-ledger.js';
+export type {
+  EventLedgerEntry,
+  LedgerAggregateType,
+  LedgerEventType,
+  LedgerSource,
+} from './event-ledger.js';
 export {
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
@@ -141,6 +148,7 @@ export {
   compatibleEnum,
   conversationId,
   factionId,
+  eventLedgerId,
   gameEventId,
   generationRecordId,
   idempotencyKey,
@@ -177,6 +185,7 @@ export type {
   CompatibleEnum,
   ConversationId,
   FactionId,
+  EventLedgerId,
   GameEventId,
   GenerationRecordId,
   IdempotencyKey,
