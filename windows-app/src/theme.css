@@ -434,6 +434,12 @@ button:focus-visible {
   transform: rotate(38deg);
 }
 
+.save-home__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .primary-action,
 .quiet-action {
   min-height: 2.8rem;
@@ -2014,10 +2020,47 @@ textarea:disabled {
   }
 }
 
+.my-hub,
 .model-settings {
   display: grid;
   gap: 1.5rem;
   padding: clamp(1.25rem, 4vw, 3rem);
+}
+
+.my-hub {
+  align-content: start;
+  max-width: 70rem;
+}
+
+.my-hub > header h1 {
+  margin: 0.2rem 0 0.75rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 400;
+}
+
+.my-hub > header p:last-child,
+.my-hub__entry p {
+  color: var(--muted);
+}
+
+.my-hub__entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  background: rgb(17 27 36 / 72%);
+}
+
+.my-hub__entry h2 {
+  margin: 0.2rem 0 0.5rem;
+}
+
+.my-hub__entry p {
+  margin: 0;
 }
 
 .model-settings__panel,

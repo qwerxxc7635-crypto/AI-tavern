@@ -21,6 +21,13 @@ afterEach(() => {
 });
 
 describe('save home page', () => {
+  it('exposes the device-level My entry without requiring a campaign', async () => {
+    renderSaveHome(new FakeCampaignGateway([]));
+    const link = screen.getByRole('link', { name: '我的' });
+    expect(link.getAttribute('href')).toBe('/my');
+    expect(await screen.findByText('炉边还没有你的故事。')).toBeTruthy();
+  });
+
   it('loads durable campaigns and shows their last-played time', async () => {
     const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
     renderSaveHome(gateway);

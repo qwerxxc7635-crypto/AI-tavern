@@ -36,6 +36,7 @@ const ArchivesPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('./model-settings-page.js').then(({ ModelSettingsPage: page }) => ({ default: page })),
 );
+const MyPage = lazy(() => import('./my-page.js').then(({ MyPage: page }) => ({ default: page })));
 const RecoveryPage = lazy(() =>
   import('./recovery-page.js').then(({ RecoveryPage: page }) => ({ default: page })),
 );
@@ -46,7 +47,7 @@ export const WINDOWS_NAVIGATION = [
   { path: '/adventure', label: '冒险', marker: 'A' },
   { path: '/character', label: '角色', marker: 'C' },
   { path: '/archives', label: '档案', marker: 'R' },
-  { path: '/settings', label: '设置', marker: 'S' },
+  { path: '/my', label: '我的', marker: 'M' },
 ] as const;
 
 export function AppRoutes() {
@@ -100,6 +101,7 @@ export function AppRoutes() {
         <Route path="adventure" element={<AdventurePage />} />
         <Route path="character" element={<CharacterPage />} />
         <Route path="archives" element={<ArchivesPage />} />
+        <Route path="my" element={<MyPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<RouteNotFound />} />
       </Route>

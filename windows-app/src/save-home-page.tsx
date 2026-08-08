@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 import {
   tauriCampaignGateway,
@@ -226,14 +226,19 @@ export function SaveHomePage({
           <h1>选择一段旅程</h1>
           <p>每一页都保存在这台设备的 SQLite 存档中。</p>
         </div>
-        <button
-          className="primary-action"
-          type="button"
-          disabled={busyId !== null}
-          onClick={() => void createCampaign()}
-        >
-          {busyId === 'new' ? '正在落笔…' : '新建存档'}
-        </button>
+        <div className="save-home__header-actions">
+          <NavLink className="quiet-action" to="/my">
+            我的
+          </NavLink>
+          <button
+            className="primary-action"
+            type="button"
+            disabled={busyId !== null}
+            onClick={() => void createCampaign()}
+          >
+            {busyId === 'new' ? '正在落笔…' : '新建存档'}
+          </button>
+        </div>
       </header>
 
       {error === null ? null : (
