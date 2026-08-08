@@ -9,6 +9,61 @@ import type { ModelSettingsGateway, ModelSettingsUpdate } from './model-settings
 afterEach(cleanup);
 
 describe('model settings page', () => {
+  it('offers all five connection profiles and applies their endpoint rules', async () => {
+    const gateway: ModelSettingsGateway = {
+      async load() {
+        return {
+          profiles: [],
+          defaultModelProfileId: null,
+          fallbackModelProfileId: null,
+          pendingCredentialCleanupCount: 0,
+        };
+      },
+      async save() {
+        throw new Error('not used');
+      },
+      async forgetCredential() {
+        throw new Error('not used');
+      },
+      async saveSecret() {
+        throw new Error('not used');
+      },
+      async deleteSecret() {},
+      async probe() {
+        throw new Error('not used');
+      },
+    };
+
+    render(<ModelSettingsPage gateway={gateway} />);
+    await screen.findByText('尚未配置模型。');
+
+    const selector = screen.getByLabelText('Connection Profile') as HTMLSelectElement;
+    expect(Array.from(selector.options).map((option) => option.text)).toEqual([
+      'DeepSeek',
+      'Qwen',
+      'OpenRouter',
+      'Ollama',
+      'OpenAI-Compatible',
+    ]);
+
+    const endpoint = screen.getByLabelText('Base URL') as HTMLInputElement;
+    expect(endpoint.readOnly).toBe(true);
+    fireEvent.change(selector, { target: { value: 'qwen' } });
+    expect(endpoint.value).toBe('https://dashscope.aliyuncs.com/compatible-mode/v1/');
+    expect(endpoint.readOnly).toBe(true);
+    fireEvent.change(selector, { target: { value: 'openrouter' } });
+    expect(endpoint.value).toBe('https://openrouter.ai/api/v1/');
+    expect(endpoint.readOnly).toBe(true);
+    fireEvent.change(selector, { target: { value: 'ollama' } });
+    expect(endpoint.value).toBe('http://localhost:11434/v1/');
+    expect(endpoint.readOnly).toBe(false);
+    expect((screen.getByLabelText('API Key') as HTMLInputElement).disabled).toBe(true);
+    fireEvent.change(selector, { target: { value: 'custom' } });
+    expect(endpoint.value).toBe('');
+    expect(endpoint.readOnly).toBe(false);
+    expect((screen.getByLabelText('API Key') as HTMLInputElement).disabled).toBe(false);
+  });
+
   it('tests a provider, saves an opaque credential reference and marks defaults', async () => {
     const saved: ModelSettingsUpdate[] = [];
     const deleted: string[] = [];

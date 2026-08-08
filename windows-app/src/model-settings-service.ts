@@ -2,6 +2,64 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type PresetKey = 'deepseek' | 'qwen' | 'openrouter' | 'ollama' | 'custom';
 
+export interface ConnectionProfileDefinition {
+  readonly key: PresetKey;
+  readonly name: string;
+  readonly baseUrl: string;
+  readonly defaultModel: string;
+  readonly endpointMode: 'FIXED' | 'CONFIGURABLE';
+  readonly credentialMode: 'REQUIRED' | 'OPTIONAL' | 'NONE';
+}
+
+export const CONNECTION_PROFILES: readonly ConnectionProfileDefinition[] = Object.freeze([
+  Object.freeze({
+    key: 'deepseek',
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/',
+    defaultModel: 'deepseek-v4-flash',
+    endpointMode: 'FIXED',
+    credentialMode: 'REQUIRED',
+  }),
+  Object.freeze({
+    key: 'qwen',
+    name: 'Qwen',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/',
+    defaultModel: 'qwen3.7-plus',
+    endpointMode: 'FIXED',
+    credentialMode: 'REQUIRED',
+  }),
+  Object.freeze({
+    key: 'openrouter',
+    name: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1/',
+    defaultModel: '',
+    endpointMode: 'FIXED',
+    credentialMode: 'REQUIRED',
+  }),
+  Object.freeze({
+    key: 'ollama',
+    name: 'Ollama',
+    baseUrl: 'http://localhost:11434/v1/',
+    defaultModel: '',
+    endpointMode: 'CONFIGURABLE',
+    credentialMode: 'NONE',
+  }),
+  Object.freeze({
+    key: 'custom',
+    name: 'OpenAI-Compatible',
+    baseUrl: '',
+    defaultModel: '',
+    endpointMode: 'CONFIGURABLE',
+    credentialMode: 'OPTIONAL',
+  }),
+]);
+
+export function getConnectionProfile(key: PresetKey): ConnectionProfileDefinition {
+  const profile = CONNECTION_PROFILES.find((candidate) => candidate.key === key);
+  if (profile === undefined) throw new TypeError('Connection profile is invalid');
+  return profile;
+}
+
 export interface ModelProfile {
   readonly id: string;
   readonly providerId: string;

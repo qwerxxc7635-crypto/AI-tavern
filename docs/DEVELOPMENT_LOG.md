@@ -2666,3 +2666,22 @@
 ### 结论
 
 - `V02-M3-T02`完成。下一项严格为`V02-M3-T03` Connection Profiles。
+
+## 2026-08-08 — V02-M3-T03 建立 Connection Profiles
+
+### 实现
+
+- 建立前端单一`CONNECTION_PROFILES`闭集，逐项定义DeepSeek、Qwen、OpenRouter、Ollama与OpenAI-Compatible的显示名、默认端点、默认模型、端点模式和凭据模式。
+- DeepSeek、Qwen及OpenRouter保持固定官方兼容端点且不可在界面编辑；Ollama与OpenAI-Compatible允许配置端点，Ollama明确不要求系统凭据。
+- Profile切换统一重置端点、模型、探测模型及receipt，避免旧Profile探测证据被新选择复用；原生层既有固定端点和安全URL校验继续作为权威门禁。
+- 已保存模型同时显示用户配置名、Connection Profile类型与实际Base URL；SQLite中已有`preset_key`继续作为持久Profile身份，不增加重复状态。
+
+### 验证
+
+- 新增五类Profile选项测试，覆盖三个固定端点只读、Ollama默认本机地址/禁用Key、OpenAI-Compatible空白可配置端点/可选Key。
+- 模型设置页面2项测试通过；`pnpm typecheck`和`pnpm lint`通过。
+- 未实现下一项T04的完整binding状态机，未连接真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M3-T03`完成。下一项严格为`V02-M3-T04` API Binding State Machine。

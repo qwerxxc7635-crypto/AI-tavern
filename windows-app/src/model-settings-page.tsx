@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 
 import {
+  CONNECTION_PROFILES,
+  getConnectionProfile,
   tauriModelSettingsGateway,
   type ModelSettingsGateway,
   type ModelSettingsSnapshot,
@@ -9,21 +11,7 @@ import {
   type ProbeModel,
 } from './model-settings-service.js';
 
-const PRESETS: Readonly<Record<PresetKey, { name: string; baseUrl: string; model: string }>> = {
-  deepseek: { name: 'DeepSeek', baseUrl: 'https://api.deepseek.com/', model: 'deepseek-v4-flash' },
-  qwen: {
-    name: 'Qwen',
-    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/',
-    model: 'qwen3.7-plus',
-  },
-  openrouter: {
-    name: 'OpenRouter',
-    baseUrl: 'https://openrouter.ai/api/v1/',
-    model: '',
-  },
-  ollama: { name: 'Ollama（本地）', baseUrl: 'http://localhost:11434/v1/', model: '' },
-  custom: { name: '自定义兼容服务', baseUrl: '', model: '' },
-};
+const DEFAULT_PROFILE = getConnectionProfile('deepseek');
 
 export function ModelSettingsPage({
   gateway = tauriModelSettingsGateway,
@@ -32,9 +20,9 @@ export function ModelSettingsPage({
 }) {
   const [snapshot, setSnapshot] = useState<ModelSettingsSnapshot | null>(null);
   const [presetKey, setPresetKey] = useState<PresetKey>('deepseek');
-  const [displayName, setDisplayName] = useState(PRESETS.deepseek.name);
-  const [baseUrl, setBaseUrl] = useState(PRESETS.deepseek.baseUrl);
-  const [modelName, setModelName] = useState(PRESETS.deepseek.model);
+  const [displayName, setDisplayName] = useState(DEFAULT_PROFILE.name);
+  const [baseUrl, setBaseUrl] = useState(DEFAULT_PROFILE.baseUrl);
+  const [modelName, setModelName] = useState(DEFAULT_PROFILE.defaultModel);
   const [apiKey, setApiKey] = useState('');
   const [models, setModels] = useState<readonly ProbeModel[]>([]);
   const [probeResult, setProbeResult] = useState<ProbeResult | null>(null);
@@ -59,15 +47,17 @@ export function ModelSettingsPage({
   }, [gateway]);
 
   function choosePreset(next: PresetKey) {
-    const selected = PRESETS[next];
+    const selected = getConnectionProfile(next);
     setPresetKey(next);
     setDisplayName(selected.name);
     setBaseUrl(selected.baseUrl);
-    setModelName(selected.model);
+    setModelName(selected.defaultModel);
     setModels([]);
     setProbeResult(null);
     setStatus(null);
   }
+
+  const selectedProfile = getConnectionProfile(presetKey);
 
   async function withCredential<T>(
     operation: (credentialRef: string | null, credentialAction: 'KEEP' | 'REPLACE') => Promise<T>,
@@ -222,14 +212,14 @@ export function ModelSettingsPage({
       </section>
       <section className="model-settings__panel" aria-label="模型配置">
         <label>
-          Provider
+          Connection Profile
           <select
             value={presetKey}
             onChange={(event) => choosePreset(event.target.value as PresetKey)}
           >
-            {Object.entries(PRESETS).map(([key, value]) => (
-              <option key={key} value={key}>
-                {value.name}
+            {CONNECTION_PROFILES.map((profile) => (
+              <option key={profile.key} value={profile.key}>
+                {profile.name}
               </option>
             ))}
           </select>
@@ -242,9 +232,7 @@ export function ModelSettingsPage({
           Base URL
           <input
             value={baseUrl}
-            readOnly={
-              presetKey === 'deepseek' || presetKey === 'qwen' || presetKey === 'openrouter'
-            }
+            readOnly={selectedProfile.endpointMode === 'FIXED'}
             onChange={(event) => {
               setBaseUrl(event.target.value);
               setModels([]);
@@ -258,7 +246,7 @@ export function ModelSettingsPage({
             type="password"
             autoComplete="off"
             value={apiKey}
-            disabled={presetKey === 'ollama'}
+            disabled={selectedProfile.credentialMode === 'NONE'}
             onChange={(event) => setApiKey(event.target.value)}
           />
         </label>
@@ -322,6 +310,8 @@ export function ModelSettingsPage({
               <li key={profile.id}>
                 <strong>{profile.modelDisplayName}</strong>
                 <span>{profile.providerDisplayName}</span>
+                <span>{getConnectionProfile(profile.presetKey).name}</span>
+                {profile.baseUrl === null ? null : <span>{profile.baseUrl}</span>}
                 {snapshot.defaultModelProfileId === profile.id ? <em>默认</em> : null}
                 {snapshot.fallbackModelProfileId === profile.id ? <em>备用</em> : null}
                 {profile.hasCredential ? (
