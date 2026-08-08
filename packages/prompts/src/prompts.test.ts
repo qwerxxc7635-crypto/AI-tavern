@@ -1,4 +1,11 @@
-import { AI_TASKS, type ModelCapabilities } from '@ember-tavern/ai-core';
+import {
+  AI_TASKS,
+  assembleContextBlocks,
+  canonicalJson,
+  createContextBlock,
+  createContextCacheLayout,
+  type ModelCapabilities,
+} from '@ember-tavern/ai-core';
 import { isoTimestamp } from '@ember-tavern/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -79,7 +86,7 @@ describe('provider-neutral prompt formatting', () => {
     expect(formatted.messages[0]?.content).toContain('WORLD_DESIGNER');
     expect(formatted.messages[0]?.content).toContain('[SYSTEM_CONTRACT]');
     expect(formatted.messages[0]?.content).toContain('[STABLE_WORLD_TRUTHS]');
-    expect(formatted.messages[1]?.content).toContain(JSON.stringify(worldInput));
+    expect(formatted.messages[1]?.content).toContain(canonicalJson(worldInput));
     expect(formatted.responseFormat).toMatchObject({
       kind: 'JSON_SCHEMA',
       name: 'generate_world_v1',
@@ -183,6 +190,52 @@ describe('stable prompt profile', () => {
     );
     expect(rendered).toContain(
       '[STABLE_WORLD_TRUTHS]\n{"a":1,"enumValue":"LOCKED","z":"line one\\nline two"}',
+    );
+  });
+
+  it('places semi-stable context before dynamic context and task input', async () => {
+    const summary = await createContextBlock({
+      id: 'summary-1',
+      type: 'summary',
+      content: { summary: 'The beacon failed.' },
+      sourceId: 'campaign-a',
+      sourceRevision: 2,
+      stability: 'semi_stable',
+      priority: 10,
+      tokenBudget: 100,
+      privacyClass: 'game_private',
+      version: 1,
+    });
+    const action = await createContextBlock({
+      id: 'action-1',
+      type: 'action',
+      content: { action: 'Inspect the beacon.' },
+      sourceId: 'turn-a',
+      sourceRevision: 7,
+      stability: 'dynamic',
+      priority: 10,
+      tokenBudget: 100,
+      privacyClass: 'game_private',
+      version: 1,
+    });
+    const layout = createContextCacheLayout(
+      assembleContextBlocks(
+        [summary, action].map((block) => ({ block, relevance: 1, required: true })),
+        { maxTokens: 1_000, typeOrder: ['summary', 'action'] },
+      ),
+    );
+    const formatted = formatTaskPrompt('GENERATE_WORLD', worldInput, capabilities, {
+      stableWorldTruths: { setting: 'Beacon Coast' },
+      cacheLayout: layout,
+    });
+    const content = formatted.messages[1]?.content ?? '';
+    expect(content.indexOf('[LONG_TERM_SUMMARY]')).toBeLessThan(
+      content.indexOf('[RECENT_HISTORY]'),
+    );
+    expect(content.indexOf('[RECENT_HISTORY]')).toBeLessThan(content.indexOf('[PLAYER_ACTION]'));
+    expect(content.indexOf('[PLAYER_ACTION]')).toBeLessThan(content.indexOf('[TASK_INPUT]'));
+    expect(formatted.messages[0]?.content).toContain(
+      '[STABLE_WORLD_TRUTHS]\n{"setting":"Beacon Coast"}',
     );
   });
 });

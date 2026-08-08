@@ -1540,3 +1540,19 @@ Prompt每段固定为`[SECTION_ENUM] + LF + canonical JSON`，段间恰好两个
 ### 影响与边界
 
 共享canonical string规则会同时影响后续新建ContextBlock hash、token估算和ResolvedModelConfig fingerprint，这是有意统一而不是存档格式升级；现有已持久化hash仍是不可变审计值，不在启动时重写。序列化只保证输入相同得到相同字节，不保证不同Prompt Profile版本命中同一缓存；版本变化必须改变profile/hash。
+
+## DEC-069：Context Cache Layout以五段和stability fail closed
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T04`、ContextBlock stable/semi-stable/dynamic模型
+
+### 决定与理由
+
+Stable Prompt Profile之后固定五段：Long-term Summary、Relevant Lore/Knowledge、Recent History、Current Scene/State、Player Action。summary/memory/lore/knowledge只允许`semi_stable`；history/scene/state/dice/action/user_input只允许`dynamic`。类型未注册或stability层级不符时布局构建失败，不把动态行动降级放进可复用前缀。
+
+Layout从已完成预算/相关性筛选的ContextAssembly投影，仅保留type、source revision、block version、content hash和content；block ID与source ID不进入Provider prompt，避免随机UUID破坏缓存。半稳定块按语义type/hash排序，动态块按语义type、source revision、hash排序；历史和行动数组本身仍保持canonical JSON的语义顺序。
+
+### 影响与边界
+
+Provider-neutral formatter可显式接收stable world truths及layout，把五个context段放在`TASK_INPUT`之前；原调用不传layout时保持兼容。当前云游戏生成仍未启用，因此不会用Fake路径伪造DeepSeek命中；后续实际生成路径必须先从知识边界过滤后的细粒度ContextBlock构建layout，不能把现有复合`task`块冒充缓存分层。

@@ -2781,3 +2781,23 @@
 ### 结论
 
 - `V02-M4-T03`完成。下一项严格为`V02-M4-T04` Context Cache Layout。
+
+## 2026-08-08 — V02-M4-T04 建立 Context Cache Layout
+
+### 实现
+
+- ContextBlock注册表增加summary、state和action语义类型；新增五段Cache Layout：Long-term Summary、Relevant Lore/Knowledge、Recent History、Current Scene/State、Player Action。
+- summary/memory/lore/knowledge强制semi-stable，history/scene/state/dice/action/user_input强制dynamic；错误stability或尚未映射的复合类型直接拒绝，防止行动进入可复用前缀。
+- Layout只投影type、source revision、version、content hash和content，不把block/source ID等随机标识送进Prompt；半稳定与动态段分别按稳定语义顺序整理。
+- Provider-neutral formatter可选接收Stable World Truths与Cache Layout，按段渲染后再追加canonical `TASK_INPUT`；既有调用不传layout时保持行为兼容。
+- 记录`DEC-069`并同步目标架构；现有复合`task` ContextBlock未被虚假拆分，真实云生成启用前必须由知识边界后的细粒度块接线。
+
+### 验证
+
+- 新增2项Layout测试，覆盖五段/两层准确顺序、summary/lore/knowledge/history/state/action映射、投影不含source ID、错误层级和未知类型拒绝。
+- Prompt集成测试证明semi-stable、dynamic与`TASK_INPUT`顺序及Stable World Truths位置；相关13项测试、`pnpm typecheck`、`pnpm lint`和diff检查通过。
+- 未访问外部API、未承诺缓存命中率、未记录完整Prompt指标。
+
+### 结论
+
+- `V02-M4-T04`完成。下一项严格为`V02-M4-T05` Cache Metrics。

@@ -13,7 +13,10 @@ export const CONTEXT_BLOCK_TYPES = [
   'scene',
   'knowledge',
   'memory',
+  'summary',
   'history',
+  'state',
+  'action',
   'user_input',
   'dice',
 ] as const;

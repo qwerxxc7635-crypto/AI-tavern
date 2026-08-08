@@ -29,6 +29,17 @@ export {
   createContextBlock,
   estimateContextTokens,
 } from './context-assembly.js';
+export {
+  CONTEXT_CACHE_SECTION_KINDS,
+  ContextCacheLayoutError,
+  createContextCacheLayout,
+} from './context-cache-layout.js';
+export type {
+  ContextCacheBlockProjection,
+  ContextCacheLayout,
+  ContextCacheSection,
+  ContextCacheSectionKind,
+} from './context-cache-layout.js';
 export type {
   ContextAssembly,
   ContextAssemblyPolicy,

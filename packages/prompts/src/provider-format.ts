@@ -1,7 +1,9 @@
 import {
   AI_TASK_SCHEMAS,
+  canonicalJson,
   selectStructuredFormat,
   type AITask,
+  type ContextCacheLayout,
   type ModelCapabilities,
   type NormalizedMessage,
   type NormalizedResponseFormat,
@@ -15,6 +17,7 @@ import {
   type StablePromptProfile,
 } from './stable-prompt-profile.js';
 import { taskPrompt } from './task-prompts.js';
+import { renderContextCacheLayout } from './context-cache-renderer.js';
 
 export interface FormattedTaskPrompt {
   readonly promptVersion: PromptVersion;
@@ -32,18 +35,33 @@ export interface StructuralRepairError {
   }[];
 }
 
+export interface PromptFormatContext {
+  readonly stableWorldTruths?: JsonValue;
+  readonly cacheLayout?: ContextCacheLayout;
+}
+
 export function formatTaskPrompt(
   task: AITask,
   input: unknown,
   capabilities: ModelCapabilities,
+  context: PromptFormatContext = Object.freeze({}),
 ): FormattedTaskPrompt {
   const schemas = AI_TASK_SCHEMAS[task];
   const validatedInput = schemas.input.parse(input);
   const definition = taskPrompt(task);
   const outputSchema = jsonRecord(z.toJSONSchema(schemas.output));
-  const stableProfile = createStablePromptProfile(definition, outputSchema);
+  const stableProfile = createStablePromptProfile(
+    definition,
+    outputSchema,
+    context.stableWorldTruths,
+  );
   const system = renderStablePromptProfile(stableProfile);
-  const user = `Task input JSON:\n${JSON.stringify(validatedInput)}`;
+  const user = [
+    context.cacheLayout === undefined ? null : renderContextCacheLayout(context.cacheLayout),
+    `[TASK_INPUT]\nTask input JSON:\n${canonicalJson(validatedInput as JsonValue)}`,
+  ]
+    .filter((part): part is string => part !== null)
+    .join('\n\n');
   const messages: readonly NormalizedMessage[] = capabilities.systemMessages
     ? [
         { role: 'SYSTEM', content: system },

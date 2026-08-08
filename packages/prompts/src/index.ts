@@ -2,7 +2,12 @@ export { BASE_RULES, BASE_SYSTEM_PROMPT } from './base-rules.js';
 export { PROMPT_HISTORY } from './prompt-history.js';
 export type { PromptHistoryEntry } from './prompt-history.js';
 export { formatOutputRepairPrompt, formatTaskPrompt } from './provider-format.js';
-export type { FormattedTaskPrompt, StructuralRepairError } from './provider-format.js';
+export type {
+  FormattedTaskPrompt,
+  PromptFormatContext,
+  StructuralRepairError,
+} from './provider-format.js';
+export { renderContextCacheLayout } from './context-cache-renderer.js';
 export {
   STABLE_PROMPT_PROFILE_ID,
   STABLE_PROMPT_PROFILE_VERSION,
