@@ -1022,9 +1022,16 @@ textarea:disabled {
 }
 
 .character-studio {
-  min-height: 100vh;
+  width: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
   padding: 1.5rem clamp(1.25rem, 4vw, 4.5rem) 4rem;
+  overflow-x: hidden;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  scroll-padding-block: 1rem;
   background:
     linear-gradient(90deg, rgb(193 120 83 / 5%) 1px, transparent 1px) 0 0 / 5rem 5rem,
     radial-gradient(circle at 85% 15%, rgb(146 166 122 / 10%), transparent 24rem),
@@ -1085,8 +1092,9 @@ textarea:disabled {
 
 .character-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.45fr) minmax(18rem, 0.75fr);
+  grid-template-columns: minmax(28rem, 1.45fr) minmax(18rem, 0.75fr);
   gap: 1px;
+  width: 100%;
   max-width: 78rem;
   background: var(--line);
 }
@@ -1190,6 +1198,9 @@ textarea:disabled {
 }
 
 .character-next {
+  position: sticky;
+  z-index: 2;
+  bottom: max(0.75rem, env(safe-area-inset-bottom));
   grid-column: 1 / -1;
   justify-self: end;
   min-width: 16rem;
@@ -1200,6 +1211,7 @@ textarea:disabled {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1px;
+  width: 100%;
   max-width: 78rem;
   background: var(--line);
 }
@@ -1244,6 +1256,7 @@ textarea:disabled {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1px;
+  width: 100%;
   max-width: 78rem;
   background: var(--line);
 }
@@ -1704,6 +1717,43 @@ textarea:disabled {
   }
 }
 
+@media (max-width: 900px) {
+  .character-form,
+  .trait-grid,
+  .character-review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .character-form__identity {
+    grid-row: auto;
+  }
+
+  .character-next {
+    grid-column: 1;
+    justify-self: stretch;
+    min-width: 0;
+  }
+}
+
+@media (max-height: 640px) {
+  .character-studio {
+    padding-top: 0.75rem;
+    padding-bottom: 2rem;
+  }
+
+  .character-studio__topline {
+    padding-bottom: 0.75rem;
+  }
+
+  .character-intro {
+    padding-block: 1.25rem;
+  }
+
+  .character-intro h1 {
+    font-size: clamp(2rem, 8vw, 3.25rem);
+  }
+}
+
 @media (max-width: 760px) {
   .app-frame {
     grid-template-columns: 5.2rem minmax(0, 1fr);
@@ -1784,21 +1834,6 @@ textarea:disabled {
 
   .world-editor > label {
     grid-column: 1 / -1;
-  }
-
-  .character-form,
-  .trait-grid,
-  .character-review {
-    grid-template-columns: 1fr;
-  }
-
-  .character-form__identity {
-    grid-row: auto;
-  }
-
-  .character-next {
-    grid-column: 1;
-    justify-self: stretch;
   }
 
   .tavern-atmosphere,
