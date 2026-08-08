@@ -38,7 +38,8 @@
 - `V02-M4-T06`：DONE；字节回归锁定相同稳定语义得到相同prefix，action只改变dynamic tail，Prompt Profile版本更新必改变prefix hash，并排除随机block/source ID间接扰动。
 - `V02-M5-T01`：DONE；根`package.json.version=0.2.0`为产品权威源，Rust crates继承单一workspace版本，Tauri/npm manifests对齐，运行时“我的”从Tauri metadata显示版本。
 - `V02-M5-T02`：DONE；根版本自动同步到npm/Tauri/Cargo/Changelog/release-info，生成玩家可读发布摘要，只读漂移检查已接入双平台CI。
-- 下一执行项严格进入 `V02-M5-T03` zh-CN Resource Layer。
+- `V02-M5-T03`：DONE；建立单一`zh-CN`类型安全资源入口，应用根语言、导航壳层、全局状态和原生存档对话框已接入且无静默英文fallback。
+- 下一执行项严格进入 `V02-M5-T04` Core UI Localization。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

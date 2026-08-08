@@ -2880,3 +2880,22 @@
 ### 结论
 
 - `V02-M5-T02`完成。下一项严格为`V02-M5-T03` zh-CN Resource Layer。
+
+## 2026-08-08 — V02-M5-T03 建立 zh-CN 玩家资源层
+
+### 实现
+
+- 新增`windows-app/src/localization/zh-CN.ts`，以只读分区集中通用、导航、标题栏、加载、路由/页面错误和存档文件对话框文案；动态存档标题使用资源格式化函数，不在页面拼接句式。
+- 新增唯一活动locale与`playerText`类型安全入口，不提供英文fallback、缺键回显或自动locale侦测；应用启动显式设置HTML根`lang=zh-CN`。
+- 应用壳层、全局Suspense/404/ErrorBoundary和Tauri导入导出对话框改用资源入口，清除其中`Current room`、`Local session`、`Preparing room`等玩家可见英文。
+- 记录`DEC-073`；页面级游戏流程迁移明确留给紧随其后的T04，不启动iOS或新增多语言切换范围。
+
+### 验证
+
+- 新增2项资源层测试，验证唯一locale、静态资源非空、动态格式化和document语言标记。
+- localization、路由、存档对话框及存档首页共4个文件/20项定向测试通过；`pnpm typecheck`、`pnpm lint`与`git diff --check`通过。
+- 未访问网络、Provider或正式用户数据，未增加英文资源或静默fallback。
+
+### 结论
+
+- `V02-M5-T03`完成。下一项严格为`V02-M5-T04` Core UI Localization。

@@ -3,6 +3,7 @@ import { getCurrentWebview } from '@tauri-apps/api/webview';
 import { open, save } from '@tauri-apps/plugin-dialog';
 
 import type { CampaignSummary } from './campaign-gateway.js';
+import { playerText } from './localization/index.js';
 
 export type CampaignArchiveImportMode = 'CREATE' | 'OVERWRITE';
 
@@ -27,12 +28,15 @@ export interface SaveTransferGateway {
   subscribeToArchiveDrops(handler: (paths: readonly string[]) => void): Promise<() => void>;
 }
 
-const ARCHIVE_FILTER = Object.freeze({ name: 'Ember Tavern 存档', extensions: ['emtavern'] });
+const ARCHIVE_FILTER = Object.freeze({
+  name: playerText.archiveDialog.filterName,
+  extensions: ['emtavern'],
+});
 
 export const tauriSaveTransferGateway: SaveTransferGateway = {
   async chooseImportPath() {
     return open({
-      title: '导入 Ember Tavern 存档',
+      title: playerText.archiveDialog.importTitle,
       filters: [ARCHIVE_FILTER],
       multiple: false,
       directory: false,
@@ -40,7 +44,7 @@ export const tauriSaveTransferGateway: SaveTransferGateway = {
   },
   async chooseExportPath(suggestedName) {
     return save({
-      title: '导出 Ember Tavern 存档',
+      title: playerText.archiveDialog.exportTitle,
       filters: [ARCHIVE_FILTER],
       defaultPath: suggestedName,
     });
