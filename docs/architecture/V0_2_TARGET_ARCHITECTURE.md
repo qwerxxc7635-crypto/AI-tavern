@@ -58,7 +58,7 @@ Orchestrator 产生 `AiOperation`：
 
 当前Prompt编译先构造版本化Stable Prompt Profile，固定`SYSTEM_CONTRACT -> GAME_RULES -> OUTPUT_SCHEMA -> PROMPT_PROFILE -> STABLE_WORLD_TRUTHS`五段；world truths进入前复制冻结，并拒绝request ID、timestamp、UUID、transient error、cache metrics和UI debug。后续summary/lore/history/scene/input不得插入这五段之间。
 
-后续Context Cache Layout固定`LONG_TERM_SUMMARY -> RELEVANT_LORE_KNOWLEDGE -> RECENT_HISTORY -> CURRENT_SCENE_STATE -> PLAYER_ACTION`。前两段只接受semi-stable summary/memory/lore/knowledge；后三段只接受dynamic history/scene/state/dice/action/user_input。布局投影保留type、source revision、version、content hash和content，不携带可能为UUID的block/source ID。
+后续Context Cache Layout固定`LONG_TERM_SUMMARY -> RELEVANT_LORE_KNOWLEDGE -> RECENT_HISTORY -> CURRENT_SCENE_STATE -> PLAYER_ACTION`。前两段只接受semi-stable summary/memory/lore/knowledge；后三段只接受dynamic history/scene/state/dice/action/user_input。内部布局投影保留type、source revision、version、content hash和content；Provider序列化只发送type/revision/version/content，不发送可能受UUID影响的block/source ID或content hash。
 
 DeepSeek usage边界可接收`prompt_cache_hit_tokens`和`prompt_cache_miss_tokens`。本地仅保留最多200项task type、hit/miss、计算ratio、cacheable prefix SHA-256和记录时间；指标写入device-local `app_settings.deepseek_cache_metrics_v1`，不得含完整Prompt、消息、上下文内容、request ID或credential。
 

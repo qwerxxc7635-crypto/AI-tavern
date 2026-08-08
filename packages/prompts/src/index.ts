@@ -8,7 +8,7 @@ export type {
   StructuralRepairError,
 } from './provider-format.js';
 export { renderContextCacheLayout } from './context-cache-renderer.js';
-export { promptCachePrefixHash } from './cache-prefix.js';
+export { promptCachePrefixHash, renderPromptCachePrefix } from './cache-prefix.js';
 export {
   STABLE_PROMPT_PROFILE_ID,
   STABLE_PROMPT_PROFILE_VERSION,

@@ -7,7 +7,6 @@ export function renderContextCacheLayout(layout: ContextCacheLayout): string {
         type: block.type,
         sourceRevision: block.sourceRevision,
         version: block.version,
-        contentHash: block.contentHash,
         content: block.content,
       }));
       return `[${section.kind}]\n${canonicalJson({ blocks })}`;

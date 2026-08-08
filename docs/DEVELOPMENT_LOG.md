@@ -2821,3 +2821,22 @@
 ### 结论
 
 - `V02-M4-T05`完成。下一项严格为`V02-M4-T06` Cache Regression。
+
+## 2026-08-08 — V02-M4-T06 固定 Cache Regression 门禁
+
+### 实现
+
+- 导出可缓存prefix的规范文本函数，与生产prefix hash共用同一路径，允许测试直接比较UTF-8字节而非只比较摘要。
+- Provider Context段不再序列化`contentHash`：该hash包含block/source身份，虽未直接发送UUID仍会随随机ID变化；Prompt只发送type、source revision、version和content，内部Layout/manifest继续保留hash供校验。
+- 保持dynamic Context完整渲染，但cacheable prefix只选两个semi-stable段；当前action变化因此只改变tail。
+- Profile hash覆盖任务Prompt版本/schema名；Prompt Profile升级会自然改变prefix bytes与SHA-256，无需人为清缓存。
+
+### 验证
+
+- 新增3项专用回归：相同稳定语义在不同object key顺序及随机block/source ID下产生逐字节相同prefix；只改action时prefix/hash不变但完整Context tail变化；Prompt版本1升2时hash必变。
+- cache regression、prompt和layout共16项测试、`pnpm typecheck`、`pnpm lint`及diff检查通过。
+- 未访问真实Provider、未声明固定缓存命中率、未把完整Prompt写入指标。
+
+### 结论
+
+- `V02-M4-T06`完成，M4 DeepSeek Cache实现任务结束。下一项严格为`V02-M5-T01` Single Version Source。
