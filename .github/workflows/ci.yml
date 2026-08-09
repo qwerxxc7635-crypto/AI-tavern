@@ -92,6 +92,12 @@ jobs:
         run: node scripts/run-with-evidence.mjs --output artifacts/evidence/windows-e2e.json -- pnpm test:windows-e2e
       - name: Build NSIS release with evidence
         run: node scripts/run-with-evidence.mjs --output artifacts/evidence/windows-nsis-build.json -- pnpm --dir windows-app tauri build --bundles nsis
+      - name: Credential Manager, WebView2, install, launch and uninstall evidence
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path target/release/bundle/nsis -Filter '*-setup.exe' -File
+          if ($installer.Count -ne 1) { throw "Expected one NSIS installer, found $($installer.Count)." }
+          node scripts/run-with-evidence.mjs --output artifacts/evidence/windows-install-gate-command.json -- pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/windows-release-gate.ps1 -InstallerPath $installer[0].FullName -EvidenceOutput artifacts/evidence/windows-install-lifecycle.json
       - name: Hash release bundle
         run: node scripts/collect-release-evidence.mjs --root target/release/bundle/nsis --output artifacts/evidence/windows-release-files.json
       - name: Upload Windows release evidence
