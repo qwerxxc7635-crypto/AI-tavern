@@ -3220,3 +3220,25 @@
 ### 结论
 
 - `V02-M8-T03`完成。下一项严格为`V02-M8-T04` Rumor / Claim。
+
+## 2026-08-09 — V02-M8-T04 轻量来源化酒馆传闻
+
+### 实现
+
+- RUMOR兼容投影新增独立claimId、来源NPC、WITNESS/HEARSAY/PERSONAL_BELIEF/FACTION_MESSAGE、confidence和claimRevision，并可通过`createClaimFromRumor`重建不含隐藏真实性的Claim。
+- `GENERATE_NPCS` schema/prompt升级v3，分别生成传播方式、Claim置信度与隐藏veracity；来源名必须解析为当前Roster NPC，程序验证后与NPC Knowledge在同一事务提交。
+- TypeScript WorldRepository和原生NPC Context验证Claim字段及来源NPC Campaign边界；Knowledge provenance继承对应Claim confidence，传闻继续只以CLAIM进入NPC Prompt。
+- schema 8与旧存档导入兼容层把历史传闻保守回填为HEARSAY/0.5，并从既有detail或NPC Knowledge恢复来源；没有新增Claims表或第二套真相源。
+- Windows Tavern view只携带claimId、来源NPC和传播方式，界面显示中文来源标签且不序列化隐藏veracity/confidence；记录`DEC-090`，未实现World Voices、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Knowledge/World/Rumor合同、AI schema/prompt、Context、Application、Repository与Windows页面定向测试通过，覆盖Claim重建、来源往返、置信度继承、v3版本及隐藏veracity不出现在玩家投影。
+- schema 6→8迁移测试同时覆盖Knowledge provenance、excluded secret和旧RUMOR来源回填；原生46项bridge测试通过，包含非法confidence零写入与Windows纵向E2E。
+- 完整79个Vitest文件/449项测试与22项Node测试通过；Rust workspace格式、全target/feature Clippy及84项测试通过。
+- `pnpm archive:interop`完成当前TypeScript/Rust归档双向生成、交叉导入与fixture逐条目比对；release metadata、zh-CN玩家文案门禁及桌面前端200 modules生产构建通过。
+- 桌面双实现仍使用Fake Provider，未触达真实付费API、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M8-T04`完成。下一项严格为`V02-M8-T05` Randomness Profiles。

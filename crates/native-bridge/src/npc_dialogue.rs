@@ -313,10 +313,12 @@ fn load_generation_context(
         connection,
         campaign_id,
         npc_id,
-        &known,
-        &suspected,
-        &false_beliefs,
-        &excluded,
+        KnowledgeFactSets {
+            known: &known,
+            suspected: &suspected,
+            false_beliefs: &false_beliefs,
+            excluded: &excluded,
+        },
         &provenance,
     )?;
     let mut used = std::collections::HashSet::new();
@@ -418,24 +420,30 @@ struct StoredKnowledgeProvenance {
     confidence: f64,
 }
 
+pub(crate) struct KnowledgeFactSets<'a> {
+    pub(crate) known: &'a [String],
+    pub(crate) suspected: &'a [String],
+    pub(crate) false_beliefs: &'a [String],
+    pub(crate) excluded: &'a [String],
+}
+
 pub(crate) fn validate_knowledge_provenance(
     connection: &Connection,
     campaign_id: &str,
     npc_id: &str,
-    known: &[String],
-    suspected: &[String],
-    false_beliefs: &[String],
-    excluded: &[String],
+    facts: KnowledgeFactSets<'_>,
     raw: &str,
 ) -> Result<(), CampaignStoreError> {
     let mut expected = std::collections::HashMap::new();
     for (ids, state) in [
-        (known, "KNOWN"),
-        (suspected, "SUSPECTED"),
-        (false_beliefs, "BELIEVED"),
+        (facts.known, "KNOWN"),
+        (facts.suspected, "SUSPECTED"),
+        (facts.false_beliefs, "BELIEVED"),
     ] {
         for fact_id in ids {
-            if expected.insert(fact_id.as_str(), state).is_some() || excluded.contains(fact_id) {
+            if expected.insert(fact_id.as_str(), state).is_some()
+                || facts.excluded.contains(fact_id)
+            {
                 return Err(CampaignStoreError::InvalidData);
             }
         }
@@ -659,6 +667,47 @@ fn knowledge_entries(
             }
         } else if kind == "FALSE_BELIEF" {
             return Err(CampaignStoreError::InvalidData);
+        }
+        if kind == "RUMOR" {
+            let detail: Value =
+                serde_json::from_str(&detail_json).map_err(|_| CampaignStoreError::InvalidData)?;
+            let claim_id = detail
+                .get("claimId")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::InvalidData)?;
+            validate_id(claim_id)?;
+            let source_npc_id = detail
+                .get("sourceNpcId")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::InvalidData)?;
+            let source_exists = connection
+                .query_row(
+                    "SELECT 1 FROM npcs WHERE id = ?1 AND campaign_id = ?2",
+                    params![source_npc_id, campaign_id],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            let valid_basis = detail
+                .get("sourceBasis")
+                .and_then(Value::as_str)
+                .is_some_and(|basis| {
+                    matches!(
+                        basis,
+                        "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+                    )
+                });
+            let valid_confidence = detail
+                .get("confidence")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| value.is_finite() && (0.0..=1.0).contains(&value));
+            let valid_revision = detail
+                .get("claimRevision")
+                .and_then(Value::as_i64)
+                .is_some_and(|value| value >= 1);
+            if !source_exists || !valid_basis || !valid_confidence || !valid_revision {
+                return Err(CampaignStoreError::InvalidData);
+            }
         }
         let target_kind = if state == "KNOWN" && kind != "RUMOR" {
             "TRUTH"

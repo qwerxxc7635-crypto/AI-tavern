@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import {
   windowsTavernService,
+  type RumorView,
   type TavernNpcView,
   type TavernSnapshot,
   type WindowsTavernService,
@@ -185,7 +186,10 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
                 <li key={rumor.id}>
                   <span>{(index + 1).toString().padStart(2, '0')}</span>
                   <p>{rumor.statement}</p>
-                  <small>— {npcName(snapshot.npcs, rumor.sourceNpcId)}</small>
+                  <small>
+                    — {npcName(snapshot.npcs, rumor.sourceNpcId)} ·{' '}
+                    {rumorSourceLabel(rumor.sourceBasis)}
+                  </small>
                 </li>
               ))}
             </ol>
@@ -240,6 +244,19 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
       </section>
     </main>
   );
+}
+
+function rumorSourceLabel(source: RumorView['sourceBasis']): string {
+  switch (source) {
+    case 'WITNESS':
+      return '亲历';
+    case 'HEARSAY':
+      return '转述';
+    case 'PERSONAL_BELIEF':
+      return '个人判断';
+    case 'FACTION_MESSAGE':
+      return '势力消息';
+  }
 }
 
 function TavernMessage({ title }: { readonly title: string }) {

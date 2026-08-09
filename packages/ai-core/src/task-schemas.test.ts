@@ -191,16 +191,22 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         {
           statement: 'A warm light moves beneath the cellar.',
           sourceNpcName: 'Tomas',
+          sourceBasis: 'WITNESS',
+          confidence: 0.9,
           veracity: 'TRUE',
         },
         {
           statement: 'The guild pays for tunnel maps.',
           sourceNpcName: 'Tomas',
+          sourceBasis: 'FACTION_MESSAGE',
+          confidence: 0.6,
           veracity: 'PARTIAL',
         },
         {
           statement: 'A courier crossed the flooded causeway.',
           sourceNpcName: 'Tomas',
+          sourceBasis: 'HEARSAY',
+          confidence: 0.4,
           veracity: 'UNKNOWN',
         },
       ],
@@ -450,17 +456,18 @@ describe('versioned AI task schemas', () => {
     const expectedVersion =
       task === 'GENERATE_ADVENTURE_TURN'
         ? 5
-        : [
-              'GENERATE_CHARACTER_TRAITS',
-              'COMPLETE_CHARACTER_BACKGROUND',
-              'GENERATE_NPCS',
-              'NPC_REPLY',
-              'GENERATE_WORLD_EVENT',
-              'SUMMARIZE_ADVENTURE',
-              'RESOLVE_DICE_RESULT',
-            ].includes(task)
-          ? 2
-          : 1;
+        : task === 'GENERATE_NPCS'
+          ? 3
+          : [
+                'GENERATE_CHARACTER_TRAITS',
+                'COMPLETE_CHARACTER_BACKGROUND',
+                'NPC_REPLY',
+                'GENERATE_WORLD_EVENT',
+                'SUMMARIZE_ADVENTURE',
+                'RESOLVE_DICE_RESULT',
+              ].includes(task)
+            ? 2
+            : 1;
     expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);

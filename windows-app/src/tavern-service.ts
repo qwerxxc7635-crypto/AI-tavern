@@ -71,8 +71,10 @@ export interface TavernNpcView {
 
 export interface RumorView {
   readonly id: string;
+  readonly claimId: string;
   readonly statement: string;
   readonly sourceNpcId: string;
+  readonly sourceBasis: 'WITNESS' | 'HEARSAY' | 'PERSONAL_BELIEF' | 'FACTION_MESSAGE';
 }
 
 export interface WorldClockView {
@@ -377,10 +379,16 @@ function parseNpc(value: unknown): TavernNpcView {
 
 function parseRumor(value: unknown): RumorView {
   const record = requireRecord(value);
+  const sourceBasis = requireString(record['sourceBasis']);
+  if (!['WITNESS', 'HEARSAY', 'PERSONAL_BELIEF', 'FACTION_MESSAGE'].includes(sourceBasis)) {
+    throw new TypeError('Rumor source basis is invalid');
+  }
   return Object.freeze({
     id: requireString(record['id']),
+    claimId: requireString(record['claimId']),
     statement: requireString(record['statement']),
     sourceNpcId: requireString(record['sourceNpcId']),
+    sourceBasis: sourceBasis as RumorView['sourceBasis'],
   });
 }
 

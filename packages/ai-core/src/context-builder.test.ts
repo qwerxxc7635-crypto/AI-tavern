@@ -3,6 +3,7 @@ import {
   adventureId,
   campaignId,
   characterTraitId,
+  claimId,
   clueId,
   conversationId,
   factionId,
@@ -171,6 +172,11 @@ const facts: readonly WorldFact[] = [
   {
     ...fact(suspectedFactId, 'The keeper may use the tunnel.'),
     kind: 'RUMOR',
+    claimId: claimId('claim-suspected'),
+    sourceNpcId: targetNpcId,
+    sourceBasis: 'PERSONAL_BELIEF',
+    confidence: 0.4,
+    claimRevision: 1,
     veracity: 'UNKNOWN',
   },
   {

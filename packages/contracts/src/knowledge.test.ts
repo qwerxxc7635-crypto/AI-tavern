@@ -4,6 +4,7 @@ import {
   campaignId,
   claimId,
   createClaim,
+  createClaimFromRumor,
   createKnowledge,
   createMemory,
   createWorldTruth,
@@ -12,6 +13,8 @@ import {
   knowledgeId,
   memoryId,
   worldTruthId,
+  worldFactId,
+  npcId,
 } from './index.js';
 
 const campaign = campaignId('campaign-knowledge');
@@ -47,6 +50,31 @@ describe('WorldTruth / Claim / Knowledge / Memory', () => {
     expect(truth.kind).toBe('WORLD_TRUTH');
     expect(claim.kind).toBe('CLAIM');
     expect(claim.source).toEqual({ kind: 'ACTOR', actorType: 'NPC', actorId: 'npc-keeper' });
+  });
+
+  it('projects a sourced rumor as a Claim without revealing hidden veracity', () => {
+    const claim = createClaimFromRumor({
+      id: worldFactId('fact-rumor'),
+      claimId: claimId('claim-rumor'),
+      campaignId: campaign,
+      kind: 'RUMOR',
+      statement: 'The guild moved the beacon lens.',
+      locationId: null,
+      factionIds: [],
+      sourceNpcId: npcId('npc-courier'),
+      sourceBasis: 'HEARSAY',
+      confidence: 0.5,
+      claimRevision: 1,
+      veracity: 'FALSE',
+      createdAt: at,
+    });
+    expect(claim).toMatchObject({
+      kind: 'CLAIM',
+      id: claimId('claim-rumor'),
+      confidence: 0.5,
+      source: { kind: 'ACTOR', actorType: 'NPC', actorId: 'npc-courier' },
+    });
+    expect(claim).not.toHaveProperty('veracity');
   });
 
   it('grants actor-scoped knowledge only about a truth or claim with provenance', () => {

@@ -1,5 +1,6 @@
 import type {
   CampaignId,
+  ClaimId,
   FactionId,
   IsoTimestamp,
   LocationId,
@@ -91,9 +92,21 @@ export interface TemporaryNarrativeFact extends WorldFactBase {
 }
 
 export type RumorVeracity = 'UNKNOWN' | 'TRUE' | 'PARTIAL' | 'FALSE';
+export const RUMOR_SOURCE_BASES = [
+  'WITNESS',
+  'HEARSAY',
+  'PERSONAL_BELIEF',
+  'FACTION_MESSAGE',
+] as const;
+export type RumorSourceBasis = (typeof RUMOR_SOURCE_BASES)[number];
 
 export interface RumorFact extends WorldFactBase {
   readonly kind: 'RUMOR';
+  readonly claimId: ClaimId;
+  readonly sourceNpcId: NpcId;
+  readonly sourceBasis: RumorSourceBasis;
+  readonly confidence: number;
+  readonly claimRevision: number;
   readonly veracity: RumorVeracity;
 }
 

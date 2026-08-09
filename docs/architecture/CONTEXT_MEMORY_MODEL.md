@@ -43,6 +43,8 @@ type ContextBlock = {
 
 合法流向：truth/event 可派生 claim；可观察的 claim 可授予 knowledge；knowledge/event 可生成 memory candidate。反向升级必须有独立的本地证据和 domain transaction。
 
+当前酒馆传闻使用`world_facts.kind=RUMOR`作为轻量Claim兼容投影，而不是WorldTruth。投影必须携带独立claimId、来源NPC、WITNESS/HEARSAY/PERSONAL_BELIEF/FACTION_MESSAGE传播方式、confidence和revision；可重建的Claim只公开Actor来源与陈述，不携带隐藏veracity。FACTION_MESSAGE仅表示NPC转述的势力消息，不建立完整World Voices或势力Actor系统。
+
 ## 隐私与 Inspector
 
 Inspector 默认只显示块类型、来源、版本、预算、hash 前缀、纳入原因和已遮罩摘要。`secret` 内容、credential、Authorization、完整系统 prompt 与未公开世界真相不显示。调试导出必须显式选择、二次清洗且不进入游戏存档。

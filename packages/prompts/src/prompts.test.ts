@@ -66,12 +66,16 @@ describe('central prompt catalog', () => {
         : 1;
       expect(TASK_PROMPTS[task]).toMatchObject({
         task,
-        version: task === 'GENERATE_ADVENTURE_TURN' ? 4 : expectedVersion,
+        version:
+          task === 'GENERATE_ADVENTURE_TURN' ? 4 : task === 'GENERATE_NPCS' ? 3 : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }
     expect(PROMPT_HISTORY).toContainEqual(
       expect.objectContaining({ task: 'GENERATE_ADVENTURE_TURN', version: 4 }),
+    );
+    expect(PROMPT_HISTORY).toContainEqual(
+      expect.objectContaining({ task: 'GENERATE_NPCS', version: 3 }),
     );
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toMatch(/3-5 distinct suggestions/);
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('knownFacts');

@@ -13,6 +13,7 @@ import {
 import {
   createNpcKnowledge,
   createNpcRelationship,
+  claimId,
   transitionCampaign,
   type AiRequestId,
   type Campaign,
@@ -235,18 +236,28 @@ export class TavernInitializationUseCases {
       }),
     );
     const rumorFacts: readonly WorldFact[] = Object.freeze(
-      output.rumors.map((rumor, index) =>
-        Object.freeze({
-          id: this.identities.fact(rumor.statement, index),
+      output.rumors.map((rumor, index) => {
+        const id = this.identities.fact(rumor.statement, index);
+        const source = profiles.find(({ name }) => name === rumor.sourceNpcName);
+        if (source === undefined) {
+          throw new AIOrchestrationError('INVALID_NPC_ROSTER', 'Rumor source NPC is missing');
+        }
+        return Object.freeze({
+          id,
           campaignId: command.campaignId,
           kind: 'RUMOR' as const,
+          claimId: claimId(`claim-${id}`),
+          sourceNpcId: source.id,
+          sourceBasis: rumor.sourceBasis,
+          confidence: rumor.confidence,
+          claimRevision: 1,
           statement: rumor.statement,
           locationId: tavern.locationId,
           factionIds: Object.freeze([]),
           veracity: rumor.veracity,
           createdAt: timestamp,
-        }),
-      ),
+        });
+      }),
     );
     const records = profiles.map((profile, index) => {
       const draft = output.npcs[index];
@@ -271,7 +282,13 @@ export class TavernInitializationUseCases {
             }
           : null,
         character.id,
-        sourcedRumors.map((fact) => requireFact(fact).id),
+        sourcedRumors.map((fact) => {
+          const required = requireFact(fact);
+          return {
+            factId: required.id,
+            confidence: required.kind === 'RUMOR' ? required.confidence : 1,
+          };
+        }),
         timestamp,
       );
     });
@@ -473,7 +490,7 @@ function npcRecord(
   profile: NpcProfile,
   visitor: NpcInitializationRecord['visitor'],
   playerCharacterId: PlayerCharacterId,
-  knownFactIds: readonly WorldFactId[],
+  knownFacts: readonly { readonly factId: WorldFactId; readonly confidence: number }[],
   learnedAt: IsoTimestamp,
 ): NpcInitializationRecord {
   return Object.freeze({
@@ -481,17 +498,17 @@ function npcRecord(
     visitor: visitor === null ? null : Object.freeze(visitor),
     knowledge: createNpcKnowledge({
       npcId: profile.id,
-      knownFactIds,
+      knownFactIds: knownFacts.map(({ factId }) => factId),
       suspectedFactIds: [],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [],
-      provenance: knownFactIds.map((factId) => ({
+      provenance: knownFacts.map(({ factId, confidence }) => ({
         factId,
         state: 'KNOWN',
         source: 'LOCAL_RULE',
         eventId: null,
         learnedAt,
-        confidence: 1,
+        confidence,
       })),
     }),
     relationship: createNpcRelationship({

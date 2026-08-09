@@ -1,6 +1,7 @@
 import type { CharacterAttributeName } from './character.js';
 import type {
   CampaignId,
+  ClaimId,
   IsoTimestamp,
   ItemId,
   NpcId,
@@ -9,6 +10,7 @@ import type {
   TavernId,
   WorldFactId,
 } from './foundation.js';
+import type { RumorSourceBasis } from './world.js';
 
 export type RumorTruthStatus = 'TRUE' | 'PARTIAL' | 'FALSE' | 'UNKNOWN';
 
@@ -19,10 +21,14 @@ export interface RumorContent {
 
 export interface Rumor {
   readonly id: RumorId;
+  readonly claimId: ClaimId;
   readonly campaignId: CampaignId;
   readonly tavernId: TavernId;
   readonly content: RumorContent;
-  readonly sourceNpcId: NpcId | null;
+  readonly sourceNpcId: NpcId;
+  readonly sourceBasis: RumorSourceBasis;
+  readonly confidence: number;
+  readonly claimRevision: number;
   readonly relatedFactIds: readonly WorldFactId[];
   readonly veracity: RumorTruthStatus;
   readonly createdAt: IsoTimestamp;

@@ -63,8 +63,10 @@ pub struct TavernNpcView {
 #[serde(rename_all = "camelCase")]
 pub struct RumorView {
     pub id: String,
+    pub claim_id: String,
     pub statement: String,
     pub source_npc_id: String,
+    pub source_basis: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -155,6 +157,8 @@ struct RosterNpcDraft {
 struct RumorDraft {
     statement: String,
     source_npc_name: String,
+    source_basis: String,
+    confidence: f64,
     veracity: String,
 }
 
@@ -345,7 +349,7 @@ impl CampaignStore {
                 .iter()
                 .enumerate()
                 .filter(|(_, rumor)| rumor.source_npc_name == npc.profile.name)
-                .map(|(rumor_index, _)| rumor_ids[rumor_index].clone())
+                .map(|(rumor_index, rumor)| (rumor_ids[rumor_index].clone(), rumor.confidence))
                 .collect::<Vec<_>>();
             insert_npc(
                 &transaction,
@@ -379,8 +383,12 @@ impl CampaignStore {
                     rumor.statement,
                     tavern.location_id,
                     serde_json::json!({
+                        "claimId": format!("claim-{}", rumor_ids[index]),
+                        "claimRevision": 1,
+                        "confidence": rumor.confidence,
                         "veracity": rumor.veracity,
                         "sourceNpcId": npc_ids[source_index],
+                        "sourceBasis": rumor.source_basis,
                     })
                     .to_string(),
                     at,
@@ -572,10 +580,41 @@ fn load_rumors(
                 .and_then(|record| record.get("sourceNpcId"))
                 .and_then(Value::as_str)
                 .ok_or(rusqlite::Error::InvalidQuery)?;
+            let claim_id = detail
+                .as_object()
+                .and_then(|record| record.get("claimId"))
+                .and_then(Value::as_str)
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let source_basis = detail
+                .as_object()
+                .and_then(|record| record.get("sourceBasis"))
+                .and_then(Value::as_str)
+                .filter(|value| {
+                    matches!(
+                        *value,
+                        "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+                    )
+                })
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let confidence = detail
+                .as_object()
+                .and_then(|record| record.get("confidence"))
+                .and_then(Value::as_f64)
+                .filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let revision = detail
+                .as_object()
+                .and_then(|record| record.get("claimRevision"))
+                .and_then(Value::as_i64)
+                .filter(|value| *value >= 1)
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let _ = (confidence, revision);
             Ok(RumorView {
                 id: row.get(0)?,
+                claim_id: claim_id.to_owned(),
                 statement: row.get(1)?,
                 source_npc_id: source.to_owned(),
+                source_basis: source_basis.to_owned(),
             })
         })?
         .collect::<Result<Vec<_>, _>>()
@@ -617,7 +656,7 @@ fn insert_npc(
     transaction: &Transaction<'_>,
     insert: NpcInsert<'_>,
     npc: &NpcDraft,
-    known_fact_ids: &[String],
+    known_facts: &[(String, f64)],
     at: &str,
 ) -> Result<(), CampaignStoreError> {
     let visit = insert.visit_reason.map(|reason| {
@@ -661,17 +700,22 @@ fn insert_npc(
          ) VALUES (?1, ?2, '[]', '[]', '[]', ?3, ?4)",
         params![
             insert.npc_id,
-            to_json(&known_fact_ids)?,
             to_json(
-                &known_fact_ids
+                &known_facts
                     .iter()
-                    .map(|fact_id| json!({
+                    .map(|(fact_id, _)| fact_id)
+                    .collect::<Vec<_>>()
+            )?,
+            to_json(
+                &known_facts
+                    .iter()
+                    .map(|(fact_id, confidence)| json!({
                         "factId": fact_id,
                         "state": "KNOWN",
                         "source": "LOCAL_RULE",
                         "eventId": null,
                         "learnedAt": at,
-                        "confidence": 1.0
+                        "confidence": confidence
                     }))
                     .collect::<Vec<_>>()
             )?,
@@ -802,6 +846,12 @@ fn validate_roster_output(output: &NpcRosterOutput) -> Result<(), CampaignStoreE
     for rumor in &output.rumors {
         validate_text(&rumor.statement, 4_000)?;
         if !names.contains(rumor.source_npc_name.as_str())
+            || !matches!(
+                rumor.source_basis.as_str(),
+                "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+            )
+            || !rumor.confidence.is_finite()
+            || !(0.0..=1.0).contains(&rumor.confidence)
             || !["UNKNOWN", "TRUE", "PARTIAL", "FALSE"].contains(&rumor.veracity.as_str())
         {
             return Err(CampaignStoreError::InvalidData);
@@ -997,6 +1047,18 @@ mod tests {
             1
         );
         assert_eq!(completed.rumors.len(), 3);
+        assert!(completed.rumors.iter().all(|rumor| {
+            rumor.claim_id.starts_with("claim-")
+                && matches!(
+                    rumor.source_basis.as_str(),
+                    "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+                )
+        }));
+        assert!(
+            !serde_json::to_string(&completed.rumors)
+                .expect("serialize player rumor view")
+                .contains("veracity")
+        );
         assert_eq!(completed.clocks.len(), 3);
         assert!(
             completed
@@ -1030,7 +1092,9 @@ mod tests {
                         && entry["state"] == "KNOWN"
                         && entry["eventId"].is_null()
                         && entry["learnedAt"].as_str().is_some()
-                        && entry["confidence"] == 1.0
+                        && entry["confidence"]
+                            .as_f64()
+                            .is_some_and(|value| (0.0..=1.0).contains(&value))
                 })
             })
         }));
@@ -1073,13 +1137,21 @@ mod tests {
             .tavern
             .expect("tavern")
             .id;
-        let mut duplicate_owner = roster_command(&store, tavern_id);
+        let mut duplicate_owner = roster_command(&store, tavern_id.clone());
         duplicate_owner.generation.validated_output["npcs"][0]["name"] =
             Value::String("Ilyra Venn".to_owned());
         duplicate_owner.generation.raw_response_text =
             duplicate_owner.generation.validated_output.to_string();
         assert!(matches!(
             store.commit_npc_roster_generation(duplicate_owner),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        let mut invalid_rumor_source = roster_command(&store, tavern_id);
+        invalid_rumor_source.generation.validated_output["rumors"][0]["confidence"] = json!(2.0);
+        invalid_rumor_source.generation.raw_response_text =
+            invalid_rumor_source.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_roster_generation(invalid_rumor_source),
             Err(CampaignStoreError::InvalidData)
         ));
         let snapshot = store
@@ -1191,9 +1263,9 @@ mod tests {
                 ),
             ],
             "rumors": [
-                {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","veracity":"TRUE"},
-                {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","veracity":"PARTIAL"},
-                {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","veracity":"UNKNOWN"},
+                {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","sourceBasis":"WITNESS","confidence":0.9,"veracity":"TRUE"},
+                {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","sourceBasis":"FACTION_MESSAGE","confidence":0.6,"veracity":"PARTIAL"},
+                {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","sourceBasis":"HEARSAY","confidence":0.4,"veracity":"UNKNOWN"},
             ],
         });
         NpcRosterGenerationCommit {

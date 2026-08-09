@@ -317,7 +317,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
       ? LEGACY_CAMPAIGN_TABLES
       : CAMPAIGN_TABLES;
   requireExactKeys(tableRoot, [...archiveTables], 'campaign.tables');
-  const tables = campaignTableRecord((table) =>
+  const parsedTables = campaignTableRecord((table) =>
     databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION && table === 'scene_frames'
       ? Object.freeze([])
       : Object.freeze(
@@ -329,6 +329,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
           ),
         ),
   );
+  const tables = upgradeLegacyRumorRows(parsedTables);
   const tableRecordCount = Object.values(tables).reduce((total, rows) => total + rows.length, 0);
   const generations = Object.freeze(
     requireRecordArray(
@@ -784,6 +785,42 @@ function upgradeLegacyKnowledgeRow(row: StoredRow): StoredRow {
     false_belief_fact_ids_json: canonicalJson(believed),
     provenance_json: canonicalJson(provenance),
   });
+}
+
+function upgradeLegacyRumorRows(
+  tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>,
+): Readonly<Record<CampaignTable, readonly StoredRow[]>> {
+  const sourceByFact = new Map<string, string>();
+  for (const knowledge of tables.npc_knowledge) {
+    const npc = requireString(knowledge['npc_id'], 'npc_knowledge.npc_id');
+    for (const factId of parseStoredIdArray(knowledge, 'known_fact_ids_json')) {
+      if (!sourceByFact.has(factId)) sourceByFact.set(factId, npc);
+    }
+  }
+  const worldFacts = tables.world_facts.map((row) => {
+    if (row['kind'] !== 'RUMOR') return row;
+    const factId = requireString(row['id'], 'world_facts.id');
+    const detailText = requireString(row['detail_json'], 'world_facts.detail_json');
+    const detail = requireRecord(parseJson(detailText, 'world_facts.detail_json'), 'rumor detail');
+    if ('claimId' in detail) return row;
+    const sourceNpcId =
+      typeof detail['sourceNpcId'] === 'string' ? detail['sourceNpcId'] : sourceByFact.get(factId);
+    if (sourceNpcId === undefined) {
+      throw new PersistenceDataError(`Legacy rumor has no attributable NPC source: ${factId}`);
+    }
+    return Object.freeze({
+      ...row,
+      detail_json: canonicalJson({
+        ...detail,
+        claimId: `claim-${factId}`,
+        claimRevision: 1,
+        confidence: 0.5,
+        sourceBasis: 'HEARSAY',
+        sourceNpcId,
+      }),
+    });
+  });
+  return Object.freeze({ ...tables, world_facts: Object.freeze(worldFacts) });
 }
 
 function parseStoredIdArray(row: StoredRow, column: string): readonly string[] {

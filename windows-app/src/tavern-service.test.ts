@@ -39,7 +39,7 @@ describe('WindowsTavernService', () => {
     expect(gateway.npcCommits[0]).toMatchObject({
       generation: {
         requestId: 'tavern-request-2',
-        promptVersion: 2,
+        promptVersion: 3,
         input: { requestedCount: 3, existingNpcNames: ['Ilyra Venn'] },
       },
     });
@@ -177,15 +177,25 @@ export function finalSnapshot(): TavernSnapshot {
     rumors: [
       {
         id: 'rumor-1',
+        claimId: 'claim-rumor-1',
         statement: 'A light moves below the cellar.',
         sourceNpcId: 'npc-resident-1',
+        sourceBasis: 'WITNESS',
       },
       {
         id: 'rumor-2',
+        claimId: 'claim-rumor-2',
         statement: 'The guild pays for tunnel maps.',
         sourceNpcId: 'npc-resident-2',
+        sourceBasis: 'FACTION_MESSAGE',
       },
-      { id: 'rumor-3', statement: 'The courier crossed alone.', sourceNpcId: 'npc-visitor' },
+      {
+        id: 'rumor-3',
+        claimId: 'claim-rumor-3',
+        statement: 'The courier crossed alone.',
+        sourceNpcId: 'npc-visitor',
+        sourceBasis: 'HEARSAY',
+      },
     ],
     clocks: [
       clock('clock-world', '世界冲突'),

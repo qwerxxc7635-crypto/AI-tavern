@@ -26,7 +26,7 @@ use super::{
 const FORMAT_VERSION: u64 = 1;
 const DATABASE_SCHEMA_VERSION: u64 = 2;
 const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
-const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 7;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 8;
 const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_COMPRESSION_RATIO: u64 = 100;
@@ -661,6 +661,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         }
         tables.insert(table.to_owned(), rows);
     }
+    upgrade_legacy_rumor_rows(&mut tables)?;
     if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
         tables.insert("scene_frames".to_owned(), Vec::new());
     }
@@ -916,6 +917,68 @@ fn upgrade_legacy_knowledge_row(row: &mut Map<String, Value>) -> Result<(), Camp
     let text = String::from_utf8(canonical_json_bytes(&Value::Array(entries))?)
         .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
     row.insert("provenance_json".to_owned(), Value::String(text));
+    Ok(())
+}
+
+fn upgrade_legacy_rumor_rows(
+    tables: &mut BTreeMap<String, Vec<Map<String, Value>>>,
+) -> Result<(), CampaignStoreError> {
+    let mut source_by_fact = BTreeMap::new();
+    for row in tables
+        .get("npc_knowledge")
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+    {
+        let npc_id = row
+            .get("npc_id")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        let known: Vec<String> = serde_json::from_str(
+            row.get("known_fact_ids_json")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?,
+        )
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        for fact_id in known {
+            source_by_fact
+                .entry(fact_id)
+                .or_insert_with(|| npc_id.to_owned());
+        }
+    }
+    for row in tables
+        .get_mut("world_facts")
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+    {
+        if row.get("kind").and_then(Value::as_str) != Some("RUMOR") {
+            continue;
+        }
+        let fact_id = row
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        let mut detail: Map<String, Value> = serde_json::from_str(
+            row.get("detail_json")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?,
+        )
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        if detail.contains_key("claimId") {
+            continue;
+        }
+        let source_npc_id = detail
+            .get("sourceNpcId")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .or_else(|| source_by_fact.get(fact_id).cloned())
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        detail.insert("claimId".to_owned(), json!(format!("claim-{fact_id}")));
+        detail.insert("claimRevision".to_owned(), json!(1));
+        detail.insert("confidence".to_owned(), json!(0.5));
+        detail.insert("sourceBasis".to_owned(), json!("HEARSAY"));
+        detail.insert("sourceNpcId".to_owned(), json!(source_npc_id));
+        let text = String::from_utf8(canonical_json_bytes(&Value::Object(detail))?)
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        row.insert("detail_json".to_owned(), Value::String(text));
+    }
     Ok(())
 }
 

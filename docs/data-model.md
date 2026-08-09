@@ -102,7 +102,7 @@ erDiagram
 | `supersedes_fact_id` | TEXT NULL FK → world_facts.id ON DELETE RESTRICT | 发展事实替代链 |
 | `created_at` | TEXT | 创建时间 |
 
-索引：`idx_world_facts_campaign_kind(campaign_id, kind)`、`idx_world_facts_campaign_created(campaign_id, created_at)`、`idx_world_facts_supersedes(supersedes_fact_id)`。JSON：`detail_json`只保存判别联合专属字段，如锁定字段、过期时间、传闻真伪或相信该错误认知的NPC ID；共有字段保持独立列。
+索引：`idx_world_facts_campaign_kind(campaign_id, kind)`、`idx_world_facts_campaign_created(campaign_id, created_at)`、`idx_world_facts_supersedes(supersedes_fact_id)`。JSON：`detail_json`只保存判别联合专属字段，如锁定字段、过期时间、传闻Claim投影或相信该错误认知的NPC ID；共有字段保持独立列。`RUMOR`不是WorldTruth，其detail必须保存claimId、sourceNpcId、sourceBasis、confidence、claimRevision及仅本地可见的veracity。
 
 ### 3.4 `player_characters`
 

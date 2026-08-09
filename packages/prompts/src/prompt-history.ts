@@ -68,4 +68,9 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Consume only actor-scoped Truth and Claim knowledge projections.',
   }),
+  Object.freeze({
+    task: 'GENERATE_NPCS',
+    version: promptVersion(3),
+    change: 'Source each tavern rumor as a lightweight NPC Claim with basis and confidence.',
+  }),
 ]);

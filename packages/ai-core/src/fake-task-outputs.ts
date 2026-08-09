@@ -134,16 +134,22 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
       {
         statement: 'A warm light moves beneath the old cellar after midnight.',
         sourceNpcName: 'Tomas Reed',
+        sourceBasis: 'WITNESS',
+        confidence: 0.9,
         veracity: 'TRUE',
       },
       {
         statement: 'The Lantern Guild pays in silver for maps of the sealed tunnels.',
         sourceNpcName: 'Nessa Vale',
+        sourceBasis: 'FACTION_MESSAGE',
+        confidence: 0.6,
         veracity: 'PARTIAL',
       },
       {
         statement: 'The storm courier crossed the flooded causeway alone.',
         sourceNpcName: 'Sera Holt',
+        sourceBasis: 'HEARSAY',
+        confidence: 0.4,
         veracity: 'UNKNOWN',
       },
     ],

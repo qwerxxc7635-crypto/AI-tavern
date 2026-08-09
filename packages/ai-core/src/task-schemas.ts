@@ -287,6 +287,8 @@ export const GenerateNpcsOutputSchema = z
           .object({
             statement: text,
             sourceNpcName: shortText,
+            sourceBasis: z.enum(['WITNESS', 'HEARSAY', 'PERSONAL_BELIEF', 'FACTION_MESSAGE']),
+            confidence: z.number().min(0).max(1),
             veracity: z.enum(['UNKNOWN', 'TRUE', 'PARTIAL', 'FALSE']),
           })
           .strict(),

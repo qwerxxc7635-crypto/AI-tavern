@@ -8,6 +8,7 @@ import type {
   WorldTruthId,
 } from './foundation.js';
 import type { JsonValue } from './pending-ai-request.js';
+import type { RumorFact } from './world.js';
 
 export const TRUTH_AUTHORITIES = [
   'LOCAL_RULE',
@@ -146,6 +147,20 @@ export function createClaim(input: Omit<Claim, 'kind'>): Claim {
     source: Object.freeze({ ...input.source }),
     confidence: requireConfidence(input.confidence),
     revision: requireRevision(input.revision),
+  });
+}
+
+export function createClaimFromRumor(rumor: RumorFact): Claim {
+  return createClaim({
+    id: rumor.claimId,
+    campaignId: rumor.campaignId,
+    subject: `rumor:${rumor.id}`,
+    predicate: 'states',
+    object: rumor.statement,
+    source: { kind: 'ACTOR', actorType: 'NPC', actorId: rumor.sourceNpcId },
+    confidence: rumor.confidence,
+    revision: rumor.claimRevision,
+    createdAt: rumor.createdAt,
   });
 }
 

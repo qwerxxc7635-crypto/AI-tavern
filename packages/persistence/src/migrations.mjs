@@ -43,6 +43,11 @@ const migrations = [
     name: 'knowledge_provenance',
     source: new URL('../../../database/migrations/0007_knowledge_provenance.sql', import.meta.url),
   },
+  {
+    version: 8,
+    name: 'rumor_claim_sources',
+    source: new URL('../../../database/migrations/0008_rumor_claim_sources.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

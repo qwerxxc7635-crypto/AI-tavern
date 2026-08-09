@@ -7,14 +7,14 @@
       "producer": "packages/persistence/src/save-export.ts",
       "sourceTest": "packages/persistence/src/save-export.test.ts",
       "createdAt": "2026-08-01T13:00:00.000Z",
-      "sha256": "af9b23b3a6a5d4b3713a6ca95ce8b817510939375f1c87abb03f5564cd68b167"
+      "sha256": "1c9d5159cef2aaacb76089eed000a403a0cc99ad1d878bbbd2b33cf40bd48bf8"
     },
     "rust": {
       "path": "packages/persistence/test-fixtures/rust-export-v2.emtavern",
       "producer": "crates/native-bridge/src/save_archive.rs",
       "sourceTest": "current_archive_interop_gate_imports_typescript_and_emits_rust",
       "createdAt": "2026-08-02T00:59:25.584Z",
-      "sha256": "ec3f36f9e8a85dcc58249f701c1a713c5ae267bd3150ac1abf1c8f67108bbd12"
+      "sha256": "ee1b76ea20ed01c3cc83f0fb7936fca214b98dcad5643c5431ef7d1c375432f0"
     }
   }
 }

@@ -1,3 +1,4 @@
+import { createClaimFromRumor } from '@ember-tavern/contracts';
 import type {
   Adventure,
   AdventureActionMode,
@@ -178,6 +179,7 @@ export function buildNpcDialogueContext(
       } else if (fact.kind === 'FALSE_BELIEF') {
         throw new ContextBuildError('NPC false belief cannot be promoted to truth or suspicion');
       }
+      if (fact.kind === 'RUMOR') createClaimFromRumor(fact);
       usedKnowledgeIds.add(id);
       return [
         {

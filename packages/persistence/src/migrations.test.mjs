@@ -142,8 +142,14 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
         npc_id, known_fact_ids_json, suspected_fact_ids_json, false_belief_fact_ids_json,
         excluded_secret_fact_ids_json, updated_at
       ) VALUES (
-        'npc-provenance', '["fact-known","fact-excluded"]', '["fact-suspected"]',
+        'npc-provenance', '["fact-known","fact-rumor","fact-excluded"]', '["fact-suspected"]',
         '["fact-believed"]', '["fact-excluded"]', '2026-08-09T01:02:03.004Z'
+      );
+      INSERT INTO world_facts (
+        id, campaign_id, kind, statement, faction_ids_json, detail_json, created_at
+      ) VALUES (
+        'fact-rumor', 'campaign-provenance', 'RUMOR', 'The bell rings below the cellar.',
+        '[]', '{"veracity":"UNKNOWN"}', '2026-08-09T01:02:03.004Z'
       );
     `);
 
@@ -153,6 +159,14 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     assert.deepEqual(JSON.parse(row.provenance_json), [
       {
         factId: 'fact-known',
+        state: 'KNOWN',
+        source: 'IMPORT',
+        eventId: null,
+        learnedAt: '2026-08-09T01:02:03.004Z',
+        confidence: 1,
+      },
+      {
+        factId: 'fact-rumor',
         state: 'KNOWN',
         source: 'IMPORT',
         eventId: null,
@@ -180,11 +194,25 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
       JSON.parse(
         database.prepare('SELECT known_fact_ids_json FROM npc_knowledge').get().known_fact_ids_json,
       ),
-      ['fact-known'],
+      ['fact-known', 'fact-rumor'],
+    );
+    assert.deepEqual(
+      JSON.parse(
+        database.prepare("SELECT detail_json FROM world_facts WHERE id = 'fact-rumor'").get()
+          .detail_json,
+      ),
+      {
+        veracity: 'UNKNOWN',
+        claimId: 'claim-fact-rumor',
+        claimRevision: 1,
+        confidence: 0.5,
+        sourceBasis: 'HEARSAY',
+        sourceNpcId: 'npc-provenance',
+      },
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      7,
+      8,
     );
   });
 });

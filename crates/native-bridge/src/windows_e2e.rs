@@ -177,9 +177,9 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             roster_npc("TEMPORARY_VISITOR", "Sera Holt", json!("Waiting for the causeway."))
         ],
         "rumors": [
-            {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","veracity":"TRUE"},
-            {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","veracity":"PARTIAL"},
-            {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","veracity":"UNKNOWN"}
+            {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","sourceBasis":"WITNESS","confidence":0.9,"veracity":"TRUE"},
+            {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","sourceBasis":"FACTION_MESSAGE","confidence":0.6,"veracity":"PARTIAL"},
+            {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","sourceBasis":"HEARSAY","confidence":0.4,"veracity":"UNKNOWN"}
         ]
     });
     let completed_tavern = store

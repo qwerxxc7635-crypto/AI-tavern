@@ -45,6 +45,7 @@ export {
   TRUTH_VISIBILITIES,
   KnowledgeModelError,
   createClaim,
+  createClaimFromRumor,
   createKnowledge,
   createMemory,
   createWorldTruth,
@@ -143,7 +144,7 @@ export type {
   PlayerAttributesInput,
   PlayerCharacter,
 } from './character.js';
-export { WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
+export { RUMOR_SOURCE_BASES, WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
 export type {
   DevelopingFact,
   Faction,
@@ -153,6 +154,7 @@ export type {
   Location,
   LockedRuleFact,
   RumorFact,
+  RumorSourceBasis,
   RumorVeracity,
   TemporaryNarrativeFact,
   WorldBible,

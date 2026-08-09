@@ -6,6 +6,7 @@ import {
   adventureId,
   aiRequestId,
   campaignId,
+  claimId,
   createCampaign,
   createNpcKnowledge,
   gameEventId,
@@ -35,6 +36,7 @@ import {
   SnapshotRepository,
   QuestRepository,
   TavernRepository,
+  WorldRepository,
   exportCampaignSave,
   importCampaignSave,
 } from './index.js';
@@ -111,7 +113,7 @@ describe('exportCampaignSave', () => {
     expect(campaignRow['default_model_profile_id']).toBeNull();
     expect(campaignRow['fallback_model_profile_id']).toBeNull();
     expect(campaignRow['task_model_overrides_json']).toBe('{}');
-    expect(requireArray(tables['world_facts'])).toHaveLength(1);
+    expect(requireArray(tables['world_facts'])).toHaveLength(2);
     expect(requireArray(tables['scene_frames'])).toHaveLength(1);
     expect(Object.keys(tables)).toHaveLength(15);
     expect(events).toHaveLength(1);
@@ -215,6 +217,11 @@ describe('importCampaignSave', () => {
     expect(
       native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
     ).toEqual({ statement: 'The beacon is lit.' });
+    expect(new WorldRepository(database).getFact(worldFactId('rumor-export'))).toMatchObject({
+      claimId: claimId('claim-rumor-export'),
+      sourceBasis: 'HEARSAY',
+      confidence: 0.5,
+    });
     expect(
       native
         .prepare('SELECT revision FROM scene_frames WHERE adventure_id = ?')
@@ -533,6 +540,21 @@ function seed(sqlite: TransactionalSqliteDatabase): void {
     updatedAt: at,
   });
   taverns.assignOwner(tavernKey, npcKey);
+  new WorldRepository(sqlite).addFact({
+    id: worldFactId('rumor-export'),
+    claimId: claimId('claim-rumor-export'),
+    campaignId: campaignKey,
+    kind: 'RUMOR',
+    statement: 'A sailor heard the beacon lens was moved.',
+    locationId: locationId('location-export'),
+    factionIds: [],
+    sourceNpcId: npcKey,
+    sourceBasis: 'HEARSAY',
+    confidence: 0.5,
+    claimRevision: 1,
+    veracity: 'UNKNOWN',
+    createdAt: at,
+  });
   new NpcRepository(sqlite).saveKnowledge(
     createNpcKnowledge({
       npcId: npcKey,

@@ -56,8 +56,8 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_NPCS: define(
     'GENERATE_NPCS',
     'WORLD_DESIGNER',
-    'Create the requested number of non-owner tavern NPCs. Give each independent motives, secrets, speech, and a valid residency-specific visit reason. Also create exactly three rumors attributed to generated NPC names with an explicit hidden veracity proposal.',
-    2,
+    'Create the requested number of non-owner tavern NPCs. Give each independent motives, secrets, speech, and a valid residency-specific visit reason. Also create exactly three rumors attributed to generated NPC names. Classify each source as witness, hearsay, personal belief, or faction message and give the Claim confidence independently from its hidden veracity proposal.',
+    3,
   ),
   NPC_REPLY: define(
     'NPC_REPLY',

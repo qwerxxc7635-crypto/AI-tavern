@@ -1614,10 +1614,12 @@ fn adventure_npc_knowledge(
                 connection,
                 campaign_id,
                 &npc_id,
-                &known,
-                &suspected,
-                &false_beliefs,
-                &excluded,
+                crate::npc_dialogue::KnowledgeFactSets {
+                    known: &known,
+                    suspected: &suspected,
+                    false_beliefs: &false_beliefs,
+                    excluded: &excluded,
+                },
                 &provenance,
             )?;
             let excluded = excluded

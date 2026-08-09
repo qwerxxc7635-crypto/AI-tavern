@@ -1880,3 +1880,21 @@ NPC自己的secret仍是其角色卡组成部分，可供扮演但受Prompt禁�
 ### 影响与边界
 
 该迁移只扩展既有NPC认知权威行，不创建WorldTruth或Claim持久源，也不让Memory成为事实。T03不实现传闻来源化、随机性Profile或Context Inspector；这些仍按T04及后续任务顺序执行。未接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-090：酒馆传闻是轻量Claim兼容投影而非WorldTruth
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T04`、传闻隐藏真实性及WorldTruth/Claim不可冒充红线
+
+### 决定与理由
+
+为避免在P2任务中引入完整World Voices或第二套并行数据库，现有`world_facts.kind=RUMOR`行保留为Claim的兼容持久投影，但明确不属于WorldTruth。每条新传闻必须携带独立claimId、来源NPC、WITNESS/HEARSAY/PERSONAL_BELIEF/FACTION_MESSAGE传播方式、0至1 confidence和正claimRevision；`createClaimFromRumor`只把陈述、NPC Actor来源、confidence与revision投影为Claim，绝不携带隐藏veracity。
+
+`GENERATE_NPCS` schema/prompt v3要求模型分别提出传播方式、Claim confidence和隐藏veracity，本地Schema与业务规则再验证来源NPC必须来自本次Roster。TypeScript与原生事务把完整来源元数据和NPC Knowledge一起写入SQLite；来源NPC的Knowledge provenance沿用Claim confidence。Repository、NPC Context与原生读取均验证claim字段、来源NPC Campaign边界和闭集枚举。
+
+schema 8把旧RUMOR保守回填为独立`claim-<factId>`、revision 1、HEARSAY和confidence 0.5；来源优先复用旧detail，其次从持有该传闻的NPC Knowledge确定。旧`.emtavern` schema 1/2在隔离导入时执行同等转换。Windows玩家投影只显示来源NPC与传播方式，不序列化veracity或数值confidence。
+
+### 影响与边界
+
+FACTION_MESSAGE只表示某NPC转述的势力消息，不建立Faction Actor、全局广播、传播图、衰减模拟或World Voices。T04不创建独立Claims表，不改变客观事实授权，不实现T05 Randomness Profiles，不接入真实Provider、付费API、正式用户数据或iOS。

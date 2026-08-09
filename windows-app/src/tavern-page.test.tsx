@@ -17,6 +17,7 @@ describe('tavern page', () => {
     expect(await screen.findByRole('heading', { name: 'Ember Rest' })).toBeTruthy();
     expect(screen.getByText('临时访客 · Concerned')).toBeTruthy();
     expect(screen.getByText('A light moves below the cellar.')).toBeTruthy();
+    expect(screen.getByText(/Tomas Reed · 亲历/)).toBeTruthy();
     expect(screen.queryByText(/TRUE|PARTIAL|UNKNOWN/)).toBeNull();
     expect(screen.getAllByLabelText(/0\/6/)).toHaveLength(3);
     expect(service.initializeCalls).toEqual(['campaign-tavern']);
@@ -137,18 +138,24 @@ function finalSnapshot(): TavernSnapshot {
     rumors: [
       {
         id: 'rumor-1',
+        claimId: 'claim-rumor-1',
         statement: 'A light moves below the cellar.',
         sourceNpcId: 'npc-resident-1',
+        sourceBasis: 'WITNESS',
       },
       {
         id: 'rumor-2',
+        claimId: 'claim-rumor-2',
         statement: 'The guild pays for tunnel maps.',
         sourceNpcId: 'npc-resident-2',
+        sourceBasis: 'FACTION_MESSAGE',
       },
       {
         id: 'rumor-3',
+        claimId: 'claim-rumor-3',
         statement: 'The courier crossed alone.',
         sourceNpcId: 'npc-visitor',
+        sourceBasis: 'HEARSAY',
       },
     ],
     clocks: ['世界冲突', '酒馆长期问题', '区域局势'].map((name, index) => ({
