@@ -624,23 +624,43 @@ function parsePlayerAction(value: unknown): PlayerAction {
     row['kind'],
     'PlayerAction.kind',
   );
+  const mode =
+    row['mode'] === undefined
+      ? Object.freeze({})
+      : Object.freeze({
+          mode: requireEnum(
+            ['ACTION', 'DIALOGUE', 'OBSERVE'] as const,
+            row['mode'],
+            'PlayerAction.mode',
+          ),
+        });
   switch (kind) {
     case 'SUGGESTED':
       return Object.freeze({
         kind,
+        ...mode,
         optionId: actionOptionId(requireString(row['optionId'], 'PlayerAction.optionId')),
         text: requireString(row['text'], 'PlayerAction.text'),
       });
     case 'FREEFORM':
-      return Object.freeze({ kind, text: requireString(row['text'], 'PlayerAction.text') });
+      return Object.freeze({
+        kind,
+        ...mode,
+        text: requireString(row['text'], 'PlayerAction.text'),
+      });
     case 'USE_ITEM':
       return Object.freeze({
         kind,
+        ...mode,
         itemId: itemId(requireString(row['itemId'], 'PlayerAction.itemId')),
         intent: requireString(row['intent'], 'PlayerAction.intent'),
       });
     case 'EXIT_ADVENTURE':
-      return Object.freeze({ kind, reason: requireString(row['reason'], 'PlayerAction.reason') });
+      return Object.freeze({
+        kind,
+        ...mode,
+        reason: requireString(row['reason'], 'PlayerAction.reason'),
+      });
   }
 }
 

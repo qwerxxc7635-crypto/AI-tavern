@@ -1,5 +1,6 @@
 import type {
   Adventure,
+  AdventureActionMode,
   AdventureTurn,
   Clue,
   GameEvent,
@@ -119,6 +120,7 @@ export interface AdventureContextSource {
   readonly clues: readonly Clue[];
   readonly relatedNpcs: readonly NpcProfile[];
   readonly playerAction: string;
+  readonly playerActionMode?: AdventureActionMode;
   readonly longTermSummary: string | null;
   readonly sceneFrame?: SceneFrame;
 }
@@ -310,6 +312,7 @@ export function buildAdventureTurnContext(
     recentTurns,
     discoveredClues,
     relatedNpcs,
+    playerActionMode: source.playerActionMode ?? 'ACTION',
     playerAction: source.playerAction,
   });
 

@@ -326,6 +326,7 @@ export class AdventureTurnUseCases {
             turns: this.adventures.listTurns(adventure.id),
             clues: this.adventures.getClues(adventure.id),
             relatedNpcs: this.relatedNpcs(adventure.questId, command.campaignId),
+            playerActionMode: action.mode ?? 'ACTION',
             playerAction: actionText(action),
             longTermSummary: this.priorAdventureSummary(command.campaignId, adventure.id),
           },

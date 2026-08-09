@@ -49,7 +49,7 @@ const events: readonly GameEvent[] = [
     payload: {
       adventureId: adventure,
       turnId: turn,
-      action: { kind: 'FREEFORM', text: 'Inspect the locked door' },
+      action: { kind: 'FREEFORM', mode: 'DIALOGUE', text: 'Inspect the locked door' },
     },
   },
   {

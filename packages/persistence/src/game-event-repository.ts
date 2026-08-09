@@ -293,23 +293,39 @@ function eventForType(
 function parseAction(value: unknown) {
   const action = requireRecord(value, 'action');
   const kind = requireEnum(ACTION_KINDS, action['kind'], 'action.kind');
+  const mode =
+    action['mode'] === undefined
+      ? Object.freeze({})
+      : Object.freeze({
+          mode: requireEnum(
+            ['ACTION', 'DIALOGUE', 'OBSERVE'] as const,
+            action['mode'],
+            'action.mode',
+          ),
+        });
   switch (kind) {
     case 'SUGGESTED':
       return Object.freeze({
         kind,
+        ...mode,
         optionId: actionOptionId(requireString(action['optionId'], 'action.optionId')),
         text: requireString(action['text'], 'action.text'),
       });
     case 'FREEFORM':
-      return Object.freeze({ kind, text: requireString(action['text'], 'action.text') });
+      return Object.freeze({ kind, ...mode, text: requireString(action['text'], 'action.text') });
     case 'USE_ITEM':
       return Object.freeze({
         kind,
+        ...mode,
         itemId: itemId(requireString(action['itemId'], 'action.itemId')),
         intent: requireString(action['intent'], 'action.intent'),
       });
     case 'EXIT_ADVENTURE':
-      return Object.freeze({ kind, reason: requireString(action['reason'], 'action.reason') });
+      return Object.freeze({
+        kind,
+        ...mode,
+        reason: requireString(action['reason'], 'action.reason'),
+      });
   }
 }
 

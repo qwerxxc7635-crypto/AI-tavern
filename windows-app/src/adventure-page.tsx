@@ -9,6 +9,7 @@ import {
 import { windowsSettlementService, type WindowsSettlementService } from './settlement-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
+import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 type AdventureActions = Pick<
   WindowsAdventureService,
@@ -21,6 +22,16 @@ const ATTRIBUTE_LABELS = {
   knowledge: '知识',
   charisma: '魅力',
 } as const;
+
+const ACTION_MODES: readonly {
+  readonly mode: AdventureActionMode;
+  readonly label: string;
+  readonly placeholder: string;
+}[] = [
+  { mode: 'ACTION', label: '行动', placeholder: '描述角色下一步要做什么…' },
+  { mode: 'DIALOGUE', label: '对话', placeholder: '描述要和谁说什么，以及想达成什么…' },
+  { mode: 'OBSERVE', label: '观察', placeholder: '描述角色要仔细观察什么…' },
+];
 
 export function AdventurePage({
   service = windowsAdventureService,
@@ -35,6 +46,7 @@ export function AdventurePage({
   const questId = search.get('questId') ?? undefined;
   const [snapshot, setSnapshot] = useState<AdventureSnapshot | null>(null);
   const [action, setAction] = useState('');
+  const [actionMode, setActionMode] = useState<AdventureActionMode>('ACTION');
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
@@ -199,7 +211,8 @@ export function AdventurePage({
               snapshot.turns.map((turn) => (
                 <article key={turn.id}>
                   <small>
-                    第 {turn.turnNumber} 回合 · {turn.playerAction}
+                    第 {turn.turnNumber} 回合 · {actionModeLabel(turn.actionMode)} ·{' '}
+                    {turn.playerAction}
                   </small>
                   <p>{turn.sceneText}</p>
                 </article>
@@ -248,10 +261,26 @@ export function AdventurePage({
               onSubmit={(event) => {
                 event.preventDefault();
                 if (action.trim().length > 0) {
-                  void run(() => service.act(campaignId, adventureId, action.trim()));
+                  void run(() => service.act(campaignId, adventureId, actionMode, action.trim()));
                 }
               }}
             >
+              <fieldset className="adventure-action-modes">
+                <legend>选择意图</legend>
+                {ACTION_MODES.map(({ mode, label }) => (
+                  <label key={mode}>
+                    <input
+                      type="radio"
+                      name="adventure-action-mode"
+                      value={mode}
+                      checked={actionMode === mode}
+                      disabled={!canAct || busy}
+                      onChange={() => setActionMode(mode)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </fieldset>
               <div className="suggested-actions">
                 {snapshot.suggestedActions.map((suggestion) => (
                   <button type="button" key={suggestion} onClick={() => setAction(suggestion)}>
@@ -266,14 +295,17 @@ export function AdventurePage({
                 maxLength={4000}
                 disabled={!canAct || busy}
                 onChange={(event) => setAction(event.target.value)}
-                placeholder="描述角色下一步要做什么…"
+                placeholder={
+                  ACTION_MODES.find(({ mode }) => mode === actionMode)?.placeholder ??
+                  '描述角色下一步要做什么…'
+                }
               />
               <button
                 className="primary-action"
                 type="submit"
                 disabled={!canAct || busy || action.trim().length === 0}
               >
-                {busy ? '正在推进…' : '提交行动'}
+                {busy ? '正在推进…' : `提交${actionModeLabel(actionMode)}`}
               </button>
             </form>
           )}
@@ -333,6 +365,10 @@ export function AdventurePage({
       </div>
     </main>
   );
+}
+
+function actionModeLabel(mode: AdventureActionMode): string {
+  return ACTION_MODES.find((entry) => entry.mode === mode)?.label ?? '行动';
 }
 
 function stateLabel(state: Exclude<AdventureSnapshot['state'], null>): string {

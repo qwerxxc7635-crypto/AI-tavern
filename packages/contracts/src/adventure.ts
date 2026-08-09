@@ -104,11 +104,28 @@ export interface Adventure {
   readonly updatedAt: IsoTimestamp;
 }
 
+export const ADVENTURE_ACTION_MODES = ['ACTION', 'DIALOGUE', 'OBSERVE'] as const;
+export type AdventureActionMode = (typeof ADVENTURE_ACTION_MODES)[number];
+
 export type PlayerAction =
-  | { readonly kind: 'SUGGESTED'; readonly optionId: ActionOptionId; readonly text: string }
-  | { readonly kind: 'FREEFORM'; readonly text: string }
-  | { readonly kind: 'USE_ITEM'; readonly itemId: ItemId; readonly intent: string }
-  | { readonly kind: 'EXIT_ADVENTURE'; readonly reason: string };
+  | {
+      readonly kind: 'SUGGESTED';
+      readonly optionId: ActionOptionId;
+      readonly text: string;
+      readonly mode?: AdventureActionMode;
+    }
+  | { readonly kind: 'FREEFORM'; readonly text: string; readonly mode?: AdventureActionMode }
+  | {
+      readonly kind: 'USE_ITEM';
+      readonly itemId: ItemId;
+      readonly intent: string;
+      readonly mode?: AdventureActionMode;
+    }
+  | {
+      readonly kind: 'EXIT_ADVENTURE';
+      readonly reason: string;
+      readonly mode?: AdventureActionMode;
+    };
 
 export type CheckDifficulty = 8 | 11 | 14 | 17;
 

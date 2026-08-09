@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 import {
   WindowsAdventureService,
@@ -25,6 +26,7 @@ describe('WindowsAdventureService', () => {
       snapshot = await service.act(
         'campaign-adventure',
         adventureIdOf(snapshot),
+        turn % 3 === 1 ? 'ACTION' : turn % 3 === 2 ? 'DIALOGUE' : 'OBSERVE',
         `Take action ${turn}`,
       );
       if (snapshot.state === 'CHECK_REQUIRED') {
@@ -54,8 +56,8 @@ describe('WindowsAdventureService', () => {
     const adventureId = adventureIdOf(snapshot);
 
     const [first, second] = await Promise.all([
-      service.act('campaign-adventure', adventureId, 'Study the lock'),
-      service.act('campaign-adventure', adventureId, 'Study the lock'),
+      service.act('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock'),
+      service.act('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock'),
     ]);
 
     expect(first.currentTurnNumber).toBe(1);
@@ -70,8 +72,8 @@ describe('WindowsAdventureService', () => {
     snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
     const adventureId = adventureIdOf(snapshot);
 
-    await gateway.submit('campaign-adventure', adventureId, 'Study the lock');
-    snapshot = await service.act('campaign-adventure', adventureId, 'Ignored retry text');
+    await gateway.submit('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock');
+    snapshot = await service.act('campaign-adventure', adventureId, 'ACTION', 'Ignored retry text');
     expect(gateway.submitCount).toBe(1);
     expect(snapshot.state).toBe('CHECK_REQUIRED');
 
@@ -87,7 +89,7 @@ describe('WindowsAdventureService', () => {
     let snapshot = await firstRun.prepare('campaign-adventure', 'quest-beacon');
     snapshot = await firstRun.start('campaign-adventure', adventureIdOf(snapshot));
     const adventureId = adventureIdOf(snapshot);
-    await gateway.submit('campaign-adventure', adventureId, 'Persist before restart');
+    await gateway.submit('campaign-adventure', adventureId, 'DIALOGUE', 'Persist before restart');
 
     const restarted = new WindowsAdventureService(gateway);
     snapshot = await restarted.load('campaign-adventure');
@@ -127,7 +129,12 @@ class MemoryAdventureGateway implements AdventureGateway {
     return this.snapshot;
   }
 
-  public async submit(_campaignId: string, _adventureId: string, playerAction: string) {
+  public async submit(
+    _campaignId: string,
+    _adventureId: string,
+    actionMode: AdventureActionMode,
+    playerAction: string,
+  ) {
     this.submitCount += 1;
     const next = this.snapshot.currentTurnNumber + 1;
     const newTurn = {
@@ -135,6 +142,7 @@ class MemoryAdventureGateway implements AdventureGateway {
       turnNumber: next,
       sceneText: this.snapshot.currentScene,
       playerAction,
+      actionMode,
       suggestedActions: [],
       checkRequest: null,
       diceResult: null,
@@ -144,7 +152,7 @@ class MemoryAdventureGateway implements AdventureGateway {
       ...this.snapshot,
       state: 'WAITING_FOR_PLAYER',
       turns: [...this.snapshot.turns, newTurn],
-      turnGenerationContext: turnInput(this.snapshot, playerAction),
+      turnGenerationContext: turnInput(this.snapshot, actionMode, playerAction),
     };
     return this.snapshot;
   }
@@ -303,7 +311,11 @@ function clue(id: string, title: string) {
   };
 }
 
-function turnInput(snapshot: AdventureSnapshot, playerAction: string) {
+function turnInput(
+  snapshot: AdventureSnapshot,
+  playerActionMode: AdventureActionMode,
+  playerAction: string,
+) {
   return {
     adventureId: 'adventure-beacon',
     worldRules: ['Magic leaves warmth.'],
@@ -348,6 +360,7 @@ function turnInput(snapshot: AdventureSnapshot, playerAction: string) {
     recentTurns: snapshot.turns.map(({ sceneText }) => sceneText).slice(-10),
     discoveredClues: [],
     relatedNpcs: [],
+    playerActionMode,
     playerAction,
   };
 }

@@ -35,7 +35,7 @@ import {
 } from './task-schemas.js';
 
 export interface AITaskSchemaDefinition {
-  readonly schemaVersion: 1 | 2 | 3;
+  readonly schemaVersion: 1 | 2 | 3 | 4;
   readonly input: z.ZodType;
   readonly output: z.ZodType;
 }
@@ -70,7 +70,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_ADVENTURE_TURN: definition(
     GenerateAdventureTurnInputSchema,
     GenerateAdventureTurnOutputSchema,
-    3,
+    4,
   ),
   RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema),
   GENERATE_WORLD_EVENT: definition(

@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 
 import { AdventurePage } from './adventure-page.js';
 import type { AdventureSnapshot } from './adventure-service.js';
+import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 afterEach(cleanup);
 
@@ -24,20 +25,25 @@ describe('adventure page', () => {
     expect(screen.getByRole('complementary', { name: '物品线索与骰子' })).toBeTruthy();
     expect(screen.getByText('Storm')).toBeTruthy();
     expect(screen.getByText('Scorched Lens')).toBeTruthy();
+    expect((screen.getByRole('radio', { name: '行动' }) as HTMLInputElement).checked).toBe(true);
+    fireEvent.click(screen.getByRole('radio', { name: '观察' }));
+    expect(screen.getByPlaceholderText('描述角色要仔细观察什么…')).toBeTruthy();
+    fireEvent.click(screen.getByRole('radio', { name: '对话' }));
+    expect(screen.getByPlaceholderText('描述要和谁说什么，以及想达成什么…')).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: 'Study the lock.' }));
-    fireEvent.click(screen.getByRole('button', { name: '提交行动' }));
+    fireEvent.click(screen.getByRole('button', { name: '提交对话' }));
     expect(await screen.findByRole('button', { name: '投掷 D20' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '投掷 D20' }));
     expect(await screen.findByText('总计 15 / 难度 11')).toBeTruthy();
-    expect(service.actions).toEqual(['Study the lock.']);
+    expect(service.actions).toEqual([{ mode: 'DIALOGUE', text: 'Study the lock.' }]);
     expect(service.rolls).toBe(1);
   });
 });
 
 class FakeAdventureService {
-  public readonly actions: string[] = [];
+  public readonly actions: { readonly mode: AdventureActionMode; readonly text: string }[] = [];
   public rolls = 0;
   private snapshot = sceneSnapshot();
 
@@ -53,8 +59,13 @@ class FakeAdventureService {
     return this.snapshot;
   }
 
-  public async act(_campaignId: string, _adventureId: string, action: string) {
-    this.actions.push(action);
+  public async act(
+    _campaignId: string,
+    _adventureId: string,
+    mode: AdventureActionMode,
+    action: string,
+  ) {
+    this.actions.push({ mode, text: action });
     this.snapshot = {
       ...this.snapshot,
       state: 'CHECK_REQUIRED',
@@ -65,6 +76,7 @@ class FakeAdventureService {
           turnNumber: 1,
           sceneText: 'Warm light leaks through the lock.',
           playerAction: action,
+          actionMode: mode,
           suggestedActions: [],
           checkRequest: {
             attribute: 'knowledge',
@@ -98,6 +110,7 @@ class FakeAdventureService {
           turnNumber: 2,
           sceneText: 'The quiet landing needs no check.',
           playerAction: 'Cross the landing.',
+          actionMode: 'ACTION',
           suggestedActions: [],
           checkRequest: null,
           diceResult: null,

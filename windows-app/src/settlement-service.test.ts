@@ -99,6 +99,7 @@ function ending(): AdventureSnapshot {
         turnNumber: 1,
         sceneText: 'Done',
         playerAction: 'Act',
+        actionMode: 'ACTION',
         suggestedActions: [],
         checkRequest: null,
         diceResult: null,

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { MY_SECTIONS, MyPage } from './my-page.js';
+import { RELEASE_INFO } from './generated-release-info.js';
 
 afterEach(cleanup);
 
@@ -37,6 +38,6 @@ describe('My page information architecture', () => {
     expect(screen.getByText('发布状态：开发频道 / 未发布')).toBeTruthy();
     expect(
       screen.getByRole('list', { name: '当前版本更新记录' }).querySelectorAll('li'),
-    ).toHaveLength(6);
+    ).toHaveLength(RELEASE_INFO.highlights.length);
   });
 });

@@ -42,6 +42,7 @@ pub struct AdventurePlanCommit {
 pub struct AdventureActionSubmit {
     pub campaign_id: String,
     pub adventure_id: String,
+    pub action_mode: String,
     pub player_action: String,
 }
 
@@ -309,6 +310,7 @@ impl CampaignStore {
     ) -> Result<AdventureSnapshot, CampaignStoreError> {
         validate_id(&command.campaign_id)?;
         validate_id(&command.adventure_id)?;
+        validate_action_mode(&command.action_mode)?;
         validate_text(&command.player_action, 4_000)?;
         let mut connection = self.connect()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -340,7 +342,12 @@ impl CampaignStore {
                 command.adventure_id,
                 snapshot.current_turn_number + 1,
                 snapshot.current_scene,
-                json!({ "kind": "FREEFORM", "text": command.player_action }).to_string(),
+                json!({
+                    "kind": "FREEFORM",
+                    "mode": command.action_mode,
+                    "text": command.player_action,
+                })
+                .to_string(),
                 at,
             ],
         )?;
@@ -1304,6 +1311,7 @@ fn turn_generation_context(
         "recentTurns": recent_turns,
         "discoveredClues": discovered,
         "relatedNpcs": related_npcs,
+        "playerActionMode": action_mode(&turn.player_action)?,
         "playerAction": action_text(&turn.player_action)?,
     }))
 }
@@ -1501,6 +1509,7 @@ fn load_turn_views(
                 "turnNumber": row.get::<_, i64>(1)?,
                 "sceneText": row.get::<_, String>(2)?,
                 "playerAction": action_text_sql(&player_action)?,
+                "actionMode": action_mode_sql(&player_action)?,
                 "suggestedActions": from_json::<Value>(row.get(4)?)?,
                 "checkRequest": row.get::<_, Option<String>>(5)?.map(from_json::<Value>).transpose()?,
                 "diceResult": row.get::<_, Option<String>>(6)?.map(from_json::<Value>).transpose()?,
@@ -1928,6 +1937,27 @@ fn action_text_sql(value: &Value) -> rusqlite::Result<String> {
     action_text(value).map_err(|_| rusqlite::Error::InvalidQuery)
 }
 
+fn validate_action_mode(mode: &str) -> Result<(), CampaignStoreError> {
+    if matches!(mode, "ACTION" | "DIALOGUE" | "OBSERVE") {
+        Ok(())
+    } else {
+        Err(CampaignStoreError::InvalidData)
+    }
+}
+
+fn action_mode(value: &Value) -> Result<String, CampaignStoreError> {
+    let mode = value
+        .get("mode")
+        .and_then(Value::as_str)
+        .unwrap_or("ACTION");
+    validate_action_mode(mode)?;
+    Ok(mode.to_owned())
+}
+
+fn action_mode_sql(value: &Value) -> rusqlite::Result<String> {
+    action_mode(value).map_err(|_| rusqlite::Error::InvalidQuery)
+}
+
 fn record_field(value: &Value, name: &str) -> Result<Value, CampaignStoreError> {
     value
         .get(name)
@@ -2017,12 +2047,34 @@ mod tests {
                 .expect("initial participants")
                 .is_empty()
         );
+        assert!(matches!(
+            store.submit_adventure_action(AdventureActionSubmit {
+                campaign_id: "campaign-adventure".to_owned(),
+                adventure_id: adventure_id.clone(),
+                action_mode: "INVALID".to_owned(),
+                player_action: "This must not be stored.".to_owned(),
+            }),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        assert!(
+            store
+                .adventure_snapshot("campaign-adventure", None)
+                .expect("snapshot after invalid mode")
+                .turns
+                .is_empty()
+        );
 
         for turn_number in 1..=8 {
+            let action_mode = match turn_number % 3 {
+                1 => "ACTION",
+                2 => "DIALOGUE",
+                _ => "OBSERVE",
+            };
             let pending = store
                 .submit_adventure_action(AdventureActionSubmit {
                     campaign_id: "campaign-adventure".to_owned(),
                     adventure_id: adventure_id.clone(),
+                    action_mode: action_mode.to_owned(),
                     player_action: format!("Take action {turn_number}"),
                 })
                 .expect("submit action");
@@ -2045,6 +2097,14 @@ mod tests {
                     .and_then(|context| context.get("sceneFrame")),
                 pending.scene_frame.as_ref(),
                 "provider context must use the persisted frame"
+            );
+            assert_eq!(
+                pending
+                    .turn_generation_context
+                    .as_ref()
+                    .and_then(|context| context.get("playerActionMode"))
+                    .and_then(Value::as_str),
+                Some(action_mode)
             );
             let turn_id = pending
                 .turns

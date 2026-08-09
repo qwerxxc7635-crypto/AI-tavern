@@ -3039,3 +3039,23 @@
 ### 结论
 
 - `V02-M7-T01`完成。下一项严格为`V02-M7-T02` Action Modes。
+
+## 2026-08-09 — V02-M7-T02 建立冒险行动模式
+
+### 实现
+
+- 冒险输入区新增“行动 / 对话 / 观察”三种互斥意图及对应中文提示和提交文案，不隐藏现有建议或文本输入。
+- Windows service与Tauri命令传递ACTION/DIALOGUE/OBSERVE；原生层在打开事务前拒绝未知模式，并把合法模式与玩家文本共同写入`player_action_json`。
+- 原生/TypeScript恢复视图保留mode；旧回合没有mode时按ACTION兼容，新的Repository回环不会丢失显式mode。
+- `GENERATE_ADVENTURE_TURN`升级到schema v4/prompt v3，Context Builder和原生上下文都传递`playerActionMode`，明确三种意图的叙事语义。
+- 记录`DEC-081`并同步Changelog/release摘要；未实现下一任务的建议数量/知识来源约束。
+
+### 验证
+
+- 页面测试覆盖三种单选模式、动态提示、对话提交及模式到service的传递；service八回合测试轮换三种模式。
+- Rust测试证明三种模式进入持久上下文，非法模式不创建回合；持久层回环覆盖OBSERVE mode。
+- 全量门禁结果记录于本任务提交前的最终验证。
+
+### 结论
+
+- `V02-M7-T02`完成。下一项严格为`V02-M7-T03` Action Suggestions。

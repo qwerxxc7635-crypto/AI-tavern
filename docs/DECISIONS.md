@@ -1732,3 +1732,19 @@ SceneFrame不嵌入不可变的`adventures.plan_json`，而由migration 6建立�
 ### 影响与边界
 
 AI回合上下文固定携带持久SceneFrame，UI snapshot必须验证其恢复摘要与当前场景一致。T01仅建立场景事实和恢复边界，不提前实现T02行动模式或T03的3至5个行动建议，不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-081：冒险意图模式是回合输入事实
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T02`、SQLite唯一真相源与确定性恢复红线
+
+### 决定与理由
+
+冒险输入固定使用`ACTION`、`DIALOGUE`、`OBSERVE`三种机器模式，分别由玩家看到的“行动”“对话”“观察”单选控件产生。模式不是纯UI标签：原生命令在事务前验证它，并与文本一起写入`adventure_turns.player_action_json`；恢复视图和`GENERATE_ADVENTURE_TURN` schema v4/prompt v3继续携带该模式，使模型按改变局势、向参与者交流或获取可观察信息的不同意图解释同一段文本。
+
+既有`.emtavern`回合没有`mode`时按`ACTION`读取，避免为了新增意图破坏schema 1/2旧档案；新写入必须显式提供合法模式。共享`PlayerAction`将mode保持为可选只用于兼容历史事实，当前Windows提交路径不省略它。
+
+### 影响与边界
+
+本任务不改变现有建议数量或生成来源，不提前实现T03的3至5项场景建议，也不改变T04自由输入可用性。未新增SQLite migration、真实Provider/付费API、正式用户数据或iOS实现。

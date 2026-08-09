@@ -57,7 +57,6 @@ describe('central prompt catalog', () => {
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
         'GENERATE_NPCS',
-        'GENERATE_ADVENTURE_TURN',
         'GENERATE_WORLD_EVENT',
         'SUMMARIZE_ADVENTURE',
       ].includes(task)
@@ -65,12 +64,12 @@ describe('central prompt catalog', () => {
         : 1;
       expect(TASK_PROMPTS[task]).toMatchObject({
         task,
-        version: expectedVersion,
+        version: task === 'GENERATE_ADVENTURE_TURN' ? 3 : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }
     expect(PROMPT_HISTORY).toContainEqual(
-      expect.objectContaining({ task: 'GENERATE_ADVENTURE_TURN', version: 2 }),
+      expect.objectContaining({ task: 'GENERATE_ADVENTURE_TURN', version: 3 }),
     );
   });
 

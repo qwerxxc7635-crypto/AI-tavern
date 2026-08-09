@@ -286,7 +286,11 @@ function adventureTurn(): AdventureTurn {
         text: 'Secure a rope and cross.',
       },
     ],
-    playerAction: { kind: 'FREEFORM', text: 'Test the nearest support first.' },
+    playerAction: {
+      kind: 'FREEFORM',
+      mode: 'OBSERVE',
+      text: 'Test the nearest support first.',
+    },
     checkRequest: {
       id: checkId,
       turnId: turnKey,

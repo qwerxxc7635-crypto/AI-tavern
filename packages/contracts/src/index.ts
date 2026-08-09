@@ -37,6 +37,7 @@ export type {
   LedgerSource,
 } from './event-ledger.js';
 export {
+  ADVENTURE_ACTION_MODES,
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
   AdventureTransitionError,
@@ -44,6 +45,7 @@ export {
 } from './adventure.js';
 export type {
   Adventure,
+  AdventureActionMode,
   AdventureEnding,
   AdventureOutcome,
   AdventurePlan,

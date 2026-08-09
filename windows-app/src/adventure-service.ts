@@ -20,6 +20,7 @@ import {
   campaignId,
   generationRecordId,
   idempotencyKey,
+  type AdventureActionMode,
   type SceneFrame,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
@@ -29,6 +30,7 @@ export interface AdventureTurnView {
   readonly turnNumber: number;
   readonly sceneText: string;
   readonly playerAction: string;
+  readonly actionMode: AdventureActionMode;
   readonly suggestedActions: readonly { readonly text: string }[];
   readonly checkRequest: {
     readonly attribute: Attribute;
@@ -116,7 +118,12 @@ export interface AdventureGateway {
     generation: GenerationAudit,
   ): Promise<AdventureSnapshot>;
   start(campaignId: string, adventureId: string): Promise<AdventureSnapshot>;
-  submit(campaignId: string, adventureId: string, playerAction: string): Promise<AdventureSnapshot>;
+  submit(
+    campaignId: string,
+    adventureId: string,
+    actionMode: AdventureActionMode,
+    playerAction: string,
+  ): Promise<AdventureSnapshot>;
   commitTurn(
     campaignId: string,
     adventureId: string,
@@ -168,10 +175,10 @@ export const tauriAdventureGateway: AdventureGateway = {
       id,
     );
   },
-  async submit(id, adventureId, playerAction) {
+  async submit(id, adventureId, actionMode, playerAction) {
     return parseSnapshot(
       await invoke<unknown>('adventure_action_submit', {
-        command: { campaignId: id, adventureId, playerAction },
+        command: { campaignId: id, adventureId, actionMode, playerAction },
       }),
       id,
     );
@@ -249,14 +256,20 @@ export class WindowsAdventureService {
     return this.gateway.start(id, adventureId);
   }
 
-  public act(id: string, adventureId: string, action: string): Promise<AdventureSnapshot> {
+  public act(
+    id: string,
+    adventureId: string,
+    actionMode: AdventureActionMode,
+    action: string,
+  ): Promise<AdventureSnapshot> {
     return this.singleFlight(id, async () => {
       requireText(action);
+      requireActionMode(actionMode);
       const current = await this.gateway.load(id);
       if (current.state === 'WAITING_FOR_PLAYER') {
         return this.completeTurn(id, adventureId, current);
       }
-      const pending = await this.gateway.submit(id, adventureId, action);
+      const pending = await this.gateway.submit(id, adventureId, actionMode, action);
       return this.completeTurn(id, adventureId, pending);
     });
   }
@@ -478,6 +491,7 @@ function parseTurn(value: unknown): AdventureTurnView {
     turnNumber: positiveInteger(record['turnNumber']),
     sceneText: requireText(record['sceneText']),
     playerAction: requireText(record['playerAction']),
+    actionMode: requireActionMode(record['actionMode']),
     suggestedActions: Object.freeze(
       requireArray(record['suggestedActions']).map((value) => {
         const action = requireRecord(value);
@@ -559,6 +573,10 @@ function positiveInteger(value: unknown): number {
 function requireBoolean(value: unknown): boolean {
   if (typeof value !== 'boolean') throw new TypeError('Adventure boolean is invalid');
   return value;
+}
+
+function requireActionMode(value: unknown): AdventureActionMode {
+  return enumValue(['ACTION', 'DIALOGUE', 'OBSERVE'] as const, value);
 }
 
 function enumValue<const Values extends readonly string[]>(

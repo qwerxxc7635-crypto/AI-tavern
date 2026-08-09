@@ -314,6 +314,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       recentTurns: [],
       discoveredClues: [],
       relatedNpcs: [npc],
+      playerActionMode: 'OBSERVE',
       playerAction: 'Inspect the lock.',
     },
     output: adventureTurnOutput,
@@ -426,7 +427,7 @@ describe('versioned AI task schemas', () => {
     const definition = AI_TASK_SCHEMAS[task];
     const expectedVersion =
       task === 'GENERATE_ADVENTURE_TURN'
-        ? 3
+        ? 4
         : [
               'GENERATE_CHARACTER_TRAITS',
               'COMPLETE_CHARACTER_BACKGROUND',

@@ -306,6 +306,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             .submit_adventure_action(AdventureActionSubmit {
                 campaign_id: CAMPAIGN_ID.to_owned(),
                 adventure_id: adventure_id.clone(),
+                action_mode: "ACTION".to_owned(),
                 player_action: format!("Take release action {turn_number}"),
             })
             .expect("submit adventure action");

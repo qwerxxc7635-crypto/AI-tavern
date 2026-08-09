@@ -46,7 +46,8 @@
 - `V02-M6-T03`：DONE；纯状态机与UI显式覆盖idle/generating/validating/preview/editing/confirming/committed，以revision+operation拒绝编辑后的迟到结果并显示中文状态。
 - `V02-M6-T04`：DONE；特质与完整角色均以可恢复Candidate暂存，未确认不写角色/装备/生成事实或推进Campaign，确认在单一SQLite事务原子提交并支持幂等重放。
 - `V02-M7-T01`：DONE；Adventure使用独立SQLite SceneFrame投影，完整回合与场景ledger原子更新，恢复点锚定可移植game event，`.emtavern` schema 2携带投影并兼容读取schema 1。
-- 下一执行项严格进入 `V02-M7-T02` Action Modes。
+- `V02-M7-T02`：DONE；冒险输入显式支持ACTION/DIALOGUE/OBSERVE，意图贯通UI、原生命令、SQLite恢复视图和AI上下文，旧回合按ACTION兼容。
+- 下一执行项严格进入 `V02-M7-T03` Action Suggestions。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

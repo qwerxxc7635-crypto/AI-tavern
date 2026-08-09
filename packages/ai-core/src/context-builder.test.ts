@@ -278,6 +278,7 @@ describe('AI context builders', () => {
           },
         ],
         relatedNpcs: [targetNpc, unrelatedNpc],
+        playerActionMode: 'OBSERVE',
         playerAction: 'Climb above the flood.',
         longTermSummary: 'The party followed the warm trail from the cellar.',
       },
@@ -290,6 +291,7 @@ describe('AI context builders', () => {
     expect(context.recentTurns.join(' ')).not.toContain('Unrelated secret');
     expect(context.discoveredClues).toEqual(['Scorched Lens: Burned from within.']);
     expect(context.relatedNpcs.map(({ id }) => id)).toEqual([targetNpcId]);
+    expect(context.playerActionMode).toBe('OBSERVE');
     expect(context.sceneFrame).toMatchObject({
       participants: [createPlayer().id],
       revision: adventure.currentTurnNumber + 1,

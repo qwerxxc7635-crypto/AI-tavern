@@ -8,6 +8,7 @@ const identifier = z.string().trim().min(1).max(200);
 const stringList = z.array(text).max(30);
 const identifierList = z.array(identifier).max(50);
 const attribute = z.enum(['physique', 'agility', 'knowledge', 'charisma']);
+const adventureActionMode = z.enum(['ACTION', 'DIALOGUE', 'OBSERVE']);
 const questRisk = z.enum(['LOW', 'MODERATE', 'HIGH', 'EXTREME']);
 const rewardTier = z.enum(['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY']);
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
@@ -408,6 +409,7 @@ export const GenerateAdventureTurnInputSchema = z
     recentTurns: stringList.max(10),
     discoveredClues: stringList,
     relatedNpcs: z.array(npcBrief).max(12),
+    playerActionMode: adventureActionMode,
     playerAction: text,
   })
   .strict();
