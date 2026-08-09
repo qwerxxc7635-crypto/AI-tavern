@@ -283,14 +283,23 @@ export function AdventurePage({
               </fieldset>
               <div className="suggested-actions">
                 {snapshot.suggestedActions.map((suggestion) => (
-                  <button type="button" key={suggestion} onClick={() => setAction(suggestion)}>
+                  <button
+                    type="button"
+                    key={suggestion}
+                    disabled={!canAct || busy}
+                    onClick={() => setAction(suggestion)}
+                  >
                     {suggestion}
                   </button>
                 ))}
               </div>
-              <label htmlFor="player-action">你的行动</label>
+              <label htmlFor="player-action">自由输入</label>
+              <p className="adventure-muted" id="free-input-help">
+                可以忽略上方建议，直接描述角色想做、想说或想观察的内容。
+              </p>
               <textarea
                 id="player-action"
+                aria-describedby="free-input-help"
                 value={action}
                 maxLength={4000}
                 disabled={!canAct || busy}

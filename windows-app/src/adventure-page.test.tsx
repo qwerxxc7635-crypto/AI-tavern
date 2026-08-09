@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -39,6 +39,55 @@ describe('adventure page', () => {
     expect(await screen.findByText('总计 15 / 难度 11')).toBeTruthy();
     expect(service.actions).toEqual([{ mode: 'DIALOGUE', text: 'Study the lock.' }]);
     expect(service.rolls).toBe(1);
+  });
+
+  it('keeps editable free input available alongside suggestions', async () => {
+    const service = new FakeAdventureService();
+    render(
+      <MemoryRouter initialEntries={['/adventure?campaignId=campaign-adventure']}>
+        <AdventurePage service={service} />
+      </MemoryRouter>,
+    );
+
+    const freeInput = (await screen.findByRole('textbox', {
+      name: '自由输入',
+    })) as HTMLTextAreaElement;
+    expect(freeInput.disabled).toBe(false);
+    expect(screen.getByText(/可以忽略上方建议/)).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /lock|keeper|hinges/i })).toHaveLength(3);
+
+    fireEvent.change(freeInput, {
+      target: { value: 'I circle behind the rain barrel and listen at the cellar wall.' },
+    });
+    fireEvent.click(screen.getByRole('radio', { name: '观察' }));
+    fireEvent.click(screen.getByRole('button', { name: '提交观察' }));
+
+    expect(await screen.findByRole('button', { name: '投掷 D20' })).toBeTruthy();
+    expect(service.actions).toEqual([
+      {
+        mode: 'OBSERVE',
+        text: 'I circle behind the rain barrel and listen at the cellar wall.',
+      },
+    ]);
+  });
+
+  it('retains free input after a failed submission so the player can retry or edit it', async () => {
+    const service = new FailingAdventureService();
+    render(
+      <MemoryRouter initialEntries={['/adventure?campaignId=campaign-adventure']}>
+        <AdventurePage service={service} />
+      </MemoryRouter>,
+    );
+
+    const freeInput = (await screen.findByRole('textbox', {
+      name: '自由输入',
+    })) as HTMLTextAreaElement;
+    fireEvent.change(freeInput, { target: { value: 'Knock three times on the cellar wall.' } });
+    fireEvent.click(screen.getByRole('button', { name: '提交行动' }));
+
+    await waitFor(() => expect(freeInput.disabled).toBe(false));
+    expect(freeInput.value).toBe('Knock three times on the cellar wall.');
+    expect(screen.getByRole('button', { name: '提交行动' })).toBeTruthy();
   });
 });
 
@@ -122,6 +171,12 @@ class FakeAdventureService {
   }
 }
 
+class FailingAdventureService extends FakeAdventureService {
+  public override async act(): Promise<AdventureSnapshot> {
+    throw new Error('offline');
+  }
+}
+
 function sceneSnapshot(): AdventureSnapshot {
   return {
     campaignId: 'campaign-adventure',
@@ -166,7 +221,7 @@ function sceneSnapshot(): AdventureSnapshot {
     turns: [],
     currentScene: 'Rain lashes the shuttered lighthouse.',
     sceneFrame: null,
-    suggestedActions: ['Study the lock.'],
+    suggestedActions: ['Study the lock.', 'Ask the keeper about the key.', 'Inspect the hinges.'],
     turnGenerationContext: null,
     diceGenerationInput: null,
   };
