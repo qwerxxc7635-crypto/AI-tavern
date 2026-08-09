@@ -234,9 +234,6 @@ export class WindowsAdventureService {
         notifyAdventureObserver(observer, 'onSubmitted');
         return this.completeTurn(id, snapshot.adventureId, snapshot, observer);
       }
-      if (snapshot.state === 'RESOLVING') {
-        return this.completeDice(id, snapshot.adventureId, snapshot);
-      }
       return snapshot;
     });
   }
@@ -287,13 +284,25 @@ export class WindowsAdventureService {
   }
 
   public resolveCheck(id: string, adventureId: string): Promise<AdventureSnapshot> {
+    return this.rollCheck(id, adventureId).then(() => this.completeCheck(id, adventureId));
+  }
+
+  public rollCheck(id: string, adventureId: string): Promise<AdventureSnapshot> {
     return this.singleFlight(id, async () => {
       const current = await this.gateway.load(id);
-      if (current.state === 'RESOLVING') {
-        return this.completeDice(id, adventureId, current);
+      if (current.state === 'RESOLVING') return current;
+      if (current.state !== 'CHECK_REQUIRED') {
+        throw new AdventureServiceError('CHECK_NOT_READY');
       }
-      const rolled = await this.gateway.roll(id, adventureId);
-      return this.completeDice(id, adventureId, rolled);
+      return this.gateway.roll(id, adventureId);
+    });
+  }
+
+  public completeCheck(id: string, adventureId: string): Promise<AdventureSnapshot> {
+    return this.singleFlight(id, async () => {
+      const current = await this.gateway.load(id);
+      if (current.state !== 'RESOLVING') return current;
+      return this.completeDice(id, adventureId, current);
     });
   }
 

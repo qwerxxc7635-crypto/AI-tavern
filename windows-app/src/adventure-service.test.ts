@@ -146,6 +146,51 @@ describe('WindowsAdventureService', () => {
     expect(gateway.submitCount).toBe(1);
     expect(phases).toEqual(['submitted', 'generating', 'validating', 'resolving', 'committed']);
   });
+
+  it('persists one roll across repeated clicks and only narrates after reveal', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const service = new WindowsAdventureService(gateway);
+    let snapshot = await service.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
+    const adventureId = adventureIdOf(snapshot);
+    snapshot = await service.act('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock');
+    expect(snapshot.state).toBe('CHECK_REQUIRED');
+
+    const [first, repeated] = await Promise.all([
+      service.rollCheck('campaign-adventure', adventureId),
+      service.rollCheck('campaign-adventure', adventureId),
+    ]);
+
+    expect(first).toBe(repeated);
+    expect(first.state).toBe('RESOLVING');
+    expect(gateway.rollCount).toBe(1);
+    expect(gateway.tasks.filter((task) => task === 'RESOLVE_DICE_RESULT')).toHaveLength(0);
+
+    snapshot = await service.rollCheck('campaign-adventure', adventureId);
+    expect(snapshot).toBe(first);
+    expect(gateway.rollCount).toBe(1);
+    snapshot = await service.completeCheck('campaign-adventure', adventureId);
+    expect(snapshot.state).toBe('SCENE');
+    expect(gateway.tasks.filter((task) => task === 'RESOLVE_DICE_RESULT')).toHaveLength(1);
+  });
+
+  it('restores an interrupted persisted roll without rerolling or auto-completing it', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const firstRun = new WindowsAdventureService(gateway);
+    let snapshot = await firstRun.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await firstRun.start('campaign-adventure', adventureIdOf(snapshot));
+    const adventureId = adventureIdOf(snapshot);
+    await firstRun.act('campaign-adventure', adventureId, 'ACTION', 'Study the lock');
+    const rolled = await firstRun.rollCheck('campaign-adventure', adventureId);
+
+    const restarted = new WindowsAdventureService(gateway);
+    snapshot = await restarted.load('campaign-adventure');
+
+    expect(snapshot).toBe(rolled);
+    expect(snapshot.state).toBe('RESOLVING');
+    expect(gateway.rollCount).toBe(1);
+    expect(gateway.tasks.filter((task) => task === 'RESOLVE_DICE_RESULT')).toHaveLength(0);
+  });
 });
 
 function phaseObserver(phases: string[]): AdventureTurnObserver {

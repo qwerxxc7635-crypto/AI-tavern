@@ -1814,3 +1814,19 @@ D20唯一判定顺序固定为：程序产生1至20的`raw`，把角色属性、
 ### 影响与边界
 
 旧别名暂时保留用于schema 1/2存档和已有调用方兼容，所有新逻辑以canonical字段为准。T06不实现动画、skip、reduced motion或中断恢复，这些严格留给T07；不接入真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-086：D20动画是已持久化硬结果的可中断投影
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T07`、SQLite唯一真相源与D20不得重骰的架构红线
+
+### 决定与理由
+
+投骰与结果叙事拆成两个可恢复步骤：原生命令先生成并原子持久化D20硬结果，把Adventure置为`RESOLVING`；Windows页面收到该snapshot后才播放动画。动画结束或玩家跳过时，Service重新读取同一份SQLite结果并生成叙事，不向动画提供随机数入口。
+
+同一Campaign的并发投骰由single-flight合并；重复调用发现`RESOLVING`时直接返回已保存snapshot。启动载入也保留该状态而不自动完成，使刷新或进程中断后能重新展示同一个raw、modifier、total、DC和result。动画结束、fallback timer与skip共享一次性reveal门，卸载时取消timer；减少动态效果偏好下立即揭示固定结果。
+
+### 影响与边界
+
+旧`resolveCheck`保留为顺序调用“锁定结果→完成叙事”的兼容入口，Windows页面使用拆分接口建立明确动画边界。T07不新增骰制、重放历史界面、数据库schema或AI能力，也不接入真实Provider、付费API、正式用户数据或iOS。

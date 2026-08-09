@@ -35,7 +35,12 @@ describe('adventure page', () => {
     fireEvent.click(screen.getByRole('button', { name: '提交对话' }));
     expect(await screen.findByRole('button', { name: '投掷 D20' })).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: '投掷 D20' }));
+    const rollButton = screen.getByRole('button', { name: '投掷 D20' });
+    fireEvent.click(rollButton);
+    fireEvent.click(rollButton);
+    expect(await screen.findByRole('button', { name: '跳过动画' })).toBeTruthy();
+    expect(screen.getByText(/检定结果已锁定/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '跳过动画' }));
     expect(await screen.findByText('原始 12 + 修正 +3 = 总计 15 / 难度 11')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toContain('最新剧情已呈现');
     expect(service.actions).toEqual([{ mode: 'DIALOGUE', text: 'Study the lock.' }]);
@@ -107,12 +112,30 @@ describe('adventure page', () => {
     expect(await screen.findByRole('textbox', { name: '自由输入' })).toBeTruthy();
     expect(service.loadCount).toBe(2);
   });
+
+  it('restores an interrupted locked roll and completes it without rolling again', async () => {
+    const service = new RestoredDiceService();
+    render(
+      <MemoryRouter initialEntries={['/adventure?campaignId=campaign-adventure']}>
+        <AdventurePage service={service} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('button', { name: '跳过动画' })).toBeTruthy();
+    expect(screen.getByText(/刷新或重放都不会重新投掷/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '跳过动画' }));
+
+    expect(await screen.findByRole('textbox', { name: '自由输入' })).toBeTruthy();
+    expect(service.rolls).toBe(0);
+    expect(service.completions).toBe(1);
+  });
 });
 
 class FakeAdventureService {
   public readonly actions: { readonly mode: AdventureActionMode; readonly text: string }[] = [];
   public rolls = 0;
-  private snapshot = sceneSnapshot();
+  public completions = 0;
+  protected snapshot = sceneSnapshot();
 
   public async load() {
     return this.snapshot;
@@ -164,14 +187,13 @@ class FakeAdventureService {
     return this.snapshot;
   }
 
-  public async resolveCheck() {
+  public async rollCheck() {
     this.rolls += 1;
     const turn = this.snapshot.turns[0];
     if (turn === undefined) throw new Error('Expected a turn before resolving a check');
     this.snapshot = {
       ...this.snapshot,
-      state: 'SCENE',
-      currentTurnNumber: 2,
+      state: 'RESOLVING',
       turns: [
         {
           ...turn,
@@ -185,8 +207,23 @@ class FakeAdventureService {
             equipmentModifier: 0,
             statusModifier: 0,
           },
-          resolved: true,
+          resolved: false,
         },
+      ],
+    };
+    return this.snapshot;
+  }
+
+  public async completeCheck() {
+    this.completions += 1;
+    const turn = this.snapshot.turns[0];
+    if (turn === undefined) throw new Error('Expected a turn before completing a check');
+    this.snapshot = {
+      ...this.snapshot,
+      state: 'SCENE',
+      currentTurnNumber: 2,
+      turns: [
+        { ...turn, resolved: true },
         {
           id: 'turn-two',
           turnNumber: 2,
@@ -201,6 +238,13 @@ class FakeAdventureService {
       ],
     };
     return this.snapshot;
+  }
+}
+
+class RestoredDiceService extends FakeAdventureService {
+  public constructor() {
+    super();
+    this.snapshot = rolledSnapshot();
   }
 }
 
@@ -271,5 +315,40 @@ function sceneSnapshot(): AdventureSnapshot {
     suggestedActions: ['Study the lock.', 'Ask the keeper about the key.', 'Inspect the hinges.'],
     turnGenerationContext: null,
     diceGenerationInput: null,
+  };
+}
+
+function rolledSnapshot(): AdventureSnapshot {
+  const snapshot = sceneSnapshot();
+  return {
+    ...snapshot,
+    state: 'RESOLVING',
+    currentTurnNumber: 1,
+    turns: [
+      {
+        id: 'turn-one',
+        turnNumber: 1,
+        sceneText: 'Warm light leaks through the lock.',
+        playerAction: 'Study the lock.',
+        actionMode: 'OBSERVE',
+        suggestedActions: [],
+        checkRequest: {
+          attribute: 'knowledge',
+          difficulty: 11,
+          reason: 'Identify the hidden mechanism.',
+        },
+        diceResult: {
+          raw: 12,
+          modifier: 3,
+          total: 15,
+          dc: 11,
+          result: 'SUCCESS',
+          attributeModifier: 3,
+          equipmentModifier: 0,
+          statusModifier: 0,
+        },
+        resolved: false,
+      },
+    ],
   };
 }

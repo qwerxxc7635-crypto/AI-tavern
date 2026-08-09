@@ -16,12 +16,13 @@ import {
 } from './adventure-turn-state-machine.js';
 import { windowsSettlementService, type WindowsSettlementService } from './settlement-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { D20Animation } from './d20-animation.js';
 import { playerText } from './localization/index.js';
 import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 type AdventureActions = Pick<
   WindowsAdventureService,
-  'load' | 'prepare' | 'start' | 'act' | 'resolveCheck'
+  'load' | 'prepare' | 'start' | 'act' | 'rollCheck' | 'completeCheck'
 >;
 
 const ATTRIBUTE_LABELS = {
@@ -64,6 +65,7 @@ export function AdventurePage({
   turnStateRef.current = turnState;
   const operationSequence = useRef(0);
   const turnInFlight = useRef(false);
+  const diceInFlight = useRef(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   const [aiError, setAiError] = useState<unknown | null>(null);
@@ -171,6 +173,41 @@ export function AdventurePage({
     dispatchTurn({ type: 'DRAFT_CHANGED' });
     setAiError(null);
     setRetryAction(null);
+  }
+
+  async function rollDice(submittedCampaignId: string, submittedAdventureId: string) {
+    if (diceInFlight.current) return;
+    diceInFlight.current = true;
+    setBusy(true);
+    setAiError(null);
+    setRetryAction(null);
+    try {
+      setSnapshot(await service.rollCheck(submittedCampaignId, submittedAdventureId));
+    } catch (error) {
+      setAiError(error);
+      setRetryAction(() => () => void rollDice(submittedCampaignId, submittedAdventureId));
+    } finally {
+      diceInFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function finishDice(submittedCampaignId: string, submittedAdventureId: string) {
+    if (diceInFlight.current) return;
+    diceInFlight.current = true;
+    setBusy(true);
+    setAiError(null);
+    setRetryAction(null);
+    try {
+      setSnapshot(await service.completeCheck(submittedCampaignId, submittedAdventureId));
+      setAction('');
+    } catch (error) {
+      setAiError(error);
+      setRetryAction(() => () => void finishDice(submittedCampaignId, submittedAdventureId));
+    } finally {
+      diceInFlight.current = false;
+      setBusy(false);
+    }
   }
 
   if (campaignId === null) {
@@ -340,6 +377,11 @@ export function AdventurePage({
                 {busy ? '正在结算…' : '结算并查看档案'}
               </button>
             </div>
+          ) : snapshot.state === 'RESOLVING' && dice !== null ? (
+            <D20Animation
+              result={dice}
+              onRevealed={() => void finishDice(campaignId, adventureId)}
+            />
           ) : check !== null && snapshot.state === 'CHECK_REQUIRED' ? (
             <div className="check-prompt">
               <p>
@@ -350,7 +392,7 @@ export function AdventurePage({
                 className="primary-action"
                 type="button"
                 disabled={busy}
-                onClick={() => void run(() => service.resolveCheck(campaignId, adventureId))}
+                onClick={() => void rollDice(campaignId, adventureId)}
               >
                 {busy ? '骰子落下…' : '投掷 D20'}
               </button>

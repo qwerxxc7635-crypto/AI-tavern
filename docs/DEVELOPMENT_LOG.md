@@ -3140,3 +3140,23 @@
 ### 结论
 
 - `V02-M7-T06`完成。下一项严格为`V02-M7-T07` D20 Animation。
+
+## 2026-08-09 — V02-M7-T07 建立不重骰的 D20 动画
+
+### 实现
+
+- Windows Adventure Service把检定拆分为`rollCheck`与`completeCheck`：前者只生成并持久化硬结果，后者只读取该结果生成叙事；兼容入口仍按相同顺序执行。
+- 新增D20动画组件，明确显示已锁定的raw、modifier、total、DC和result，并支持动画结束、fallback与“跳过动画”三种一次性完成路径。
+- `prefers-reduced-motion`下立即揭示结果；组件中断卸载会取消fallback，刷新后从SQLite `RESOLVING` snapshot恢复同一结果，再继续叙事。
+- Campaign级single-flight合并重复点击；已处于`RESOLVING`时直接复用持久结果，载入不再隐式跳过动画，也没有任何UI重骰入口。
+- 记录`DEC-086`并同步Changelog/release摘要；未实现M8知识模型、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 动画、页面与Service共16项定向测试通过，覆盖skip、repeat animation event、reduce motion、unmount interruption、refresh restore、并发/顺序重复点击及叙事阶段边界。
+- 完整78个Vitest文件/442项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及83项测试通过，包含Windows纵向E2E；桌面前端199 modules生产构建通过。因用户级TUNA Git索引不可达，Rust门禁以临时Cargo Home复用本机rsproxy缓存离线执行，未修改全局配置或依赖锁。
+
+### 结论
+
+- `V02-M7-T07`完成。下一项严格为`V02-M8-T01` WorldTruth / Claim / Knowledge / Memory。
