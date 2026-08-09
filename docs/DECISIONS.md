@@ -1748,3 +1748,19 @@ AI回合上下文固定携带持久SceneFrame，UI snapshot必须验证其恢复
 ### 影响与边界
 
 本任务不改变现有建议数量或生成来源，不提前实现T03的3至5项场景建议，也不改变T04自由输入可用性。未新增SQLite migration、真实Provider/付费API、正式用户数据或iOS实现。
+
+## DEC-082：行动建议受数量合同和知识边界共同约束
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T03`、NPC知识隔离与AI输出必须验证的架构红线
+
+### 决定与理由
+
+`GENERATE_ADVENTURE_TURN`活动场景必须返回3至5条经过去空白、大小写不敏感去重的行动建议；`ENDING`必须返回0条。该合同同时落在共享Zod schema v5与原生提交验证中，任何不合规输出均在游戏事务前失败，不能写入回合、场景帧或游戏事实。
+
+建议生成上下文显式携带持久SceneFrame、Quest、Player Character、相关且非FALSE_BELIEF的World Facts，以及按相关NPC分组的known、suspected和false-belief statements。NPC的excluded secret fact IDs在进入上下文前过滤；NPC认知不提升为全局真相，false belief也不混入known facts。Prompt v4要求建议联合依据这些来源，不能只产出与当前场景无关的通用选项。
+
+### 影响与边界
+
+上下文预算不足时先裁剪历史与非核心知识，但保持NPC简介和知识条目的关联；所有知识仍只来自当前Campaign的SQLite。T03不增加建议自己的行动模式、不改变玩家自由输入是否可用，也不接入真实Provider、付费API、正式用户数据或iOS。

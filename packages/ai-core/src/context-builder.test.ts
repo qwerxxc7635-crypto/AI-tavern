@@ -278,6 +278,8 @@ describe('AI context builders', () => {
           },
         ],
         relatedNpcs: [targetNpc, unrelatedNpc],
+        worldFacts: facts,
+        npcKnowledge: [knowledge],
         playerActionMode: 'OBSERVE',
         playerAction: 'Climb above the flood.',
         longTermSummary: 'The party followed the warm trail from the cellar.',
@@ -292,6 +294,17 @@ describe('AI context builders', () => {
     expect(context.discoveredClues).toEqual(['Scorched Lens: Burned from within.']);
     expect(context.relatedNpcs.map(({ id }) => id)).toEqual([targetNpcId]);
     expect(context.playerActionMode).toBe('OBSERVE');
+    expect(context.knownFacts).toEqual([
+      { id: targetFactId, kind: 'DEVELOPING_FACT', statement: 'The cellar door is warm.' },
+    ]);
+    expect(context.npcKnowledge).toEqual([
+      {
+        npcId: targetNpcId,
+        knownFacts: ['The cellar door is warm.'],
+        suspectedFacts: ['The keeper may use the tunnel.'],
+        falseBeliefs: ['The tunnel ends beneath the market.'],
+      },
+    ]);
     expect(context.sceneFrame).toMatchObject({
       participants: [createPlayer().id],
       revision: adventure.currentTurnNumber + 1,
@@ -434,6 +447,8 @@ describe('AI context builders', () => {
         ),
         clues: [],
         relatedNpcs: [targetNpc],
+        worldFacts: facts,
+        npcKnowledge: [knowledge],
         playerAction: 'Continue.',
         longTermSummary: 'A previous adventure restored the harbor road.',
       },

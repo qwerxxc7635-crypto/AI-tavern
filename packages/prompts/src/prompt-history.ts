@@ -53,4 +53,9 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(3),
     change: 'Interpret explicit action, dialogue, and observation intent modes.',
   }),
+  Object.freeze({
+    task: 'GENERATE_ADVENTURE_TURN',
+    version: promptVersion(4),
+    change: 'Require 3-5 grounded and distinct suggestions for active scenes.',
+  }),
 ]);

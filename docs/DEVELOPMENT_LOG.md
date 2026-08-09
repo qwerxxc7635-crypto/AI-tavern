@@ -3059,3 +3059,24 @@
 ### 结论
 
 - `V02-M7-T02`完成。下一项严格为`V02-M7-T03` Action Suggestions。
+
+## 2026-08-09 — V02-M7-T03 建立受知识边界约束的行动建议
+
+### 实现
+
+- `GENERATE_ADVENTURE_TURN`升级到schema v5/prompt v4；活动场景严格要求3至5条不重复建议，ENDING严格要求0条，结构错误不能进入游戏事务。
+- TypeScript Context Builder从当前Campaign SQLite读取Quest相关/LOCKED_RULE事实，并只为相关NPC装配known、suspected与false-belief statements；excluded secret facts在发送给模型前过滤。
+- Application Use Case与原生Windows路径都传递knownFacts和npcKnowledge；原生提交层独立复核建议数量与去空白、大小写不敏感唯一性，避免绕过共享schema。
+- Fake Provider与测试夹具改为合法的3条活动建议；记录`DEC-082`并同步Changelog/release摘要。
+- 未改变T04自由输入合同，未接入真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 定向Vitest 6个文件、67项测试通过，覆盖上下文知识筛选、NPC秘密隔离、schema数量/去重/ENDING边界、prompt版本及两条回合编排路径。
+- 完整74个Vitest文件/407项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及82项测试通过，包含Windows纵向E2E；原生层覆盖少于3条、空白/大小写重复及ENDING空建议边界。
+- 桌面前端生产构建通过；未读取或改写正式用户存档。
+
+### 结论
+
+- `V02-M7-T03`完成。下一项严格为`V02-M7-T04` Free Input。

@@ -558,6 +558,7 @@ function contextFromSqlite(database: TransactionalSqliteDatabase) {
   const adventures = new AdventureRepository(database);
   const adventure = requireEntity(adventures.get(adventureKey), 'Adventure');
   const npc = requireEntity(new NpcRepository(database).get(npcKey), 'NPC');
+  const npcKnowledge = new NpcRepository(database).getKnowledge(npcKey);
   return buildAdventureTurnContext({
     world,
     playerCharacter: player,
@@ -567,6 +568,8 @@ function contextFromSqlite(database: TransactionalSqliteDatabase) {
     turns: adventures.listTurns(adventureKey),
     clues: adventures.getClues(adventureKey),
     relatedNpcs: [npc],
+    worldFacts: new WorldRepository(database).listFacts(campaignKey),
+    npcKnowledge: npcKnowledge === null ? [] : [npcKnowledge],
     playerAction: 'Study the lock.',
     longTermSummary: null,
   });

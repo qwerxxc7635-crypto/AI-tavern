@@ -119,6 +119,8 @@ export interface AdventureContextSource {
   readonly turns: readonly AdventureTurn[];
   readonly clues: readonly Clue[];
   readonly relatedNpcs: readonly NpcProfile[];
+  readonly worldFacts: readonly WorldFact[];
+  readonly npcKnowledge: readonly NpcKnowledge[];
   readonly playerAction: string;
   readonly playerActionMode?: AdventureActionMode;
   readonly longTermSummary: string | null;
@@ -249,6 +251,37 @@ export function buildAdventureTurnContext(
       currentMood: npc.currentMood,
     }));
   const sceneFrame = source.sceneFrame ?? deriveSceneFrame(source);
+  const relatedNpcIds = new Set(relatedNpcs.map(({ id }) => id));
+  const factById = new Map(
+    source.worldFacts.filter((fact) => fact.campaignId === campaign).map((fact) => [fact.id, fact]),
+  );
+  let knownFacts = source.worldFacts
+    .filter(
+      (fact) =>
+        fact.campaignId === campaign &&
+        fact.kind !== 'FALSE_BELIEF' &&
+        (fact.kind === 'LOCKED_RULE' || source.quest.relatedFactIds.includes(fact.id)),
+    )
+    .slice(0, 30)
+    .map(({ id, kind, statement }) => ({ id, kind, statement }));
+  let npcKnowledge = source.npcKnowledge
+    .filter(({ npcId }) => relatedNpcIds.has(npcId))
+    .slice(0, 12)
+    .map((knowledge) => {
+      const excluded = new Set(knowledge.excludedSecretFactIds);
+      const statementsFor = (ids: NpcKnowledge['knownFactIds']) =>
+        ids.flatMap((id) => {
+          if (excluded.has(id)) return [];
+          const fact = factById.get(id);
+          return fact === undefined ? [] : [fact.statement];
+        });
+      return {
+        npcId: knowledge.npcId,
+        knownFacts: statementsFor(knowledge.knownFactIds),
+        suspectedFacts: statementsFor(knowledge.suspectedFactIds),
+        falseBeliefs: statementsFor(knowledge.falseBeliefFactIds),
+      };
+    });
   const turnHistory = source.turns
     .filter((turn) => turn.adventureId === source.adventure.id)
     .sort((left, right) => left.turnNumber - right.turnNumber)
@@ -312,13 +345,20 @@ export function buildAdventureTurnContext(
     recentTurns,
     discoveredClues,
     relatedNpcs,
+    knownFacts,
+    npcKnowledge,
     playerActionMode: source.playerActionMode ?? 'ACTION',
     playerAction: source.playerAction,
   });
 
   while (serializedLength(build()) > budget.maxCharacters) {
     if (recentTurns.length > 0) recentTurns = recentTurns.slice(1);
-    else if (relatedNpcs.length > 0) relatedNpcs = relatedNpcs.slice(0, -1);
+    else if (relatedNpcs.length > 0) {
+      const removedNpcId = relatedNpcs.at(-1)?.id;
+      relatedNpcs = relatedNpcs.slice(0, -1);
+      npcKnowledge = npcKnowledge.filter(({ npcId }) => npcId !== removedNpcId);
+    } else if (npcKnowledge.length > 0) npcKnowledge = npcKnowledge.slice(0, -1);
+    else if (knownFacts.length > 0) knownFacts = knownFacts.slice(0, -1);
     else if (discoveredClues.length > 0) discoveredClues = discoveredClues.slice(1);
     else if (longTermSummary !== null) {
       longTermSummary = shrinkSummary(longTermSummary);

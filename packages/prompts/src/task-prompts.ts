@@ -77,8 +77,8 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_ADVENTURE_TURN: define(
     'GENERATE_ADVENTURE_TURN',
     'GAME_MASTER',
-    'Resolve only the submitted intent from the supplied SceneFrame. ACTION changes the situation, DIALOGUE addresses a participant, and OBSERVE gathers perceivable information. Preserve the frame participant, pressure, affordance, consequence, and return-point boundaries; propose, but never apply, state changes.',
-    3,
+    'Resolve only the submitted intent from the supplied SceneFrame. ACTION changes the situation, DIALOGUE addresses a participant, and OBSERVE gathers perceivable information. For an active scene, return 3-5 distinct suggestions grounded jointly in the scene, quest, player character, knownFacts, and npcKnowledge; return none for ENDING. Preserve authority boundaries and propose, but never apply, state changes.',
+    4,
   ),
   RESOLVE_DICE_RESULT: define(
     'RESOLVE_DICE_RESULT',

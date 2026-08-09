@@ -667,7 +667,11 @@ fn adventure_turn_output(ending: bool) -> Value {
         json!({
             "sceneText":"Warm light leaks through the old cellar lock.",
             "speakerNpcIds":[],
-            "suggestedActions":[{"text":"Study the lock."}],
+            "suggestedActions":[
+                {"text":"Study the lock."},
+                {"text":"Ask the keeper about the old key."},
+                {"text":"Observe the warm marks on the frame."}
+            ],
             "checkRequest":{
                 "attribute":"knowledge",
                 "difficulty":11,

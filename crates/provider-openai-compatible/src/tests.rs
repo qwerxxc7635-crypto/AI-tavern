@@ -661,7 +661,8 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
         "speakerNpcIds": [],
         "suggestedActions": [
             { "text": "Brace the sea gate." },
-            { "text": "Inspect the lens housing." }
+            { "text": "Inspect the lens housing." },
+            { "text": "Ask the keeper about the pulse." }
         ],
         "checkRequest": null,
         "discoveredClues": ["Salt-crusted lens key"],
@@ -703,7 +704,7 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
     let turn: Value = serde_json::from_str(&response.content).unwrap();
     assert_eq!(turn["adventureState"], "WAITING_FOR_PLAYER");
     assert!(turn["sceneText"].as_str().unwrap().contains("beacon"));
-    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 2);
+    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 3);
     assert_eq!(turn["discoveredClues"].as_array().unwrap().len(), 1);
 
     let requests = captured.lock().await;
@@ -725,7 +726,8 @@ async fn ollama_lists_installed_models_and_generates_structured_content_offline(
         "speakerNpcIds": [],
         "suggestedActions": [
             { "text": "Follow the chalk marks." },
-            { "text": "Listen for movement." }
+            { "text": "Listen for movement." },
+            { "text": "Inspect the dry passage walls." }
         ],
         "checkRequest": null,
         "discoveredClues": [],
@@ -761,7 +763,7 @@ async fn ollama_lists_installed_models_and_generates_structured_content_offline(
         .unwrap();
     let turn: Value = serde_json::from_str(&response.content).unwrap();
     assert_eq!(turn["adventureState"], "WAITING_FOR_PLAYER");
-    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 2);
+    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 3);
 
     let requests = captured.lock().await;
     let model_head = String::from_utf8_lossy(&requests[0].head);

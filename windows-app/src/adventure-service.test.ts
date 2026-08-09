@@ -360,6 +360,14 @@ function turnInput(
     recentTurns: snapshot.turns.map(({ sceneText }) => sceneText).slice(-10),
     discoveredClues: [],
     relatedNpcs: [],
+    knownFacts: [
+      {
+        id: 'fact-warm-lock',
+        kind: 'DEVELOPING_FACT',
+        statement: 'The cellar lock radiates a faint warmth.',
+      },
+    ],
+    npcKnowledge: [],
     playerActionMode,
     playerAction,
   };

@@ -193,7 +193,11 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
   GENERATE_ADVENTURE_TURN: {
     sceneText: 'Warm light leaks through the old cellar lock as the storm shakes the shutters.',
     speakerNpcIds: [],
-    suggestedActions: [{ text: 'Study the lock.' }, { text: 'Ask Ilyra for the old key.' }],
+    suggestedActions: [
+      { text: 'Study the lock.' },
+      { text: 'Ask Ilyra for the old key.' },
+      { text: 'Observe the warm marks around the frame.' },
+    ],
     checkRequest: {
       attribute: 'knowledge',
       difficulty: 11,

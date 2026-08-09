@@ -9,6 +9,13 @@ const stringList = z.array(text).max(30);
 const identifierList = z.array(identifier).max(50);
 const attribute = z.enum(['physique', 'agility', 'knowledge', 'charisma']);
 const adventureActionMode = z.enum(['ACTION', 'DIALOGUE', 'OBSERVE']);
+const worldFactKind = z.enum([
+  'LOCKED_RULE',
+  'DEVELOPING_FACT',
+  'TEMPORARY_NARRATIVE',
+  'RUMOR',
+  'FALSE_BELIEF',
+]);
 const questRisk = z.enum(['LOW', 'MODERATE', 'HIGH', 'EXTREME']);
 const rewardTier = z.enum(['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY']);
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
@@ -409,6 +416,21 @@ export const GenerateAdventureTurnInputSchema = z
     recentTurns: stringList.max(10),
     discoveredClues: stringList,
     relatedNpcs: z.array(npcBrief).max(12),
+    knownFacts: z
+      .array(z.object({ id: identifier, kind: worldFactKind, statement: text }).strict())
+      .max(30),
+    npcKnowledge: z
+      .array(
+        z
+          .object({
+            npcId: identifier,
+            knownFacts: stringList,
+            suspectedFacts: stringList,
+            falseBeliefs: stringList,
+          })
+          .strict(),
+      )
+      .max(12),
     playerActionMode: adventureActionMode,
     playerAction: text,
   })
@@ -430,7 +452,25 @@ export const GenerateAdventureTurnOutputSchema = z
     statePatchProposals: z.array(statePatchProposal).max(20),
     adventureState: z.enum(['SCENE', 'WAITING_FOR_PLAYER', 'CHECK_REQUIRED', 'ENDING']),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    const count = output.suggestedActions.length;
+    if (output.adventureState === 'ENDING' ? count !== 0 : count < 3 || count > 5) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestedActions'],
+        message: 'Active scenes require 3-5 suggestions; endings require none',
+      });
+    }
+    const normalized = output.suggestedActions.map(({ text }) => text.toLocaleLowerCase('zh-CN'));
+    if (new Set(normalized).size !== normalized.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestedActions'],
+        message: 'Suggested actions must be unique',
+      });
+    }
+  });
 
 export const ResolveDiceResultInputSchema = z
   .object({

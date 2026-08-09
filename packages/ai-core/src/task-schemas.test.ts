@@ -71,7 +71,11 @@ const questOutput = {
 const adventureTurnOutput = {
   sceneText: 'Warm light leaks through the lock.',
   speakerNpcIds: [],
-  suggestedActions: [{ text: 'Use a thin tool.' }],
+  suggestedActions: [
+    { text: 'Use a thin tool.' },
+    { text: 'Ask the keeper about the lock.' },
+    { text: 'Inspect the warm hinges.' },
+  ],
   checkRequest: { attribute: 'knowledge', difficulty: 11, reason: 'Study the old lock.' },
   discoveredClues: ['The lock is warm from inside.'],
   statePatchProposals: [patch],
@@ -314,6 +318,17 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       recentTurns: [],
       discoveredClues: [],
       relatedNpcs: [npc],
+      knownFacts: [
+        { id: 'fact-cellar', kind: 'DEVELOPING_FACT', statement: 'The cellar door is warm.' },
+      ],
+      npcKnowledge: [
+        {
+          npcId: npc.id,
+          knownFacts: ['The cellar door is warm.'],
+          suspectedFacts: [],
+          falseBeliefs: [],
+        },
+      ],
       playerActionMode: 'OBSERVE',
       playerAction: 'Inspect the lock.',
     },
@@ -427,7 +442,7 @@ describe('versioned AI task schemas', () => {
     const definition = AI_TASK_SCHEMAS[task];
     const expectedVersion =
       task === 'GENERATE_ADVENTURE_TURN'
-        ? 4
+        ? 5
         : [
               'GENERATE_CHARACTER_TRAITS',
               'COMPLETE_CHARACTER_BACKGROUND',
@@ -463,6 +478,44 @@ describe('versioned AI task schemas', () => {
       AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.output.safeParse({
         ...adventureTurnOutput,
         unvalidatedExtra: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires three to five unique suggestions for an active adventure turn', () => {
+    const schema = AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.output;
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        suggestedActions: adventureTurnOutput.suggestedActions.slice(0, 2),
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        suggestedActions: [
+          ...adventureTurnOutput.suggestedActions,
+          { text: '  use A thin TOOL.  ' },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('forbids suggestions after an adventure reaches its ending', () => {
+    const schema = AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.output;
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        adventureState: 'ENDING',
+        checkRequest: null,
+        suggestedActions: [],
+      }).success,
+    ).toBe(true);
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        adventureState: 'ENDING',
+        checkRequest: null,
       }).success,
     ).toBe(false);
   });

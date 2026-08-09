@@ -1311,6 +1311,8 @@ fn turn_generation_context(
         "recentTurns": recent_turns,
         "discoveredClues": discovered,
         "relatedNpcs": related_npcs,
+        "knownFacts": adventure_known_facts(connection, campaign_id, &quest)?,
+        "npcKnowledge": adventure_npc_knowledge(connection, campaign_id, &quest)?,
         "playerActionMode": action_mode(&turn.player_action)?,
         "playerAction": action_text(&turn.player_action)?,
     }))
@@ -1445,6 +1447,115 @@ fn related_npcs(
         result.push(npc);
     }
     Ok(result)
+}
+
+fn adventure_known_facts(
+    connection: &Connection,
+    campaign_id: &str,
+    quest: &Value,
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut ids = array_field(quest, "relatedFactIds")?
+        .into_iter()
+        .filter_map(|value| value.as_str().map(str::to_owned))
+        .collect::<Vec<_>>();
+    let mut locked = connection.prepare(
+        "SELECT id FROM world_facts
+         WHERE campaign_id = ?1 AND kind = 'LOCKED_RULE' ORDER BY created_at, id LIMIT 30",
+    )?;
+    ids.extend(
+        locked
+            .query_map([campaign_id], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<_>, _>>()?,
+    );
+    ids.sort();
+    ids.dedup();
+    let mut result = Vec::new();
+    for id in ids.into_iter().take(30) {
+        let fact = connection
+            .query_row(
+                "SELECT id, kind, statement FROM world_facts
+                 WHERE id = ?1 AND campaign_id = ?2 AND kind <> 'FALSE_BELIEF'",
+                params![id, campaign_id],
+                |row| {
+                    Ok(json!({
+                        "id": row.get::<_, String>(0)?,
+                        "kind": row.get::<_, String>(1)?,
+                        "statement": row.get::<_, String>(2)?,
+                    }))
+                },
+            )
+            .optional()?;
+        if let Some(fact) = fact {
+            result.push(fact);
+        }
+    }
+    Ok(result)
+}
+
+fn adventure_npc_knowledge(
+    connection: &Connection,
+    campaign_id: &str,
+    quest: &Value,
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut result = Vec::new();
+    for npc_id in array_field(quest, "relatedNpcIds")?
+        .into_iter()
+        .filter_map(|value| value.as_str().map(str::to_owned))
+        .take(12)
+    {
+        let knowledge = connection
+            .query_row(
+                "SELECT known_fact_ids_json, suspected_fact_ids_json,
+                        false_belief_fact_ids_json, excluded_secret_fact_ids_json
+                 FROM npc_knowledge
+                 JOIN npcs ON npcs.id = npc_knowledge.npc_id
+                 WHERE npc_knowledge.npc_id = ?1 AND npcs.campaign_id = ?2",
+                params![npc_id, campaign_id],
+                |row| {
+                    Ok((
+                        from_json::<Vec<String>>(row.get(0)?)?,
+                        from_json::<Vec<String>>(row.get(1)?)?,
+                        from_json::<Vec<String>>(row.get(2)?)?,
+                        from_json::<Vec<String>>(row.get(3)?)?,
+                    ))
+                },
+            )
+            .optional()?;
+        if let Some((known, suspected, false_beliefs, excluded)) = knowledge {
+            let excluded = excluded
+                .into_iter()
+                .collect::<std::collections::HashSet<_>>();
+            result.push(json!({
+                "npcId": npc_id,
+                "knownFacts": fact_statements(connection, campaign_id, &known, &excluded)?,
+                "suspectedFacts": fact_statements(connection, campaign_id, &suspected, &excluded)?,
+                "falseBeliefs": fact_statements(connection, campaign_id, &false_beliefs, &excluded)?,
+            }));
+        }
+    }
+    Ok(result)
+}
+
+fn fact_statements(
+    connection: &Connection,
+    campaign_id: &str,
+    ids: &[String],
+    excluded: &std::collections::HashSet<String>,
+) -> Result<Vec<String>, CampaignStoreError> {
+    let mut statements = Vec::new();
+    for id in ids.iter().filter(|id| !excluded.contains(*id)).take(30) {
+        if let Some(statement) = connection
+            .query_row(
+                "SELECT statement FROM world_facts WHERE id = ?1 AND campaign_id = ?2",
+                params![id, campaign_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+        {
+            statements.push(statement);
+        }
+    }
+    Ok(statements)
 }
 
 fn load_items(
@@ -1723,15 +1834,21 @@ fn validate_plan(output: &PlanOutput) -> Result<(), CampaignStoreError> {
 
 fn validate_turn_output(output: &TurnOutput) -> Result<(), CampaignStoreError> {
     validate_text(&output.scene_text, 4_000)?;
-    if output.suggested_actions.len() > 5
+    let suggestion_count = output.suggested_actions.len();
+    if (output.adventure_state == "ENDING" && suggestion_count != 0)
+        || (output.adventure_state != "ENDING" && !(3..=5).contains(&suggestion_count))
         || !["SCENE", "WAITING_FOR_PLAYER", "CHECK_REQUIRED", "ENDING"]
             .contains(&output.adventure_state.as_str())
         || (output.check_request.is_some() != (output.adventure_state == "CHECK_REQUIRED"))
     {
         return Err(CampaignStoreError::InvalidData);
     }
+    let mut suggestions = std::collections::HashSet::new();
     for action in &output.suggested_actions {
         validate_text(&action.text, 4_000)?;
+        if !suggestions.insert(action.text.trim().to_lowercase()) {
+            return Err(CampaignStoreError::InvalidData);
+        }
     }
     if let Some(check) = &output.check_request {
         if !["physique", "agility", "knowledge", "charisma"].contains(&check.attribute.as_str())
@@ -2106,6 +2223,24 @@ mod tests {
                     .and_then(Value::as_str),
                 Some(action_mode)
             );
+            assert_eq!(
+                pending
+                    .turn_generation_context
+                    .as_ref()
+                    .and_then(|context| context.get("knownFacts"))
+                    .and_then(Value::as_array)
+                    .map(Vec::len),
+                Some(1)
+            );
+            assert_eq!(
+                pending
+                    .turn_generation_context
+                    .as_ref()
+                    .and_then(|context| context.get("npcKnowledge"))
+                    .and_then(Value::as_array)
+                    .map(Vec::len),
+                Some(1)
+            );
             let turn_id = pending
                 .turns
                 .last()
@@ -2292,7 +2427,11 @@ mod tests {
             json!({
                 "sceneText": "Warm light leaks through the old cellar lock.",
                 "speakerNpcIds": [],
-                "suggestedActions": [{ "text": "Study the lock." }],
+                "suggestedActions": [
+                    { "text": "Study the lock." },
+                    { "text": "Ask Ilyra about the old key." },
+                    { "text": "Observe the warm marks on the frame." }
+                ],
                 "checkRequest": {
                     "attribute": "knowledge",
                     "difficulty": 11,
@@ -2303,6 +2442,30 @@ mod tests {
                 "adventureState": "CHECK_REQUIRED"
             })
         }
+    }
+
+    #[test]
+    fn rejects_invalid_adventure_suggestion_sets() {
+        let mut too_few = turn_output(false);
+        too_few["suggestedActions"] = json!([
+            { "text": "Study the lock." },
+            { "text": "Ask Ilyra about the old key." }
+        ]);
+        let too_few: TurnOutput = serde_json::from_value(too_few).expect("turn output");
+        assert!(validate_turn_output(&too_few).is_err());
+
+        let mut duplicate = turn_output(false);
+        duplicate["suggestedActions"] = json!([
+            { "text": "Study the lock." },
+            { "text": "Ask Ilyra about the old key." },
+            { "text": "  STUDY THE LOCK.  " }
+        ]);
+        let duplicate: TurnOutput = serde_json::from_value(duplicate).expect("turn output");
+        assert!(validate_turn_output(&duplicate).is_err());
+
+        let ending: TurnOutput =
+            serde_json::from_value(turn_output(true)).expect("ending turn output");
+        assert!(validate_turn_output(&ending).is_ok());
     }
 
     fn audit(
@@ -2334,6 +2497,14 @@ mod tests {
                  ) VALUES (
                    'campaign-adventure', 1, 'TAVERN', NULL,
                    '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z'
+                 );
+                 INSERT INTO world_facts (
+                   id, campaign_id, kind, statement, location_id, faction_ids_json,
+                   detail_json, supersedes_fact_id, created_at
+                 ) VALUES (
+                   'fact-warm-lock', 'campaign-adventure', 'DEVELOPING_FACT',
+                   'The cellar lock radiates a faint warmth.', NULL, '[]', '{}', NULL,
+                   '2026-07-31T06:00:00.000Z'
                  );
                  INSERT INTO world_bibles (
                    campaign_id, schema_version, name, current_region, summary, core_conflict,
@@ -2380,6 +2551,13 @@ mod tests {
                    '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z'
                  );
                  UPDATE taverns SET owner_npc_id = 'npc-owner' WHERE id = 'tavern-rest';
+                 INSERT INTO npc_knowledge (
+                   npc_id, known_fact_ids_json, suspected_fact_ids_json,
+                   false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
+                 ) VALUES (
+                   'npc-owner', '[\"fact-warm-lock\"]', '[]', '[]', '[]',
+                   '2026-07-31T06:00:00.000Z'
+                 );
                  INSERT INTO quests (
                    id, campaign_id, publisher_npc_id, content_json, status, risk,
                    recommended_attributes_json, expected_turns_min, expected_turns_max,
@@ -2388,7 +2566,7 @@ mod tests {
                    'quest-beacon', 'campaign-adventure', 'npc-owner',
                    '{\"title\":\"The Fading Beacon\",\"summary\":\"Investigate the failing lighthouse.\",\"objective\":\"Restore the beacon.\",\"failureCost\":\"Ships remain trapped.\"}',
                    'ACCEPTED', 'MODERATE', '[\"knowledge\",\"agility\"]', 8, 12,
-                   'NOTABLE', '[]', '[]',
+                   'NOTABLE', '[\"npc-owner\"]', '[\"fact-warm-lock\"]',
                    '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z'
                  );",
             )

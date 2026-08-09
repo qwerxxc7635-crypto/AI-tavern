@@ -326,6 +326,8 @@ export class AdventureTurnUseCases {
             turns: this.adventures.listTurns(adventure.id),
             clues: this.adventures.getClues(adventure.id),
             relatedNpcs: this.relatedNpcs(adventure.questId, command.campaignId),
+            worldFacts: this.worlds.listFacts(command.campaignId),
+            npcKnowledge: this.relatedNpcKnowledge(adventure.questId, command.campaignId),
             playerActionMode: action.mode ?? 'ACTION',
             playerAction: actionText(action),
             longTermSummary: this.priorAdventureSummary(command.campaignId, adventure.id),
@@ -595,6 +597,13 @@ export class AdventureTurnUseCases {
         throw new AIOrchestrationError('NPC_NOT_FOUND', 'Related campaign NPC not found');
       }
       return npc;
+    });
+  }
+
+  private relatedNpcKnowledge(questIdValue: Adventure['questId'], campaignId: CampaignId) {
+    return this.requireQuest(questIdValue, campaignId).relatedNpcIds.flatMap((id) => {
+      const knowledge = this.npcs.getKnowledge(id);
+      return knowledge === null ? [] : [knowledge];
     });
   }
 
