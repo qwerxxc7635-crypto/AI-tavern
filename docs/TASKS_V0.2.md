@@ -49,7 +49,8 @@
 - `V02-M7-T02`：DONE；冒险输入显式支持ACTION/DIALOGUE/OBSERVE，意图贯通UI、原生命令、SQLite恢复视图和AI上下文，旧回合按ACTION兼容。
 - `V02-M7-T03`：DONE；活动场景严格生成3至5条不重复建议，结局不生成建议；输入显式携带scene、quest、character、known facts及按NPC隔离的knowledge。
 - `V02-M7-T04`：DONE；每个可行动场景都保留独立可编辑的自由输入，建议仅用于填充而非门禁，提交失败保留原文供编辑或重试。
-- 下一执行项严格进入 `V02-M7-T05` Adventure Turn State Machine。
+- `V02-M7-T05`：DONE；显式回合状态机覆盖draft→submitted→generating→validating→resolving→committed→narrating，按阶段分类失败，以operation/revision拒绝迟到事件并从SQLite待处理回合恢复。
+- 下一执行项严格进入 `V02-M7-T06` D20 Hard Logic。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

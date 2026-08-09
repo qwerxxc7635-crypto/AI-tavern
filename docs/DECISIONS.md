@@ -1780,3 +1780,19 @@ AI回合上下文固定携带持久SceneFrame，UI snapshot必须验证其恢复
 ### 影响与边界
 
 自由输入与建议共用已有4,000字符边界、事务和恢复路径，不新增数据库schema、AI任务或输入来源。T04不提前实现T05的完整显式回合状态机，不接入真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-084：冒险回合控制阶段显式化但不取代SQLite事实
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T05`、显式状态机与SQLite唯一真相源红线
+
+### 决定与理由
+
+Windows冒险回合使用纯reducer固定表达`draft → submitted → generating → validating → resolving → committed → narrating`。其中draft是未提交的本地输入；submitted对应行动提交/持久化边界；generating和validating由Provider及结构验证边界驱动；resolving表示把已验证输出交给原子游戏事务；committed只在SQLite提交返回后到达；narrating表示最新已提交剧情可呈现且允许下一回合。
+
+每次操作绑定递增operation ID与draft revision，乱序事件、旧操作结果及编辑后的迟到事件均被reducer拒绝。submitted、generating、validating和resolving分别映射到明确失败原因，失败保留玩家输入并允许显式重试；重新载入发现SQLite `WAITING_FOR_PLAYER`时复用已有待处理回合继续生成，不重复写玩家行动。载入/恢复失败提供同回合重试与恢复中心入口。
+
+### 影响与边界
+
+该控制状态机不新增SQLite列，也不把React状态提升为游戏真相。持久Adventure状态仍决定可执行命令；页面`resolving`控制阶段与数据库中为D20保留的`RESOLVING`领域状态不是同一个枚举。T05不修改D20数值、动画或T06/T07范围，不接入真实Provider/付费API、正式用户数据或iOS。

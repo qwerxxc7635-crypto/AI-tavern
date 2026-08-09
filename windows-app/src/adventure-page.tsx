@@ -1,11 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useReducer, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   windowsAdventureService,
   type AdventureSnapshot,
+  type AdventureTurnObserver,
   type WindowsAdventureService,
 } from './adventure-service.js';
+import {
+  INITIAL_ADVENTURE_TURN_STATE,
+  reduceAdventureTurnState,
+  type AdventureTurnEvent,
+  type AdventureTurnFailure,
+  type AdventureTurnPhase,
+} from './adventure-turn-state-machine.js';
 import { windowsSettlementService, type WindowsSettlementService } from './settlement-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
@@ -48,47 +56,121 @@ export function AdventurePage({
   const [action, setAction] = useState('');
   const [actionMode, setActionMode] = useState<AdventureActionMode>('ACTION');
   const [busy, setBusy] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [aiError, setAiError] = useState<unknown | null>(null);
-  const [retryOperation, setRetryOperation] = useState<(() => Promise<AdventureSnapshot>) | null>(
-    null,
+  const [turnState, dispatchTurn] = useReducer(
+    reduceAdventureTurnState,
+    INITIAL_ADVENTURE_TURN_STATE,
   );
+  const turnStateRef = useRef(turnState);
+  turnStateRef.current = turnState;
+  const operationSequence = useRef(0);
+  const turnInFlight = useRef(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const [aiError, setAiError] = useState<unknown | null>(null);
+  const [retryAction, setRetryAction] = useState<(() => void) | null>(null);
 
   useEffect(() => {
     if (campaignId === null) return;
     let active = true;
+    let observedTurn = false;
+    const operationId = ++operationSequence.current;
+    const revision = turnStateRef.current.revision;
+    const observer = turnObserver(
+      operationId,
+      revision,
+      (event) => {
+        if (active) dispatchTurn(event);
+      },
+      () => {
+        observedTurn = true;
+      },
+    );
     void service
-      .load(campaignId, questId)
+      .load(campaignId, questId, observer)
       .then((loaded) =>
         loaded.adventureId === null && questId !== undefined
           ? service.prepare(campaignId, questId)
           : loaded,
       )
       .then((loaded) => {
-        if (active) setSnapshot(loaded);
+        if (!active) return;
+        setSnapshot(loaded);
+        if (observedTurn) {
+          dispatchTurn({ type: 'NARRATION_STARTED', operationId, revision });
+        } else {
+          dispatchTurn({ type: 'RESTORED', phase: restoredTurnPhase(loaded) });
+        }
       })
       .catch(() => {
-        if (active) setLoadError('冒险记录无法载入，本地存档没有被更改。');
+        if (!active) return;
+        if (observedTurn) {
+          dispatchTurn({ type: 'FAILED', operationId, revision });
+          setLoadError('已提交的行动仍保存在本地，但本次恢复未完成。');
+        } else {
+          setLoadError('冒险记录无法载入，本地存档没有被更改。');
+        }
       });
     return () => {
       active = false;
     };
-  }, [campaignId, questId, service]);
+  }, [campaignId, loadAttempt, questId, service]);
 
   async function run(operation: () => Promise<AdventureSnapshot>) {
     if (busy) return;
     setBusy(true);
     setAiError(null);
-    setRetryOperation(null);
+    setRetryAction(null);
     try {
       setSnapshot(await operation());
       setAction('');
     } catch (error) {
       setAiError(error);
-      setRetryOperation(() => operation);
+      setRetryAction(() => () => void run(operation));
     } finally {
       setBusy(false);
     }
+  }
+
+  async function submitTurn(
+    submittedCampaignId: string,
+    submittedAdventureId: string,
+    mode: AdventureActionMode,
+    text: string,
+  ) {
+    if (turnInFlight.current) return;
+    turnInFlight.current = true;
+    const operationId = ++operationSequence.current;
+    const revision = turnState.revision;
+    dispatchTurn({ type: 'SUBMITTED', operationId });
+    setAiError(null);
+    setRetryAction(null);
+    try {
+      const observer = turnObserver(operationId, revision, dispatchTurn);
+      const committed = await service.act(
+        submittedCampaignId,
+        submittedAdventureId,
+        mode,
+        text,
+        observer,
+      );
+      setSnapshot(committed);
+      setAction('');
+      dispatchTurn({ type: 'NARRATION_STARTED', operationId, revision });
+    } catch (error) {
+      dispatchTurn({ type: 'FAILED', operationId, revision });
+      setAiError(error);
+      setRetryAction(
+        () => () => void submitTurn(submittedCampaignId, submittedAdventureId, mode, text),
+      );
+    } finally {
+      turnInFlight.current = false;
+    }
+  }
+
+  function draftChanged() {
+    dispatchTurn({ type: 'DRAFT_CHANGED' });
+    setAiError(null);
+    setRetryAction(null);
   }
 
   if (campaignId === null) {
@@ -101,7 +183,24 @@ export function AdventurePage({
         <h1>正在整理冒险记录…</h1>
       </main>
     ) : (
-      <AdventureMessage title={loadError} />
+      <main className="adventure-page adventure-preparation">
+        <p className="eyebrow">恢复未完成</p>
+        <h1>{loadError}</h1>
+        <p>可以安全重试；系统会复用SQLite中的待处理回合，不会重复提交玩家行动。</p>
+        <button
+          className="primary-action"
+          type="button"
+          onClick={() => {
+            setLoadError(null);
+            setLoadAttempt((attempt) => attempt + 1);
+          }}
+        >
+          重新载入并继续
+        </button>
+        <Link className="text-link" to={`/recovery?campaignId=${encodeURIComponent(campaignId)}`}>
+          打开恢复中心
+        </Link>
+      </main>
     );
   }
   if (snapshot.adventureId === null || snapshot.state === null) {
@@ -135,10 +234,7 @@ export function AdventurePage({
           {busy ? '正在启程…' : '开始冒险'}
         </button>
         {aiError === null ? null : (
-          <AIErrorNotice
-            error={aiError}
-            onRetry={retryOperation === null ? undefined : () => void run(retryOperation)}
-          />
+          <AIErrorNotice error={aiError} onRetry={retryAction ?? undefined} />
         )}
       </main>
     );
@@ -149,6 +245,10 @@ export function AdventurePage({
   const dice =
     [...snapshot.turns].reverse().find(({ diceResult }) => diceResult !== null)?.diceResult ?? null;
   const canAct = snapshot.state === 'SCENE';
+  const turnBusy = ['submitted', 'generating', 'validating', 'resolving', 'committed'].includes(
+    turnState.phase,
+  );
+  const actionDisabled = !canAct || busy || turnBusy;
 
   return (
     <main className="adventure-page">
@@ -261,7 +361,7 @@ export function AdventurePage({
               onSubmit={(event) => {
                 event.preventDefault();
                 if (action.trim().length > 0) {
-                  void run(() => service.act(campaignId, adventureId, actionMode, action.trim()));
+                  void submitTurn(campaignId, adventureId, actionMode, action.trim());
                 }
               }}
             >
@@ -274,8 +374,11 @@ export function AdventurePage({
                       name="adventure-action-mode"
                       value={mode}
                       checked={actionMode === mode}
-                      disabled={!canAct || busy}
-                      onChange={() => setActionMode(mode)}
+                      disabled={actionDisabled}
+                      onChange={() => {
+                        setActionMode(mode);
+                        draftChanged();
+                      }}
                     />
                     <span>{label}</span>
                   </label>
@@ -286,8 +389,11 @@ export function AdventurePage({
                   <button
                     type="button"
                     key={suggestion}
-                    disabled={!canAct || busy}
-                    onClick={() => setAction(suggestion)}
+                    disabled={actionDisabled}
+                    onClick={() => {
+                      setAction(suggestion);
+                      draftChanged();
+                    }}
                   >
                     {suggestion}
                   </button>
@@ -302,27 +408,30 @@ export function AdventurePage({
                 aria-describedby="free-input-help"
                 value={action}
                 maxLength={4000}
-                disabled={!canAct || busy}
-                onChange={(event) => setAction(event.target.value)}
+                disabled={actionDisabled}
+                onChange={(event) => {
+                  setAction(event.target.value);
+                  draftChanged();
+                }}
                 placeholder={
                   ACTION_MODES.find(({ mode }) => mode === actionMode)?.placeholder ??
                   '描述角色下一步要做什么…'
                 }
               />
+              <p className="adventure-muted" role="status" aria-live="polite">
+                {turnPhaseLabel(turnState.phase, turnState.failure)}
+              </p>
               <button
                 className="primary-action"
                 type="submit"
-                disabled={!canAct || busy || action.trim().length === 0}
+                disabled={actionDisabled || action.trim().length === 0}
               >
-                {busy ? '正在推进…' : `提交${actionModeLabel(actionMode)}`}
+                {turnBusy ? '正在推进…' : `提交${actionModeLabel(actionMode)}`}
               </button>
             </form>
           )}
           {aiError === null ? null : (
-            <AIErrorNotice
-              error={aiError}
-              onRetry={retryOperation === null ? undefined : () => void run(retryOperation)}
-            />
+            <AIErrorNotice error={aiError} onRetry={retryAction ?? undefined} />
           )}
         </section>
 
@@ -378,6 +487,74 @@ export function AdventurePage({
 
 function actionModeLabel(mode: AdventureActionMode): string {
   return ACTION_MODES.find((entry) => entry.mode === mode)?.label ?? '行动';
+}
+
+function turnObserver(
+  operationId: number,
+  revision: number,
+  dispatch: (event: AdventureTurnEvent) => void,
+  onObserved: () => void = () => undefined,
+): AdventureTurnObserver {
+  return {
+    onSubmitted: () => {
+      onObserved();
+      dispatch({ type: 'SUBMITTED', operationId });
+    },
+    onGenerationStarted: () => dispatch({ type: 'GENERATION_STARTED', operationId, revision }),
+    onValidationStarted: () => dispatch({ type: 'VALIDATION_STARTED', operationId, revision }),
+    onResolutionStarted: () => dispatch({ type: 'RESOLUTION_STARTED', operationId, revision }),
+    onCommitted: () => dispatch({ type: 'COMMIT_SUCCEEDED', operationId, revision }),
+  };
+}
+
+function restoredTurnPhase(
+  snapshot: AdventureSnapshot,
+): 'draft' | 'submitted' | 'resolving' | 'narrating' {
+  if (snapshot.state === 'WAITING_FOR_PLAYER') return 'submitted';
+  if (snapshot.state === 'RESOLVING') return 'resolving';
+  if (
+    snapshot.turns.length > 0 ||
+    snapshot.state === 'CHECK_REQUIRED' ||
+    snapshot.state === 'ENDING'
+  ) {
+    return 'narrating';
+  }
+  return 'draft';
+}
+
+function turnPhaseLabel(phase: AdventureTurnPhase, failure: AdventureTurnFailure | null): string {
+  switch (phase) {
+    case 'draft':
+      return '可编辑本回合行动。';
+    case 'submitted':
+      return '正在提交并保存玩家行动…';
+    case 'generating':
+      return '正在生成下一段剧情…';
+    case 'validating':
+      return '正在验证剧情结构与规则…';
+    case 'resolving':
+      return '正在原子提交回合结果…';
+    case 'committed':
+      return '回合结果已写入本地存档。';
+    case 'narrating':
+      return '最新剧情已呈现，可以继续行动。';
+    case 'failed':
+      return failureLabel(failure);
+  }
+}
+
+function failureLabel(failure: AdventureTurnFailure | null): string {
+  switch (failure) {
+    case 'generation_failed':
+      return '剧情生成失败，原行动已保留，可重试或编辑。';
+    case 'validation_failed':
+      return '剧情验证失败，未写入回合结果，可重试或编辑。';
+    case 'resolution_failed':
+      return '回合提交失败，存档未留下部分结果，可重试。';
+    case 'submission_failed':
+    case null:
+      return '行动提交失败，原文已保留，可重试或编辑。';
+  }
 }
 
 function stateLabel(state: Exclude<AdventureSnapshot['state'], null>): string {

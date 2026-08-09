@@ -5,6 +5,7 @@ import {
   WindowsAdventureService,
   type AdventureGateway,
   type AdventureSnapshot,
+  type AdventureTurnObserver,
 } from './adventure-service.js';
 
 describe('WindowsAdventureService', () => {
@@ -65,6 +66,52 @@ describe('WindowsAdventureService', () => {
     expect(gateway.submitCount).toBe(1);
   });
 
+  it('reports submitted, generation, validation, resolution and commit boundaries in order', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const service = new WindowsAdventureService(gateway);
+    let snapshot = await service.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
+    const phases: string[] = [];
+
+    await service.act(
+      'campaign-adventure',
+      adventureIdOf(snapshot),
+      'ACTION',
+      'Walk around the locked door and inspect the stonework.',
+      phaseObserver(phases),
+    );
+
+    expect(phases).toEqual(['submitted', 'generating', 'validating', 'resolving', 'committed']);
+  });
+
+  it('does not let a UI observer interrupt the persisted turn workflow', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const service = new WindowsAdventureService(gateway);
+    let snapshot = await service.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
+    const fail = () => {
+      throw new Error('observer failed');
+    };
+
+    snapshot = await service.act(
+      'campaign-adventure',
+      adventureIdOf(snapshot),
+      'OBSERVE',
+      'Inspect the mortar beside the old lock.',
+      {
+        onSubmitted: fail,
+        onGenerationStarted: fail,
+        onValidationStarted: fail,
+        onResolutionStarted: fail,
+        onCommitted: fail,
+      },
+    );
+
+    expect(snapshot.currentTurnNumber).toBe(1);
+    expect(gateway.submitCount).toBe(1);
+    expect(gateway.tasks.filter((task) => task === 'GENERATE_ADVENTURE_TURN')).toHaveLength(1);
+  });
+
   it('resumes persisted action and dice work without submitting or rolling twice', async () => {
     const gateway = new MemoryAdventureGateway();
     const service = new WindowsAdventureService(gateway);
@@ -92,12 +139,24 @@ describe('WindowsAdventureService', () => {
     await gateway.submit('campaign-adventure', adventureId, 'DIALOGUE', 'Persist before restart');
 
     const restarted = new WindowsAdventureService(gateway);
-    snapshot = await restarted.load('campaign-adventure');
+    const phases: string[] = [];
+    snapshot = await restarted.load('campaign-adventure', undefined, phaseObserver(phases));
 
     expect(snapshot.state).toBe('CHECK_REQUIRED');
     expect(gateway.submitCount).toBe(1);
+    expect(phases).toEqual(['submitted', 'generating', 'validating', 'resolving', 'committed']);
   });
 });
+
+function phaseObserver(phases: string[]): AdventureTurnObserver {
+  return {
+    onSubmitted: () => phases.push('submitted'),
+    onGenerationStarted: () => phases.push('generating'),
+    onValidationStarted: () => phases.push('validating'),
+    onResolutionStarted: () => phases.push('resolving'),
+    onCommitted: () => phases.push('committed'),
+  };
+}
 
 class MemoryAdventureGateway implements AdventureGateway {
   public readonly tasks: string[] = [];

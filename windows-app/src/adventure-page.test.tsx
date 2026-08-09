@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { AdventurePage } from './adventure-page.js';
-import type { AdventureSnapshot } from './adventure-service.js';
+import type { AdventureSnapshot, AdventureTurnObserver } from './adventure-service.js';
 import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 afterEach(cleanup);
@@ -37,6 +37,7 @@ describe('adventure page', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '投掷 D20' }));
     expect(await screen.findByText('总计 15 / 难度 11')).toBeTruthy();
+    expect(screen.getByRole('status').textContent).toContain('最新剧情已呈现');
     expect(service.actions).toEqual([{ mode: 'DIALOGUE', text: 'Study the lock.' }]);
     expect(service.rolls).toBe(1);
   });
@@ -87,7 +88,24 @@ describe('adventure page', () => {
 
     await waitFor(() => expect(freeInput.disabled).toBe(false));
     expect(freeInput.value).toBe('Knock three times on the cellar wall.');
+    expect(screen.getByRole('status').textContent).toContain('剧情生成失败');
     expect(screen.getByRole('button', { name: '提交行动' })).toBeTruthy();
+  });
+
+  it('offers a deterministic retry when loading or pending-turn recovery fails', async () => {
+    const service = new RecoveringLoadService();
+    render(
+      <MemoryRouter initialEntries={['/adventure?campaignId=campaign-adventure']}>
+        <AdventurePage service={service} />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: /冒险记录无法载入/ })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '打开恢复中心' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '重新载入并继续' }));
+
+    expect(await screen.findByRole('textbox', { name: '自由输入' })).toBeTruthy();
+    expect(service.loadCount).toBe(2);
   });
 });
 
@@ -113,7 +131,12 @@ class FakeAdventureService {
     _adventureId: string,
     mode: AdventureActionMode,
     action: string,
+    observer?: AdventureTurnObserver,
   ) {
+    observer?.onSubmitted?.();
+    observer?.onGenerationStarted?.();
+    observer?.onValidationStarted?.();
+    observer?.onResolutionStarted?.();
     this.actions.push({ mode, text: action });
     this.snapshot = {
       ...this.snapshot,
@@ -137,6 +160,7 @@ class FakeAdventureService {
         },
       ],
     };
+    observer?.onCommitted?.();
     return this.snapshot;
   }
 
@@ -172,8 +196,22 @@ class FakeAdventureService {
 }
 
 class FailingAdventureService extends FakeAdventureService {
-  public override async act(): Promise<AdventureSnapshot> {
+  public override async act(
+    ...args: Parameters<FakeAdventureService['act']>
+  ): Promise<AdventureSnapshot> {
+    args[4]?.onSubmitted?.();
+    args[4]?.onGenerationStarted?.();
     throw new Error('offline');
+  }
+}
+
+class RecoveringLoadService extends FakeAdventureService {
+  public loadCount = 0;
+
+  public override async load(): Promise<AdventureSnapshot> {
+    this.loadCount += 1;
+    if (this.loadCount === 1) throw new Error('interrupted');
+    return super.load();
   }
 }
 

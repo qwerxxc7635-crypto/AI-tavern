@@ -137,6 +137,14 @@ export interface AdventureGateway {
   ): Promise<AdventureSnapshot>;
 }
 
+export interface AdventureTurnObserver {
+  readonly onSubmitted?: () => void;
+  readonly onGenerationStarted?: () => void;
+  readonly onValidationStarted?: () => void;
+  readonly onResolutionStarted?: () => void;
+  readonly onCommitted?: () => void;
+}
+
 interface RequestIdentity {
   readonly requestId: string;
   readonly generationRecordId: string;
@@ -216,14 +224,19 @@ export class WindowsAdventureService {
     private readonly createIdentity: (task: AITask) => RequestIdentity = defaultIdentity,
   ) {}
 
-  public load(id: string, questId?: string): Promise<AdventureSnapshot> {
+  public load(
+    id: string,
+    questId?: string,
+    observer?: AdventureTurnObserver,
+  ): Promise<AdventureSnapshot> {
     campaignId(id);
     if (questId !== undefined) requireText(questId);
     return this.singleFlight(id, async () => {
       const snapshot = await this.gateway.load(id, questId);
       if (snapshot.adventureId === null) return snapshot;
       if (snapshot.state === 'WAITING_FOR_PLAYER') {
-        return this.completeTurn(id, snapshot.adventureId, snapshot);
+        notifyAdventureObserver(observer, 'onSubmitted');
+        return this.completeTurn(id, snapshot.adventureId, snapshot, observer);
       }
       if (snapshot.state === 'RESOLVING') {
         return this.completeDice(id, snapshot.adventureId, snapshot);
@@ -261,16 +274,19 @@ export class WindowsAdventureService {
     adventureId: string,
     actionMode: AdventureActionMode,
     action: string,
+    observer?: AdventureTurnObserver,
   ): Promise<AdventureSnapshot> {
     return this.singleFlight(id, async () => {
       requireText(action);
       requireActionMode(actionMode);
       const current = await this.gateway.load(id);
       if (current.state === 'WAITING_FOR_PLAYER') {
-        return this.completeTurn(id, adventureId, current);
+        notifyAdventureObserver(observer, 'onSubmitted');
+        return this.completeTurn(id, adventureId, current, observer);
       }
       const pending = await this.gateway.submit(id, adventureId, actionMode, action);
-      return this.completeTurn(id, adventureId, pending);
+      notifyAdventureObserver(observer, 'onSubmitted');
+      return this.completeTurn(id, adventureId, pending, observer);
     });
   }
 
@@ -289,15 +305,21 @@ export class WindowsAdventureService {
     id: string,
     adventureId: string,
     pending: AdventureSnapshot,
+    observer?: AdventureTurnObserver,
   ): Promise<AdventureSnapshot> {
+    notifyAdventureObserver(observer, 'onGenerationStarted');
     const input = GenerateAdventureTurnInputSchema.parse(pending.turnGenerationContext);
     const generation = await this.generate(
       'GENERATE_ADVENTURE_TURN',
       input,
       GenerateAdventureTurnOutputSchema.parse,
       { adventureId, turnId: requireLastTurn(pending).id },
+      () => notifyAdventureObserver(observer, 'onValidationStarted'),
     );
-    return this.gateway.commitTurn(id, adventureId, generation);
+    notifyAdventureObserver(observer, 'onResolutionStarted');
+    const committed = await this.gateway.commitTurn(id, adventureId, generation);
+    notifyAdventureObserver(observer, 'onCommitted');
+    return committed;
   }
 
   private async completeDice(
@@ -320,6 +342,7 @@ export class WindowsAdventureService {
     input: unknown,
     parseOutput: (value: unknown) => unknown,
     context: unknown,
+    onValidationStarted?: () => void,
   ): Promise<GenerationAudit> {
     const identity = this.createIdentity(task);
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
@@ -340,6 +363,7 @@ export class WindowsAdventureService {
     if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
       throw new AdventureServiceError('PROVIDER_IDENTITY_MISMATCH');
     }
+    onValidationStarted?.();
     const validation = validateAIOutput(task, response.content);
     if (!validation.ok) throw new AdventureServiceError(validation.error.code);
     return {
@@ -376,6 +400,17 @@ export class AdventureServiceError extends Error {
   public constructor(public readonly code: string) {
     super('Adventure operation failed');
     this.name = 'AdventureServiceError';
+  }
+}
+
+function notifyAdventureObserver(
+  observer: AdventureTurnObserver | undefined,
+  event: keyof AdventureTurnObserver,
+): void {
+  try {
+    observer?.[event]?.();
+  } catch {
+    // UI observation must never change the persisted adventure workflow.
   }
 }
 

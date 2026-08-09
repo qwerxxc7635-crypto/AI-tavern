@@ -3099,3 +3099,23 @@
 ### 结论
 
 - `V02-M7-T04`完成。下一项严格为`V02-M7-T05` Adventure Turn State Machine。
+
+## 2026-08-09 — V02-M7-T05 建立显式冒险回合状态机
+
+### 实现
+
+- 新增纯Adventure Turn reducer，完整覆盖draft、submitted、generating、validating、resolving、committed和narrating，并用operation ID与draft revision拒绝乱序或迟到事件。
+- Windows Adventure Service新增只读阶段观察边界：行动持久化、Provider生成、输出验证、原子提交开始和SQLite提交完成按真实顺序通知页面；恢复`WAITING_FOR_PLAYER`时复用同一条链路且不重复submit。
+- 页面不再只用单一busy推断AI回合：各阶段提供中文live status，只有提交/生成/验证/提交事务进行时禁用行动；成功进入narrating后可继续编辑下一回合。
+- submitted、generating、validating、resolving失败分别保留明确原因和原输入；编辑会废弃旧重试闭包。首次载入或待处理回合恢复失败时提供安全重载和恢复中心入口。
+- 记录`DEC-084`并同步Changelog/release摘要；未改变D20硬逻辑、动画、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 状态机、service与page共18项定向测试通过，覆盖完整七阶段顺序、四类失败、乱序/迟到拒绝、观察器隔离、待处理回合重启恢复、任意自由输入失败保留及载入重试。
+- 完整75个Vitest文件/420项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及82项测试通过，包含Windows纵向E2E；桌面前端生产构建通过。
+
+### 结论
+
+- `V02-M7-T05`完成。下一项严格为`V02-M7-T06` D20 Hard Logic。
