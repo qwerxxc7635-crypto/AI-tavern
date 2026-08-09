@@ -301,9 +301,17 @@ export const NpcReplyInputSchema = z
     currentRegion: shortText,
     npc: npcContextCard,
     relationship,
-    knownFacts: stringList,
-    suspectedFacts: stringList,
-    falseBeliefs: stringList,
+    knowledge: z
+      .array(
+        z
+          .object({
+            targetKind: z.enum(['TRUTH', 'CLAIM']),
+            state: z.enum(['KNOWN', 'SUSPECTED', 'BELIEVED']),
+            statement: text,
+          })
+          .strict(),
+      )
+      .max(100),
     recentMessages: z
       .array(z.object({ role: z.enum(['PLAYER', 'NPC']), content: text }).strict())
       .max(20),

@@ -63,4 +63,9 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Narrate only after raw, modifier, total, DC, and result are fixed locally.',
   }),
+  Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(2),
+    change: 'Consume only actor-scoped Truth and Claim knowledge projections.',
+  }),
 ]);

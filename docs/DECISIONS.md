@@ -1846,3 +1846,19 @@ D20唯一判定顺序固定为：程序产生1至20的`raw`，把角色属性、
 ### 影响与边界
 
 本任务建立后续纵向功能共用的最小领域合同，不把新对象伪装成已持久事实，也不立即迁移现有`world_facts`/`npc_knowledge`兼容投影。T02将把Actor Knowledge投影接入NPC Prompt边界；T03再落实source event、learned_at和confidence的SQLite provenance，不在T01提前新增不完整数据库真相源。未接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-088：NPC Prompt只消费本地授权的Actor Knowledge投影
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T02`、有限认知与知识可见性属于本地hard logic的架构红线
+
+### 决定与理由
+
+`NPC_REPLY`输入升级为单一Knowledge投影数组，每项显式标记TRUTH/CLAIM和KNOWN/SUSPECTED/BELIEVED。KNOWN中的非传闻事实才作为Truth；传闻、怀疑与错误认知始终作为Claim。Prompt v2要求只把KNOWN Truth当客观状态，不把SUSPECTED或BELIEVED Claim升级为WorldTruth，也不得推断被省略的世界事实。
+
+TypeScript Context Builder虽然从Repository取得Campaign事实集合，但只按当前NPC的知识ID投影，并过滤excluded secret、其他NPC消息和其他NPC记忆；未知ID、同一ID跨多个认知状态、FALSE_BELIEF进入known/suspected或不属于当前Actor都fail closed。原生Windows路径执行相同规则，直接按允许ID和Campaign查询，并验证Memory内npcId；提交事务重新构造预期上下文，拒绝WebView篡改。
+
+### 影响与边界
+
+NPC自己的secret仍是其角色卡组成部分，可供扮演但受Prompt禁止主动泄露；其他NPC secret没有进入该路径。Adventure的多NPC知识投影属于既有GM上下文，不在T02借机改写。T03将为授权条目补齐持久provenance；本任务未新增数据库schema、真实Provider/付费API、正式用户数据或iOS。

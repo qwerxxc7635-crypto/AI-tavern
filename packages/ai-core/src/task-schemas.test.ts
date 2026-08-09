@@ -218,9 +218,14 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         currentStatus: 'ACTIVE',
       },
       relationship: { trust: 1, closeness: 0, awe: 0, obligation: 0 },
-      knownFacts: ['The cellar has an old door.'],
-      suspectedFacts: ['The lighthouse keeper used the tunnel.'],
-      falseBeliefs: [],
+      knowledge: [
+        { targetKind: 'TRUTH', state: 'KNOWN', statement: 'The cellar has an old door.' },
+        {
+          targetKind: 'CLAIM',
+          state: 'SUSPECTED',
+          statement: 'The lighthouse keeper used the tunnel.',
+        },
+      ],
       recentMessages: [{ role: 'PLAYER', content: 'What is below the cellar?' }],
       longTermMemories: ['Mira previously helped close the harbor gate.'],
       playerMessage: 'Show me the door.',

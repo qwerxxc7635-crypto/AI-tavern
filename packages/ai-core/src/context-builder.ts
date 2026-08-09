@@ -155,13 +155,43 @@ export function buildNpcDialogueContext(
   const facts = new Map(
     source.facts
       .filter((fact) => fact.campaignId === source.world.campaignId && !excluded.has(fact.id))
-      .map((fact) => [fact.id, fact.statement]),
+      .map((fact) => [fact.id, fact]),
   );
-  const statements = (ids: readonly WorldFact['id'][]) =>
+  const usedKnowledgeIds = new Set<WorldFact['id']>();
+  const knowledgeEntries = (
+    ids: readonly WorldFact['id'][],
+    state: 'KNOWN' | 'SUSPECTED' | 'BELIEVED',
+  ) =>
     ids.flatMap((id) => {
-      const statement = facts.get(id);
-      return statement === undefined ? [] : [statement];
+      if (excluded.has(id)) return [];
+      if (usedKnowledgeIds.has(id)) {
+        throw new ContextBuildError('NPC knowledge cannot place one fact in multiple states');
+      }
+      const fact = facts.get(id);
+      if (fact === undefined) {
+        throw new ContextBuildError('NPC knowledge references an unavailable campaign fact');
+      }
+      if (state === 'BELIEVED') {
+        if (fact.kind !== 'FALSE_BELIEF' || !fact.believedByNpcIds.includes(source.npc.id)) {
+          throw new ContextBuildError('NPC false belief is not assigned to this actor');
+        }
+      } else if (fact.kind === 'FALSE_BELIEF') {
+        throw new ContextBuildError('NPC false belief cannot be promoted to truth or suspicion');
+      }
+      usedKnowledgeIds.add(id);
+      return [
+        {
+          targetKind: state === 'KNOWN' && fact.kind !== 'RUMOR' ? 'TRUTH' : 'CLAIM',
+          state,
+          statement: fact.statement,
+        } as const,
+      ];
     });
+  const actorKnowledge = [
+    ...knowledgeEntries(source.knowledge.knownFactIds, 'KNOWN'),
+    ...knowledgeEntries(source.knowledge.suspectedFactIds, 'SUSPECTED'),
+    ...knowledgeEntries(source.knowledge.falseBeliefFactIds, 'BELIEVED'),
+  ];
   let recentMessages = takeNewest(
     source.messages
       .filter(
@@ -202,9 +232,7 @@ export function buildNpcDialogueContext(
       awe: source.relationship.awe,
       obligation: source.relationship.obligation,
     },
-    knownFacts: statements(source.knowledge.knownFactIds),
-    suspectedFacts: statements(source.knowledge.suspectedFactIds),
-    falseBeliefs: statements(source.knowledge.falseBeliefFactIds),
+    knowledge: actorKnowledge,
     recentMessages,
     longTermMemories,
     playerMessage: source.playerMessage,

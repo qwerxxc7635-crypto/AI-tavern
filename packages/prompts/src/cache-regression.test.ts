@@ -55,8 +55,8 @@ describe('DeepSeek cache regression', () => {
     const updated = createStablePromptProfile(
       {
         ...TASK_PROMPTS.NPC_REPLY,
-        version: promptVersion(2),
-        outputSchemaName: 'npc_reply_v2',
+        version: promptVersion(3),
+        outputSchemaName: 'npc_reply_v3',
       },
       schema,
       { world: '暮湾' },
@@ -65,8 +65,8 @@ describe('DeepSeek cache regression', () => {
     const currentHash = await promptCachePrefixHash(current, context);
     const updatedHash = await promptCachePrefixHash(updated, context);
 
-    expect(current.promptVersion).toBe(1);
-    expect(updated.promptVersion).toBe(2);
+    expect(current.promptVersion).toBe(2);
+    expect(updated.promptVersion).toBe(3);
     expect(updatedHash).not.toBe(currentHash);
   });
 });

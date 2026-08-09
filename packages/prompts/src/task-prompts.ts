@@ -62,7 +62,8 @@ export const TASK_PROMPTS = Object.freeze({
   NPC_REPLY: define(
     'NPC_REPLY',
     'NPC_ACTOR',
-    'Reply only from this NPC perspective and limited knowledge. Do not reveal excluded secrets or facts belonging only to other NPCs.',
+    'Reply only from this NPC perspective. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
+    2,
   ),
   GENERATE_QUEST: define(
     'GENERATE_QUEST',

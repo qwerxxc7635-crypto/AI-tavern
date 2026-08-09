@@ -53,7 +53,8 @@
 - `V02-M7-T06`：DONE；程序在叙事/动画前固定raw、modifier、total、DC、result，使用无偏D20取样和安全整数运算，持久化/UI/档案读取均拒绝矛盾结果。
 - `V02-M7-T07`：DONE；D20动画只消费SQLite中已锁定的硬结果，支持跳过、减少动态效果、中断/刷新恢复及重复点击合并，任何展示路径都不会重骰。
 - `V02-M8-T01`：DONE；共享领域合同以独立判别模型区分WorldTruth、Claim、actor-scoped Knowledge与Memory，并验证truth/event→claim/knowledge→memory的单向来源边界。
-- 下一执行项严格进入 `V02-M8-T02` NPC Knowledge Boundary。
+- `V02-M8-T02`：DONE；NPC_REPLY只接收当前Actor获准的Truth/Claim知识投影、同Actor消息/记忆与自身角色卡，缺失、重复、跨Actor错误认知或客户端篡改均fail closed。
+- 下一执行项严格进入 `V02-M8-T03` Knowledge Provenance。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

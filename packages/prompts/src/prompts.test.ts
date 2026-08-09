@@ -57,6 +57,7 @@ describe('central prompt catalog', () => {
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
         'GENERATE_NPCS',
+        'NPC_REPLY',
         'GENERATE_WORLD_EVENT',
         'SUMMARIZE_ADVENTURE',
         'RESOLVE_DICE_RESULT',

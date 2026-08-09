@@ -3180,3 +3180,23 @@
 ### 结论
 
 - `V02-M8-T01`完成。下一项严格为`V02-M8-T02` NPC Knowledge Boundary。
+
+## 2026-08-09 — V02-M8-T02 固化 NPC 知识边界
+
+### 实现
+
+- `NPC_REPLY` schema v2改为结构化Knowledge数组，显式区分TRUTH/CLAIM及KNOWN/SUSPECTED/BELIEVED，不再传递三个无类型字符串列表。
+- TypeScript Context Builder只按当前NPC知识ID投影同Campaign事实，并过滤excluded secret、其他Actor消息和记忆；缺失事实、重复状态和错误认知越权均失败关闭。
+- 原生Windows生成上下文实现同一查询与分类规则，限制最多100条，验证FALSE_BELIEF归属和memory.npcId；未授权但同Campaign存在的事实不会进入snapshot。
+- 原生提交继续在事务内重建预期上下文并逐值比较，WebView不能注入“已知事实”；Prompt v2明确Claim不得冒充WorldTruth。
+- 记录`DEC-088`并同步Changelog/release摘要；未修改Adventure GM知识上下文，未提前实现T03 provenance。
+
+### 验证
+
+- Context Builder、NPC Application、schema、prompt与Windows service共57项定向测试通过；原生NPC 3项测试覆盖未授权事实排除、跨Actor false belief拒绝及篡改零写入。
+- 完整79个Vitest文件/447项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及84项测试通过，包含Windows纵向E2E；桌面前端200 modules生产构建通过。Rust继续以临时Cargo Home复用本机rsproxy缓存离线执行，未修改全局配置或依赖锁。
+
+### 结论
+
+- `V02-M8-T02`完成。下一项严格为`V02-M8-T03` Knowledge Provenance。

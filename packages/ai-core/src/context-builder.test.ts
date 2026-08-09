@@ -142,8 +142,16 @@ const knowledge: NpcKnowledge = {
 };
 const facts: readonly WorldFact[] = [
   fact(targetFactId, 'The cellar door is warm.'),
-  fact(suspectedFactId, 'The keeper may use the tunnel.'),
-  fact(falseFactId, 'The tunnel ends beneath the market.'),
+  {
+    ...fact(suspectedFactId, 'The keeper may use the tunnel.'),
+    kind: 'RUMOR',
+    veracity: 'UNKNOWN',
+  },
+  {
+    ...fact(falseFactId, 'The tunnel ends beneath the market.'),
+    kind: 'FALSE_BELIEF',
+    believedByNpcIds: [targetNpcId],
+  },
   fact(excludedFactId, 'The sealed ledger names Ilyra.'),
   fact(unrelatedFactId, 'Tomas sabotaged the old ferry.'),
 ];
@@ -185,9 +193,11 @@ describe('AI context builders', () => {
     );
 
     expect(NpcReplyInputSchema.safeParse(context).success).toBe(true);
-    expect(context.knownFacts).toEqual(['The cellar door is warm.']);
-    expect(context.suspectedFacts).toEqual(['The keeper may use the tunnel.']);
-    expect(context.falseBeliefs).toEqual(['The tunnel ends beneath the market.']);
+    expect(context.knowledge).toEqual([
+      { targetKind: 'TRUTH', state: 'KNOWN', statement: 'The cellar door is warm.' },
+      { targetKind: 'CLAIM', state: 'SUSPECTED', statement: 'The keeper may use the tunnel.' },
+      { targetKind: 'CLAIM', state: 'BELIEVED', statement: 'The tunnel ends beneath the market.' },
+    ]);
     expect(context.recentMessages).toEqual([
       { role: 'PLAYER', content: 'What is below the cellar?' },
       { role: 'NPC', content: 'An old passage.' },
@@ -196,6 +206,49 @@ describe('AI context builders', () => {
     expect(JSON.stringify(context)).toContain(targetNpc.secret);
     expect(JSON.stringify(context)).not.toContain(unrelatedNpc.secret);
     expect(JSON.stringify(context)).not.toContain('sealed ledger');
+  });
+
+  it('fails closed when knowledge promotes another actor false belief or duplicates a fact', () => {
+    expect(() =>
+      buildNpcDialogueContext({
+        world,
+        npc: targetNpc,
+        knowledge: {
+          ...knowledge,
+          knownFactIds: [falseFactId],
+          falseBeliefFactIds: [],
+        },
+        relationship,
+        facts: [
+          {
+            ...fact(falseFactId, 'Tomas believes the harbor is empty.'),
+            kind: 'FALSE_BELIEF',
+            believedByNpcIds: [unrelatedNpcId],
+          },
+        ],
+        messages: [],
+        memories: [],
+        playerMessage: 'What do you know?',
+      }),
+    ).toThrow('false belief');
+
+    expect(() =>
+      buildNpcDialogueContext({
+        world,
+        npc: targetNpc,
+        knowledge: {
+          ...knowledge,
+          knownFactIds: [targetFactId],
+          suspectedFactIds: [targetFactId],
+          falseBeliefFactIds: [],
+        },
+        relationship,
+        facts,
+        messages: [],
+        memories: [],
+        playerMessage: 'What do you know?',
+      }),
+    ).toThrow('multiple states');
   });
 
   it('combines long-term memory with recent dialogue and trims oldest optional context first', () => {
