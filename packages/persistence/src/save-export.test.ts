@@ -3,16 +3,21 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
+  adventureId,
   aiRequestId,
   campaignId,
   createCampaign,
   gameEventId,
   generationRecordId,
   isoTimestamp,
+  locationId,
   modelProfileId,
+  npcId,
   promptVersion,
   schemaVersion,
   snapshotId,
+  questId,
+  tavernId,
   transitionCampaign,
   worldFactId,
 } from '@ember-tavern/contracts';
@@ -21,10 +26,14 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyMigrations } from './migrations.mjs';
 import {
   CampaignRepository,
+  AdventureRepository,
   GameEventRepository,
   GenerationRecordRepository,
+  NpcRepository,
   PersistenceDataError,
   SnapshotRepository,
+  QuestRepository,
+  TavernRepository,
   exportCampaignSave,
   importCampaignSave,
 } from './index.js';
@@ -90,7 +99,7 @@ describe('exportCampaignSave', () => {
     expect(manifest).toMatchObject({
       application: 'ember-tavern',
       campaignId: campaignKey,
-      databaseSchemaVersion: 1,
+      databaseSchemaVersion: 2,
       formatVersion: 1,
       files: {
         'campaign.json': { records: 1 },
@@ -102,7 +111,8 @@ describe('exportCampaignSave', () => {
     expect(campaignRow['fallback_model_profile_id']).toBeNull();
     expect(campaignRow['task_model_overrides_json']).toBe('{}');
     expect(requireArray(tables['world_facts'])).toHaveLength(1);
-    expect(Object.keys(tables)).toHaveLength(14);
+    expect(requireArray(tables['scene_frames'])).toHaveLength(1);
+    expect(Object.keys(tables)).toHaveLength(15);
     expect(events).toHaveLength(1);
     expect(parseObject(events[0] ?? '')).toMatchObject({
       id: gameEventId('event-export'),
@@ -194,15 +204,21 @@ describe('importCampaignSave', () => {
   it('imports the current Rust archive during the interop gate when provided', async () => {
     const input = process.env['EMBER_RUST_ARCHIVE_INPUT'];
     if (input === undefined) return;
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
     const imported = await importCampaignSave(database, new Uint8Array(readFileSync(input)), {
       mode: 'CREATE',
       importedAt: isoTimestamp('2026-08-02T01:00:00.000Z'),
       snapshotId: snapshotId('snapshot-current-rust-interop'),
     });
-    expect(imported.campaign.id).toBe(campaignId('campaign-transfer'));
+    expect(imported.campaign.id).toBe(campaignKey);
     expect(
-      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-transfer'),
-    ).toEqual({ statement: 'The bell is ringing.' });
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
+    ).toEqual({ statement: 'The beacon is lit.' });
+    expect(
+      native
+        .prepare('SELECT revision FROM scene_frames WHERE adventure_id = ?')
+        .get('adventure-export'),
+    ).toEqual({ revision: 4 });
   });
 
   it('imports the Rust v1 fixture without device state', async () => {
@@ -468,6 +484,100 @@ function seed(sqlite: TransactionalSqliteDatabase): void {
     payload: { worldName: 'Ember Coast' },
     occurredAt: at,
   });
+  const tavernKey = tavernId('tavern-export');
+  const npcKey = npcId('npc-export');
+  const questKey = questId('quest-export');
+  const adventureKey = adventureId('adventure-export');
+  const taverns = new TavernRepository(sqlite);
+  taverns.create({
+    id: tavernKey,
+    campaignId: campaignKey,
+    locationId: locationId('location-export'),
+    name: 'Ember Cup',
+    position: 'Harbor road',
+    environment: 'Warm stone hall',
+    specialRules: [],
+    longTermProblem: 'The beacon is fading.',
+    ownerNpcId: npcKey,
+    residentNpcIds: [npcKey],
+    visitorNpcIds: [],
+    createdAt: at,
+    updatedAt: at,
+  });
+  new NpcRepository(sqlite).create({
+    id: npcKey,
+    campaignId: campaignKey,
+    tavernId: tavernKey,
+    residency: 'OWNER',
+    name: 'Ilyra',
+    identity: 'Innkeeper',
+    appearance: 'Red coat',
+    personality: 'Observant',
+    goal: 'Keep the harbor road open.',
+    secret: 'Knows an old route.',
+    speechStyle: 'Measured',
+    currentMood: 'Concerned',
+    currentStatus: 'ACTIVE',
+    createdAt: at,
+    updatedAt: at,
+  });
+  taverns.assignOwner(tavernKey, npcKey);
+  new QuestRepository(sqlite).create({
+    id: questKey,
+    campaignId: campaignKey,
+    publisherNpcId: npcKey,
+    content: {
+      title: 'The Fading Beacon',
+      summary: 'Investigate the failing lighthouse.',
+      objective: 'Restore the beacon.',
+      failureCost: 'Ships remain trapped.',
+    },
+    status: 'ACCEPTED',
+    risk: 'MODERATE',
+    recommendedAttributes: ['knowledge', 'agility'],
+    expectedTurns: { min: 8, max: 12 },
+    rewardTier: 'NOTABLE',
+    relatedNpcIds: [npcKey],
+    relatedFactIds: [],
+    createdAt: at,
+    updatedAt: at,
+  });
+  new AdventureRepository(sqlite).create({
+    id: adventureKey,
+    campaignId: campaignKey,
+    questId: questKey,
+    state: 'WAITING_FOR_PLAYER',
+    plan: {
+      adventureId: adventureKey,
+      objective: 'Restore the beacon.',
+      risk: 'MODERATE',
+      expectedTurns: { min: 8, max: 12 },
+      coreScenes: ['Lighthouse approach'],
+      necessaryClueIds: [],
+      majorObstacles: ['Storm winds'],
+      possibleEndings: ['Beacon restored', 'Harbor remains closed'],
+      failureCost: 'Ships remain trapped.',
+    },
+    currentTurnNumber: 0,
+    createdAt: at,
+    updatedAt: at,
+  });
+  sqlite
+    .prepare(
+      `INSERT INTO scene_frames (
+         adventure_id, campaign_id, scene_id, location, participants_json, pressure_json,
+         affordances_json, pending_consequences_json, return_point_json, revision, updated_at
+       ) VALUES (?, ?, ?, ?, ?, '[]', '[]', '[]', ?, 4, ?)`,
+    )
+    .run(
+      adventureKey,
+      campaignKey,
+      'scene-export',
+      'Lighthouse approach',
+      JSON.stringify([npcKey]),
+      JSON.stringify({ eventId: gameEventId('event-export'), summary: 'Lighthouse approach' }),
+      at,
+    );
   const generations = new GenerationRecordRepository(sqlite);
   generations.create({
     id: generationRecordId('generation-export'),

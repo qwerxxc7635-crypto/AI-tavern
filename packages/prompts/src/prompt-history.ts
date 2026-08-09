@@ -43,4 +43,9 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Build settlement world events from filtered clocks, factions, and recent events.',
   }),
+  Object.freeze({
+    task: 'GENERATE_ADVENTURE_TURN',
+    version: promptVersion(2),
+    change: 'Ground every turn in the persisted SceneFrame recovery and authority boundaries.',
+  }),
 ]);

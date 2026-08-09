@@ -15,6 +15,7 @@ import type {
   WorldFactId,
 } from './foundation.js';
 import type { QuestRisk } from './quest.js';
+import type { JsonValue } from './pending-ai-request.js';
 
 export interface AdventurePlan {
   readonly adventureId: AdventureId;
@@ -26,6 +27,32 @@ export interface AdventurePlan {
   readonly majorObstacles: readonly string[];
   readonly possibleEndings: readonly string[];
   readonly failureCost: string;
+}
+
+export interface SceneFrame {
+  readonly sceneId: string;
+  readonly location: string;
+  readonly participants: readonly string[];
+  readonly pressure: readonly {
+    readonly id: string;
+    readonly kind: string;
+    readonly level: number;
+  }[];
+  readonly affordances: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly preconditions: readonly string[];
+  }[];
+  readonly pendingConsequences: readonly {
+    readonly id: string;
+    readonly trigger: string;
+    readonly payload: JsonValue;
+  }[];
+  readonly returnPoint: {
+    readonly eventId: string;
+    readonly summary: string;
+  };
+  readonly revision: number;
 }
 
 export const ADVENTURE_STATES = [

@@ -152,6 +152,7 @@ function sceneSnapshot(): AdventureSnapshot {
     ],
     turns: [],
     currentScene: 'Rain lashes the shuttered lighthouse.',
+    sceneFrame: null,
     suggestedActions: ['Study the lock.'],
     turnGenerationContext: null,
     diceGenerationInput: null,

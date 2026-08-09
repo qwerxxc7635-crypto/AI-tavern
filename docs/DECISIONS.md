@@ -1716,3 +1716,19 @@ AI车卡以纯reducer表达idle、generating、validating、preview、editing、
 ### 影响与边界
 
 “未确认不落库”在本架构中指不落角色、装备、Campaign阶段和已提交生成事实；Candidate自身必须留在本地SQLite，不能退化为易失React内存。当前`.emtavern`格式尚未携带PROPOSED Candidate，因此导出遇到未确认候选时明确失败并提示先完成确认，禁止静默生成缺失进度的归档。没有引入新migration、真实Provider调用、付费API或iOS实现。
+
+## DEC-080：SceneFrame是独立的可恢复投影
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T01`、Architecture Gate的SceneFrame与SQLite唯一真相源红线
+
+### 决定与理由
+
+SceneFrame不嵌入不可变的`adventures.plan_json`，而由migration 6建立一Adventure一行的`scene_frames`投影。初始计划、叙事回合和D20结算在同一个`BEGIN IMMEDIATE`事务中同时更新Adventure聚合、SceneFrame以及`SCENE_COMMITTED` ledger；revision必须逐次加一，重启只读取最后提交成功的frame。
+
+`returnPoint.eventId`锚定`game_events`中的可移植已提交事件，SceneFrame本身进入`.emtavern` Campaign archive schema 2；设备级`event_ledger`不迁移。导入严格验证frame结构、Campaign/Adventure归属和事件锚点；目标设备第一次继续导入场景时允许SCENE ledger从导入revision建立本地审计基线，之后仍要求连续递增。旧schema 1档案没有SceneFrame时允许从已提交Adventure事实派生兼容视图，下一次完整提交再建立正式投影。
+
+### 影响与边界
+
+AI回合上下文固定携带持久SceneFrame，UI snapshot必须验证其恢复摘要与当前场景一致。T01仅建立场景事实和恢复边界，不提前实现T02行动模式或T03的3至5个行动建议，不接入真实Provider、付费API、正式用户数据或iOS。

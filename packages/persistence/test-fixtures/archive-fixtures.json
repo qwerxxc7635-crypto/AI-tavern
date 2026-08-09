@@ -3,18 +3,18 @@
   "command": "pnpm archive:interop",
   "fixtures": {
     "typescript": {
-      "path": "packages/persistence/test-fixtures/typescript-export-v1.emtavern",
+      "path": "packages/persistence/test-fixtures/typescript-export-v2.emtavern",
       "producer": "packages/persistence/src/save-export.ts",
       "sourceTest": "packages/persistence/src/save-export.test.ts",
       "createdAt": "2026-08-01T13:00:00.000Z",
-      "sha256": "613d643c13398134c27ddcd0b4fa27bbf2bcc4f9fe920b607a3152eb52973c47"
+      "sha256": "fcebf11e37bcdbdf544f554612bb3f9e355528a063b32512a2811c8787755e23"
     },
     "rust": {
-      "path": "packages/persistence/test-fixtures/rust-export-v1.emtavern",
+      "path": "packages/persistence/test-fixtures/rust-export-v2.emtavern",
       "producer": "crates/native-bridge/src/save_archive.rs",
       "sourceTest": "current_archive_interop_gate_imports_typescript_and_emits_rust",
       "createdAt": "2026-08-02T00:59:25.584Z",
-      "sha256": "d1bd48a278a220f7741d56727b406070bc43218566b9aaa461f517e68a5ab467"
+      "sha256": "b71cabdf4aa09a1ed999b32964def55b49d55b37313cdd434e8b3f61574d6114"
     }
   }
 }

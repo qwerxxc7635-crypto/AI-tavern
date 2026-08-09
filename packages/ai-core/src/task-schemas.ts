@@ -2,6 +2,7 @@ import type { JsonValue } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
 const text = z.string().trim().min(1).max(4_000);
+const sceneText = z.string().trim().min(1).max(12_000);
 const shortText = z.string().trim().min(1).max(200);
 const identifier = z.string().trim().min(1).max(200);
 const stringList = z.array(text).max(30);
@@ -374,6 +375,25 @@ export const GenerateAdventurePlanOutputSchema = z
     path: ['expectedTurns', 'max'],
   });
 
+export const SceneFrameSchema = z
+  .object({
+    sceneId: identifier,
+    location: text,
+    participants: identifierList.min(1).max(30),
+    pressure: z
+      .array(z.object({ id: identifier, kind: shortText, level: z.number().int().min(0) }).strict())
+      .max(30),
+    affordances: z
+      .array(z.object({ id: identifier, label: text, preconditions: stringList.max(20) }).strict())
+      .max(10),
+    pendingConsequences: z
+      .array(z.object({ id: identifier, trigger: shortText, payload: jsonValueSchema }).strict())
+      .max(20),
+    returnPoint: z.object({ eventId: identifier, summary: sceneText }).strict(),
+    revision: z.number().int().min(1),
+  })
+  .strict();
+
 export const GenerateAdventureTurnInputSchema = z
   .object({
     adventureId: identifier,
@@ -382,7 +402,8 @@ export const GenerateAdventureTurnInputSchema = z
     quest: questContext,
     adventurePlan: adventurePlanContext,
     currentTurnNumber: z.number().int().min(0),
-    currentScene: text,
+    currentScene: sceneText,
+    sceneFrame: SceneFrameSchema,
     longTermSummary: text.nullable(),
     recentTurns: stringList.max(10),
     discoveredClues: stringList,

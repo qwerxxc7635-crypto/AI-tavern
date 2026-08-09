@@ -7,7 +7,7 @@
 > iOS：DEFERRED  
 > 版本：0.2.0
 
-## 当前执行状态（2026-08-08）
+## 当前执行状态（2026-08-09）
 
 - `V02-M0-T01`～`V02-M0-T03`：DONE；起始证据、PlatformPaths 与跨平台脚本验证见 `docs/V0_2_BASELINE.md`。
 - `V02-COMP-T01`～`V02-COMP-T07`：DONE；三仓库固定 SHA、源码可用性、矩阵、Gap、Borrow/Reject 均已记录在 `docs/research/`。
@@ -45,7 +45,8 @@
 - `V02-M6-T02`：DONE；已确认角色卡固定呈现summary、basics、attributes、background、personality、traits、equipment、AI controls八区，复用现有持久字段且无schema迁移。
 - `V02-M6-T03`：DONE；纯状态机与UI显式覆盖idle/generating/validating/preview/editing/confirming/committed，以revision+operation拒绝编辑后的迟到结果并显示中文状态。
 - `V02-M6-T04`：DONE；特质与完整角色均以可恢复Candidate暂存，未确认不写角色/装备/生成事实或推进Campaign，确认在单一SQLite事务原子提交并支持幂等重放。
-- 下一执行项严格进入 `V02-M7-T01` SceneFrame。
+- `V02-M7-T01`：DONE；Adventure使用独立SQLite SceneFrame投影，完整回合与场景ledger原子更新，恢复点锚定可移植game event，`.emtavern` schema 2携带投影并兼容读取schema 1。
+- 下一执行项严格进入 `V02-M7-T02` Action Modes。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

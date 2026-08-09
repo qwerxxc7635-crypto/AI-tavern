@@ -33,6 +33,11 @@ const migrations = [
     name: 'event_ledger',
     source: new URL('../../../database/migrations/0005_event_ledger.sql', import.meta.url),
   },
+  {
+    version: 6,
+    name: 'scene_frames',
+    source: new URL('../../../database/migrations/0006_scene_frames.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

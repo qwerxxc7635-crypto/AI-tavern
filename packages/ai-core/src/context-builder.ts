@@ -10,6 +10,7 @@ import type {
   NpcRelationship,
   PlayerCharacter,
   Quest,
+  SceneFrame,
   WorldBible,
   WorldFact,
 } from '@ember-tavern/contracts';
@@ -119,6 +120,7 @@ export interface AdventureContextSource {
   readonly relatedNpcs: readonly NpcProfile[];
   readonly playerAction: string;
   readonly longTermSummary: string | null;
+  readonly sceneFrame?: SceneFrame;
 }
 
 export interface WorldEventContextSource {
@@ -244,6 +246,7 @@ export function buildAdventureTurnContext(
       goal: npc.goal,
       currentMood: npc.currentMood,
     }));
+  const sceneFrame = source.sceneFrame ?? deriveSceneFrame(source);
   const turnHistory = source.turns
     .filter((turn) => turn.adventureId === source.adventure.id)
     .sort((left, right) => left.turnNumber - right.turnNumber)
@@ -302,6 +305,7 @@ export function buildAdventureTurnContext(
     },
     currentTurnNumber: source.adventure.currentTurnNumber,
     currentScene: source.currentScene,
+    sceneFrame,
     longTermSummary,
     recentTurns,
     discoveredClues,
@@ -318,6 +322,56 @@ export function buildAdventureTurnContext(
     } else throw new ContextBuildError('Adventure context core fields exceed the character budget');
   }
   return GenerateAdventureTurnInputSchema.parse(build());
+}
+
+function deriveSceneFrame(source: AdventureContextSource): SceneFrame {
+  const latest = source.turns
+    .filter(({ adventureId }) => adventureId === source.adventure.id)
+    .sort((left, right) => left.turnNumber - right.turnNumber)
+    .at(-1);
+  const location =
+    source.adventure.plan.coreScenes[
+      Math.min(
+        Math.max(source.adventure.currentTurnNumber - 1, 0),
+        source.adventure.plan.coreScenes.length - 1,
+      )
+    ] ?? source.currentScene;
+  return Object.freeze({
+    sceneId: `${source.adventure.id}:scene:${source.adventure.currentTurnNumber}`,
+    location,
+    participants: Object.freeze([
+      source.playerCharacter.id,
+      ...new Set(latest?.speakerNpcIds ?? []),
+    ]),
+    pressure: Object.freeze([]),
+    affordances: Object.freeze(
+      (latest?.suggestedActions ?? []).map(({ optionId, text }) =>
+        Object.freeze({ id: optionId, label: text, preconditions: Object.freeze([]) }),
+      ),
+    ),
+    pendingConsequences: Object.freeze(
+      latest?.checkRequest === null || latest?.checkRequest === undefined
+        ? []
+        : [
+            Object.freeze({
+              id: latest.checkRequest.id,
+              trigger: 'CHECK_REQUIRED',
+              payload: {
+                id: latest.checkRequest.id,
+                turnId: latest.checkRequest.turnId,
+                attribute: latest.checkRequest.attribute,
+                difficulty: latest.checkRequest.difficulty,
+                reason: latest.checkRequest.reason,
+              },
+            }),
+          ],
+    ),
+    returnPoint: Object.freeze({
+      eventId: latest?.id ?? source.adventure.id,
+      summary: source.currentScene,
+    }),
+    revision: Math.max(source.adventure.currentTurnNumber + 1, 1),
+  });
 }
 
 export function buildWorldEventContext(

@@ -106,6 +106,7 @@ function ending(): AdventureSnapshot {
       },
     ],
     currentScene: 'Done',
+    sceneFrame: null,
     suggestedActions: [],
     turnGenerationContext: null,
     diceGenerationInput: null,

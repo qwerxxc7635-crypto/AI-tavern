@@ -23,6 +23,7 @@ pub struct AdventureSnapshot {
     pub clues: Vec<Value>,
     pub turns: Vec<Value>,
     pub current_scene: String,
+    pub scene_frame: Option<Value>,
     pub suggested_actions: Vec<String>,
     pub turn_generation_context: Option<Value>,
     pub dice_generation_input: Option<Value>,
@@ -230,6 +231,41 @@ impl CampaignStore {
                 at,
             ],
         )?;
+        let participants = scene_participants(&transaction, &command.campaign_id, &[])?;
+        let location = array_field(&plan, "coreScenes")?
+            .first()
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::InvalidData)?
+            .to_owned();
+        let return_event_id = match latest_game_event_id(
+            &transaction,
+            &command.campaign_id,
+            Some("QUEST_ACCEPTED"),
+        ) {
+            Ok(event_id) => event_id,
+            Err(CampaignStoreError::NotFound) => insert_event(
+                &transaction,
+                &command.campaign_id,
+                "QUEST_ACCEPTED",
+                json!({ "questId": command.quest_id, "adventureId": adventure_id }),
+                &at,
+            )?,
+            Err(error) => return Err(error),
+        };
+        write_scene_frame(
+            &transaction,
+            &command.campaign_id,
+            &adventure_id,
+            &command.generation.idempotency_key,
+            &format!("{adventure_id}:scene:0"),
+            &location,
+            participants,
+            Vec::new(),
+            Vec::new(),
+            &location,
+            &return_event_id,
+            &at,
+        )?;
         transaction.commit()?;
         self.adventure_snapshot(&command.campaign_id, Some(&command.quest_id))
     }
@@ -379,6 +415,27 @@ impl CampaignStore {
                 })
             })
             .collect::<Vec<_>>();
+        let affordances = suggested_actions
+            .iter()
+            .map(|action| {
+                Ok(json!({
+                    "id": text_field(action, "optionId")?,
+                    "label": text_field(action, "text")?,
+                    "preconditions": [],
+                }))
+            })
+            .collect::<Result<Vec<_>, CampaignStoreError>>()?;
+        let pending_consequences = match check_request.as_ref() {
+            Some(check) => vec![json!({
+                "id": text_field(check, "id")?,
+                "trigger": "CHECK_REQUIRED",
+                "payload": check,
+            })],
+            None => Vec::new(),
+        };
+        let participants =
+            scene_participants(&transaction, &command.campaign_id, &output.speaker_npc_ids)?;
+        let location = scene_location(&transaction, &command.adventure_id, turn.turn_number)?;
         let mut clues = load_clues(&transaction, &command.adventure_id)?;
         for title in &output.discovered_clues {
             if let Some(clue) = clues
@@ -436,11 +493,25 @@ impl CampaignStore {
                 command.adventure_id,
             ],
         )?;
-        insert_event(
+        let return_event_id = insert_event(
             &transaction,
             &command.campaign_id,
             "PLAYER_ACTION_SUBMITTED",
             json!({ "adventureId": command.adventure_id, "turnId": turn.id }),
+            &at,
+        )?;
+        write_scene_frame(
+            &transaction,
+            &command.campaign_id,
+            &command.adventure_id,
+            &command.generation.idempotency_key,
+            &turn.id,
+            &location,
+            participants,
+            affordances,
+            pending_consequences,
+            &output.scene_text,
+            &return_event_id,
             &at,
         )?;
         transaction.commit()?;
@@ -558,6 +629,23 @@ impl CampaignStore {
             "UPDATE adventures SET state = 'SCENE', updated_at = ?1 WHERE id = ?2",
             params![at, command.adventure_id],
         )?;
+        let current_frame = load_scene_frame(&transaction, &command.adventure_id)?;
+        let return_event_id =
+            latest_game_event_id(&transaction, &command.campaign_id, Some("DICE_ROLLED"))?;
+        write_scene_frame(
+            &transaction,
+            &command.campaign_id,
+            &command.adventure_id,
+            &command.generation.idempotency_key,
+            &text_field(&current_frame, "sceneId")?,
+            &text_field(&current_frame, "location")?,
+            array_field(&current_frame, "participants")?,
+            array_field(&current_frame, "affordances")?,
+            Vec::new(),
+            &combined,
+            &return_event_id,
+            &at,
+        )?;
         transaction.commit()?;
         self.adventure_snapshot(&command.campaign_id, None)
     }
@@ -613,6 +701,7 @@ fn load_snapshot(
             clues: Vec::new(),
             turns: Vec::new(),
             current_scene: text_field(&record_field(&quest, "content")?, "summary")?,
+            scene_frame: None,
             suggested_actions: Vec::new(),
             turn_generation_context: None,
             dice_generation_input: None,
@@ -621,10 +710,16 @@ fn load_snapshot(
     let clues = load_clues(connection, &adventure_id)?;
     let turns = load_turn_views(connection, &adventure_id)?;
     let latest = latest_turn(connection, &adventure_id).ok();
-    let current_scene = latest
-        .as_ref()
-        .map(|turn| turn.scene_text.clone())
-        .unwrap_or(text_field(&record_field(&quest, "content")?, "summary")?);
+    let scene_frame = Some(load_scene_frame(connection, &adventure_id)?);
+    let current_scene = text_field(
+        &record_field(
+            scene_frame
+                .as_ref()
+                .ok_or(CampaignStoreError::InvalidData)?,
+            "returnPoint",
+        )?,
+        "summary",
+    )?;
     let suggested_actions = turns
         .last()
         .and_then(|turn| turn.get("suggestedActions"))
@@ -671,6 +766,7 @@ fn load_snapshot(
         clues,
         turns,
         current_scene,
+        scene_frame,
         suggested_actions,
         turn_generation_context,
         dice_generation_input,
@@ -722,6 +818,375 @@ fn plan_input(
         ),
         "relevantFacts": relevant_facts,
     }))
+}
+
+pub(crate) fn load_scene_frame(
+    connection: &Connection,
+    adventure_id: &str,
+) -> Result<Value, CampaignStoreError> {
+    if let Some(frame) = load_persisted_scene_frame(connection, adventure_id)? {
+        validate_scene_frame(&frame)?;
+        validate_scene_frame_projection(connection, adventure_id, &frame)?;
+        return Ok(frame);
+    }
+    let (campaign_id, current_turn_number): (String, i64) = connection
+        .query_row(
+            "SELECT campaign_id, current_turn_number FROM adventures WHERE id = ?1",
+            [adventure_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .optional()?
+        .ok_or(CampaignStoreError::NotFound)?;
+    let latest = latest_turn(connection, adventure_id).ok();
+    let speaker_ids = latest
+        .as_ref()
+        .map(|turn| turn_speaker_ids(connection, &turn.id))
+        .transpose()?
+        .unwrap_or_default();
+    let participants = scene_participants(connection, &campaign_id, &speaker_ids)?;
+    let location = scene_location(connection, adventure_id, current_turn_number.max(1))?;
+    let event_id = match latest_game_event_id(connection, &campaign_id, None) {
+        Ok(event_id) => event_id,
+        Err(CampaignStoreError::NotFound) => adventure_id.to_owned(),
+        Err(error) => return Err(error),
+    };
+    let summary = latest
+        .map(|turn| turn.scene_text)
+        .unwrap_or_else(|| location.clone());
+    Ok(json!({
+        "sceneId": format!("{adventure_id}:legacy"),
+        "location": location,
+        "participants": participants,
+        "pressure": scene_pressure(connection, &campaign_id)?,
+        "affordances": [],
+        "pendingConsequences": [],
+        "returnPoint": { "eventId": event_id, "summary": summary },
+        "revision": 1,
+    }))
+}
+
+fn load_persisted_scene_frame(
+    connection: &Connection,
+    adventure_id: &str,
+) -> Result<Option<Value>, CampaignStoreError> {
+    let row = connection
+        .query_row(
+            "SELECT scene_id, location, participants_json, pressure_json, affordances_json,
+                    pending_consequences_json, return_point_json, revision
+             FROM scene_frames WHERE adventure_id = ?1",
+            [adventure_id],
+            |row| {
+                Ok(json!({
+                    "sceneId": row.get::<_, String>(0)?,
+                    "location": row.get::<_, String>(1)?,
+                    "participants": from_json::<Value>(row.get(2)?)?,
+                    "pressure": from_json::<Value>(row.get(3)?)?,
+                    "affordances": from_json::<Value>(row.get(4)?)?,
+                    "pendingConsequences": from_json::<Value>(row.get(5)?)?,
+                    "returnPoint": from_json::<Value>(row.get(6)?)?,
+                    "revision": row.get::<_, i64>(7)?,
+                }))
+            },
+        )
+        .optional()?;
+    Ok(row)
+}
+
+#[allow(clippy::too_many_arguments)]
+fn write_scene_frame(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+    adventure_id: &str,
+    operation_id: &str,
+    scene_id: &str,
+    location: &str,
+    participants: Vec<Value>,
+    affordances: Vec<Value>,
+    pending_consequences: Vec<Value>,
+    summary: &str,
+    return_event_id: &str,
+    at: &str,
+) -> Result<Value, CampaignStoreError> {
+    validate_id(operation_id)?;
+    validate_id(scene_id)?;
+    validate_text(location, 4_000)?;
+    validate_text(summary, 12_000)?;
+    validate_id(return_event_id)?;
+    if !adventure_exists(transaction, campaign_id, adventure_id)? {
+        return Err(CampaignStoreError::NotFound);
+    }
+    let revision = transaction.query_row(
+        "SELECT COALESCE(MAX(revision) + 1, 1) FROM (
+           SELECT revision FROM event_ledger
+           WHERE aggregate_type = 'SCENE' AND aggregate_id = ?1
+           UNION ALL
+           SELECT revision FROM scene_frames WHERE adventure_id = ?1
+         )",
+        [adventure_id],
+        |row| row.get::<_, i64>(0),
+    )?;
+    let frame = json!({
+        "sceneId": scene_id,
+        "location": location,
+        "participants": participants,
+        "pressure": scene_pressure(transaction, campaign_id)?,
+        "affordances": affordances,
+        "pendingConsequences": pending_consequences,
+        "returnPoint": { "eventId": return_event_id, "summary": summary },
+        "revision": revision,
+    });
+    validate_scene_frame(&frame)?;
+    let return_point = record_field(&frame, "returnPoint")?;
+    let changed = transaction.execute(
+        "INSERT INTO scene_frames (
+           adventure_id, campaign_id, scene_id, location, participants_json, pressure_json,
+           affordances_json, pending_consequences_json, return_point_json, revision, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+         ON CONFLICT(adventure_id) DO UPDATE SET
+           scene_id = excluded.scene_id,
+           location = excluded.location,
+           participants_json = excluded.participants_json,
+           pressure_json = excluded.pressure_json,
+           affordances_json = excluded.affordances_json,
+           pending_consequences_json = excluded.pending_consequences_json,
+           return_point_json = excluded.return_point_json,
+           revision = excluded.revision,
+           updated_at = excluded.updated_at
+         WHERE scene_frames.campaign_id = excluded.campaign_id
+           AND scene_frames.revision + 1 = excluded.revision",
+        params![
+            adventure_id,
+            campaign_id,
+            scene_id,
+            location,
+            Value::Array(array_field(&frame, "participants")?).to_string(),
+            Value::Array(array_field(&frame, "pressure")?).to_string(),
+            Value::Array(array_field(&frame, "affordances")?).to_string(),
+            Value::Array(array_field(&frame, "pendingConsequences")?).to_string(),
+            return_point.to_string(),
+            revision,
+            at,
+        ],
+    )?;
+    if changed != 1 {
+        return Err(CampaignStoreError::InvalidState);
+    }
+    transaction.execute(
+        "INSERT INTO event_ledger (
+           id, campaign_id, event_type, operation_id, aggregate_type, aggregate_id,
+           revision, payload_json, payload_version, source, occurred_at
+         ) VALUES (?1, ?2, 'SCENE_COMMITTED', ?3, 'SCENE', ?4, ?5, ?6, 1, 'SYSTEM', ?7)",
+        params![
+            Uuid::new_v4().to_string(),
+            campaign_id,
+            operation_id,
+            adventure_id,
+            revision,
+            frame.to_string(),
+            at,
+        ],
+    )?;
+    Ok(frame)
+}
+
+fn validate_scene_frame(frame: &Value) -> Result<(), CampaignStoreError> {
+    let root = frame.as_object().ok_or(CampaignStoreError::InvalidData)?;
+    if root.len() != 8
+        || ![
+            "sceneId",
+            "location",
+            "participants",
+            "pressure",
+            "affordances",
+            "pendingConsequences",
+            "returnPoint",
+            "revision",
+        ]
+        .iter()
+        .all(|key| root.contains_key(*key))
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    validate_id(&text_field(frame, "sceneId")?)?;
+    validate_text(&text_field(frame, "location")?, 4_000)?;
+    let revision = integer_field(frame, "revision")?;
+    let participants = array_field(frame, "participants")?;
+    let pressure = array_field(frame, "pressure")?;
+    let affordances = array_field(frame, "affordances")?;
+    let pending = array_field(frame, "pendingConsequences")?;
+    if revision < 1
+        || participants.is_empty()
+        || participants.len() > 30
+        || pressure.len() > 30
+        || affordances.len() > 10
+        || pending.len() > 20
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut participant_ids = std::collections::HashSet::new();
+    for participant in participants {
+        let id = participant
+            .as_str()
+            .ok_or(CampaignStoreError::InvalidData)?;
+        validate_id(id)?;
+        if !participant_ids.insert(id.to_owned()) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    for value in pressure {
+        if value.as_object().is_none_or(|record| record.len() != 3) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        validate_id(&text_field(&value, "id")?)?;
+        validate_text(&text_field(&value, "kind")?, 200)?;
+        if integer_field(&value, "level")? < 0 {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    for value in affordances {
+        if value.as_object().is_none_or(|record| record.len() != 3) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        validate_id(&text_field(&value, "id")?)?;
+        validate_text(&text_field(&value, "label")?, 4_000)?;
+        let preconditions = array_field(&value, "preconditions")?;
+        if preconditions.len() > 20 {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        for precondition in preconditions {
+            validate_text(
+                precondition
+                    .as_str()
+                    .ok_or(CampaignStoreError::InvalidData)?,
+                4_000,
+            )?;
+        }
+    }
+    for value in pending {
+        if value.as_object().is_none_or(|record| record.len() != 3) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        validate_id(&text_field(&value, "id")?)?;
+        validate_text(&text_field(&value, "trigger")?, 200)?;
+        value
+            .get("payload")
+            .ok_or(CampaignStoreError::InvalidData)?;
+    }
+    let return_point = record_field(frame, "returnPoint")?;
+    if return_point
+        .as_object()
+        .is_none_or(|record| record.len() != 2)
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    validate_id(&text_field(&return_point, "eventId")?)?;
+    validate_text(&text_field(&return_point, "summary")?, 12_000)?;
+    Ok(())
+}
+
+fn validate_scene_frame_projection(
+    connection: &Connection,
+    adventure_id: &str,
+    frame: &Value,
+) -> Result<(), CampaignStoreError> {
+    let ledger = connection
+        .query_row(
+            "SELECT revision, payload_json FROM event_ledger
+             WHERE aggregate_type = 'SCENE' AND aggregate_id = ?1
+             ORDER BY revision DESC LIMIT 1",
+            [adventure_id],
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()?;
+    if let Some((revision, payload)) = ledger {
+        let ledger_frame: Value =
+            serde_json::from_str(&payload).map_err(|_| CampaignStoreError::InvalidData)?;
+        if revision != integer_field(frame, "revision")? || ledger_frame != *frame {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    let return_point = record_field(frame, "returnPoint")?;
+    let event_id = text_field(&return_point, "eventId")?;
+    if connection
+        .query_row(
+            "SELECT 1 FROM game_events
+             JOIN adventures ON adventures.id = ?2
+             WHERE game_events.id = ?1
+               AND game_events.campaign_id = adventures.campaign_id",
+            params![event_id, adventure_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_none()
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(())
+}
+
+fn scene_participants(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_ids: &[String],
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut values = vec![player_character_id(connection, campaign_id)?];
+    for id in npc_ids {
+        validate_id(id)?;
+        if !values.contains(id) {
+            values.push(id.clone());
+        }
+    }
+    Ok(values.into_iter().map(Value::String).collect())
+}
+
+fn scene_pressure(
+    connection: &Connection,
+    campaign_id: &str,
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, current FROM world_clocks WHERE campaign_id = ?1 AND current > 0
+         ORDER BY created_at, id LIMIT 30",
+    )?;
+    Ok(statement
+        .query_map([campaign_id], |row| {
+            Ok(json!({
+                "id": row.get::<_, String>(0)?,
+                "kind": "WORLD_CLOCK",
+                "level": row.get::<_, i64>(1)?,
+            }))
+        })?
+        .collect::<Result<Vec<_>, _>>()?)
+}
+
+fn scene_location(
+    connection: &Connection,
+    adventure_id: &str,
+    turn_number: i64,
+) -> Result<String, CampaignStoreError> {
+    let plan: Value = connection.query_row(
+        "SELECT plan_json FROM adventures WHERE id = ?1",
+        [adventure_id],
+        |row| from_json(row.get(0)?),
+    )?;
+    let scenes = array_field(&plan, "coreScenes")?;
+    let index = usize::try_from(turn_number.saturating_sub(1)).unwrap_or(0);
+    scenes
+        .get(index.min(scenes.len().saturating_sub(1)))
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .ok_or(CampaignStoreError::InvalidData)
+}
+
+fn turn_speaker_ids(
+    connection: &Connection,
+    turn_id: &str,
+) -> Result<Vec<String>, CampaignStoreError> {
+    let raw: String = connection.query_row(
+        "SELECT speaker_npc_ids_json FROM adventure_turns WHERE id = ?1",
+        [turn_id],
+        |row| row.get(0),
+    )?;
+    serde_json::from_str(&raw).map_err(|_| CampaignStoreError::InvalidData)
 }
 
 fn turn_generation_context(
@@ -834,6 +1299,7 @@ fn turn_generation_context(
             "value"
         )?,
         "currentScene": turn.scene_text,
+        "sceneFrame": load_scene_frame(connection, adventure_id)?,
         "longTermSummary": null,
         "recentTurns": recent_turns,
         "discoveredClues": discovered,
@@ -1108,6 +1574,21 @@ fn active_adventure_id(
     campaign_id: &str,
 ) -> Result<Option<String>, CampaignStoreError> {
     Ok(active_adventure(connection, campaign_id)?.map(|value| value.0))
+}
+
+fn adventure_exists(
+    connection: &Connection,
+    campaign_id: &str,
+    adventure_id: &str,
+) -> Result<bool, CampaignStoreError> {
+    Ok(connection
+        .query_row(
+            "SELECT 1 FROM adventures WHERE id = ?1 AND campaign_id = ?2",
+            params![adventure_id, campaign_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some())
 }
 
 fn accepted_quest_id(
@@ -1396,20 +1877,41 @@ fn insert_event(
     event_type: &str,
     payload: Value,
     at: &str,
-) -> Result<(), CampaignStoreError> {
+) -> Result<String, CampaignStoreError> {
+    let id = Uuid::new_v4().to_string();
     transaction.execute(
         "INSERT INTO game_events (
            id, campaign_id, schema_version, type, payload_json, occurred_at
          ) VALUES (?1, ?2, 1, ?3, ?4, ?5)",
-        params![
-            Uuid::new_v4().to_string(),
-            campaign_id,
-            event_type,
-            payload.to_string(),
-            at,
-        ],
+        params![id, campaign_id, event_type, payload.to_string(), at,],
     )?;
-    Ok(())
+    Ok(id)
+}
+
+fn latest_game_event_id(
+    connection: &Connection,
+    campaign_id: &str,
+    event_type: Option<&str>,
+) -> Result<String, CampaignStoreError> {
+    let result = match event_type {
+        Some(kind) => connection
+            .query_row(
+                "SELECT id FROM game_events WHERE campaign_id = ?1 AND type = ?2
+                 ORDER BY occurred_at DESC, id DESC LIMIT 1",
+                params![campaign_id, kind],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?,
+        None => connection
+            .query_row(
+                "SELECT id FROM game_events WHERE campaign_id = ?1
+                 ORDER BY occurred_at DESC, id DESC LIMIT 1",
+                [campaign_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?,
+    };
+    result.ok_or(CampaignStoreError::NotFound)
 }
 
 fn action_text(value: &Value) -> Result<String, CampaignStoreError> {
@@ -1473,6 +1975,7 @@ fn from_json<T: for<'de> Deserialize<'de>>(value: String) -> rusqlite::Result<T>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CampaignArchiveImportMode;
 
     #[test]
     fn completes_eight_turns_with_checks_and_restores_the_ending() {
@@ -1504,6 +2007,16 @@ mod tests {
         let mut snapshot = store
             .start_adventure("campaign-adventure", &adventure_id)
             .expect("start adventure");
+        let initial_frame = snapshot.scene_frame.as_ref().expect("initial scene frame");
+        assert_eq!(
+            integer_field(initial_frame, "revision").expect("initial revision"),
+            1
+        );
+        assert!(
+            !array_field(initial_frame, "participants")
+                .expect("initial participants")
+                .is_empty()
+        );
 
         for turn_number in 1..=8 {
             let pending = store
@@ -1525,6 +2038,14 @@ mod tests {
                     && character_trait.get("description").is_some()
                     && character_trait.get("id").is_none()
             }));
+            assert_eq!(
+                pending
+                    .turn_generation_context
+                    .as_ref()
+                    .and_then(|context| context.get("sceneFrame")),
+                pending.scene_frame.as_ref(),
+                "provider context must use the persisted frame"
+            );
             let turn_id = pending
                 .turns
                 .last()
@@ -1548,6 +2069,15 @@ mod tests {
                 .expect("commit turn");
             if !ending {
                 assert_eq!(snapshot.state.as_deref(), Some("CHECK_REQUIRED"));
+                assert_eq!(
+                    array_field(
+                        snapshot.scene_frame.as_ref().expect("check scene frame"),
+                        "pendingConsequences"
+                    )
+                    .expect("pending consequences")
+                    .len(),
+                    1
+                );
                 let rolled = store
                     .roll_adventure_check("campaign-adventure", &adventure_id)
                     .expect("roll check");
@@ -1569,6 +2099,14 @@ mod tests {
                     })
                     .expect("commit dice");
                 assert_eq!(snapshot.state.as_deref(), Some("SCENE"));
+                assert!(
+                    array_field(
+                        snapshot.scene_frame.as_ref().expect("resolved scene frame"),
+                        "pendingConsequences"
+                    )
+                    .expect("resolved consequences")
+                    .is_empty()
+                );
             }
         }
 
@@ -1584,6 +2122,82 @@ mod tests {
         assert_eq!(restored.state.as_deref(), Some("ENDING"));
         assert_eq!(restored.current_turn_number, 8);
         assert_eq!(restored.turns.len(), 8);
+        let restored_frame = restored.scene_frame.as_ref().expect("restored scene frame");
+        assert_eq!(
+            integer_field(restored_frame, "revision").expect("restored revision"),
+            16
+        );
+        let connection = reopened.connect().expect("scene ledger connection");
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM event_ledger
+                     WHERE aggregate_type = 'SCENE' AND aggregate_id = ?1",
+                    [&adventure_id],
+                    |row| row.get::<_, i64>(0)
+                )
+                .expect("scene ledger count"),
+            16
+        );
+        drop(connection);
+        let archive_path = directory.path().join("scene-frame.emtavern");
+        reopened
+            .export_campaign_archive("campaign-adventure", &archive_path, "0.2.0")
+            .expect("export scene frame");
+        let imported_store = CampaignStore::open(directory.path().join("imported.sqlite"))
+            .expect("open import database");
+        imported_store
+            .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
+            .expect("import scene frame");
+        assert_eq!(
+            imported_store
+                .adventure_snapshot("campaign-adventure", None)
+                .expect("imported adventure")
+                .scene_frame,
+            restored.scene_frame
+        );
+        let mut imported_connection = imported_store.connect().expect("imported connection");
+        let imported_transaction = imported_connection
+            .transaction_with_behavior(TransactionBehavior::Immediate)
+            .expect("imported transaction");
+        let imported_frame =
+            load_scene_frame(&imported_transaction, &adventure_id).expect("imported scene frame");
+        let return_event_id = text_field(
+            &record_field(&imported_frame, "returnPoint").expect("imported return point"),
+            "eventId",
+        )
+        .expect("imported return event");
+        let continued_frame = write_scene_frame(
+            &imported_transaction,
+            "campaign-adventure",
+            &adventure_id,
+            "operation-imported-scene-continuation",
+            &text_field(&imported_frame, "sceneId").expect("imported scene id"),
+            &text_field(&imported_frame, "location").expect("imported location"),
+            array_field(&imported_frame, "participants").expect("imported participants"),
+            array_field(&imported_frame, "affordances").expect("imported affordances"),
+            Vec::new(),
+            "The imported scene remains recoverable.",
+            &return_event_id,
+            "2026-07-31T06:30:00.000Z",
+        )
+        .expect("continue imported scene");
+        assert_eq!(
+            integer_field(&continued_frame, "revision").expect("continued revision"),
+            17
+        );
+        assert_eq!(
+            imported_transaction
+                .query_row(
+                    "SELECT revision FROM event_ledger
+                     WHERE aggregate_type = 'SCENE' AND aggregate_id = ?1",
+                    [&adventure_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("imported scene ledger baseline"),
+            17
+        );
+        imported_transaction.commit().expect("commit continuation");
     }
 
     fn plan_output() -> Value {
@@ -1680,7 +2294,7 @@ mod tests {
                    initial_equipment_ids_json, created_at, updated_at
                  ) VALUES (
                    'character-player', 'campaign-adventure', 'Mara', NULL, NULL, 'Curious scout',
-                   '[]', '[]', 'ROGUE', 'Scout',
+                   '[]', '{}', 'ROGUE', 'Scout',
                    '{\"physique\":2,\"agility\":4,\"knowledge\":3,\"charisma\":1}',
                    '[{\"name\":\"Keen Eye\",\"description\":\"Notices details.\"},{\"name\":\"Sure Step\",\"description\":\"Moves safely.\"}]',
                    'Find the road.', '{}', '[]',

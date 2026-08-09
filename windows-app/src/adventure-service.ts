@@ -8,6 +8,7 @@ import {
   GenerateAdventureTurnOutputSchema,
   ResolveDiceResultInputSchema,
   ResolveDiceResultOutputSchema,
+  SceneFrameSchema,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -19,6 +20,7 @@ import {
   campaignId,
   generationRecordId,
   idempotencyKey,
+  type SceneFrame,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 
@@ -88,6 +90,7 @@ export interface AdventureSnapshot {
   }[];
   readonly turns: readonly AdventureTurnView[];
   readonly currentScene: string;
+  readonly sceneFrame: SceneFrame | null;
   readonly suggestedActions: readonly string[];
   readonly turnGenerationContext: unknown | null;
   readonly diceGenerationInput: unknown | null;
@@ -386,6 +389,12 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
   const attributes = requireRecord(player['attributes']);
   const quest = requireRecord(record['quest']);
   const content = requireRecord(quest['content']);
+  const currentScene = requireText(record['currentScene']);
+  const sceneFrame =
+    record['sceneFrame'] === null ? null : SceneFrameSchema.parse(record['sceneFrame']);
+  if (sceneFrame !== null && sceneFrame.returnPoint.summary !== currentScene) {
+    throw new TypeError('Adventure scene does not match its recovery frame');
+  }
   return Object.freeze({
     campaignId: storedCampaignId,
     campaignState: requireText(record['campaignState']),
@@ -419,7 +428,8 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
     items: Object.freeze(requireArray(record['items']).map(parseItem)),
     clues: Object.freeze(requireArray(record['clues']).map(parseClue)),
     turns: Object.freeze(requireArray(record['turns']).map(parseTurn)),
-    currentScene: requireText(record['currentScene']),
+    currentScene,
+    sceneFrame,
     suggestedActions: Object.freeze(requireArray(record['suggestedActions']).map(requireText)),
     turnGenerationContext: record['turnGenerationContext'] ?? null,
     diceGenerationInput: record['diceGenerationInput'] ?? null,

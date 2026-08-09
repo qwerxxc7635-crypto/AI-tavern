@@ -25,7 +25,7 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 const FORMAT_VERSION = 1;
 // Device-only schema migrations (for example, credential cleanup bookkeeping)
 // must not change the portable campaign archive contract.
-const ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -51,6 +51,7 @@ type CampaignTable =
   | 'npc_relationships'
   | 'quests'
   | 'adventures'
+  | 'scene_frames'
   | 'adventure_turns'
   | 'conversations'
   | 'messages'
@@ -71,6 +72,7 @@ const TABLE_QUERIES: Readonly<Record<CampaignTable, string>> = {
     WHERE npcs.campaign_id = ? ORDER BY npc_relationships.npc_id`,
   quests: 'SELECT * FROM quests WHERE campaign_id = ? ORDER BY id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
+  scene_frames: 'SELECT * FROM scene_frames WHERE campaign_id = ? ORDER BY adventure_id',
   adventure_turns: `SELECT adventure_turns.* FROM adventure_turns
     JOIN adventures ON adventures.id = adventure_turns.adventure_id
     WHERE adventures.campaign_id = ?
@@ -118,6 +120,13 @@ const JSON_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
     'related_fact_ids_json',
   ]),
   adventures: new Set(['plan_json', 'clues_json', 'ending_json']),
+  scene_frames: new Set([
+    'participants_json',
+    'pressure_json',
+    'affordances_json',
+    'pending_consequences_json',
+    'return_point_json',
+  ]),
   adventure_turns: new Set([
     'speaker_npc_ids_json',
     'suggested_actions_json',
@@ -469,6 +478,7 @@ function campaignTableRecord(
     npc_relationships: values('npc_relationships'),
     quests: values('quests'),
     adventures: values('adventures'),
+    scene_frames: values('scene_frames'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),
     messages: values('messages'),

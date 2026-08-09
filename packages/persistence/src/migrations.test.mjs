@@ -29,6 +29,7 @@ const coreTables = [
   'provider_configs',
   'quests',
   'save_snapshots',
+  'scene_frames',
   'taverns',
   'world_bibles',
   'world_clocks',

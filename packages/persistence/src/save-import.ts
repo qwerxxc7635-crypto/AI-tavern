@@ -56,7 +56,8 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 type ImportMode = 'CREATE' | 'OVERWRITE';
 
 const FORMAT_VERSION = 1;
-const ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
+const LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -83,6 +84,7 @@ type CampaignTable =
   | 'npc_relationships'
   | 'quests'
   | 'adventures'
+  | 'scene_frames'
   | 'adventure_turns'
   | 'conversations'
   | 'messages'
@@ -99,12 +101,15 @@ const CAMPAIGN_TABLES = [
   'npc_relationships',
   'quests',
   'adventures',
+  'scene_frames',
   'adventure_turns',
   'conversations',
   'messages',
   'items',
   'world_clocks',
 ] as const satisfies readonly CampaignTable[];
+
+const LEGACY_CAMPAIGN_TABLES = CAMPAIGN_TABLES.filter((table) => table !== 'scene_frames');
 
 const INSERT_ORDER = [
   'world_bibles',
@@ -116,6 +121,7 @@ const INSERT_ORDER = [
   'npc_relationships',
   'quests',
   'adventures',
+  'scene_frames',
   'adventure_turns',
   'conversations',
   'messages',
@@ -266,7 +272,10 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     manifest['databaseSchemaVersion'],
     'manifest.databaseSchemaVersion',
   );
-  if (databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION) {
+  if (
+    databaseVersion !== LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION &&
+    databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION
+  ) {
     throw new PersistenceDataError(
       databaseVersion > ARCHIVE_DATABASE_SCHEMA_VERSION
         ? `Save schema ${databaseVersion} is newer than supported schema ${ARCHIVE_DATABASE_SCHEMA_VERSION}`
@@ -303,13 +312,19 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     throw new PersistenceDataError('Campaign archive model bindings are not portable');
   }
   const tableRoot = requireRecord(campaignDocument['tables'], 'campaign.tables');
-  requireExactKeys(tableRoot, [...CAMPAIGN_TABLES], 'campaign.tables');
+  const archiveTables =
+    databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION
+      ? LEGACY_CAMPAIGN_TABLES
+      : CAMPAIGN_TABLES;
+  requireExactKeys(tableRoot, [...archiveTables], 'campaign.tables');
   const tables = campaignTableRecord((table) =>
-    Object.freeze(
-      requireRecordArray(tableRoot[table], `campaign.tables.${table}`, MAX_TABLE_RECORDS).map(
-        (row) => parseStoredRow(row, table),
-      ),
-    ),
+    databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION && table === 'scene_frames'
+      ? Object.freeze([])
+      : Object.freeze(
+          requireRecordArray(tableRoot[table], `campaign.tables.${table}`, MAX_TABLE_RECORDS).map(
+            (row) => parseStoredRow(row, table),
+          ),
+        ),
   );
   const tableRecordCount = Object.values(tables).reduce((total, rows) => total + rows.length, 0);
   const generations = Object.freeze(
@@ -329,6 +344,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     decodeUtf8(readVerified('events.ndjson'), 'events.ndjson'),
     importedCampaignId,
   );
+  validateSceneFrameArchive(tables, events, importedCampaignId);
   if (1 + tableRecordCount + generations.length + events.length > MAX_TOTAL_RECORDS) {
     throw new PersistenceDataError('Save archive exceeds the total record limit');
   }
@@ -341,6 +357,146 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     events,
     generations,
   });
+}
+
+function validateSceneFrameArchive(
+  tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>,
+  events: readonly StoredRow[],
+  expectedCampaignId: CampaignId,
+): void {
+  const adventures = new Map(
+    tables.adventures.map((row) => [
+      requireString(row['id'], 'adventure id'),
+      requireString(row['campaign_id'], 'adventure campaign id'),
+    ]),
+  );
+  const eventIds = new Set(events.map((row) => requireString(row['id'], 'event id')));
+  for (const row of tables.scene_frames) {
+    requireExactKeys(
+      row,
+      [
+        'adventure_id',
+        'campaign_id',
+        'scene_id',
+        'location',
+        'participants_json',
+        'pressure_json',
+        'affordances_json',
+        'pending_consequences_json',
+        'return_point_json',
+        'revision',
+        'updated_at',
+      ],
+      'scene_frames row',
+    );
+    const adventureKey = requireString(row['adventure_id'], 'scene frame adventure id');
+    const campaignKey = requireString(row['campaign_id'], 'scene frame campaign id');
+    if (campaignKey !== expectedCampaignId || adventures.get(adventureKey) !== campaignKey) {
+      throw new PersistenceDataError('Scene frame campaign does not match its adventure');
+    }
+    requireBoundedText(row['scene_id'], 'scene frame scene id', 200);
+    requireBoundedText(row['location'], 'scene frame location', 4_000);
+    requireCanonicalTimestamp(row['updated_at'], 'scene frame updated_at');
+    requirePositiveInteger(row['revision'], 'scene frame revision');
+    const participants = parseSceneArray(row, 'participants_json', 'participants');
+    const pressure = parseSceneArray(row, 'pressure_json', 'pressure');
+    const affordances = parseSceneArray(row, 'affordances_json', 'affordances');
+    const pending = parseSceneArray(row, 'pending_consequences_json', 'pending consequences');
+    if (
+      participants.length < 1 ||
+      participants.length > 30 ||
+      pressure.length > 30 ||
+      affordances.length > 10 ||
+      pending.length > 20
+    ) {
+      throw new PersistenceDataError('Scene frame collection size is invalid');
+    }
+    const participantIds = participants.map((value, index) =>
+      requireBoundedText(value, `scene frame participant ${index}`, 200),
+    );
+    if (new Set(participantIds).size !== participantIds.length) {
+      throw new PersistenceDataError('Scene frame participants must be unique');
+    }
+    pressure.forEach((value, index) => {
+      const record = requireRecord(value, `scene frame pressure ${index}`);
+      requireExactKeys(record, ['id', 'kind', 'level'], `scene frame pressure ${index}`);
+      requireBoundedText(record['id'], `scene frame pressure ${index}.id`, 200);
+      requireBoundedText(record['kind'], `scene frame pressure ${index}.kind`, 200);
+      const level = record['level'];
+      if (typeof level !== 'number' || !Number.isSafeInteger(level) || level < 0) {
+        throw new PersistenceDataError(`scene frame pressure ${index}.level is invalid`);
+      }
+    });
+    affordances.forEach((value, index) => {
+      const record = requireRecord(value, `scene frame affordance ${index}`);
+      requireExactKeys(record, ['id', 'label', 'preconditions'], `scene frame affordance ${index}`);
+      requireBoundedText(record['id'], `scene frame affordance ${index}.id`, 200);
+      requireBoundedText(record['label'], `scene frame affordance ${index}.label`, 4_000);
+      requireArray(
+        record['preconditions'],
+        `scene frame affordance ${index}.preconditions`,
+      ).forEach((value, conditionIndex) =>
+        requireBoundedText(
+          value,
+          `scene frame affordance ${index}.preconditions.${conditionIndex}`,
+          4_000,
+        ),
+      );
+      if (
+        requireArray(record['preconditions'], `scene frame affordance ${index}.preconditions`)
+          .length > 20
+      ) {
+        throw new PersistenceDataError(
+          `scene frame affordance ${index}.preconditions has too many entries`,
+        );
+      }
+    });
+    pending.forEach((value, index) => {
+      const record = requireRecord(value, `scene frame pending consequence ${index}`);
+      requireExactKeys(
+        record,
+        ['id', 'trigger', 'payload'],
+        `scene frame pending consequence ${index}`,
+      );
+      requireBoundedText(record['id'], `scene frame pending consequence ${index}.id`, 200);
+      requireBoundedText(
+        record['trigger'],
+        `scene frame pending consequence ${index}.trigger`,
+        200,
+      );
+    });
+    const returnPoint = requireRecord(
+      parseStoredJson(row, 'return_point_json'),
+      'scene frame return point',
+    );
+    requireExactKeys(returnPoint, ['eventId', 'summary'], 'scene frame return point');
+    const returnEventId = requireBoundedText(
+      returnPoint['eventId'],
+      'scene frame return point event id',
+      200,
+    );
+    requireBoundedText(returnPoint['summary'], 'scene frame return point summary', 12_000);
+    if (!eventIds.has(returnEventId)) {
+      throw new PersistenceDataError('Scene frame return point event is missing from the archive');
+    }
+  }
+}
+
+function parseSceneArray(row: StoredRow, column: string, label: string): readonly unknown[] {
+  return requireArray(parseStoredJson(row, column), `scene frame ${label}`);
+}
+
+function parseStoredJson(row: StoredRow, column: string): unknown {
+  const text = requireString(row[column], `scene_frames.${column}`);
+  return parseJson(text, `scene_frames.${column}`);
+}
+
+function requireBoundedText(value: unknown, label: string, maximum: number): string {
+  const text = requireString(value, label);
+  if (text.trim() !== text || text.length > maximum) {
+    throw new PersistenceDataError(`${label} must be trimmed and at most ${maximum} characters`);
+  }
+  return text;
 }
 
 function validateChecksumDocument(checksum: Record<string, unknown>): Readonly<{
@@ -867,6 +1023,7 @@ function campaignTableRecord(
     npc_relationships: values('npc_relationships'),
     quests: values('quests'),
     adventures: values('adventures'),
+    scene_frames: values('scene_frames'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),
     messages: values('messages'),

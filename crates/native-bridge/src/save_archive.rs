@@ -24,8 +24,9 @@ use super::{
 };
 
 const FORMAT_VERSION: u64 = 1;
-const DATABASE_SCHEMA_VERSION: u64 = 1;
-const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 5;
+const DATABASE_SCHEMA_VERSION: u64 = 2;
+const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 6;
 const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_COMPRESSION_RATIO: u64 = 100;
@@ -43,7 +44,7 @@ const ENTRY_NAMES: [&str; 5] = [
     "generations.json",
     "checksum.json",
 ];
-const CAMPAIGN_TABLES: [&str; 14] = [
+const LEGACY_CAMPAIGN_TABLES: [&str; 14] = [
     "world_bibles",
     "world_facts",
     "player_characters",
@@ -59,7 +60,24 @@ const CAMPAIGN_TABLES: [&str; 14] = [
     "items",
     "world_clocks",
 ];
-const INSERT_ORDER: [&str; 14] = CAMPAIGN_TABLES;
+const CAMPAIGN_TABLES: [&str; 15] = [
+    "world_bibles",
+    "world_facts",
+    "player_characters",
+    "taverns",
+    "npcs",
+    "npc_knowledge",
+    "npc_relationships",
+    "quests",
+    "adventures",
+    "scene_frames",
+    "adventure_turns",
+    "conversations",
+    "messages",
+    "items",
+    "world_clocks",
+];
+const INSERT_ORDER: [&str; 15] = CAMPAIGN_TABLES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -366,6 +384,7 @@ fn query_campaign_table(
         }
         "quests" => "SELECT * FROM quests WHERE campaign_id = ?1 ORDER BY id",
         "adventures" => "SELECT * FROM adventures WHERE campaign_id = ?1 ORDER BY id",
+        "scene_frames" => "SELECT * FROM scene_frames WHERE campaign_id = ?1 ORDER BY adventure_id",
         "adventure_turns" => {
             "SELECT adventure_turns.* FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id WHERE adventures.campaign_id = ?1 ORDER BY adventure_turns.adventure_id, adventure_turns.turn_number, adventure_turns.id"
         }
@@ -552,7 +571,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         .get("databaseSchemaVersion")
         .and_then(Value::as_u64)
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
-    if database_version != DATABASE_SCHEMA_VERSION {
+    if ![LEGACY_DATABASE_SCHEMA_VERSION, DATABASE_SCHEMA_VERSION].contains(&database_version) {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
     let campaign_id = require_text(manifest.get("campaignId"))?.to_owned();
@@ -609,10 +628,15 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let table_root = require_object(campaign_document.get("tables"))?;
-    require_exact_keys(table_root, &CAMPAIGN_TABLES)?;
+    let archive_tables: &[&str] = if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
+        &LEGACY_CAMPAIGN_TABLES
+    } else {
+        &CAMPAIGN_TABLES
+    };
+    require_exact_keys(table_root, archive_tables)?;
     let mut tables = BTreeMap::new();
     let mut total_records = 1_usize;
-    for table in CAMPAIGN_TABLES {
+    for &table in archive_tables {
         let values = require_array(table_root.get(table))?;
         validate_record_count(values.len(), MAX_TABLE_RECORDS)?;
         total_records = total_records
@@ -630,6 +654,9 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             }
         }
         tables.insert(table.to_owned(), rows);
+    }
+    if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
+        tables.insert("scene_frames".to_owned(), Vec::new());
     }
     let generation_values = require_array(generation_document.get("records"))?;
     validate_record_count(generation_values.len(), MAX_GENERATION_RECORDS)?;
@@ -852,6 +879,7 @@ fn validate_json_container(
             | ("npcs", "visit_json")
             | ("quests", "content_json")
             | ("adventures", "plan_json" | "ending_json")
+            | ("scene_frames", "return_point_json")
             | (
                 "adventure_turns",
                 "player_action_json" | "check_request_json" | "dice_result_json"
@@ -990,6 +1018,14 @@ fn is_json_column(table: &str, column: &str) -> bool {
             )
             | ("adventures", "plan_json" | "clues_json" | "ending_json")
             | (
+                "scene_frames",
+                "participants_json"
+                    | "pressure_json"
+                    | "affordances_json"
+                    | "pending_consequences_json"
+                    | "return_point_json"
+            )
+            | (
                 "adventure_turns",
                 "speaker_npc_ids_json"
                     | "suggested_actions_json"
@@ -1099,6 +1135,18 @@ fn validate_imported_state(
         if actual != expected {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+    }
+    for row in parsed
+        .tables
+        .get("scene_frames")
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+    {
+        let adventure_id = row
+            .get("adventure_id")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        crate::adventure_play::load_scene_frame(transaction, adventure_id)
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
     }
     Ok(())
 }
@@ -1605,11 +1653,11 @@ mod tests {
             .map(PathBuf::from)
             .unwrap_or_else(|| {
                 Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../packages/persistence/test-fixtures/typescript-export-v1.emtavern")
+                    .join("../../packages/persistence/test-fixtures/typescript-export-v2.emtavern")
             });
         let rust_archive = std::env::var_os("EMBER_RUST_ARCHIVE_OUTPUT")
             .map(PathBuf::from)
-            .unwrap_or_else(|| fallback.path().join("rust-export-v1.emtavern"));
+            .unwrap_or_else(|| fallback.path().join("rust-export-v2.emtavern"));
         let work_directory = std::env::var_os("EMBER_ARCHIVE_INTEROP_WORK")
             .map(PathBuf::from)
             .unwrap_or_else(|| fallback.path().join("work"));
@@ -1629,27 +1677,18 @@ mod tests {
             )
             .unwrap();
         assert_eq!(fact, "The beacon is lit.");
-        drop(connection);
-
-        let exporter = CampaignStore::open(work_directory.join("rust-export.sqlite")).unwrap();
-        exporter
-            .create_at("campaign-transfer".to_owned(), FIRST_TIME.to_owned())
-            .unwrap();
-        let connection = exporter.connect().unwrap();
-        connection
-            .execute(
-                "INSERT INTO world_facts (
-                   id, campaign_id, kind, statement, location_id, faction_ids_json,
-                   detail_json, supersedes_fact_id, created_at
-                 ) VALUES ('fact-transfer', 'campaign-transfer', 'DEVELOPING_FACT',
-                   'The bell is ringing.', NULL, '[]', '{}', NULL, ?1)",
-                [FIRST_TIME],
+        let scene_revision: i64 = connection
+            .query_row(
+                "SELECT revision FROM scene_frames WHERE adventure_id = 'adventure-export'",
+                [],
+                |row| row.get(0),
             )
             .unwrap();
+        assert_eq!(scene_revision, 4);
         drop(connection);
-        exporter
+        importer
             .export_campaign_archive_at(
-                "campaign-transfer",
+                "campaign-export",
                 rust_archive,
                 "0.1.0",
                 "2026-08-02T00:59:25.584Z",

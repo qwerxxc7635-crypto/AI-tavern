@@ -300,6 +300,16 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       },
       currentTurnNumber: 1,
       currentScene: 'The cellar door is sealed.',
+      sceneFrame: {
+        sceneId: 'scene-1',
+        location: 'Lighthouse cellar',
+        participants: ['player-1'],
+        pressure: [{ id: 'clock-storm', kind: 'WORLD_CLOCK', level: 2 }],
+        affordances: [],
+        pendingConsequences: [],
+        returnPoint: { eventId: 'event-quest-accepted', summary: 'The cellar door is sealed.' },
+        revision: 1,
+      },
       longTermSummary: null,
       recentTurns: [],
       discoveredClues: [],
@@ -414,17 +424,19 @@ describe('versioned AI task schemas', () => {
 
   it.each(AI_TASKS)('%s has a current version and accepts its own fixture', (task) => {
     const definition = AI_TASK_SCHEMAS[task];
-    const expectedVersion = [
-      'GENERATE_CHARACTER_TRAITS',
-      'COMPLETE_CHARACTER_BACKGROUND',
-      'GENERATE_NPCS',
-      'NPC_REPLY',
-      'GENERATE_ADVENTURE_TURN',
-      'GENERATE_WORLD_EVENT',
-      'SUMMARIZE_ADVENTURE',
-    ].includes(task)
-      ? 2
-      : 1;
+    const expectedVersion =
+      task === 'GENERATE_ADVENTURE_TURN'
+        ? 3
+        : [
+              'GENERATE_CHARACTER_TRAITS',
+              'COMPLETE_CHARACTER_BACKGROUND',
+              'GENERATE_NPCS',
+              'NPC_REPLY',
+              'GENERATE_WORLD_EVENT',
+              'SUMMARIZE_ADVENTURE',
+            ].includes(task)
+          ? 2
+          : 1;
     expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);

@@ -286,6 +286,7 @@ function initialSnapshot(): AdventureSnapshot {
     clues: [],
     turns: [],
     currentScene: 'Investigate the failing lighthouse.',
+    sceneFrame: sceneFrame(),
     suggestedActions: [],
     turnGenerationContext: null,
     diceGenerationInput: null,
@@ -342,10 +343,24 @@ function turnInput(snapshot: AdventureSnapshot, playerAction: string) {
     },
     currentTurnNumber: snapshot.currentTurnNumber,
     currentScene: snapshot.currentScene,
+    sceneFrame: snapshot.sceneFrame,
     longTermSummary: null,
     recentTurns: snapshot.turns.map(({ sceneText }) => sceneText).slice(-10),
     discoveredClues: [],
     relatedNpcs: [],
     playerAction,
   };
+}
+
+function sceneFrame() {
+  return {
+    sceneId: 'scene-initial',
+    location: 'Lighthouse approach',
+    participants: ['character-player'],
+    pressure: [],
+    affordances: [],
+    pendingConsequences: [],
+    returnPoint: { eventId: 'event-quest-accepted', summary: 'Approach the lighthouse.' },
+    revision: 1,
+  } as const;
 }

@@ -290,6 +290,11 @@ describe('AI context builders', () => {
     expect(context.recentTurns.join(' ')).not.toContain('Unrelated secret');
     expect(context.discoveredClues).toEqual(['Scorched Lens: Burned from within.']);
     expect(context.relatedNpcs.map(({ id }) => id)).toEqual([targetNpcId]);
+    expect(context.sceneFrame).toMatchObject({
+      participants: [createPlayer().id],
+      revision: adventure.currentTurnNumber + 1,
+      returnPoint: { summary: 'The lighthouse stair is flooded.' },
+    });
     expect(JSON.stringify(context)).not.toContain(targetNpc.secret);
     expect(context.longTermSummary).toContain('warm trail');
   });

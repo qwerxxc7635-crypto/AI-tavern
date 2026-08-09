@@ -3018,3 +3018,24 @@
 ### 结论
 
 - `V02-M6-T04`完成，M6车卡AI任务结束。下一项严格为`V02-M7-T01` SceneFrame。
+
+## 2026-08-09 — V02-M7-T01 建立 Adventure SceneFrame
+
+### 实现
+
+- 新增migration 6的`scene_frames`独立投影，保存scene/location/participants/pressure/affordances/pending consequences/return point/revision，不污染不可变`adventures.plan_json`。
+- 初始冒险计划、叙事回合和D20结算均在现有原子事务中更新SceneFrame，并追加相同revision的`SCENE_COMMITTED` Event Ledger；失败回滚后不会留下半个场景。
+- Adventure snapshot和AI回合ContextBlock读取持久Frame，严格验证嵌套结构、revision、最新本地ledger以及可移植game event恢复锚点；旧库无Frame时只派生兼容视图。
+- GENERATE_ADVENTURE_TURN升级为prompt v2/schema v3，输入必须包含SceneFrame；Windows service验证Frame与当前场景摘要一致。
+- `.emtavern` Campaign archive schema升级至2并携带`scene_frames`，TypeScript/Rust读取方继续接受schema 1；导入在正式写入前验证Frame结构、归属和event恢复点，Event Ledger保持设备级不迁移。
+- 记录`DEC-080`并更新Changelog/release摘要；未实现T02行动模式、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Rust Adventure测试覆盖初始Frame、每次回合/D20 revision、待决后果清除、重启恢复、ledger一致性和`.emtavern`跨库回环。
+- TypeScript契约、上下文、prompt、service/page、存档和migration定向测试通过；旧数据库升级保留原始备份，schema 1 Rust夹具保持可导入。
+- 全量门禁结果记录于本任务提交前的最终验证。
+
+### 结论
+
+- `V02-M7-T01`完成。下一项严格为`V02-M7-T02` Action Modes。

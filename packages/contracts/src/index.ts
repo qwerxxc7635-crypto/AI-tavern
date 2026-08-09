@@ -54,6 +54,7 @@ export type {
   Clue,
   DiceResult,
   PlayerAction,
+  SceneFrame,
 } from './adventure.js';
 export { QUEST_STATUSES } from './quest.js';
 export type {
