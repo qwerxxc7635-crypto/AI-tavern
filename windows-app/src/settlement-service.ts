@@ -21,6 +21,7 @@ import {
   idempotencyKey,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
 import type { AdventureSnapshot } from './adventure-service.js';
 import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
 import {
@@ -176,6 +177,7 @@ export class WindowsSettlementService {
     const model = (await this.provider.listModels()).find((m) => m.name === 'ember-fake-v1');
     if (model === undefined) throw new Error('Fake model unavailable');
     assertTaskContextBudget(task, input);
+    await recordContextInspection(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {

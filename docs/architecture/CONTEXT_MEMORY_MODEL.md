@@ -57,4 +57,6 @@ Prompt会携带最近任务结构或现有NPC原型用于生成时避让，但�
 
 ## 隐私与 Inspector
 
-Inspector 默认只显示块类型、来源、版本、预算、hash 前缀、纳入原因和已遮罩摘要。`secret` 内容、credential、Authorization、完整系统 prompt 与未公开世界真相不显示。调试导出必须显式选择、二次清洗且不进入游戏存档。
+Inspector 默认只显示块类型、估算token、来源、revision、stability、纳入/省略及原因、12位hash前缀和会话cache观察。`secret`来源名显示为“已遮罩”；块内容、credential、Authorization、完整系统 prompt 与未公开世界真相不显示。当前Windows Inspector只在内存保存本次会话最近一次真实请求的Manifest投影，不写SQLite、不进入游戏存档，也不提供未经二次清洗的调试导出。
+
+ContextManifest现在显式携带stability，Orchestrator在Provider前把它与实际ContextBlock重新比对。Inspector的HIT/MISS只表示本次应用会话是否已见过相同`type + source + revision + version + hash`，不是Provider返回的账单缓存命中；被省略块显示NOT_APPLICABLE。

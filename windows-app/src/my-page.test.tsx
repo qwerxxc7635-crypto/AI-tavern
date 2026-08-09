@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { MY_SECTIONS, MyPage } from './my-page.js';
+import type { ContextInspectorSnapshot } from './context-inspector-service.js';
 import { RELEASE_INFO } from './generated-release-info.js';
 import type {
   RandomnessSettingsGateway,
@@ -97,5 +98,51 @@ describe('My page information architecture', () => {
     fireEvent.click(screen.getByRole('button', { name: '保存随机性设置' }));
     expect((await screen.findByRole('status')).textContent).toBe('已保存自定义档。');
     await waitFor(() => expect(screen.getByText('当前实际温度：1.4')).toBeTruthy());
+  });
+
+  it('renders only context manifest metadata for the latest request', async () => {
+    const snapshot: ContextInspectorSnapshot = {
+      task: 'NPC_REPLY',
+      estimatedTokens: 80,
+      maxTokens: 4_000,
+      entries: [
+        {
+          block: 'knowledge',
+          token: 80,
+          source: 'npc-knowledge',
+          revision: 4,
+          stability: 'semi_stable',
+          decision: 'INCLUDED',
+          reason: 'relevant',
+          hash: '0123456789ab',
+          cache: 'HIT',
+        },
+      ],
+    };
+    render(
+      <MemoryRouter>
+        <MyPage
+          versionGateway={{
+            async getVersion() {
+              return '0.2.0';
+            },
+          }}
+          randomnessGateway={randomnessGateway()}
+          contextInspectorGateway={{
+            async load() {
+              return snapshot;
+            },
+          }}
+        />
+      </MemoryRouter>,
+    );
+    const inspector = await screen.findByRole('table');
+    expect(inspector.textContent).toContain('knowledge');
+    expect(inspector.textContent).toContain('npc-knowledge');
+    expect(inspector.textContent).toContain('semi_stable');
+    expect(inspector.textContent).toContain('INCLUDED · relevant');
+    expect(inspector.textContent).toContain('0123456789ab');
+    expect(inspector.textContent).toContain('HIT');
+    expect(screen.getByText(/秘密内容、完整系统提示与凭据不会/u)).toBeTruthy();
   });
 });

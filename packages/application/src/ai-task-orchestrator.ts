@@ -274,6 +274,7 @@ async function validateTaskRequest(request: AITaskRequest, config: ProviderConfi
       entry.blockId !== block.id ||
       entry.sourceId !== block.sourceId ||
       entry.sourceRevision !== block.sourceRevision ||
+      entry.stability !== block.stability ||
       entry.version !== block.version ||
       entry.contentHash !== block.contentHash ||
       recalculated.contentHash !== block.contentHash

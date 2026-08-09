@@ -91,6 +91,7 @@ const contextAssembly: ContextAssembly = {
         type: 'task',
         sourceId: requestId,
         sourceRevision: 1,
+        stability: 'dynamic',
         version: 1,
         contentHash: contextBlock.contentHash,
         privacyClass: 'game_private',

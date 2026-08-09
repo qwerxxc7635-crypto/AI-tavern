@@ -58,6 +58,7 @@ export interface ContextManifestEntry {
   readonly type: ContextBlockType;
   readonly sourceId: string;
   readonly sourceRevision: number;
+  readonly stability: ContextStability;
   readonly version: number;
   readonly contentHash: string;
   readonly privacyClass: ContextPrivacyClass;
@@ -180,6 +181,7 @@ export function assembleContextBlocks(
         type: candidate.block.type,
         sourceId: candidate.block.sourceId,
         sourceRevision: candidate.block.sourceRevision,
+        stability: candidate.block.stability,
         version: candidate.block.version,
         contentHash: candidate.block.contentHash,
         privacyClass: candidate.block.privacyClass,

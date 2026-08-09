@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 
+import {
+  sessionContextInspectorGateway,
+  type ContextInspectorGateway,
+  type ContextInspectorSnapshot,
+} from './context-inspector-service.js';
 import { tauriVersionGateway, type VersionGateway } from './version-service.js';
 import { RELEASE_INFO } from './generated-release-info.js';
 import { playerText } from './localization/index.js';
@@ -24,9 +29,11 @@ export const MY_SECTIONS = [
 export function MyPage({
   versionGateway = tauriVersionGateway,
   randomnessGateway = tauriRandomnessSettingsGateway,
+  contextInspectorGateway = sessionContextInspectorGateway,
 }: {
   readonly versionGateway?: VersionGateway;
   readonly randomnessGateway?: RandomnessSettingsGateway;
+  readonly contextInspectorGateway?: ContextInspectorGateway;
 }) {
   const [version, setVersion] = useState<string | null>(null);
 
@@ -96,6 +103,7 @@ export function MyPage({
             <SectionCopy eyebrow={playerText.coreUi.contextAssembly} title="上下文">
               查看ContextBlock预算、来源、版本与纳入原因；秘密内容默认不在检查器中展示。
             </SectionCopy>
+            <ContextInspectorPanel gateway={contextInspectorGateway} />
           </section>
 
           <section id="privacy" className="my-hub__entry">
@@ -126,6 +134,78 @@ export function MyPage({
         返回存档首页
       </NavLink>
     </main>
+  );
+}
+
+function ContextInspectorPanel({ gateway }: { readonly gateway: ContextInspectorGateway }) {
+  const [snapshot, setSnapshot] = useState<ContextInspectorSnapshot | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  async function load() {
+    try {
+      setSnapshot(await gateway.load());
+    } finally {
+      setLoaded(true);
+    }
+  }
+
+  useEffect(() => {
+    void load();
+  }, [gateway]);
+
+  return (
+    <div className="context-inspector" aria-label="上下文检查器">
+      <div>
+        <strong>最近一次实际请求</strong>
+        <button type="button" className="quiet-action" onClick={() => void load()}>
+          刷新检查器
+        </button>
+      </div>
+      {!loaded ? (
+        <p>读取中…</p>
+      ) : snapshot === null ? (
+        <p>本次会话尚无可检查的 AI 上下文。</p>
+      ) : (
+        <>
+          <p>
+            任务：{snapshot.task} · 估算令牌 {snapshot.estimatedTokens} / {snapshot.maxTokens}
+          </p>
+          <div className="context-inspector__table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>块</th>
+                  <th>估算令牌</th>
+                  <th>来源</th>
+                  <th>修订</th>
+                  <th>稳定性</th>
+                  <th>纳入/省略</th>
+                  <th>哈希</th>
+                  <th>缓存</th>
+                </tr>
+              </thead>
+              <tbody>
+                {snapshot.entries.map((entry) => (
+                  <tr key={`${entry.block}:${entry.source}:${entry.revision}:${entry.hash}`}>
+                    <td>{entry.block}</td>
+                    <td>{entry.token}</td>
+                    <td>{entry.source}</td>
+                    <td>{entry.revision}</td>
+                    <td>{entry.stability}</td>
+                    <td>
+                      {entry.decision} · {entry.reason}
+                    </td>
+                    <td>{entry.hash}</td>
+                    <td>{entry.cache}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p>仅显示清单元数据；秘密内容、完整系统提示与凭据不会在此展示。</p>
+        </>
+      )}
+    </div>
   );
 }
 

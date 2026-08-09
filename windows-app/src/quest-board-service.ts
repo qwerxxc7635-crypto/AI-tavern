@@ -20,6 +20,7 @@ import {
   isoTimestamp,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
 import {
   balancedRandomnessTemperatureSource,
   tauriRandomnessTemperatureSource,
@@ -208,6 +209,7 @@ export class WindowsQuestBoardService {
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new QuestBoardServiceError('MODEL_NOT_FOUND');
     assertTaskContextBudget('GENERATE_QUEST', input);
+    await recordContextInspection('GENERATE_QUEST', input);
     const prompt = formatTaskPrompt('GENERATE_QUEST', input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {

@@ -2275,6 +2275,47 @@ textarea:disabled {
   font-size: 0.78rem;
 }
 
+#context.my-hub__entry {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.context-inspector {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.context-inspector > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.context-inspector__table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+}
+
+.context-inspector table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.context-inspector th,
+.context-inspector td {
+  padding: 0.55rem 0.65rem;
+  text-align: left;
+  white-space: nowrap;
+  border-bottom: 1px solid var(--line);
+}
+
+.context-inspector tbody tr:last-child td {
+  border-bottom: 0;
+}
+
 @media (max-width: 760px) {
   .my-hub__layout {
     grid-template-columns: 1fr;

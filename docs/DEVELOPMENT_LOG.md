@@ -3305,3 +3305,24 @@
 ### 结论
 
 - `V02-M8-T07`完成。下一项严格为`V02-M8-T08` Context Inspector。
+
+## 2026-08-09 — V02-M8-T08 提供隐私遮罩 Context Inspector
+
+### 实现
+
+- ContextManifest条目新增stability，并在AITaskOrchestrator调用Provider前与实际ContextBlock一并复核，防止检查视图与发送块漂移。
+- 新增会话级Context Inspector Service；七条Windows AI生成路径在实际请求格式化前记录最近Manifest，不写SQLite或存档。
+- Inspector投影包含block、估算token、source、revision、stability、INCLUDED/OMITTED原因、12位hash前缀与HIT/MISS/NOT_APPLICABLE缓存观察。
+- secret来源统一遮罩，快照完全不携带block content、完整system prompt、未公开世界真相或凭据；相同上下文二次观察只在当前会话标记HIT。
+- “我的/上下文”新增可横向滚动的只读表格、总预算和刷新按钮；空会话显示明确空状态。记录`DEC-094`并同步Changelog与Context/Memory文档，未实现诊断导出、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Inspector Service、Context Assembly/Orchestrator与My页面定向测试通过，覆盖实际请求记录、同内容会话HIT、included/omitted、secret来源遮罩、hash前缀和UI八列展示。
+- 完整82个Vitest文件/461项测试与22项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及87项测试通过，包含Windows纵向E2E；Inspector未修改SQLite schema或存档格式。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对；桌面前端203 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T08`完成。下一项严格为`V02-M9-T01` Shared Gate。

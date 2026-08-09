@@ -1946,3 +1946,19 @@ FACTION_MESSAGE只表示某NPC转述的势力消息，不建立Faction Actor、�
 ### 影响与边界
 
 预算与摘要只影响发送给模型的请求期投影，不删除或重写SQLite历史，也不进入`.emtavern`新字段。旧记录仍由本地数据库完整保存，游戏规则可按需查询；模型只获得任务相关的有限窗口。T07不实现T08 Context Inspector、tokenizer精确计数、向量检索、真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-094：Context Inspector只投影Manifest元数据并使用会话级缓存观察
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T08`、Context最小披露和secret默认遮罩红线
+
+### 决定与理由
+
+ContextManifest补齐每个条目的stability，AITaskOrchestrator在Provider前将blockId、source、revision、stability、version与hash重新比对。七条Windows AI生成Service在预算校验后、Prompt格式化前为实际输入生成同一ContextAssembly，并把最近一次Manifest投影保存到仅存在于当前应用进程的Inspector会话状态。
+
+“我的/上下文”只显示block类型、估算token、来源、revision、stability、INCLUDED/OMITTED与原因、12位hash前缀和cache观察。secret来源名统一替换为“已遮罩”，Manifest本身不含content，因此Inspector没有展示完整系统Prompt、块内容、未公开世界真相、API Key或Authorization的接口。HIT/MISS仅表示本次会话是否已观察相同type/source/revision/version/hash；省略块为NOT_APPLICABLE，不冒充Provider账单缓存命中。
+
+### 影响与边界
+
+Inspector不写SQLite、不新增schema、不进入`.emtavern`，应用重启后清空；刷新按钮只重读内存快照。T08不实现Prompt全文预览、秘密内容开关、诊断导出、Provider精确缓存账单、真实Provider/付费API、正式用户数据或iOS。下一阶段严格进入M9双平台验收。

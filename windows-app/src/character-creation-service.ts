@@ -28,6 +28,7 @@ import {
   type PlayerAttributesInput,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
 import {
   balancedRandomnessTemperatureSource,
   tauriRandomnessTemperatureSource,
@@ -276,6 +277,7 @@ export class WindowsCharacterCreationService {
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new CharacterCreationServiceError('MODEL_NOT_FOUND');
     assertTaskContextBudget(task, input);
+    await recordContextInspection(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
