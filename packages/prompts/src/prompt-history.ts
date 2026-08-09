@@ -58,4 +58,9 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(4),
     change: 'Require 3-5 grounded and distinct suggestions for active scenes.',
   }),
+  Object.freeze({
+    task: 'RESOLVE_DICE_RESULT',
+    version: promptVersion(2),
+    change: 'Narrate only after raw, modifier, total, DC, and result are fixed locally.',
+  }),
 ]);

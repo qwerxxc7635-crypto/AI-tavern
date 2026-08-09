@@ -59,6 +59,7 @@ describe('central prompt catalog', () => {
         'GENERATE_NPCS',
         'GENERATE_WORLD_EVENT',
         'SUMMARIZE_ADVENTURE',
+        'RESOLVE_DICE_RESULT',
       ].includes(task)
         ? 2
         : 1;
@@ -74,6 +75,9 @@ describe('central prompt catalog', () => {
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toMatch(/3-5 distinct suggestions/);
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('knownFacts');
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('npcKnowledge');
+    expect(TASK_PROMPTS.RESOLVE_DICE_RESULT.instruction).toMatch(
+      /raw, modifier, total, DC, and result/,
+    );
   });
 
   it('centralizes authority, privacy, validation, and JSON rules', () => {

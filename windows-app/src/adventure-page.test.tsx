@@ -36,7 +36,7 @@ describe('adventure page', () => {
     expect(await screen.findByRole('button', { name: '投掷 D20' })).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '投掷 D20' }));
-    expect(await screen.findByText('总计 15 / 难度 11')).toBeTruthy();
+    expect(await screen.findByText('原始 12 + 修正 +3 = 总计 15 / 难度 11')).toBeTruthy();
     expect(screen.getByRole('status').textContent).toContain('最新剧情已呈现');
     expect(service.actions).toEqual([{ mode: 'DIALOGUE', text: 'Study the lock.' }]);
     expect(service.rolls).toBe(1);
@@ -175,7 +175,16 @@ class FakeAdventureService {
       turns: [
         {
           ...turn,
-          diceResult: { naturalRoll: 12, total: 15, difficulty: 11, success: true },
+          diceResult: {
+            raw: 12,
+            modifier: 3,
+            total: 15,
+            dc: 11,
+            result: 'SUCCESS',
+            attributeModifier: 3,
+            equipmentModifier: 0,
+            statusModifier: 0,
+          },
           resolved: true,
         },
         {

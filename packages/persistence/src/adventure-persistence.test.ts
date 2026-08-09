@@ -300,6 +300,10 @@ function adventureTurn(): AdventureTurn {
     },
     diceResult: {
       checkRequestId: checkId,
+      raw: 12,
+      modifier: 2,
+      dc: 14,
+      result: 'SUCCESS',
       d20: 12,
       attributeModifier: 2,
       equipmentModifier: 0,

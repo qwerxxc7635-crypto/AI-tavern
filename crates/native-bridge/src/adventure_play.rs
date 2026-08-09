@@ -546,21 +546,14 @@ impl CampaignStore {
             .and_then(Value::as_i64)
             .ok_or(CampaignStoreError::InvalidData)?;
         let equipment_modifier = equipment_modifier(&transaction, campaign_id, &attribute)?;
-        let random = Uuid::new_v4();
-        let natural_roll = i64::from(random.as_bytes()[0] % 20) + 1;
-        let total = natural_roll + attribute_value + equipment_modifier;
-        let dice = json!({
-            "checkRequestId": text_field(&check, "id")?,
-            "naturalRoll": natural_roll,
-            "attributeValue": attribute_value,
-            "equipmentModifier": equipment_modifier,
-            "statusModifier": 0,
-            "total": total,
-            "difficulty": difficulty,
-            "success": total >= difficulty,
-            "criticalSuccess": natural_roll == 20,
-            "criticalFailure": natural_roll == 1,
-        });
+        let dice = resolve_d20_hard_logic(
+            &text_field(&check, "id")?,
+            roll_unbiased_d20(),
+            attribute_value,
+            equipment_modifier,
+            0,
+            difficulty,
+        )?;
         let at = current_timestamp()?;
         transaction.execute(
             "UPDATE adventure_turns SET dice_result_json = ?1 WHERE id = ?2",
@@ -1327,14 +1320,107 @@ fn dice_generation_input(turn: &StoredTurn) -> Result<Value, CampaignStoreError>
         .dice_result
         .as_ref()
         .ok_or(CampaignStoreError::InvalidData)?;
+    let hard = validate_stored_dice_result(dice)?;
+    if hard.check_request_id != text_field(check, "id")?
+        || hard.dc != integer_field(check, "difficulty")?
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
     Ok(json!({
         "scene": turn.scene_text,
         "action": action_text(&turn.player_action)?,
         "attribute": text_field(check, "attribute")?,
-        "difficulty": integer_field(check, "difficulty")?,
-        "total": integer_field(dice, "total")?,
-        "success": dice.get("success").and_then(Value::as_bool).ok_or(CampaignStoreError::InvalidData)?,
+        "raw": hard.raw,
+        "modifier": hard.modifier,
+        "total": hard.total,
+        "dc": hard.dc,
+        "result": hard.result,
     }))
+}
+
+struct StoredD20HardResult {
+    check_request_id: String,
+    raw: i64,
+    modifier: i64,
+    total: i64,
+    dc: i64,
+    result: String,
+}
+
+fn validate_stored_dice_result(dice: &Value) -> Result<StoredD20HardResult, CampaignStoreError> {
+    let check_request_id = text_field(dice, "checkRequestId")?;
+    let raw = consistent_integer(dice, &["raw", "naturalRoll", "d20"])?;
+    let attribute_modifier = consistent_integer(dice, &["attributeModifier", "attributeValue"])?;
+    let equipment_modifier = integer_field(dice, "equipmentModifier")?;
+    let status_modifier = integer_field(dice, "statusModifier")?;
+    let computed_modifier = attribute_modifier
+        .checked_add(equipment_modifier)
+        .and_then(|value| value.checked_add(status_modifier))
+        .ok_or(CampaignStoreError::InvalidData)?;
+    if let Some(value) = dice.get("modifier") {
+        let modifier = value.as_i64().ok_or(CampaignStoreError::InvalidData)?;
+        if modifier != computed_modifier {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    let total = integer_field(dice, "total")?;
+    let dc = consistent_integer(dice, &["dc", "difficulty"])?;
+    let expected_success = total >= dc;
+    let result = match dice.get("result") {
+        Some(value) => match value.as_str() {
+            Some("SUCCESS") => "SUCCESS",
+            Some("FAILURE") => "FAILURE",
+            _ => return Err(CampaignStoreError::InvalidData),
+        },
+        None => {
+            if dice
+                .get("success")
+                .and_then(Value::as_bool)
+                .ok_or(CampaignStoreError::InvalidData)?
+            {
+                "SUCCESS"
+            } else {
+                "FAILURE"
+            }
+        }
+    };
+    if let Some(value) = dice.get("success") {
+        let success = value.as_bool().ok_or(CampaignStoreError::InvalidData)?;
+        if success != (result == "SUCCESS") {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    if !(1..=20).contains(&raw)
+        || !(1..=5).contains(&attribute_modifier)
+        || ![8, 11, 14, 17].contains(&dc)
+        || raw.checked_add(computed_modifier) != Some(total)
+        || expected_success != (result == "SUCCESS")
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(StoredD20HardResult {
+        check_request_id,
+        raw,
+        modifier: computed_modifier,
+        total,
+        dc,
+        result: result.to_owned(),
+    })
+}
+
+fn consistent_integer(value: &Value, fields: &[&str]) -> Result<i64, CampaignStoreError> {
+    let mut values = Vec::new();
+    for field in fields {
+        if let Some(candidate) = value.get(field) {
+            values.push(candidate.as_i64().ok_or(CampaignStoreError::InvalidData)?);
+        }
+    }
+    let first = *values.first().ok_or(CampaignStoreError::InvalidData)?;
+    if values.iter().all(|candidate| *candidate == first) {
+        Ok(first)
+    } else {
+        Err(CampaignStoreError::InvalidData)
+    }
 }
 
 fn world_context(connection: &Connection, campaign_id: &str) -> Result<Value, CampaignStoreError> {
@@ -1926,14 +2012,69 @@ fn equipment_modifier(
     let effects = statement
         .query_map([campaign_id], |row| from_json::<Value>(row.get(0)?))?
         .collect::<Result<Vec<_>, _>>()?;
-    Ok(effects
+    effects
         .iter()
         .filter(|effect| {
             effect.get("kind").and_then(Value::as_str) == Some("CHECK_MODIFIER")
                 && effect.get("attribute").and_then(Value::as_str) == Some(attribute)
         })
         .filter_map(|effect| effect.get("modifier").and_then(Value::as_i64))
-        .sum())
+        .try_fold(0_i64, |total, modifier| {
+            total
+                .checked_add(modifier)
+                .ok_or(CampaignStoreError::InvalidData)
+        })
+}
+
+fn roll_unbiased_d20() -> i64 {
+    loop {
+        let byte = Uuid::new_v4().as_bytes()[0];
+        if byte < 240 {
+            return i64::from(byte % 20) + 1;
+        }
+    }
+}
+
+fn resolve_d20_hard_logic(
+    check_request_id: &str,
+    raw: i64,
+    attribute_modifier: i64,
+    equipment_modifier: i64,
+    status_modifier: i64,
+    dc: i64,
+) -> Result<Value, CampaignStoreError> {
+    validate_id(check_request_id)?;
+    if !(1..=20).contains(&raw)
+        || !(1..=5).contains(&attribute_modifier)
+        || ![8, 11, 14, 17].contains(&dc)
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let modifier = attribute_modifier
+        .checked_add(equipment_modifier)
+        .and_then(|value| value.checked_add(status_modifier))
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let total = raw
+        .checked_add(modifier)
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let success = total >= dc;
+    Ok(json!({
+        "checkRequestId": check_request_id,
+        "raw": raw,
+        "modifier": modifier,
+        "total": total,
+        "dc": dc,
+        "result": if success { "SUCCESS" } else { "FAILURE" },
+        "naturalRoll": raw,
+        "attributeValue": attribute_modifier,
+        "attributeModifier": attribute_modifier,
+        "equipmentModifier": equipment_modifier,
+        "statusModifier": status_modifier,
+        "difficulty": dc,
+        "success": success,
+        "criticalSuccess": raw == 20,
+        "criticalFailure": raw == 1,
+    }))
 }
 
 fn validate_audit(audit: &TavernGenerationAudit, task: &str) -> Result<(), CampaignStoreError> {
@@ -2466,6 +2607,47 @@ mod tests {
         let ending: TurnOutput =
             serde_json::from_value(turn_output(true)).expect("ending turn output");
         assert!(validate_turn_output(&ending).is_ok());
+    }
+
+    #[test]
+    fn resolves_d20_hard_logic_before_any_narration() {
+        let success = resolve_d20_hard_logic("check-one", 10, 3, 2, -1, 14)
+            .expect("resolve successful check");
+        assert_eq!(integer_field(&success, "raw").expect("raw"), 10);
+        assert_eq!(integer_field(&success, "modifier").expect("modifier"), 4);
+        assert_eq!(integer_field(&success, "total").expect("total"), 14);
+        assert_eq!(integer_field(&success, "dc").expect("dc"), 14);
+        assert_eq!(text_field(&success, "result").expect("result"), "SUCCESS");
+        assert!(validate_stored_dice_result(&success).is_ok());
+
+        let mut contradictory = success.clone();
+        contradictory["total"] = json!(13);
+        assert!(validate_stored_dice_result(&contradictory).is_err());
+        contradictory = success.clone();
+        contradictory["result"] = json!(false);
+        assert!(validate_stored_dice_result(&contradictory).is_err());
+
+        let legacy = json!({
+            "checkRequestId": "check-legacy",
+            "naturalRoll": 9,
+            "attributeValue": 2,
+            "equipmentModifier": 0,
+            "statusModifier": 0,
+            "total": 11,
+            "difficulty": 14,
+            "success": false
+        });
+        assert!(validate_stored_dice_result(&legacy).is_ok());
+
+        let failure =
+            resolve_d20_hard_logic("check-two", 9, 3, 1, 0, 14).expect("resolve failed check");
+        assert_eq!(integer_field(&failure, "total").expect("total"), 13);
+        assert_eq!(text_field(&failure, "result").expect("result"), "FAILURE");
+
+        assert!(resolve_d20_hard_logic("check-invalid", 0, 3, 0, 0, 11).is_err());
+        assert!(resolve_d20_hard_logic("check-invalid", 10, 6, 0, 0, 11).is_err());
+        assert!(resolve_d20_hard_logic("check-invalid", 10, 3, 0, 0, 12).is_err());
+        assert!(resolve_d20_hard_logic("check-overflow", 20, 5, i64::MAX, 0, 17,).is_err());
     }
 
     fn audit(

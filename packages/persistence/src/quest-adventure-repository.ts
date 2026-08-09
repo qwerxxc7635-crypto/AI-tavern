@@ -31,6 +31,7 @@ import {
 } from '@ember-tavern/contracts';
 
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
+import { parseStoredDiceResult } from './dice-result-validation.js';
 import { GameEventRepository } from './game-event-repository.js';
 import {
   parseJson,
@@ -676,19 +677,7 @@ function parseCheckRequest(value: unknown): CheckRequest {
 }
 
 function parseDiceResult(value: unknown): DiceResult {
-  const row = requireRecord(value, 'DiceResult');
-  return Object.freeze({
-    checkRequestId: checkRequestId(
-      requireString(row['checkRequestId'], 'DiceResult.checkRequestId'),
-    ),
-    d20: requireNumber(row['d20'], 'DiceResult.d20'),
-    attributeModifier: requireNumber(row['attributeModifier'], 'DiceResult.attributeModifier'),
-    equipmentModifier: requireNumber(row['equipmentModifier'], 'DiceResult.equipmentModifier'),
-    statusModifier: requireNumber(row['statusModifier'], 'DiceResult.statusModifier'),
-    total: requireNumber(row['total'], 'DiceResult.total'),
-    difficulty: requireDifficulty(row['difficulty']),
-    success: requireBoolean(row['success'], 'DiceResult.success'),
-  });
+  return parseStoredDiceResult(value);
 }
 
 function parseClues(value: unknown): readonly Clue[] {

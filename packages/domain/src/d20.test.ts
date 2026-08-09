@@ -51,6 +51,10 @@ describe('D20 rule engine', () => {
       fixed(10),
     );
     expect(result).toMatchObject({
+      raw: 10,
+      modifier: 4,
+      dc: 14,
+      result: 'SUCCESS',
       d20: 10,
       attributeModifier: 3,
       equipmentModifier: 2,
@@ -172,7 +176,7 @@ describe('D20 rule engine', () => {
         {
           checkRequestId: checkId,
           attributeValue: 5,
-          equipmentModifier: Number.MAX_SAFE_INTEGER,
+          equipmentModifier: Number.MAX_SAFE_INTEGER - 5,
           statusModifier: 0,
           difficulty: 8,
         },
@@ -195,8 +199,12 @@ describe('D20 rule engine', () => {
     expect(Object.isFrozen(result)).toBe(true);
     expect(result).toMatchObject({
       checkRequestId: checkId,
+      raw: 7,
+      modifier: 4,
       d20: 7,
       total: 11,
+      dc: 11,
+      result: 'SUCCESS',
       success: true,
     });
   });

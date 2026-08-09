@@ -168,6 +168,10 @@ describe('AdventureTurnUseCases', () => {
       });
       expect(rolled.diceResult).toEqual({
         checkRequestId: checkRequestId(`check:${firstTurnId}`),
+        raw: 7,
+        modifier: 4,
+        dc: 11,
+        result: 'SUCCESS',
         d20: 7,
         attributeModifier: 3,
         equipmentModifier: 1,

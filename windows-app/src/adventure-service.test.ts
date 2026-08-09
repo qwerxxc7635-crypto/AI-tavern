@@ -253,7 +253,16 @@ class MemoryAdventureGateway implements AdventureGateway {
     const last = lastTurnOf(this.snapshot);
     const updated = {
       ...last,
-      diceResult: { naturalRoll: 12, total: 15, difficulty: 11, success: true },
+      diceResult: {
+        raw: 12,
+        modifier: 3,
+        total: 15,
+        dc: 11,
+        result: 'SUCCESS',
+        attributeModifier: 3,
+        equipmentModifier: 0,
+        statusModifier: 0,
+      } as const,
     };
     this.snapshot = {
       ...this.snapshot,
@@ -263,9 +272,11 @@ class MemoryAdventureGateway implements AdventureGateway {
         scene: last.sceneText,
         action: last.playerAction,
         attribute: 'knowledge',
-        difficulty: 11,
+        raw: 12,
+        modifier: 3,
         total: 15,
-        success: true,
+        dc: 11,
+        result: 'SUCCESS',
       },
     };
     return this.snapshot;

@@ -83,7 +83,8 @@ export const TASK_PROMPTS = Object.freeze({
   RESOLVE_DICE_RESULT: define(
     'RESOLVE_DICE_RESULT',
     'GAME_MASTER',
-    'Narrate the supplied immutable local dice result. Never reroll, change the total, difficulty, or success value.',
+    'Narrate the supplied immutable local dice result only after hard logic has fixed raw, modifier, total, DC, and result. Never reroll or change any of those five values.',
+    2,
   ),
   GENERATE_WORLD_EVENT: define(
     'GENERATE_WORLD_EVENT',

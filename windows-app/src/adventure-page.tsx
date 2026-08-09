@@ -471,11 +471,12 @@ export function AdventurePage({
               <p className="adventure-muted">等待检定</p>
             ) : (
               <>
-                <strong className="dice-face">{dice.naturalRoll}</strong>
+                <strong className="dice-face">{dice.raw}</strong>
                 <span>
-                  总计 {dice.total} / 难度 {dice.difficulty}
+                  原始 {dice.raw} + 修正 {formatModifier(dice.modifier)} = 总计 {dice.total} / 难度{' '}
+                  {dice.dc}
                 </span>
-                <em>{dice.success ? '成功' : '失败'}</em>
+                <em>{dice.result === 'SUCCESS' ? '成功' : '失败'}</em>
               </>
             )}
           </section>
@@ -487,6 +488,10 @@ export function AdventurePage({
 
 function actionModeLabel(mode: AdventureActionMode): string {
   return ACTION_MODES.find((entry) => entry.mode === mode)?.label ?? '行动';
+}
+
+function formatModifier(modifier: number): string {
+  return modifier >= 0 ? `+${modifier}` : String(modifier);
 }
 
 function turnObserver(

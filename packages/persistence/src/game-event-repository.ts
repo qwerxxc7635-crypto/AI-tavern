@@ -3,7 +3,6 @@ import {
   actionOptionId,
   adventureId,
   campaignId,
-  checkRequestId,
   clueId,
   createNpcRelationship,
   gameEventId,
@@ -24,10 +23,10 @@ import {
 } from '@ember-tavern/contracts';
 
 import { PersistenceDataError } from './campaign-repository.js';
+import { parseStoredDiceResult } from './dice-result-validation.js';
 import {
   parseJson,
   requireArray,
-  requireBoolean,
   requireEnum,
   requireNullableString,
   requireNumber,
@@ -39,7 +38,6 @@ import type { SqliteDatabase } from './sqlite-port.js';
 
 const ACTION_KINDS = ['SUGGESTED', 'FREEFORM', 'USE_ITEM', 'EXIT_ADVENTURE'] as const;
 const OUTCOMES = ['SUCCESS', 'PARTIAL_SUCCESS', 'FAILURE'] as const;
-const DIFFICULTIES = [8, 11, 14, 17] as const;
 
 export class GameEventRepository {
   public constructor(private readonly database: SqliteDatabase) {}
@@ -330,17 +328,7 @@ function parseAction(value: unknown) {
 }
 
 function parseDiceResult(value: unknown) {
-  const result = requireRecord(value, 'result');
-  return Object.freeze({
-    checkRequestId: checkRequestId(requireString(result['checkRequestId'], 'checkRequestId')),
-    d20: requireNumber(result['d20'], 'd20'),
-    attributeModifier: requireNumber(result['attributeModifier'], 'attributeModifier'),
-    equipmentModifier: requireNumber(result['equipmentModifier'], 'equipmentModifier'),
-    statusModifier: requireNumber(result['statusModifier'], 'statusModifier'),
-    total: requireNumber(result['total'], 'total'),
-    difficulty: requireDifficulty(result['difficulty']),
-    success: requireBoolean(result['success'], 'success'),
-  });
+  return parseStoredDiceResult(value, 'result');
 }
 
 function parseRelationship(value: unknown) {
@@ -355,14 +343,6 @@ function parseRelationship(value: unknown) {
     awe: requireNumber(relationship['awe'], 'relationship.awe'),
     obligation: requireNumber(relationship['obligation'], 'relationship.obligation'),
   });
-}
-
-function requireDifficulty(value: unknown) {
-  const difficulty = requireNumber(value, 'difficulty');
-  if (!(DIFFICULTIES as readonly number[]).includes(difficulty)) {
-    throw new PersistenceDataError(`Unknown check difficulty: ${difficulty}`);
-  }
-  return difficulty as (typeof DIFFICULTIES)[number];
 }
 
 function parseModel(value: unknown) {

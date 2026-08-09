@@ -72,7 +72,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
     GenerateAdventureTurnOutputSchema,
     5,
   ),
-  RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema),
+  RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema, 2),
   GENERATE_WORLD_EVENT: definition(
     GenerateWorldEventInputSchema,
     GenerateWorldEventOutputSchema,

@@ -3119,3 +3119,24 @@
 ### 结论
 
 - `V02-M7-T05`完成。下一项严格为`V02-M7-T06` D20 Hard Logic。
+
+## 2026-08-09 — V02-M7-T06 固化 D20 硬逻辑
+
+### 实现
+
+- 共享DiceResult新增canonical raw、modifier、total、DC、result，程序按属性+装备+状态计算modifier，以安全整数加法计算total，再用total>=DC产生结果；旧d20/difficulty/success字段作为兼容别名保留。
+- 原生Windows路径抽出独立D20硬逻辑，在SQLite事务前验证raw 1至20、属性1至5、DC闭集和溢出；随机字节使用rejection sampling消除直接mod 20偏差。
+- 原生回合、TypeScript Repository、Game Event、Windows snapshot和Adventure Archive读取均复核别名一致性、修正分解、总计算式及结果，矛盾数据不能进入叙事或玩家界面。
+- 冒险页和档案页明确展示raw + modifier = total / DC / result；`RESOLVE_DICE_RESULT`升级为schema/prompt v2，输入只携带已固定的五个硬结果字段并拒绝模型改写。
+- 记录`DEC-085`并同步Changelog/release摘要；未实现T07动画、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- D20领域、持久化、schema、application、prompt、Windows解析/页面/档案共12个文件107项定向测试通过；覆盖阈值、边界、溢出、旧字段兼容和多种矛盾字段拒绝。
+- 原生Adventure 3项定向测试通过，覆盖成功/失败硬结果、非法raw/属性/DC/溢出及完整八回合恢复链路。
+- 完整77个Vitest文件/436项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及83项测试通过，包含Windows纵向E2E；桌面前端生产构建通过。
+
+### 结论
+
+- `V02-M7-T06`完成。下一项严格为`V02-M7-T07` D20 Animation。

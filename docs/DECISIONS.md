@@ -1796,3 +1796,21 @@ Windows冒险回合使用纯reducer固定表达`draft → submitted → generati
 ### 影响与边界
 
 该控制状态机不新增SQLite列，也不把React状态提升为游戏真相。持久Adventure状态仍决定可执行命令；页面`resolving`控制阶段与数据库中为D20保留的`RESOLVING`领域状态不是同一个枚举。T05不修改D20数值、动画或T06/T07范围，不接入真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-085：D20先形成不可变硬结果再进入叙事和动画
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T06`、D20程序权威与AI不得修改游戏状态的架构红线
+
+### 决定与理由
+
+D20唯一判定顺序固定为：程序产生1至20的`raw`，把角色属性、装备和状态相加为`modifier`，安全整数加法得到`total`，读取闭集8/11/14/17中的`DC`，最后用`total >= DC`得到`SUCCESS`或`FAILURE`。自然1和20只保留信息性critical aliases，不覆盖上述成功规则。原生随机取样拒绝240至255后再对20取模，避免单字节直接取模偏差。
+
+新持久结果和共享`DiceResult`同时保存canonical raw/modifier/total/DC/result、修正分解以及旧字段别名；读取旧存档时允许从既有d20或naturalRoll等别名构造canonical投影，但任一并存字段冲突、加法不成立、DC非法或结果与total不符都拒绝。冒险页与档案页只渲染校验后的canonical投影，并显示原始点数、总修正、总计、DC和结果。
+
+`RESOLVE_DICE_RESULT`升级为schema/prompt v2，只接收已固定的五个硬结果字段；Schema再次验证算式与结果。模型只能叙述该结果，不能重骰、修改难度或反推成功。SQLite中的DICE_ROLLED事件与回合结果在同一事务写入，动画只能消费该已提交事实。
+
+### 影响与边界
+
+旧别名暂时保留用于schema 1/2存档和已有调用方兼容，所有新逻辑以canonical字段为准。T06不实现动画、skip、reduced motion或中断恢复，这些严格留给T07；不接入真实Provider/付费API、正式用户数据或iOS。

@@ -24,6 +24,7 @@ import {
   type SceneFrame,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
 
 export interface AdventureTurnView {
   readonly id: string;
@@ -37,12 +38,7 @@ export interface AdventureTurnView {
     readonly difficulty: number;
     readonly reason: string;
   } | null;
-  readonly diceResult: {
-    readonly naturalRoll: number;
-    readonly total: number;
-    readonly difficulty: number;
-    readonly success: boolean;
-  } | null;
+  readonly diceResult: D20HardResultView | null;
   readonly resolved: boolean;
 }
 
@@ -520,7 +516,7 @@ function parseClue(value: unknown) {
 function parseTurn(value: unknown): AdventureTurnView {
   const record = requireRecord(value);
   const check = record['checkRequest'] === null ? null : requireRecord(record['checkRequest']);
-  const dice = record['diceResult'] === null ? null : requireRecord(record['diceResult']);
+  const dice = record['diceResult'];
   return Object.freeze({
     id: requireText(record['id']),
     turnNumber: positiveInteger(record['turnNumber']),
@@ -544,15 +540,7 @@ function parseTurn(value: unknown): AdventureTurnView {
             difficulty: positiveInteger(check['difficulty']),
             reason: requireText(check['reason']),
           }),
-    diceResult:
-      dice === null
-        ? null
-        : Object.freeze({
-            naturalRoll: positiveInteger(dice['naturalRoll']),
-            total: integer(dice['total']),
-            difficulty: positiveInteger(dice['difficulty']),
-            success: requireBoolean(dice['success']),
-          }),
+    diceResult: dice === null ? null : parseD20HardResult(dice),
     resolved: requireBoolean(record['resolved']),
   });
 }

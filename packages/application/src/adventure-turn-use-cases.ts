@@ -374,9 +374,11 @@ export class AdventureTurnUseCases {
       scene: turn.sceneText,
       action: actionText(action),
       attribute: check.attribute,
-      difficulty: check.difficulty,
+      raw: result.raw,
+      modifier: result.modifier,
       total: result.total,
-      success: result.success,
+      dc: result.dc,
+      result: result.result,
     });
     await this.orchestrator.execute({
       ...generation(command),

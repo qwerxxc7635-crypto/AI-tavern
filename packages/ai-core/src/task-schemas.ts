@@ -477,11 +477,31 @@ export const ResolveDiceResultInputSchema = z
     scene: text,
     action: text,
     attribute,
-    difficulty: z.union([z.literal(8), z.literal(11), z.literal(14), z.literal(17)]),
+    raw: z.number().int().min(1).max(20),
+    modifier: z.number().int(),
     total: z.number().int(),
-    success: z.boolean(),
+    dc: z.union([z.literal(8), z.literal(11), z.literal(14), z.literal(17)]),
+    result: z.enum(['SUCCESS', 'FAILURE']),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (input.raw + input.modifier !== input.total) {
+      context.addIssue({
+        code: 'custom',
+        path: ['total'],
+        message: 'total must equal raw plus modifier',
+      });
+    }
+    const resultIsSuccess = input.result === 'SUCCESS';
+    const totalMeetsDc = input.total >= input.dc;
+    if (resultIsSuccess !== totalMeetsDc) {
+      context.addIssue({
+        code: 'custom',
+        path: ['result'],
+        message: 'result must be derived from total and DC',
+      });
+    }
+  });
 export const ResolveDiceResultOutputSchema = z
   .object({
     narration: text,

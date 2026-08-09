@@ -339,9 +339,11 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       scene: 'The cellar door is sealed.',
       action: 'Inspect the lock.',
       attribute: 'knowledge',
-      difficulty: 11,
+      raw: 10,
+      modifier: 4,
       total: 14,
-      success: true,
+      dc: 11,
+      result: 'SUCCESS',
     },
     output: {
       narration: 'Mira identifies a hidden catch.',
@@ -450,6 +452,7 @@ describe('versioned AI task schemas', () => {
               'NPC_REPLY',
               'GENERATE_WORLD_EVENT',
               'SUMMARIZE_ADVENTURE',
+              'RESOLVE_DICE_RESULT',
             ].includes(task)
           ? 2
           : 1;
@@ -518,5 +521,12 @@ describe('versioned AI task schemas', () => {
         checkRequest: null,
       }).success,
     ).toBe(false);
+  });
+
+  it('rejects a dice narration input that contradicts local hard logic', () => {
+    const schema = AI_TASK_SCHEMAS.RESOLVE_DICE_RESULT.input;
+    const input = fixtures.RESOLVE_DICE_RESULT.input as Record<string, unknown>;
+    expect(schema.safeParse({ ...input, total: 13 }).success).toBe(false);
+    expect(schema.safeParse({ ...input, result: 'FAILURE' }).success).toBe(false);
   });
 });

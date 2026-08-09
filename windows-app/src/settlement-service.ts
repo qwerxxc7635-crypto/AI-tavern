@@ -19,6 +19,7 @@ import {
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 import type { AdventureSnapshot } from './adventure-service.js';
+import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
 
 export interface AdventureArchive {
   readonly campaignId: string;
@@ -29,12 +30,7 @@ export interface AdventureArchive {
   readonly keyDecisions: readonly string[];
   readonly unresolvedThreads: readonly string[];
   readonly nextDirections: readonly string[];
-  readonly diceResults: readonly {
-    readonly naturalRoll: number;
-    readonly total: number;
-    readonly difficulty: number;
-    readonly success: boolean;
-  }[];
+  readonly diceResults: readonly D20HardResultView[];
   readonly participantNpcs: readonly { readonly id: string; readonly name: string }[];
   readonly unresolvedClues: readonly {
     readonly id: string;
@@ -210,15 +206,7 @@ function parseArchive(value: unknown, id: string): AdventureArchive {
     keyDecisions: stringArray(r['keyDecisions']),
     unresolvedThreads: stringArray(r['unresolvedThreads']),
     nextDirections: stringArray(r['nextDirections']),
-    diceResults: requireArray(r['diceResults']).map((v) => {
-      const x = requireRecord(v);
-      return {
-        naturalRoll: requireInteger(x['naturalRoll']),
-        total: requireInteger(x['total']),
-        difficulty: requireInteger(x['difficulty']),
-        success: requireBoolean(x['success']),
-      };
-    }),
+    diceResults: requireArray(r['diceResults']).map(parseD20HardResult),
     participantNpcs: requireArray(r['participantNpcs']).map((v) => {
       const x = requireRecord(v);
       return { id: requireString(x['id']), name: requireString(x['name']) };
@@ -270,10 +258,6 @@ function requireString(v: unknown): string {
 }
 function requireInteger(v: unknown): number {
   if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw new TypeError('Expected integer');
-  return v;
-}
-function requireBoolean(v: unknown): boolean {
-  if (typeof v !== 'boolean') throw new TypeError('Expected boolean');
   return v;
 }
 function stringArray(v: unknown) {

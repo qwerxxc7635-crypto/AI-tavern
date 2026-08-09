@@ -76,8 +76,8 @@ export function ArchivesPage({
             <ul>
               {a.diceResults.map((roll, index) => (
                 <li key={`${a.adventureId}-roll-${index}`}>
-                  D20 {roll.naturalRoll} · 总计 {roll.total}/{roll.difficulty} ·{' '}
-                  {roll.success ? '成功' : '失败'}
+                  D20 {roll.raw} + 修正 {roll.modifier >= 0 ? `+${roll.modifier}` : roll.modifier} ={' '}
+                  {roll.total} / 难度 {roll.dc} · {roll.result === 'SUCCESS' ? '成功' : '失败'}
                 </li>
               ))}
             </ul>

@@ -139,11 +139,15 @@ export interface CheckRequest {
 
 export interface DiceResult {
   readonly checkRequestId: CheckRequestId;
+  readonly raw: number;
+  readonly modifier: number;
+  readonly total: number;
+  readonly dc: CheckDifficulty;
+  readonly result: 'SUCCESS' | 'FAILURE';
   readonly d20: number;
   readonly attributeModifier: number;
   readonly equipmentModifier: number;
   readonly statusModifier: number;
-  readonly total: number;
   readonly difficulty: CheckDifficulty;
   readonly success: boolean;
 }
