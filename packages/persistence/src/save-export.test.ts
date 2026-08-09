@@ -134,6 +134,7 @@ describe('exportCampaignSave', () => {
     expect(archiveText).not.toContain(secret);
     expect(archiveText).not.toContain('credential_ref');
     expect(archiveText).not.toContain('provider-secret');
+    expect(archiveText).not.toContain('randomness_profile_v1');
     expect(native.prepare('SELECT COUNT(*) AS count FROM campaigns').get()).toEqual({ count: 1 });
   });
 
@@ -651,6 +652,9 @@ function seed(sqlite: TransactionalSqliteDatabase): void {
   sqlite
     .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
     .run('private-test-setting', `{"apiKey":"${secret}"}`, at);
+  sqlite
+    .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+    .run('randomness_profile_v1', JSON.stringify({ profile: 'HIGH', customTemperature: null }), at);
 }
 
 function readStoredZip(bytes: Uint8Array): ReadonlyMap<string, Uint8Array> {

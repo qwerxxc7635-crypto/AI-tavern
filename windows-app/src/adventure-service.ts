@@ -25,6 +25,11 @@ import {
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface AdventureTurnView {
   readonly id: string;
@@ -218,6 +223,7 @@ export class WindowsAdventureService {
     private readonly gateway: AdventureGateway = tauriAdventureGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: (task: AITask) => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(
@@ -353,6 +359,7 @@ export class WindowsAdventureService {
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new AdventureServiceError('MODEL_NOT_FOUND');
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task,
@@ -360,7 +367,7 @@ export class WindowsAdventureService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 8_000,
       timeoutMs: 5_000,
     };
@@ -399,7 +406,12 @@ export class WindowsAdventureService {
   }
 }
 
-export const windowsAdventureService = new WindowsAdventureService();
+export const windowsAdventureService = new WindowsAdventureService(
+  tauriAdventureGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class AdventureServiceError extends Error {
   public constructor(public readonly code: string) {

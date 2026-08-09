@@ -17,6 +17,11 @@ import {
   isoTimestamp,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface QuestNpcBrief {
   readonly id: string;
@@ -134,6 +139,7 @@ export class WindowsQuestBoardService {
     private readonly gateway: QuestBoardGateway = tauriQuestBoardGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: () => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(id: string): Promise<QuestBoardSnapshot> {
@@ -197,6 +203,7 @@ export class WindowsQuestBoardService {
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new QuestBoardServiceError('MODEL_NOT_FOUND');
     const prompt = formatTaskPrompt('GENERATE_QUEST', input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task: 'GENERATE_QUEST',
@@ -204,7 +211,7 @@ export class WindowsQuestBoardService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 4_000,
       timeoutMs: 5_000,
     };
@@ -231,7 +238,12 @@ export class WindowsQuestBoardService {
   }
 }
 
-export const windowsQuestBoardService = new WindowsQuestBoardService();
+export const windowsQuestBoardService = new WindowsQuestBoardService(
+  tauriQuestBoardGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class QuestBoardServiceError extends Error {
   public constructor(public readonly code: string) {

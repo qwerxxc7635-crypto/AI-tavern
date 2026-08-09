@@ -4,6 +4,12 @@ import { NavLink } from 'react-router-dom';
 import { tauriVersionGateway, type VersionGateway } from './version-service.js';
 import { RELEASE_INFO } from './generated-release-info.js';
 import { playerText } from './localization/index.js';
+import {
+  tauriRandomnessSettingsGateway,
+  type RandomnessProfile,
+  type RandomnessSettingsGateway,
+  type RandomnessSettingsSnapshot,
+} from './randomness-settings-service.js';
 
 export const MY_SECTIONS = [
   { id: 'api', label: 'API', description: '连接与模型档案' },
@@ -17,8 +23,10 @@ export const MY_SECTIONS = [
 
 export function MyPage({
   versionGateway = tauriVersionGateway,
+  randomnessGateway = tauriRandomnessSettingsGateway,
 }: {
   readonly versionGateway?: VersionGateway;
+  readonly randomnessGateway?: RandomnessSettingsGateway;
 }) {
   const [version, setVersion] = useState<string | null>(null);
 
@@ -73,8 +81,9 @@ export function MyPage({
 
           <section id="generation" className="my-hub__entry">
             <SectionCopy eyebrow={playerText.coreUi.generationProfile} title="生成参数">
-              管理温度参数、最大输出和超时等设备级默认值；每次请求会冻结实际配置。
+              选择设备级随机性档位；每次请求会读取并冻结对应温度，不影响本地D20结果。
             </SectionCopy>
+            <RandomnessSettingsPanel gateway={randomnessGateway} />
           </section>
 
           <section id="deepseek-cache" className="my-hub__entry">
@@ -117,6 +126,107 @@ export function MyPage({
         返回存档首页
       </NavLink>
     </main>
+  );
+}
+
+const RANDOMNESS_CHOICES: ReadonlyArray<{
+  readonly profile: RandomnessProfile;
+  readonly label: string;
+  readonly description: string;
+}> = [
+  { profile: 'CONSERVATIVE', label: '稳健', description: '更一致，温度 0.2' },
+  { profile: 'BALANCED', label: '平衡', description: '默认档，温度 0.7' },
+  { profile: 'HIGH', label: '高随机', description: '更多变化，温度 1.1' },
+  { profile: 'CUSTOM', label: '自定义', description: '自行设置 0 至 2' },
+];
+
+function RandomnessSettingsPanel({ gateway }: { readonly gateway: RandomnessSettingsGateway }) {
+  const [settings, setSettings] = useState<RandomnessSettingsSnapshot | null>(null);
+  const [profile, setProfile] = useState<RandomnessProfile>('BALANCED');
+  const [customTemperature, setCustomTemperature] = useState(0.9);
+  const [status, setStatus] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const customTemperatureIsValid =
+    Number.isFinite(customTemperature) && customTemperature >= 0 && customTemperature <= 2;
+
+  useEffect(() => {
+    let active = true;
+    void gateway
+      .load()
+      .then((loaded) => {
+        if (!active) return;
+        setSettings(loaded);
+        setProfile(loaded.profile);
+        if (loaded.customTemperature !== null) setCustomTemperature(loaded.customTemperature);
+      })
+      .catch(() => {
+        if (active) setStatus('无法读取随机性设置。');
+      });
+    return () => {
+      active = false;
+    };
+  }, [gateway]);
+
+  async function save() {
+    setSaving(true);
+    setStatus(null);
+    try {
+      const saved = await gateway.save({
+        profile,
+        customTemperature: profile === 'CUSTOM' ? customTemperature : null,
+      });
+      setSettings(saved);
+      setStatus(
+        `已保存${RANDOMNESS_CHOICES.find((choice) => choice.profile === saved.profile)?.label ?? ''}档。`,
+      );
+    } catch {
+      setStatus('无法保存随机性设置，请重试。');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="generation-profile" aria-label="随机性档位">
+      <div className="generation-profile__choices">
+        {RANDOMNESS_CHOICES.map((choice) => (
+          <label key={choice.profile}>
+            <input
+              type="radio"
+              name="randomness-profile"
+              value={choice.profile}
+              checked={profile === choice.profile}
+              onChange={() => setProfile(choice.profile)}
+            />
+            <strong>{choice.label}</strong>
+            <span>{choice.description}</span>
+          </label>
+        ))}
+      </div>
+      {profile === 'CUSTOM' ? (
+        <label>
+          自定义温度
+          <input
+            aria-label="自定义温度"
+            type="number"
+            min="0"
+            max="2"
+            step="0.1"
+            value={customTemperature}
+            onChange={(event) => setCustomTemperature(event.currentTarget.valueAsNumber)}
+          />
+        </label>
+      ) : null}
+      <p>当前实际温度：{settings?.temperature ?? '读取中…'}</p>
+      <button
+        type="button"
+        disabled={saving || (profile === 'CUSTOM' && !customTemperatureIsValid)}
+        onClick={() => void save()}
+      >
+        {saving ? '保存中…' : '保存随机性设置'}
+      </button>
+      {status === null ? null : <p role="status">{status}</p>}
+    </div>
   );
 }
 

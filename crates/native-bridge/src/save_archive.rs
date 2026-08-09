@@ -1858,6 +1858,14 @@ mod tests {
                 [FIRST_TIME],
             )
             .expect("seed private setting");
+        connection
+            .execute(
+                "INSERT INTO app_settings (key, value_json, updated_at)
+                 VALUES ('randomness_profile_v1',
+                   '{\"profile\":\"HIGH\",\"customTemperature\":null}', ?1)",
+                [FIRST_TIME],
+            )
+            .expect("seed randomness setting");
         drop(connection);
 
         fs::write(&archive_path, b"replace only after complete export").expect("seed old export");
@@ -1867,6 +1875,7 @@ mod tests {
         let archive = fs::read(&archive_path).expect("read archive");
         assert!(!String::from_utf8_lossy(&archive).contains("credential_ref"));
         assert!(!String::from_utf8_lossy(&archive).contains("TOP_SECRET_NATIVE_EXPORT"));
+        assert!(!String::from_utf8_lossy(&archive).contains("randomness_profile_v1"));
         assert!(
             fs::read_dir(directory.path())
                 .expect("list export directory")

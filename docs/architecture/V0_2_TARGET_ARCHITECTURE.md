@@ -70,6 +70,8 @@ DeepSeek usage边界可接收`prompt_cache_hit_tokens`和`prompt_cache_miss_toke
 
 当前实现以规范化端点、Connection Profile身份与options、credential reference、模型档案/名称、完整能力、生成参数、prompt版本/响应格式及cache profile计算SHA-256 fingerprint。Orchestrator先复算fingerprint并逐值绑定route/request，再从ResolvedModelConfig投影ProviderConfig；调用期间不再读取可变设置对象。GenerationRecord只保存fingerprint，不复制credential reference；结构修复必须匹配原fingerprint。
 
+随机性是device-local生成偏好而非Campaign事实。`app_settings.randomness_profile_v1`只允许CONSERVATIVE 0.2、BALANCED 0.7、HIGH 1.1或CUSTOM 0至2；每条Windows AI路径在构造`NormalizedAIRequest`前从原生边界读取一次，并把解析后的temperature冻结进请求/GenerationRecord。设置变化不追溯修改既有请求，且永不影响本地D20和其他Hard Logic。
+
 ## 候选和事务
 
 生成结果先进入 `AICandidate`：`candidate_id`、`operation_id`、`task_type`、结构化 payload、validation evidence、provenance、status、created_at。状态仅可 `proposed -> accepted|rejected|superseded`。接受时以 `expected_revision` 在单一 SQLite 写事务内重新执行 domain policy、写事实和 ledger；失败不产生部分状态。

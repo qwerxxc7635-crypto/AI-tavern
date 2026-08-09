@@ -12,14 +12,23 @@ describe('WindowsWorldCreationService', () => {
   it('uses the unified Fake Provider and commits schema-validated generation and refinement', async () => {
     const gateway = new FakeWorldGateway();
     let identity = 0;
-    const service = new WindowsWorldCreationService(gateway, undefined, (task) => {
-      identity += 1;
-      return {
-        requestId: `request-${identity}`,
-        generationRecordId: `generation-${identity}`,
-        idempotencyKey: `world:${task}:${identity}`,
-      };
-    });
+    const service = new WindowsWorldCreationService(
+      gateway,
+      undefined,
+      (task) => {
+        identity += 1;
+        return {
+          requestId: `request-${identity}`,
+          generationRecordId: `generation-${identity}`,
+          idempotencyKey: `world:${task}:${identity}`,
+        };
+      },
+      {
+        async resolveTemperature() {
+          return 1.4;
+        },
+      },
+    );
 
     const generated = await service.generate('campaign-world', {
       concept: '漂浮在风暴云海上的群岛世界',
@@ -40,6 +49,7 @@ describe('WindowsWorldCreationService', () => {
       task: 'GENERATE_WORLD',
       requestId: 'request-1',
       promptVersion: 1,
+      request: { temperature: 1.4 },
     });
 
     const current = generated.world;

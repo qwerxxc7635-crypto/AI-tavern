@@ -18,9 +18,10 @@ use ember_native_bridge::{
     CharacterCompletionCommit, CharacterCreationSnapshot, CharacterTraitGenerationCommit,
     CredentialAction, CredentialCleanupReason, ModelCapabilitiesRegistration,
     ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
-    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit, TavernGenerationCommit,
-    TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
-    model_endpoint_fingerprint, model_probe_fingerprint,
+    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
+    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, TavernGenerationCommit, TavernSnapshot,
+    WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
+    model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -270,6 +271,21 @@ fn model_settings_forget_credential(
     store.forget_model_credential(&profile_id)?;
     retry_pending_credential_cleanup(&store, &SecretStore)?;
     store.model_settings().map_err(Into::into)
+}
+
+#[tauri::command]
+fn randomness_settings_get(
+    store: State<'_, CampaignStore>,
+) -> Result<RandomnessSettingsSnapshot, CommandError> {
+    store.randomness_settings().map_err(Into::into)
+}
+
+#[tauri::command]
+fn randomness_settings_save(
+    command: RandomnessSettingsUpdate,
+    store: State<'_, CampaignStore>,
+) -> Result<RandomnessSettingsSnapshot, CommandError> {
+    store.save_randomness_settings(command).map_err(Into::into)
 }
 
 fn retry_pending_credential_cleanup(
@@ -840,6 +856,8 @@ pub fn run() {
             model_settings_get,
             model_settings_save,
             model_settings_forget_credential,
+            randomness_settings_get,
+            randomness_settings_save,
             provider_probe
         ])
         .run(tauri::generate_context!())

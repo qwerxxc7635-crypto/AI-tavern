@@ -1898,3 +1898,19 @@ schema 8把旧RUMOR保守回填为独立`claim-<factId>`、revision 1、HEARSAY�
 ### 影响与边界
 
 FACTION_MESSAGE只表示某NPC转述的势力消息，不建立Faction Actor、全局广播、传播图、衰减模拟或World Voices。T04不创建独立Claims表，不改变客观事实授权，不实现T05 Randomness Profiles，不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-091：随机性档位是设备级采样配置且不得影响Hard Logic
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T05`、Provider三层冻结规则、SQLite唯一真相源及D20硬逻辑边界
+
+### 决定与理由
+
+随机性提供CONSERVATIVE（稳健，temperature 0.2）、BALANCED（平衡，默认0.7）、HIGH（高随机，1.1）和CUSTOM（自定义0至2）四档。v0.2只公开所有已支持Provider共有的temperature，不提前暴露top-p、top-k、seed或Provider专属采样器，避免一份设置在不同Adapter产生伪一致语义。
+
+设置以非秘密JSON保存在device-local `app_settings.randomness_profile_v1`，原生读取对闭集、预设映射、自定义存在性、有限值和范围fail closed；缺失设置只解析为BALANCED，不隐式写库。My页面通过Tauri命令读写，七条Windows AI生成Service在构造请求前读取一次实际temperature，并把值冻结进`NormalizedAIRequest`，因此GenerationRecord仍能审计当次真实采样配置。
+
+### 影响与边界
+
+随机性偏好不是Campaign事实，不进入`.emtavern`，修改后也不追溯既有请求。它只影响模型采样，绝不改变无偏D20、属性修正、DC、结果判定、事务校验或其他Hard Logic。T05不实现T06重复抑制、真实Provider/付费API、正式用户数据或iOS。

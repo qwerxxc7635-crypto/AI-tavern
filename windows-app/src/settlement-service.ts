@@ -20,6 +20,11 @@ import {
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 import type { AdventureSnapshot } from './adventure-service.js';
 import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface AdventureArchive {
   readonly campaignId: string;
@@ -96,6 +101,7 @@ export class WindowsSettlementService {
   public constructor(
     private readonly gateway: SettlementGateway = tauriSettlementGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
   public list(id: string) {
     campaignId(id);
@@ -163,6 +169,7 @@ export class WindowsSettlementService {
     const model = (await this.provider.listModels()).find((m) => m.name === 'ember-fake-v1');
     if (model === undefined) throw new Error('Fake model unavailable');
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(`${task.toLowerCase()}-${suffix}`),
       task,
@@ -170,7 +177,7 @@ export class WindowsSettlementService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 8000,
       timeoutMs: 5000,
     };
@@ -193,7 +200,11 @@ export class WindowsSettlementService {
     };
   }
 }
-export const windowsSettlementService = new WindowsSettlementService();
+export const windowsSettlementService = new WindowsSettlementService(
+  tauriSettlementGateway,
+  new FakeAIProvider(),
+  tauriRandomnessTemperatureSource,
+);
 function parseArchive(value: unknown, id: string): AdventureArchive {
   const r = requireRecord(value);
   if (requireString(r['campaignId']) !== id) throw new TypeError('Archive campaign mismatch');

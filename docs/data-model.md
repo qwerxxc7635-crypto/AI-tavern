@@ -429,6 +429,8 @@ erDiagram
 
 保留键`deepseek_cache_metrics_v1`的值为最多200项有界数组，每项只含task type、cache hit/miss tokens、由二者计算的ratio、64位小写十六进制prefix hash与记录时间；禁止写完整Prompt、消息、上下文、request ID或credential。该设备遥测不属于Campaign可移植事实。
 
+保留键`randomness_profile_v1`保存`profile`与`customTemperature`：CONSERVATIVE/BALANCED/HIGH必须分别解析为0.2/0.7/1.1且自定义值为空，CUSTOM必须携带0至2的有限自定义值。该设置只控制生成请求采样，导出存档不携带，也不得改变本地D20或其他Hard Logic。
+
 ## 5. JSON列清单与边界
 
 | 表 | JSON列 |

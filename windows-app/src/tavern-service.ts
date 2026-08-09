@@ -20,6 +20,11 @@ import {
   isoTimestamp,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface TavernWorldContext {
   readonly name: string;
@@ -163,6 +168,7 @@ export class WindowsTavernService {
     private readonly gateway: TavernGateway = tauriTavernGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: (task: TavernTask) => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(id: string): Promise<TavernSnapshot> {
@@ -236,6 +242,7 @@ export class WindowsTavernService {
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new TavernServiceError('MODEL_NOT_FOUND');
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task,
@@ -243,7 +250,7 @@ export class WindowsTavernService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 6_000,
       timeoutMs: 5_000,
     };
@@ -270,7 +277,12 @@ export class WindowsTavernService {
   }
 }
 
-export const windowsTavernService = new WindowsTavernService();
+export const windowsTavernService = new WindowsTavernService(
+  tauriTavernGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class TavernServiceError extends Error {
   public constructor(public readonly code: string) {

@@ -2243,6 +2243,38 @@ textarea:disabled {
   margin: 0;
 }
 
+.generation-profile {
+  display: grid;
+  gap: 0.75rem;
+  min-width: min(100%, 24rem);
+}
+
+.generation-profile__choices {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(9rem, 1fr));
+  gap: 0.55rem;
+}
+
+.generation-profile__choices label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.15rem 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  cursor: pointer;
+}
+
+.generation-profile__choices input {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.generation-profile__choices span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
 @media (max-width: 760px) {
   .my-hub__layout {
     grid-template-columns: 1fr;

@@ -3242,3 +3242,24 @@
 ### 结论
 
 - `V02-M8-T04`完成。下一项严格为`V02-M8-T05` Randomness Profiles。
+
+## 2026-08-09 — V02-M8-T05 建立 Randomness Profiles
+
+### 实现
+
+- 新增CONSERVATIVE/BALANCED/HIGH/CUSTOM四档设备级随机性合同，分别解析为0.2、0.7、1.1或0至2的有限自定义temperature；缺省为BALANCED。
+- 原生CampaignStore以`app_settings.randomness_profile_v1`持久化非秘密设置，闭集、预设映射和自定义形状验证失败时不覆盖最后有效值；重开数据库后保持设置。
+- My页面“生成参数”提供稳健、平衡、高随机与自定义选择、当前实际温度及显式保存状态；非法自定义值不能提交。
+- 世界、车卡、酒馆、NPC对话、任务、冒险与结算七条Windows AI路径在请求前读取实际temperature并冻结进请求快照；测试默认源保持离线确定性。
+- 记录`DEC-091`并同步数据模型、目标架构和Changelog；随机性不进入存档、不影响本地D20，未实现T06重复抑制、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Randomness Service、My页面与World Service共6项定向测试通过，覆盖四档解析、自定义边界、矛盾快照拒绝、UI保存和请求temperature冻结。
+- 原生Randomness 2项测试通过，覆盖默认值、四档保存、重开恢复和非法更新零覆盖。
+- 完整80个Vitest文件/452项测试与22项Node测试通过；Rust workspace格式、全target/feature Clippy及86项测试通过，包含Windows纵向E2E。
+- `pnpm archive:interop`验证设备级随机性设置不进入TypeScript/Rust归档并完成双向交叉导入；release metadata、zh-CN玩家文案门禁及桌面前端201 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T05`完成。下一项严格为`V02-M8-T06` Repetition Reduction。

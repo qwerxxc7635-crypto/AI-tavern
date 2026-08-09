@@ -56,7 +56,8 @@
 - `V02-M8-T02`：DONE；NPC_REPLY只接收当前Actor获准的Truth/Claim知识投影、同Actor消息/记忆与自身角色卡，缺失、重复、跨Actor错误认知或客户端篡改均fail closed。
 - `V02-M8-T03`：DONE；schema 7在既有NPC Knowledge权威行记录source、event、learned_at与confidence，旧数据库/存档确定性回填，双实现读取均验证Actor、状态与事件边界。
 - `V02-M8-T04`：DONE；酒馆传闻作为带独立claimId、NPC来源、传播方式、confidence和revision的轻量Claim兼容投影持久化，玩家只见来源而不见隐藏真实性。
-- 下一执行项严格进入 `V02-M8-T05` Randomness Profiles。
+- `V02-M8-T05`：DONE；设备级生成偏好提供稳健、平衡、高随机与0至2自定义温度，七条Windows AI生成路径在请求前读取并冻结实际值，本地D20不受影响。
+- 下一执行项严格进入 `V02-M8-T06` Repetition Reduction。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
