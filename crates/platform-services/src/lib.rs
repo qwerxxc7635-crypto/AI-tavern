@@ -50,12 +50,19 @@ impl AppInstanceLock for FileAppInstanceLock {
 
     fn try_acquire(&self) -> Result<AppInstanceLockGuard, AppInstanceLockError> {
         let file = self.open()?;
-        file.try_lock_exclusive()
-            .map_err(|error| match error.kind() {
-                std::io::ErrorKind::WouldBlock => AppInstanceLockError::AlreadyLocked,
-                _ => AppInstanceLockError::Io(error),
-            })?;
+        file.try_lock_exclusive().map_err(map_try_lock_error)?;
         Ok(AppInstanceLockGuard { file })
+    }
+}
+
+fn map_try_lock_error(error: std::io::Error) -> AppInstanceLockError {
+    let contended = fs2::lock_contended_error();
+    let matches_platform_code =
+        error.raw_os_error().is_some() && error.raw_os_error() == contended.raw_os_error();
+    if matches_platform_code || error.kind() == std::io::ErrorKind::WouldBlock {
+        AppInstanceLockError::AlreadyLocked
+    } else {
+        AppInstanceLockError::Io(error)
     }
 }
 
@@ -303,5 +310,20 @@ mod tests {
         ));
         drop(guard);
         second.try_acquire().unwrap();
+    }
+
+    #[test]
+    fn lock_contention_mapping_uses_the_platform_error_code() {
+        assert!(matches!(
+            map_try_lock_error(fs2::lock_contended_error()),
+            AppInstanceLockError::AlreadyLocked
+        ));
+        assert!(matches!(
+            map_try_lock_error(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "not a lock contention error",
+            )),
+            AppInstanceLockError::Io(_)
+        ));
     }
 }
