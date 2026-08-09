@@ -5,6 +5,33 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import test from 'node:test';
+import { resolveProcessInvocation } from './process-runner.mjs';
+
+test('resolves pnpm through Node when an npm entrypoint is available', () => {
+  assert.deepEqual(
+    resolveProcessInvocation('pnpm', ['test'], {
+      platform: 'win32',
+      npmExecPath: 'C:\\pnpm\\pnpm.cjs',
+      nodeExecPath: 'C:\\node\\node.exe',
+    }),
+    {
+      command: 'C:\\node\\node.exe',
+      args: ['C:\\pnpm\\pnpm.cjs', 'test'],
+      shell: false,
+    },
+  );
+});
+
+test('uses the Windows command shim through a shell only as a direct-call fallback', () => {
+  assert.deepEqual(
+    resolveProcessInvocation('pnpm', ['test'], {
+      platform: 'win32',
+      npmExecPath: null,
+      nodeExecPath: 'C:\\node\\node.exe',
+    }),
+    { command: 'pnpm.cmd', args: ['test'], shell: true },
+  );
+});
 
 test('records UTF-8 command output, timestamps and exit code', () => {
   const directory = mkdtempSync(join(tmpdir(), 'ember-ci-evidence-'));

@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { runPnpm, runProcess } from './process-runner.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDirectory = join(root, 'packages', 'persistence', 'test-fixtures');
@@ -14,13 +14,13 @@ const typescriptOutput = join(work, 'typescript-export-v1.emtavern');
 const rustOutput = join(work, 'rust-export-v1.emtavern');
 
 try {
-  run(packageCommand(), ['exec', 'vitest', 'run', 'packages/persistence/src/save-export.test.ts'], {
+  runPnpm(['exec', 'vitest', 'run', 'packages/persistence/src/save-export.test.ts'], {
     EMBER_TS_ARCHIVE_OUTPUT: typescriptOutput,
   });
   verifyRegeneratedFixture('typescript', typescriptOutput);
 
-  run(
-    cargoCommand(),
+  runProcess(
+    'cargo',
     [
       'test',
       '-p',
@@ -35,7 +35,7 @@ try {
   );
   verifyRegeneratedFixture('rust', rustOutput);
 
-  run(packageCommand(), ['exec', 'vitest', 'run', 'packages/persistence/src/save-export.test.ts'], {
+  runPnpm(['exec', 'vitest', 'run', 'packages/persistence/src/save-export.test.ts'], {
     EMBER_RUST_ARCHIVE_INPUT: rustOutput,
   });
 } finally {
@@ -77,24 +77,6 @@ function readStoredEntries(bytes) {
   return entries;
 }
 
-function run(command, args, additions) {
-  const result = spawnSync(command, args, {
-    cwd: root,
-    env: { ...process.env, ...additions },
-    stdio: 'inherit',
-  });
-  if (result.error !== undefined) throw result.error;
-  if (result.status !== 0) process.exit(result.status ?? 1);
-}
-
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex');
-}
-
-function packageCommand() {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-}
-
-function cargoCommand() {
-  return process.platform === 'win32' ? 'cargo.exe' : 'cargo';
 }

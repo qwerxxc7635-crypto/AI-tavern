@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { spawn } from 'node:child_process';
+import { resolveProcessInvocation } from './process-runner.mjs';
 
 const separator = process.argv.indexOf('--');
 const outputFlag = process.argv.indexOf('--output');
@@ -17,14 +18,16 @@ if (
 const output = resolve(process.argv[outputFlag + 1]);
 const requestedCommand = process.argv[separator + 1];
 const commandArgs = process.argv.slice(separator + 2);
-const command =
-  process.platform === 'win32' && requestedCommand === 'pnpm' ? 'pnpm.cmd' : requestedCommand;
+const invocation = resolveProcessInvocation(requestedCommand, commandArgs);
 const startedAt = new Date().toISOString();
 const stdout = [];
 const stderr = [];
 let spawnError;
 
-const child = spawn(command, commandArgs, { env: process.env, shell: false });
+const child = spawn(invocation.command, invocation.args, {
+  env: process.env,
+  shell: invocation.shell,
+});
 child.stdout.on('data', (chunk) => {
   stdout.push(chunk);
   process.stdout.write(chunk);
