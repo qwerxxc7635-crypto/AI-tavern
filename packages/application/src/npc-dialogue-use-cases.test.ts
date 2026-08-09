@@ -146,7 +146,9 @@ describe('NpcDialogueUseCases', () => {
       expect(JSON.stringify(generation?.request)).not.toContain(
         'A visitor alone saw the bell chamber map.',
       );
-      expect(JSON.stringify(generation?.request)).toContain('Earlier history:');
+      expect(JSON.stringify(generation?.request)).toContain(
+        'Earlier history (12 entries; sampled):',
+      );
       expect(JSON.stringify(generation?.request)).toContain('dialogue-history-62');
       expect(JSON.stringify(generation?.request)).not.toContain('dialogue-history-30');
       expect(JSON.stringify(generation?.request)).toContain('memory-history-19');
@@ -170,7 +172,9 @@ describe('NpcDialogueUseCases', () => {
       const memoryGeneration = new GenerationRecordRepository(sqlite).get(
         generationRecordId('generation-memories'),
       );
-      expect(JSON.stringify(memoryGeneration?.request)).toContain('Earlier history:');
+      expect(JSON.stringify(memoryGeneration?.request)).toContain(
+        'Earlier history (52 entries; sampled):',
+      );
       expect(JSON.stringify(memoryGeneration?.request)).toContain('dialogue-history-62');
       expect(JSON.stringify(memoryGeneration?.request)).not.toContain('dialogue-history-30');
       expect(new NpcRepository(sqlite).listMemories(npcKey).at(-1)).toEqual(memories[0]);

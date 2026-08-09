@@ -588,4 +588,33 @@ describe('versioned AI task schemas', () => {
       }).success,
     ).toBe(false);
   });
+
+  it('rejects unbounded history arrays at every history-bearing prompt boundary', () => {
+    const repeated = (count: number) =>
+      Array.from({ length: count }, (_, index) => `history-entry-${index}`);
+    expect(
+      AI_TASK_SCHEMAS.NPC_REPLY.input.safeParse({
+        ...(fixtures.NPC_REPLY.input as Record<string, unknown>),
+        recentMessages: repeated(13).map((content) => ({ role: 'PLAYER', content })),
+      }).success,
+    ).toBe(false);
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.input.safeParse({
+        ...(fixtures.GENERATE_ADVENTURE_TURN.input as Record<string, unknown>),
+        recentTurns: repeated(9),
+      }).success,
+    ).toBe(false);
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_WORLD_EVENT.input.safeParse({
+        ...(fixtures.GENERATE_WORLD_EVENT.input as Record<string, unknown>),
+        recentImportantEvents: repeated(11),
+      }).success,
+    ).toBe(false);
+    expect(
+      AI_TASK_SCHEMAS.SUMMARIZE_ADVENTURE.input.safeParse({
+        ...(fixtures.SUMMARIZE_ADVENTURE.input as Record<string, unknown>),
+        turnSummaries: repeated(10),
+      }).success,
+    ).toBe(false);
+  });
 });

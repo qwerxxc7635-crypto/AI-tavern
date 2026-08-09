@@ -10,7 +10,20 @@ describe('WindowsSettlementService', () => {
   it('generates validated proposals once and sends them to the fixed settlement command', async () => {
     const gateway = new Gateway();
     const service = new WindowsSettlementService(gateway);
-    const snapshot = ending();
+    const base = ending();
+    const baseTurn = base.turns[0];
+    if (baseTurn === undefined) throw new Error('Ending fixture requires one turn');
+    const snapshot: AdventureSnapshot = {
+      ...base,
+      currentTurnNumber: 20,
+      turns: Array.from({ length: 20 }, (_, index) => ({
+        ...baseTurn,
+        id: `turn-${index + 1}`,
+        turnNumber: index + 1,
+        sceneText: `scene-marker-${index + 1}`,
+        playerAction: `action-marker-${index + 1}`,
+      })),
+    };
     const [first, second] = await Promise.all([
       service.settle('campaign', snapshot),
       service.settle('campaign', snapshot),
@@ -20,6 +33,11 @@ describe('WindowsSettlementService', () => {
     const command = gateway.commands.at(0);
     expect(command).toBeDefined();
     if (command === undefined) throw new Error('Settlement command missing');
+    const summaryInput = command.summary.input as { turnSummaries: string[] };
+    expect(summaryInput.turnSummaries).toHaveLength(9);
+    expect(summaryInput.turnSummaries[0]).toMatch(/^Earlier history \(12 entries; sampled\):/);
+    expect(summaryInput.turnSummaries.at(-1)).toContain('scene-marker-20');
+    expect(JSON.stringify(summaryInput)).not.toContain('scene-marker-6');
     expect(command.summary.validatedOutput).toMatchObject({ npcUpdates: [{ npcId: 'owner' }] });
     expect(command.worldEvent.validatedOutput).toMatchObject({
       clockAdvances: [{ clockId: 'clock' }],

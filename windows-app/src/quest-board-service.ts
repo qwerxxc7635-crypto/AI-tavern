@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   GenerateQuestInputSchema,
   GenerateQuestOutputSchema,
   hasRepeatedQuestStructure,
@@ -206,6 +207,7 @@ export class WindowsQuestBoardService {
     const identity = this.createIdentity();
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new QuestBoardServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget('GENERATE_QUEST', input);
     const prompt = formatTaskPrompt('GENERATE_QUEST', input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {

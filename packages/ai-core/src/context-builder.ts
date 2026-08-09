@@ -93,9 +93,26 @@ export function contextBudgetForTask(task: AITask): ContextBudget {
   return TASK_CONTEXT_BUDGETS[task];
 }
 
+export function assertTaskContextBudget(task: AITask, input: unknown): void {
+  const budget = contextBudgetForTask(task);
+  let characters: number;
+  try {
+    const serialized = JSON.stringify(input);
+    if (serialized === undefined) throw new TypeError('Context is not JSON serializable');
+    characters = serialized.length;
+  } catch (error) {
+    throw new ContextBuildError('AI task context must be JSON serializable', { cause: error });
+  }
+  if (characters > budget.maxCharacters) {
+    throw new ContextBuildError(
+      `AI task context exceeds the ${budget.maxCharacters} character budget`,
+    );
+  }
+}
+
 export class ContextBuildError extends Error {
-  public constructor(message: string) {
-    super(message);
+  public constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'ContextBuildError';
   }
 }
@@ -517,8 +534,9 @@ export function compressContextHistory(
   const canonical = values.filter((value) => value.trim().length > 0);
   const recent = takeNewest(canonical, recentLimit);
   const older = canonical.slice(0, Math.max(0, canonical.length - recent.length));
-  const prefix = 'Earlier history: ';
-  const summary = boundedSummary(older, Math.max(1, summaryMaxCharacters - prefix.length));
+  const sampledOlder = older.length <= 4 ? older : [...older.slice(0, 2), ...older.slice(-2)];
+  const prefix = `Earlier history (${older.length} entries${older.length > 4 ? '; sampled' : ''}): `;
+  const summary = boundedSummary(sampledOlder, Math.max(1, summaryMaxCharacters - prefix.length));
   return Object.freeze([...(summary === null ? [] : [`${prefix}${summary}`]), ...recent]);
 }
 

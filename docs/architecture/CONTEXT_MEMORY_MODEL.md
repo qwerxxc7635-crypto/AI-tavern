@@ -34,6 +34,10 @@ type ContextBlock = {
 
 装配器按`stable → semi_stable → dynamic`、任务声明type顺序、priority降序、id升序产生确定顺序。候选携带0～1 relevance和required标记；低相关或超块/总预算的可选块整块排除，required块无法容纳时整体失败，禁止截断JSON。现有任务schema builder先完成知识过滤和历史裁剪，再把其结果封装为game-private任务块；manifest只含元数据，不含块内容。
 
+15类任务分别绑定12,000至22,000字符预算。Application编排在ContextBlock装配时执行预算，七条Windows直连生成Service在`formatTaskPrompt`前调用同一任务预算断言；不可JSON序列化或超预算输入不得进入Provider。历史型Schema同时固定硬上限：NPC最近消息12、长期记忆9（1条旧史摘要+8条最近记忆）、冒险最近回合8、世界事件10、结算回合摘要9。
+
+`compressContextHistory`不会把旧史逐条伪装成摘要：超过四条的旧记录只采样最早两条和最晚两条，并在摘要头记录被压缩总数；最近窗口保持原顺序。这样Provider可得到时间跨度线索和最新细节，但不能读取全量世界、对话、记忆或回合history。
+
 ## 真相、主张、知识、记忆
 
 - `WorldTruth`：由本地规则或已接受事务确认的客观状态；可被隐藏，但不能由摘要创建。

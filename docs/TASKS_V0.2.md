@@ -58,7 +58,8 @@
 - `V02-M8-T04`：DONE；酒馆传闻作为带独立claimId、NPC来源、传播方式、confidence和revision的轻量Claim兼容投影持久化，玩家只见来源而不见隐藏真实性。
 - `V02-M8-T05`：DONE；设备级生成偏好提供稳健、平衡、高随机与0至2自定义温度，七条Windows AI生成路径在请求前读取并冻结实际值，本地D20不受影响。
 - `V02-M8-T06`：DONE；生成结果在写入前检测规范化重复长句、最近任务结构签名和NPC身份/性格原型签名，命中即拒绝且不产生部分写入。
-- 下一执行项严格进入 `V02-M8-T07` Context Budget。
+- `V02-M8-T07`：DONE；所有Windows Provider调用前执行任务级字符预算，历史型Schema固定数量上限，长历史只保留最新窗口与带总数的有损抽样摘要。
+- 下一执行项严格进入 `V02-M8-T08` Context Inspector。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -992,7 +993,11 @@ NPC Prompt 只接收允许知道的信息。
 
 ## V02-M8-T07 [P1] Context Budget
 
+状态：DONE。
+
 禁止全量世界 history 进入 Prompt。
+
+当前实现对15类AI任务配置12,000至22,000字符预算；七条Windows生成Service在Prompt格式化前统一失败关闭。NPC消息最多12条、长期记忆为8条最新项加1条有损旧史摘要、冒险回合最多8条、世界事件最多10条、结算回合为8条最新项加1条摘要。超过四项的旧史摘要只抽样最早两项和最晚两项并记录被压缩总数，不逐条携带完整历史。
 
 ---
 

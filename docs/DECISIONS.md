@@ -1930,3 +1930,19 @@ FACTION_MESSAGE只表示某NPC转述的势力消息，不建立Faction Actor、�
 ### 影响与边界
 
 这些签名只是请求期派生验证数据，不新增数据库列、不进入`.emtavern`，也不成为世界事实。精确规范化规则可解释且跨双实现复现，但不会捕获所有语义近义改写；T06不引入embedding、付费相似度模型、自动改写循环或T07 Context Budget，也不接入真实Provider、正式用户数据或iOS。
+
+## DEC-093：任务字符预算与有损旧史摘要共同阻止全量History进入Provider
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T07`、Context Assembler预算与最小披露架构红线
+
+### 决定与理由
+
+沿用既有15类任务预算表：紧凑任务12,000字符、NPC/记忆任务16,000、冒险任务22,000。Application路径继续在ContextBlock装配时执行总预算；七条Windows直连AI Service在Prompt格式化前统一调用`assertTaskContextBudget`，因此不可JSON序列化或超预算输入不会到达任何Provider Adapter。
+
+历史型输入Schema把运行期窗口固化为硬上限：NPC最近消息12、长期记忆9、冒险最近回合8、世界事件10、结算回合摘要9；相关事实、规则与一致性事实各不超过30。超过最近窗口的旧记录使用有损摘要：当旧记录多于四项时只抽样最早两项与最晚两项，并记录旧记录总数，禁止把全量条目简单拼接后称为summary。Windows结算与既有Application结算现在使用同一压缩规则。
+
+### 影响与边界
+
+预算与摘要只影响发送给模型的请求期投影，不删除或重写SQLite历史，也不进入`.emtavern`新字段。旧记录仍由本地数据库完整保存，游戏规则可按需查询；模型只获得任务相关的有限窗口。T07不实现T08 Context Inspector、tokenizer精确计数、向量检索、真实Provider/付费API、正式用户数据或iOS。

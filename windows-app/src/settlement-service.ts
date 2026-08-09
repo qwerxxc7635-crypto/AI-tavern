@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
+  compressContextHistory,
+  contextBudgetForTask,
   GenerateWorldEventInputSchema,
   GenerateWorldEventOutputSchema,
   SummarizeAdventureInputSchema,
@@ -124,7 +127,11 @@ export class WindowsSettlementService {
     const relatedNpcIds = [s.quest.publisherNpcId];
     const summaryInput = SummarizeAdventureInputSchema.parse({
       questTitle: s.quest.content.title,
-      turnSummaries: s.turns.map((t) => `${t.playerAction}: ${t.sceneText}`),
+      turnSummaries: compressContextHistory(
+        s.turns.map((t) => `${t.playerAction}: ${t.sceneText}`),
+        contextBudgetForTask('SUMMARIZE_ADVENTURE').recentTurnLimit,
+        contextBudgetForTask('SUMMARIZE_ADVENTURE').historicalSummaryMaxCharacters,
+      ),
       ending: 'SUCCESS',
       discoveredClues: s.clues.filter((c) => c.discoveredInTurnId !== null).map((c) => c.title),
       relatedNpcs: relatedNpcIds.map((npcId) => ({
@@ -168,6 +175,7 @@ export class WindowsSettlementService {
     const suffix = crypto.randomUUID();
     const model = (await this.provider.listModels()).find((m) => m.name === 'ember-fake-v1');
     if (model === undefined) throw new Error('Fake model unavailable');
+    assertTaskContextBudget(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {

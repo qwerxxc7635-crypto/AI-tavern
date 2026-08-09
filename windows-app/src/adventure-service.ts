@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   GenerateAdventurePlanInputSchema,
   GenerateAdventurePlanOutputSchema,
   GenerateAdventureTurnInputSchema,
@@ -358,6 +359,7 @@ export class WindowsAdventureService {
     const identity = this.createIdentity(task);
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new AdventureServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {

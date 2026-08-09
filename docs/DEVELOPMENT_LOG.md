@@ -3284,3 +3284,24 @@
 ### 结论
 
 - `V02-M8-T06`完成。下一项严格为`V02-M8-T07` Context Budget。
+
+## 2026-08-09 — V02-M8-T07 固化 Prompt Context Budget
+
+### 实现
+
+- 复用15类任务现有12,000/16,000/22,000字符预算，新增公共`assertTaskContextBudget`；七条Windows AI生成Service均在Prompt格式化和Provider调用前执行失败关闭。
+- 历史型Schema固定窗口上限：NPC消息12、长期记忆9、冒险回合8、世界事件10、结算回合摘要9，并限制相关事实、规则、记忆提取和一致性输入。
+- `compressContextHistory`改为真正有损的旧史摘要：超过四项时只保留最早两项和最晚两项样本，标注被压缩条目总数，再附加任务预算允许的最新窗口。
+- Windows Adventure Settlement从发送全部回合改为与Application一致的8条最近回合加1条旧史抽样摘要；原生NPC、冒险上下文本来已分别限制12条消息、8条记忆、8个回合、30项事实并继续保持。
+- 记录`DEC-093`并同步Changelog与Context/Memory架构文档；未实现T08 Inspector、精确tokenizer、向量检索、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Context Builder、Schema、Application与Windows Settlement定向测试覆盖80条历史压缩、抽样缺失中间条目、最近窗口保留、四类历史数组超限拒绝及12,000字符总预算拒绝。
+- 完整81个Vitest文件/458项测试与22项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及87项测试通过，包含Windows纵向E2E；T07未修改SQLite schema或原生存档格式。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对；桌面前端202 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T07`完成。下一项严格为`V02-M8-T08` Context Inspector。

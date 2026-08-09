@@ -348,8 +348,8 @@ export const NpcReplyInputSchema = z
       .max(100),
     recentMessages: z
       .array(z.object({ role: z.enum(['PLAYER', 'NPC']), content: text }).strict())
-      .max(20),
-    longTermMemories: stringList,
+      .max(12),
+    longTermMemories: stringList.max(9),
     playerMessage: text,
   })
   .strict();
@@ -429,7 +429,7 @@ export const GenerateAdventurePlanInputSchema = z
       .object({ id: identifier, content: questContent, risk: questRisk, expectedTurns: turnRange })
       .strict(),
     playerSummary: text,
-    relevantFacts: stringList,
+    relevantFacts: stringList.max(30),
   })
   .strict();
 export const GenerateAdventurePlanOutputSchema = z
@@ -481,7 +481,7 @@ export const GenerateAdventureTurnInputSchema = z
     currentScene: sceneText,
     sceneFrame: SceneFrameSchema,
     longTermSummary: text.nullable(),
-    recentTurns: stringList.max(10),
+    recentTurns: stringList.max(8),
     discoveredClues: stringList,
     relatedNpcs: z.array(npcBrief).max(12),
     knownFacts: z
@@ -604,7 +604,7 @@ export const GenerateWorldEventInputSchema = z
           .strict(),
       )
       .max(12),
-    recentImportantEvents: stringList,
+    recentImportantEvents: stringList.max(10),
     currentChapter: text,
   })
   .strict();
@@ -622,7 +622,7 @@ export const GenerateWorldEventOutputSchema = z
 export const SummarizeAdventureInputSchema = z
   .object({
     questTitle: shortText,
-    turnSummaries: stringList.min(1).max(100),
+    turnSummaries: stringList.min(1).max(9),
     ending: z.enum(['SUCCESS', 'PARTIAL_SUCCESS', 'FAILURE']),
     discoveredClues: stringList,
     relatedNpcs: z
@@ -668,7 +668,7 @@ export const SummarizeAdventureOutputSchema = z
   .strict();
 
 export const ExtractMemoriesInputSchema = z
-  .object({ npc: npcBrief, turnIds: identifierList, transcript: stringList.min(1).max(100) })
+  .object({ npc: npcBrief, turnIds: identifierList.max(50), transcript: stringList.min(1).max(13) })
   .strict();
 export const ExtractMemoriesOutputSchema = z
   .object({
@@ -681,8 +681,8 @@ export const ExtractMemoriesOutputSchema = z
 export const CheckConsistencyInputSchema = z
   .object({
     world: worldContext,
-    lockedRules: stringList,
-    knownFacts: stringList,
+    lockedRules: stringList.max(30),
+    knownFacts: stringList.max(30),
     proposedContent: text,
   })
   .strict();

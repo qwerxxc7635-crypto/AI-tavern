@@ -38,6 +38,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AI_TASKS,
+  assertTaskContextBudget,
   buildAdventureTurnContext,
   buildNpcDialogueContext,
   buildWorldEventContext,
@@ -481,6 +482,15 @@ describe('AI context builders', () => {
     );
   });
 
+  it('rejects an oversized task context before prompt formatting', () => {
+    expect(() =>
+      assertTaskContextBudget('GENERATE_WORLD', {
+        history: 'x'.repeat(contextBudgetForTask('GENERATE_WORLD').maxCharacters + 1),
+      }),
+    ).toThrow('exceeds the 12000 character budget');
+    expect(() => assertTaskContextBudget('GENERATE_WORLD', { concept: 'bounded' })).not.toThrow();
+  });
+
   it('compresses older NPC and adventure history while preserving bounded recent context', () => {
     const dialogueBudget = contextBudgetForTask('NPC_REPLY');
     const dialogue = buildNpcDialogueContext(
@@ -508,7 +518,7 @@ describe('AI context builders', () => {
     expect(dialogue.recentMessages).toHaveLength(dialogueBudget.recentMessageLimit);
     expect(dialogue.recentMessages[0]?.content).toContain('dialogue-marker-68');
     expect(dialogue.longTermMemories).toHaveLength(dialogueBudget.longTermMemoryLimit + 1);
-    expect(dialogue.longTermMemories[0]).toMatch(/^Earlier history:/);
+    expect(dialogue.longTermMemories[0]).toMatch(/^Earlier history \(32 entries; sampled\):/);
     expect(dialogue.longTermMemories.at(-1)).toContain('memory-marker-39');
     expect(JSON.stringify(dialogue).length).toBeLessThanOrEqual(dialogueBudget.maxCharacters);
 
@@ -555,7 +565,7 @@ describe('AI context builders', () => {
       180,
     );
     expect(compressed).toHaveLength(4);
-    expect(compressed[0]).toMatch(/^Earlier history: 1\. entry-0-/);
+    expect(compressed[0]).toMatch(/^Earlier history \(17 entries; sampled\): 1\. entry-0-/);
     expect(compressed[0]?.length).toBeLessThanOrEqual(180);
     expect(compressed.slice(1)).toEqual([
       `entry-17-${'x'.repeat(40)}`,

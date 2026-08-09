@@ -4,6 +4,7 @@ export {
   buildAdventureTurnContext,
   buildNpcDialogueContext,
   buildWorldEventContext,
+  assertTaskContextBudget,
   compressContextHistory,
   contextBudgetForTask,
   ContextBuildError,
