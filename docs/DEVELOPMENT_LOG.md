@@ -3160,3 +3160,23 @@
 ### 结论
 
 - `V02-M7-T07`完成。下一项严格为`V02-M8-T01` WorldTruth / Claim / Knowledge / Memory。
+
+## 2026-08-09 — V02-M8-T01 建立四层知识领域模型
+
+### 实现
+
+- 新增独立WorldTruth、Claim、Knowledge与Memory判别合同及各自强类型ID，避免继续用WorldFact或NPC记忆数组表达所有语义。
+- WorldTruth固定本地授权与public/game-private/secret可见性；Claim保存结构化陈述、Truth/Event/Actor来源、confidence和revision。
+- Knowledge固定Actor、Truth/Claim目标、known/suspected/believed状态、可见性与最小来源；Memory只能引用Knowledge/Event证据，不含任何Truth authority。
+- 构造器拒绝空白标识、非法枚举/置信度/revision、非有限或循环JSON、重复Memory来源和无来源Memory。
+- 记录`DEC-087`并同步Changelog/release摘要；T01没有把仅有合同的新对象写入SQLite，避免在T03完整provenance落地前制造第二套不完整真相源。
+
+### 验证
+
+- Knowledge合同4项定向测试与既有Foundation/World/Tavern共31项测试通过，覆盖四层区分、Actor范围、来源、Memory单向边界及非法输入。
+- 完整79个Vitest文件/446项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及83项测试通过，包含Windows纵向E2E；桌面前端200 modules生产构建通过。Rust继续以临时Cargo Home复用本机rsproxy缓存离线执行，未修改全局配置或依赖锁。
+
+### 结论
+
+- `V02-M8-T01`完成。下一项严格为`V02-M8-T02` NPC Knowledge Boundary。

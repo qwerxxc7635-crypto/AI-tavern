@@ -37,6 +37,35 @@ export type {
   LedgerSource,
 } from './event-ledger.js';
 export {
+  KNOWLEDGE_ACTOR_TYPES,
+  KNOWLEDGE_PROVENANCE_KINDS,
+  KNOWLEDGE_STATES,
+  KNOWLEDGE_VISIBILITIES,
+  TRUTH_AUTHORITIES,
+  TRUTH_VISIBILITIES,
+  KnowledgeModelError,
+  createClaim,
+  createKnowledge,
+  createMemory,
+  createWorldTruth,
+} from './knowledge.js';
+export type {
+  Claim,
+  ClaimSource,
+  Knowledge,
+  KnowledgeActor,
+  KnowledgeActorType,
+  KnowledgeProvenance,
+  KnowledgeProvenanceKind,
+  KnowledgeState,
+  KnowledgeTarget,
+  KnowledgeVisibility,
+  Memory,
+  TruthAuthority,
+  TruthVisibility,
+  WorldTruth,
+} from './knowledge.js';
+export {
   ADVENTURE_ACTION_MODES,
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
@@ -175,6 +204,10 @@ export {
   turnId,
   worldClockId,
   worldFactId,
+  worldTruthId,
+  claimId,
+  knowledgeId,
+  memoryId,
 } from './foundation.js';
 export type {
   ActionOptionId,
@@ -211,4 +244,8 @@ export type {
   TurnId,
   WorldClockId,
   WorldFactId,
+  WorldTruthId,
+  ClaimId,
+  KnowledgeId,
+  MemoryId,
 } from './foundation.js';

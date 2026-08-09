@@ -1830,3 +1830,19 @@ D20唯一判定顺序固定为：程序产生1至20的`raw`，把角色属性、
 ### 影响与边界
 
 旧`resolveCheck`保留为顺序调用“锁定结果→完成叙事”的兼容入口，Windows页面使用拆分接口建立明确动画边界。T07不新增骰制、重放历史界面、数据库schema或AI能力，也不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-087：四层知识对象以判别合同阻止反向升级
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T01`、Architecture Gate的WorldTruth/Claim/Knowledge/Memory不可互相冒充红线
+
+### 决定与理由
+
+共享领域层建立四种互不兼容的判别对象：WorldTruth只能由本地规则、用户接受、领域事务或导入授权创建；Claim保存subject/predicate/object、Truth/Event/Actor来源、0至1 confidence和revision；Knowledge绑定单一Actor，只能指向Truth或Claim，并携带known/suspected/believed状态、可见性及观察/交流/推理/导入来源；Memory只保存主观摘要及Knowledge/Event来源。
+
+所有构造器复核规范文本、有限JSON、枚举、confidence、正revision、来源唯一性和Memory非空证据。Memory类型不含truth authority，WorldTruth输入也不接受Memory来源，因此摘要、印象或模型记忆没有反向升级为客观事实的领域入口。
+
+### 影响与边界
+
+本任务建立后续纵向功能共用的最小领域合同，不把新对象伪装成已持久事实，也不立即迁移现有`world_facts`/`npc_knowledge`兼容投影。T02将把Actor Knowledge投影接入NPC Prompt边界；T03再落实source event、learned_at和confidence的SQLite provenance，不在T01提前新增不完整数据库真相源。未接入真实Provider、付费API、正式用户数据或iOS。

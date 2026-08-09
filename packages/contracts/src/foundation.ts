@@ -12,6 +12,10 @@ export type TurnId = Branded<string, 'TurnId'>;
 export type FactionId = Branded<string, 'FactionId'>;
 export type LocationId = Branded<string, 'LocationId'>;
 export type WorldFactId = Branded<string, 'WorldFactId'>;
+export type WorldTruthId = Branded<string, 'WorldTruthId'>;
+export type ClaimId = Branded<string, 'ClaimId'>;
+export type KnowledgeId = Branded<string, 'KnowledgeId'>;
+export type MemoryId = Branded<string, 'MemoryId'>;
 export type PlayerCharacterId = Branded<string, 'PlayerCharacterId'>;
 export type CharacterTraitId = Branded<string, 'CharacterTraitId'>;
 export type ItemId = Branded<string, 'ItemId'>;
@@ -57,6 +61,10 @@ export const turnId = (value: string): TurnId => createId(value, 'TurnId');
 export const factionId = (value: string): FactionId => createId(value, 'FactionId');
 export const locationId = (value: string): LocationId => createId(value, 'LocationId');
 export const worldFactId = (value: string): WorldFactId => createId(value, 'WorldFactId');
+export const worldTruthId = (value: string): WorldTruthId => createId(value, 'WorldTruthId');
+export const claimId = (value: string): ClaimId => createId(value, 'ClaimId');
+export const knowledgeId = (value: string): KnowledgeId => createId(value, 'KnowledgeId');
+export const memoryId = (value: string): MemoryId => createId(value, 'MemoryId');
 export const playerCharacterId = (value: string): PlayerCharacterId =>
   createId(value, 'PlayerCharacterId');
 export const characterTraitId = (value: string): CharacterTraitId =>
