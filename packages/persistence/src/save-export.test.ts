@@ -7,6 +7,7 @@ import {
   aiRequestId,
   campaignId,
   createCampaign,
+  createNpcKnowledge,
   gameEventId,
   generationRecordId,
   isoTimestamp,
@@ -289,6 +290,16 @@ describe('importCampaignSave', () => {
         .prepare('SELECT default_model_profile_id FROM campaigns WHERE id = ?')
         .get(campaignKey),
     ).toEqual({ default_model_profile_id: null });
+    expect(new NpcRepository(database).getKnowledge(npcId('npc-export'))?.provenance).toEqual([
+      {
+        factId: worldFactId('fact-export'),
+        state: 'KNOWN',
+        source: 'IMPORT',
+        eventId: null,
+        learnedAt: at,
+        confidence: 1,
+      },
+    ]);
 
     const continued = transitionCampaign(
       imported.campaign,
@@ -522,6 +533,26 @@ function seed(sqlite: TransactionalSqliteDatabase): void {
     updatedAt: at,
   });
   taverns.assignOwner(tavernKey, npcKey);
+  new NpcRepository(sqlite).saveKnowledge(
+    createNpcKnowledge({
+      npcId: npcKey,
+      knownFactIds: [worldFactId('fact-export')],
+      suspectedFactIds: [],
+      falseBeliefFactIds: [],
+      excludedSecretFactIds: [],
+      provenance: [
+        {
+          factId: worldFactId('fact-export'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: at,
+          confidence: 1,
+        },
+      ],
+    }),
+    at,
+  );
   new QuestRepository(sqlite).create({
     id: questKey,
     campaignId: campaignKey,

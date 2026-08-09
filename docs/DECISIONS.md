@@ -1862,3 +1862,21 @@ TypeScript Context Builder虽然从Repository取得Campaign事实集合，但只
 ### 影响与边界
 
 NPC自己的secret仍是其角色卡组成部分，可供扮演但受Prompt禁止主动泄露；其他NPC secret没有进入该路径。Adventure的多NPC知识投影属于既有GM上下文，不在T02借机改写。T03将为授权条目补齐持久provenance；本任务未新增数据库schema、真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-089：Knowledge Provenance与NPC兼容投影共用单一SQLite权威行
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T03`、SQLite唯一真相源及Truth/Claim/Knowledge/Memory不可冒充红线
+
+### 决定与理由
+
+不新建第二套Knowledge真相表。schema 7在现有`npc_knowledge`一NPC一行的权威记录上新增`provenance_json`，每个活动事实必须恰有一条包含state、source、eventId、learnedAt和confidence的来源记录。KNOWN、SUSPECTED与旧false belief投影分别对应KNOWN、SUSPECTED与BELIEVED；同一事实不能跨状态重复，excluded secret不能同时成为活动认知。
+
+来源闭集为LOCAL_RULE、OBSERVATION、COMMUNICATION、INFERENCE与IMPORT。观察、交流和推理必须引用同Campaign的`game_events`；本地规则与兼容导入允许无事件。confidence是Actor持有该认知的置信度，不把BELIEVED Claim提升为客观真相。TypeScript Repository在写入和读取时重建领域合同，原生NPC/Adventure上下文在读取时执行相同的状态、时间、置信度、Actor与事件验证。
+
+数据库schema 6升级时按原数组顺序确定性生成IMPORT provenance，怀疑项使用0.5，其余使用1.0，并过滤excluded secret。`.emtavern`格式版本保持2：新存档携带该JSON列；旧schema 1/2存档缺列时，导入隔离事务使用同一规则补齐后再执行领域重载验证。跨语言fixture随新列重新生成并以SHA-256锁定。
+
+### 影响与边界
+
+该迁移只扩展既有NPC认知权威行，不创建WorldTruth或Claim持久源，也不让Memory成为事实。T03不实现传闻来源化、随机性Profile或Context Inspector；这些仍按T04及后续任务顺序执行。未接入真实Provider、付费API、正式用户数据或iOS。

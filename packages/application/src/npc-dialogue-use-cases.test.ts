@@ -259,6 +259,16 @@ function seedCampaign(database: TransactionalSqliteDatabase): void {
       suspectedFactIds: [],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [worldFactId('fact-excluded')],
+      provenance: [
+        {
+          factId: worldFactId('fact-known'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: at,
+          confidence: 1,
+        },
+      ],
     }),
     at,
   );

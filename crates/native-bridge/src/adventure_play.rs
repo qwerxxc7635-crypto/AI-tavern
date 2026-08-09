@@ -3,6 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
+use crate::npc_dialogue::validate_knowledge_provenance;
 use crate::{
     CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
 };
@@ -1592,7 +1593,7 @@ fn adventure_npc_knowledge(
         let knowledge = connection
             .query_row(
                 "SELECT known_fact_ids_json, suspected_fact_ids_json,
-                        false_belief_fact_ids_json, excluded_secret_fact_ids_json
+                        false_belief_fact_ids_json, excluded_secret_fact_ids_json, provenance_json
                  FROM npc_knowledge
                  JOIN npcs ON npcs.id = npc_knowledge.npc_id
                  WHERE npc_knowledge.npc_id = ?1 AND npcs.campaign_id = ?2",
@@ -1603,11 +1604,22 @@ fn adventure_npc_knowledge(
                         from_json::<Vec<String>>(row.get(1)?)?,
                         from_json::<Vec<String>>(row.get(2)?)?,
                         from_json::<Vec<String>>(row.get(3)?)?,
+                        row.get::<_, String>(4)?,
                     ))
                 },
             )
             .optional()?;
-        if let Some((known, suspected, false_beliefs, excluded)) = knowledge {
+        if let Some((known, suspected, false_beliefs, excluded, provenance)) = knowledge {
+            validate_knowledge_provenance(
+                connection,
+                campaign_id,
+                &npc_id,
+                &known,
+                &suspected,
+                &false_beliefs,
+                &excluded,
+                &provenance,
+            )?;
             let excluded = excluded
                 .into_iter()
                 .collect::<std::collections::HashSet<_>>();
@@ -2735,9 +2747,11 @@ mod tests {
                  UPDATE taverns SET owner_npc_id = 'npc-owner' WHERE id = 'tavern-rest';
                  INSERT INTO npc_knowledge (
                    npc_id, known_fact_ids_json, suspected_fact_ids_json,
-                   false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
+                   false_belief_fact_ids_json, excluded_secret_fact_ids_json,
+                   provenance_json, updated_at
                  ) VALUES (
                    'npc-owner', '[\"fact-warm-lock\"]', '[]', '[]', '[]',
+                   '[{\"factId\":\"fact-warm-lock\",\"state\":\"KNOWN\",\"source\":\"IMPORT\",\"eventId\":null,\"learnedAt\":\"2026-07-31T06:00:00.000Z\",\"confidence\":1}]',
                    '2026-07-31T06:00:00.000Z'
                  );
                  INSERT INTO quests (

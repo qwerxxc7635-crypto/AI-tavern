@@ -112,6 +112,7 @@ const JSON_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
     'suspected_fact_ids_json',
     'false_belief_fact_ids_json',
     'excluded_secret_fact_ids_json',
+    'provenance_json',
   ]),
   quests: new Set([
     'content_json',

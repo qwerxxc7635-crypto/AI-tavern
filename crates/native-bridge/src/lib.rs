@@ -49,6 +49,8 @@ const EVENT_LEDGER_MIGRATION: &str =
     include_str!("../../../database/migrations/0005_event_ledger.sql");
 const SCENE_FRAMES_MIGRATION: &str =
     include_str!("../../../database/migrations/0006_scene_frames.sql");
+const KNOWLEDGE_PROVENANCE_MIGRATION: &str =
+    include_str!("../../../database/migrations/0007_knowledge_provenance.sql");
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -470,7 +472,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if latest_version > 6 {
+    if latest_version > 7 {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
 
@@ -489,6 +491,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (4_i64, "ai_candidates", AI_CANDIDATES_MIGRATION),
         (5_i64, "event_ledger", EVENT_LEDGER_MIGRATION),
         (6_i64, "scene_frames", SCENE_FRAMES_MIGRATION),
+        (
+            7_i64,
+            "knowledge_provenance",
+            KNOWLEDGE_PROVENANCE_MIGRATION,
+        ),
     ] {
         let applied_name = connection
             .query_row(

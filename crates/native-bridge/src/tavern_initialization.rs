@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{CampaignStore, CampaignStoreError, current_timestamp, validate_id};
@@ -656,9 +656,27 @@ fn insert_npc(
     transaction.execute(
         "INSERT INTO npc_knowledge (
            npc_id, known_fact_ids_json, suspected_fact_ids_json,
-           false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
-         ) VALUES (?1, ?2, '[]', '[]', '[]', ?3)",
-        params![insert.npc_id, to_json(&known_fact_ids)?, at],
+           false_belief_fact_ids_json, excluded_secret_fact_ids_json,
+           provenance_json, updated_at
+         ) VALUES (?1, ?2, '[]', '[]', '[]', ?3, ?4)",
+        params![
+            insert.npc_id,
+            to_json(&known_fact_ids)?,
+            to_json(
+                &known_fact_ids
+                    .iter()
+                    .map(|fact_id| json!({
+                        "factId": fact_id,
+                        "state": "KNOWN",
+                        "source": "LOCAL_RULE",
+                        "eventId": null,
+                        "learnedAt": at,
+                        "confidence": 1.0
+                    }))
+                    .collect::<Vec<_>>()
+            )?,
+            at
+        ],
     )?;
     transaction.execute(
         "INSERT INTO npc_relationships (
@@ -995,6 +1013,27 @@ mod tests {
         assert_eq!(restored.npcs, completed.npcs);
         assert_eq!(restored.rumors, completed.rumors);
         assert_eq!(restored.clocks, completed.clocks);
+        let connection = final_store.connect().expect("inspect provenance");
+        let mut statement = connection
+            .prepare("SELECT provenance_json FROM npc_knowledge ORDER BY npc_id")
+            .expect("prepare provenance query");
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("query provenance")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect provenance");
+        assert_eq!(rows.len(), 4);
+        assert!(rows.iter().all(|row| {
+            serde_json::from_str::<Vec<Value>>(row).is_ok_and(|entries| {
+                entries.iter().all(|entry| {
+                    entry["source"] == "LOCAL_RULE"
+                        && entry["state"] == "KNOWN"
+                        && entry["eventId"].is_null()
+                        && entry["learnedAt"].as_str().is_some()
+                        && entry["confidence"] == 1.0
+                })
+            })
+        }));
     }
 
     #[test]

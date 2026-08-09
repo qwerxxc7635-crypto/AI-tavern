@@ -3,6 +3,7 @@ import {
   campaignId,
   createNpcKnowledge,
   createNpcRelationship,
+  gameEventId,
   isoTimestamp,
   locationId,
   npcId,
@@ -13,6 +14,7 @@ import {
   turnId,
   worldFactId,
   type NpcKnowledge,
+  type NpcKnowledgeProvenance,
   type NpcMemory,
   type NpcProfile,
   type NpcRelationship,
@@ -36,6 +38,14 @@ import type { SqliteDatabase, SqliteRunResult } from './sqlite-port.js';
 
 const NPC_RESIDENCIES = ['OWNER', 'RESIDENT', 'TEMPORARY_VISITOR'] as const;
 const NPC_STATUSES = ['ACTIVE', 'ABSENT', 'LEFT', 'DECEASED'] as const;
+const NPC_KNOWLEDGE_STATES = ['KNOWN', 'SUSPECTED', 'BELIEVED'] as const;
+const NPC_KNOWLEDGE_SOURCES = [
+  'LOCAL_RULE',
+  'OBSERVATION',
+  'COMMUNICATION',
+  'INFERENCE',
+  'IMPORT',
+] as const;
 const TAVERN_CHANGE_KINDS = ['TROPHY', 'MENU', 'DAMAGE', 'DECORATION', 'LAYOUT', 'OTHER'] as const;
 
 export class TavernRepository {
@@ -277,25 +287,44 @@ export class NpcRepository {
   }
 
   public saveKnowledge(knowledge: NpcKnowledge, at: ReturnType<typeof isoTimestamp>): void {
+    const canonical = createNpcKnowledge(knowledge);
+    for (const entry of canonical.provenance) {
+      if (entry.eventId === null) continue;
+      const event = this.database
+        .prepare(
+          `SELECT 1 FROM game_events
+           JOIN npcs ON npcs.campaign_id = game_events.campaign_id
+           WHERE game_events.id = ? AND npcs.id = ?`,
+        )
+        .get(entry.eventId, canonical.npcId);
+      if (event === undefined) {
+        throw new PersistenceDataError(
+          `Knowledge provenance event is outside the NPC campaign: ${entry.eventId}`,
+        );
+      }
+    }
     this.database
       .prepare(
         `INSERT INTO npc_knowledge (
            npc_id, known_fact_ids_json, suspected_fact_ids_json,
-           false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
-         ) VALUES (?, ?, ?, ?, ?, ?)
+           false_belief_fact_ids_json, excluded_secret_fact_ids_json,
+           provenance_json, updated_at
+         ) VALUES (?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT(npc_id) DO UPDATE SET
            known_fact_ids_json = excluded.known_fact_ids_json,
            suspected_fact_ids_json = excluded.suspected_fact_ids_json,
            false_belief_fact_ids_json = excluded.false_belief_fact_ids_json,
            excluded_secret_fact_ids_json = excluded.excluded_secret_fact_ids_json,
+           provenance_json = excluded.provenance_json,
            updated_at = excluded.updated_at`,
       )
       .run(
-        knowledge.npcId,
-        JSON.stringify(knowledge.knownFactIds),
-        JSON.stringify(knowledge.suspectedFactIds),
-        JSON.stringify(knowledge.falseBeliefFactIds),
-        JSON.stringify(knowledge.excludedSecretFactIds),
+        canonical.npcId,
+        JSON.stringify(canonical.knownFactIds),
+        JSON.stringify(canonical.suspectedFactIds),
+        JSON.stringify(canonical.falseBeliefFactIds),
+        JSON.stringify(canonical.excludedSecretFactIds),
+        JSON.stringify(canonical.provenance),
         at,
       );
   }
@@ -405,20 +434,59 @@ function mapVisitor(value: unknown): TemporaryVisitor {
 }
 
 function mapKnowledge(value: unknown): NpcKnowledge {
-  const row = requireRecord(value, 'NpcKnowledge row');
-  const ids = (key: string) =>
-    Object.freeze(
-      requireArray(parseJson(row[key], key), key).map((id, index) =>
-        worldFactId(requireString(id, `${key}[${index}]`)),
+  try {
+    const row = requireRecord(value, 'NpcKnowledge row');
+    const ids = (key: string) =>
+      Object.freeze(
+        requireArray(parseJson(row[key], key), key).map((id, index) =>
+          worldFactId(requireString(id, `${key}[${index}]`)),
+        ),
+      );
+    return createNpcKnowledge({
+      npcId: npcId(requireString(row['npc_id'], 'npc_id')),
+      knownFactIds: ids('known_fact_ids_json'),
+      suspectedFactIds: ids('suspected_fact_ids_json'),
+      falseBeliefFactIds: ids('false_belief_fact_ids_json'),
+      excludedSecretFactIds: ids('excluded_secret_fact_ids_json'),
+      provenance: Object.freeze(
+        requireArray(parseJson(row['provenance_json'], 'provenance_json'), 'provenance_json').map(
+          (value, index): NpcKnowledgeProvenance => {
+            const entry = requireRecord(value, `provenance_json[${index}]`);
+            const rawEventId = requireNullableString(
+              entry['eventId'],
+              `provenance_json[${index}].eventId`,
+            );
+            return Object.freeze({
+              factId: worldFactId(
+                requireString(entry['factId'], `provenance_json[${index}].factId`),
+              ),
+              state: requireEnum(
+                NPC_KNOWLEDGE_STATES,
+                entry['state'],
+                `provenance_json[${index}].state`,
+              ),
+              source: requireEnum(
+                NPC_KNOWLEDGE_SOURCES,
+                entry['source'],
+                `provenance_json[${index}].source`,
+              ),
+              eventId: rawEventId === null ? null : gameEventId(rawEventId),
+              learnedAt: isoTimestamp(
+                requireString(entry['learnedAt'], `provenance_json[${index}].learnedAt`),
+              ),
+              confidence: requireNumber(
+                entry['confidence'],
+                `provenance_json[${index}].confidence`,
+              ),
+            });
+          },
+        ),
       ),
-    );
-  return createNpcKnowledge({
-    npcId: npcId(requireString(row['npc_id'], 'npc_id')),
-    knownFactIds: ids('known_fact_ids_json'),
-    suspectedFactIds: ids('suspected_fact_ids_json'),
-    falseBeliefFactIds: ids('false_belief_fact_ids_json'),
-    excludedSecretFactIds: ids('excluded_secret_fact_ids_json'),
-  });
+    });
+  } catch (error) {
+    if (error instanceof PersistenceDataError) throw error;
+    throw new PersistenceDataError('Persisted NPC knowledge is invalid', { cause: error });
+  }
 }
 
 function mapRelationship(value: unknown): NpcRelationship {

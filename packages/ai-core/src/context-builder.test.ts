@@ -135,10 +135,36 @@ const relationship: NpcRelationship = {
 };
 const knowledge: NpcKnowledge = {
   npcId: targetNpcId,
-  knownFactIds: [targetFactId, excludedFactId],
+  knownFactIds: [targetFactId],
   suspectedFactIds: [suspectedFactId],
   falseBeliefFactIds: [falseFactId],
   excludedSecretFactIds: [excludedFactId],
+  provenance: [
+    {
+      factId: targetFactId,
+      state: 'KNOWN',
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt: now,
+      confidence: 1,
+    },
+    {
+      factId: suspectedFactId,
+      state: 'SUSPECTED',
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt: now,
+      confidence: 0.5,
+    },
+    {
+      factId: falseFactId,
+      state: 'BELIEVED',
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt: now,
+      confidence: 1,
+    },
+  ],
 };
 const facts: readonly WorldFact[] = [
   fact(targetFactId, 'The cellar door is warm.'),

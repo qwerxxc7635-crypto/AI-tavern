@@ -180,9 +180,10 @@ erDiagram
 | `suspected_fact_ids_json` | TEXT JSON | 怀疑数组 |
 | `false_belief_fact_ids_json` | TEXT JSON | 错误认知数组 |
 | `excluded_secret_fact_ids_json` | TEXT JSON | 明确不可知秘密数组 |
+| `provenance_json` | TEXT JSON | 每个活动知识事实的state、source、eventId、learnedAt与confidence；与四个兼容投影同一权威行 |
 | `updated_at` | TEXT | 修改时间 |
 
-索引：主键满足按NPC读取。JSON中的ID由Repository验证属于同一Campaign；不使用全知事实查询构建NPC上下文。
+索引：主键满足按NPC读取。JSON中的ID由Repository验证属于同一Campaign；provenance必须与活动知识ID一一对应，观察/交流/推理来源必须引用同Campaign事件，明确排除的秘密不得拥有活动provenance。不使用全知事实查询构建NPC上下文。
 
 ### 3.8 `npc_relationships`
 
@@ -438,7 +439,7 @@ erDiagram
 | player_characters | story_preferences_json, content_boundaries_json, attributes_json, traits_json, background_json, initial_equipment_ids_json |
 | taverns | special_rules_json, changes_json |
 | npcs | visit_json, memories_json |
-| npc_knowledge | known_fact_ids_json, suspected_fact_ids_json, false_belief_fact_ids_json, excluded_secret_fact_ids_json |
+| npc_knowledge | known_fact_ids_json, suspected_fact_ids_json, false_belief_fact_ids_json, excluded_secret_fact_ids_json, provenance_json |
 | quests | content_json, recommended_attributes_json, related_npc_ids_json, related_fact_ids_json |
 | adventures | plan_json, clues_json, ending_json |
 | adventure_turns | speaker_npc_ids_json, suggested_actions_json, player_action_json, check_request_json, dice_result_json |

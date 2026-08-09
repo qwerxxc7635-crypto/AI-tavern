@@ -75,6 +75,7 @@ export const KNOWLEDGE_VISIBILITIES = ['ACTOR_PRIVATE', 'SHARED'] as const;
 export type KnowledgeVisibility = (typeof KNOWLEDGE_VISIBILITIES)[number];
 
 export const KNOWLEDGE_PROVENANCE_KINDS = [
+  'LOCAL_RULE',
   'OBSERVATION',
   'COMMUNICATION',
   'INFERENCE',
@@ -85,6 +86,9 @@ export type KnowledgeProvenanceKind = (typeof KNOWLEDGE_PROVENANCE_KINDS)[number
 export interface KnowledgeProvenance {
   readonly kind: KnowledgeProvenanceKind;
   readonly sourceId: string;
+  readonly eventId: GameEventId | null;
+  readonly learnedAt: IsoTimestamp;
+  readonly confidence: number;
 }
 
 export interface Knowledge {
@@ -151,6 +155,13 @@ export function createKnowledge(input: Omit<Knowledge, 'kind'>): Knowledge {
   requireEnum(KNOWLEDGE_STATES, input.state, 'Knowledge state');
   requireEnum(KNOWLEDGE_VISIBILITIES, input.visibility, 'Knowledge visibility');
   requireEnum(KNOWLEDGE_PROVENANCE_KINDS, input.provenance.kind, 'Knowledge provenance kind');
+  if (
+    input.provenance.kind !== 'LOCAL_RULE' &&
+    input.provenance.kind !== 'IMPORT' &&
+    input.provenance.eventId === null
+  ) {
+    throw new KnowledgeModelError('Knowledge provenance source requires an event');
+  }
   return Object.freeze({
     ...input,
     kind: 'KNOWLEDGE',
@@ -159,9 +170,18 @@ export function createKnowledge(input: Omit<Knowledge, 'kind'>): Knowledge {
     provenance: Object.freeze({
       ...input.provenance,
       sourceId: requireText(input.provenance.sourceId, 'Knowledge provenance sourceId'),
+      learnedAt: requireTimestamp(input.provenance.learnedAt, 'Knowledge provenance learnedAt'),
+      confidence: requireConfidence(input.provenance.confidence),
     }),
     revision: requireRevision(input.revision),
   });
+}
+
+function requireTimestamp(value: IsoTimestamp, label: string): IsoTimestamp {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value)
+    throw new KnowledgeModelError(`${label} must be an ISO timestamp`);
+  return value;
 }
 
 export function createMemory(input: Omit<Memory, 'kind'>): Memory {

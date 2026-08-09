@@ -38,6 +38,11 @@ const migrations = [
     name: 'scene_frames',
     source: new URL('../../../database/migrations/0006_scene_frames.sql', import.meta.url),
   },
+  {
+    version: 7,
+    name: 'knowledge_provenance',
+    source: new URL('../../../database/migrations/0007_knowledge_provenance.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

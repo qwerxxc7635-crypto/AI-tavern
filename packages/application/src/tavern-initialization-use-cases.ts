@@ -163,6 +163,7 @@ export class TavernInitializationUseCases {
       null,
       command.playerCharacterId,
       [],
+      timestamp,
     );
     try {
       this.requests.commitTavernOnce(
@@ -271,6 +272,7 @@ export class TavernInitializationUseCases {
           : null,
         character.id,
         sourcedRumors.map((fact) => requireFact(fact).id),
+        timestamp,
       );
     });
     const nextCampaign =
@@ -472,6 +474,7 @@ function npcRecord(
   visitor: NpcInitializationRecord['visitor'],
   playerCharacterId: PlayerCharacterId,
   knownFactIds: readonly WorldFactId[],
+  learnedAt: IsoTimestamp,
 ): NpcInitializationRecord {
   return Object.freeze({
     profile: Object.freeze(profile),
@@ -482,6 +485,14 @@ function npcRecord(
       suspectedFactIds: [],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [],
+      provenance: knownFactIds.map((factId) => ({
+        factId,
+        state: 'KNOWN',
+        source: 'LOCAL_RULE',
+        eventId: null,
+        learnedAt,
+        confidence: 1,
+      })),
     }),
     relationship: createNpcRelationship({
       npcId: profile.id,

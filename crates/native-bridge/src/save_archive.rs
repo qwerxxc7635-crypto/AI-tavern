@@ -26,7 +26,7 @@ use super::{
 const FORMAT_VERSION: u64 = 1;
 const DATABASE_SCHEMA_VERSION: u64 = 2;
 const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
-const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 6;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 7;
 const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_COMPRESSION_RATIO: u64 = 100;
@@ -644,7 +644,13 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             .ok_or(CampaignStoreError::ArchiveInvalid)?;
         let rows = values
             .iter()
-            .map(|value| parse_stored_row(require_object(Some(value))?, table))
+            .map(|value| {
+                let mut row = parse_stored_row(require_object(Some(value))?, table)?;
+                if table == "npc_knowledge" {
+                    upgrade_legacy_knowledge_row(&mut row)?;
+                }
+                Ok::<_, CampaignStoreError>(row)
+            })
             .collect::<Result<Vec<_>, _>>()?;
         for row in &rows {
             if row.contains_key("campaign_id")
@@ -849,6 +855,70 @@ fn parse_stored_row(
     Ok(result)
 }
 
+fn upgrade_legacy_knowledge_row(row: &mut Map<String, Value>) -> Result<(), CampaignStoreError> {
+    if row.contains_key("provenance_json") {
+        return Ok(());
+    }
+    let learned_at = row
+        .get("updated_at")
+        .and_then(Value::as_str)
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+        .to_owned();
+    validate_timestamp(&learned_at)?;
+    let parse_ids = |column: &str| -> Result<Vec<String>, CampaignStoreError> {
+        let text = row
+            .get(column)
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        serde_json::from_str(text).map_err(|_| CampaignStoreError::ArchiveInvalid)
+    };
+    let excluded = parse_ids("excluded_secret_fact_ids_json")?
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>();
+    let known = parse_ids("known_fact_ids_json")?
+        .into_iter()
+        .filter(|id| !excluded.contains(id))
+        .collect::<Vec<_>>();
+    let suspected = parse_ids("suspected_fact_ids_json")?
+        .into_iter()
+        .filter(|id| !excluded.contains(id))
+        .collect::<Vec<_>>();
+    let believed = parse_ids("false_belief_fact_ids_json")?
+        .into_iter()
+        .filter(|id| !excluded.contains(id))
+        .collect::<Vec<_>>();
+    let mut entries = Vec::new();
+    for (ids, state, confidence) in [
+        (&known, "KNOWN", 1.0),
+        (&suspected, "SUSPECTED", 0.5),
+        (&believed, "BELIEVED", 1.0),
+    ] {
+        for fact_id in ids {
+            entries.push(json!({
+                "factId": fact_id,
+                "state": state,
+                "source": "IMPORT",
+                "eventId": null,
+                "learnedAt": learned_at,
+                "confidence": confidence,
+            }));
+        }
+    }
+    for (column, ids) in [
+        ("known_fact_ids_json", known),
+        ("suspected_fact_ids_json", suspected),
+        ("false_belief_fact_ids_json", believed),
+    ] {
+        let text = String::from_utf8(canonical_json_bytes(&json!(ids))?)
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        row.insert(column.to_owned(), Value::String(text));
+    }
+    let text = String::from_utf8(canonical_json_bytes(&Value::Array(entries))?)
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    row.insert("provenance_json".to_owned(), Value::String(text));
+    Ok(())
+}
+
 fn normalize_json_text(
     text: &str,
     table: &str,
@@ -1008,6 +1078,7 @@ fn is_json_column(table: &str, column: &str) -> bool {
                     | "suspected_fact_ids_json"
                     | "false_belief_fact_ids_json"
                     | "excluded_secret_fact_ids_json"
+                    | "provenance_json"
             )
             | (
                 "quests",

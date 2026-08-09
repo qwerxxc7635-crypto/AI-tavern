@@ -281,13 +281,27 @@ fn load_generation_context(
         return Err(CampaignStoreError::InvalidState);
     }
     let relationship = load_relationship(connection, npc_id)?;
-    let (known, suspected, false_beliefs, excluded): (String, String, String, String) = connection
+    let (known, suspected, false_beliefs, excluded, provenance): (
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) = connection
         .query_row(
             "SELECT known_fact_ids_json, suspected_fact_ids_json,
-                    false_belief_fact_ids_json, excluded_secret_fact_ids_json
+                    false_belief_fact_ids_json, excluded_secret_fact_ids_json, provenance_json
              FROM npc_knowledge WHERE npc_id = ?1",
             [npc_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .optional()?
         .ok_or(CampaignStoreError::InvalidData)?;
@@ -295,6 +309,16 @@ fn load_generation_context(
     let known = id_list(&known)?;
     let suspected = id_list(&suspected)?;
     let false_beliefs = id_list(&false_beliefs)?;
+    validate_knowledge_provenance(
+        connection,
+        campaign_id,
+        npc_id,
+        &known,
+        &suspected,
+        &false_beliefs,
+        &excluded,
+        &provenance,
+    )?;
     let mut used = std::collections::HashSet::new();
     let mut knowledge = knowledge_entries(
         connection,
@@ -381,6 +405,92 @@ fn load_generation_context(
         "recentMessages": recent_messages,
         "longTermMemories": long_term_memories,
     }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredKnowledgeProvenance {
+    fact_id: String,
+    state: String,
+    source: String,
+    event_id: Option<String>,
+    learned_at: String,
+    confidence: f64,
+}
+
+pub(crate) fn validate_knowledge_provenance(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+    known: &[String],
+    suspected: &[String],
+    false_beliefs: &[String],
+    excluded: &[String],
+    raw: &str,
+) -> Result<(), CampaignStoreError> {
+    let mut expected = std::collections::HashMap::new();
+    for (ids, state) in [
+        (known, "KNOWN"),
+        (suspected, "SUSPECTED"),
+        (false_beliefs, "BELIEVED"),
+    ] {
+        for fact_id in ids {
+            if expected.insert(fact_id.as_str(), state).is_some() || excluded.contains(fact_id) {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    let entries: Vec<StoredKnowledgeProvenance> =
+        serde_json::from_str(raw).map_err(|_| CampaignStoreError::InvalidData)?;
+    if entries.len() != expected.len() {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut seen = std::collections::HashSet::new();
+    for entry in entries {
+        if !seen.insert(entry.fact_id.clone())
+            || expected.get(entry.fact_id.as_str()).copied() != Some(entry.state.as_str())
+            || !entry.confidence.is_finite()
+            || !(0.0..=1.0).contains(&entry.confidence)
+            || time::OffsetDateTime::parse(
+                &entry.learned_at,
+                &time::format_description::well_known::Rfc3339,
+            )
+            .is_err()
+            || !matches!(
+                entry.source.as_str(),
+                "LOCAL_RULE" | "OBSERVATION" | "COMMUNICATION" | "INFERENCE" | "IMPORT"
+            )
+            || (!matches!(entry.source.as_str(), "LOCAL_RULE" | "IMPORT")
+                && entry.event_id.is_none())
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        if let Some(event_id) = entry.event_id {
+            let exists = connection
+                .query_row(
+                    "SELECT 1 FROM game_events WHERE id = ?1 AND campaign_id = ?2",
+                    params![event_id, campaign_id],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            if !exists {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    let npc_exists = connection
+        .query_row(
+            "SELECT 1 FROM npcs WHERE id = ?1 AND campaign_id = ?2",
+            params![npc_id, campaign_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !npc_exists {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(())
 }
 
 fn load_npc(
@@ -892,9 +1002,11 @@ mod tests {
                  );
                  INSERT INTO npc_knowledge (
                    npc_id, known_fact_ids_json, suspected_fact_ids_json,
-                   false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
+                   false_belief_fact_ids_json, excluded_secret_fact_ids_json,
+                   provenance_json, updated_at
                  ) VALUES (
                    'npc-owner', '[\"fact-known\"]', '[]', '[]', '[]',
+                   '[{\"factId\":\"fact-known\",\"state\":\"KNOWN\",\"source\":\"IMPORT\",\"eventId\":null,\"learnedAt\":\"2026-07-31T05:00:00.000Z\",\"confidence\":1}]',
                    '2026-07-31T05:00:00.000Z'
                  );
                  INSERT INTO npc_relationships (

@@ -101,10 +101,20 @@ export type {
   RumorContent,
   RumorTruthStatus,
 } from './quest.js';
-export { RelationshipValueError, createNpcKnowledge, createNpcRelationship } from './tavern.js';
+export {
+  NPC_KNOWLEDGE_SOURCES,
+  NPC_KNOWLEDGE_STATES,
+  NpcKnowledgeError,
+  RelationshipValueError,
+  createNpcKnowledge,
+  createNpcRelationship,
+} from './tavern.js';
 export type {
   NpcKnowledge,
   NpcKnowledgeInput,
+  NpcKnowledgeProvenance,
+  NpcKnowledgeSource,
+  NpcKnowledgeState,
   NpcMemory,
   NpcProfile,
   NpcRelationship,

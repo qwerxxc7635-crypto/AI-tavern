@@ -54,7 +54,8 @@
 - `V02-M7-T07`：DONE；D20动画只消费SQLite中已锁定的硬结果，支持跳过、减少动态效果、中断/刷新恢复及重复点击合并，任何展示路径都不会重骰。
 - `V02-M8-T01`：DONE；共享领域合同以独立判别模型区分WorldTruth、Claim、actor-scoped Knowledge与Memory，并验证truth/event→claim/knowledge→memory的单向来源边界。
 - `V02-M8-T02`：DONE；NPC_REPLY只接收当前Actor获准的Truth/Claim知识投影、同Actor消息/记忆与自身角色卡，缺失、重复、跨Actor错误认知或客户端篡改均fail closed。
-- 下一执行项严格进入 `V02-M8-T03` Knowledge Provenance。
+- `V02-M8-T03`：DONE；schema 7在既有NPC Knowledge权威行记录source、event、learned_at与confidence，旧数据库/存档确定性回填，双实现读取均验证Actor、状态与事件边界。
+- 下一执行项严格进入 `V02-M8-T04` Rumor / Claim。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 

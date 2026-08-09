@@ -3200,3 +3200,23 @@
 ### 结论
 
 - `V02-M8-T02`完成。下一项严格为`V02-M8-T03` Knowledge Provenance。
+
+## 2026-08-09 — V02-M8-T03 持久化 Knowledge Provenance
+
+### 实现
+
+- schema 7在既有`npc_knowledge`权威行新增`provenance_json`，为每个活动知识事实记录state、source、eventId、learnedAt与confidence；没有新建第二套Truth或Knowledge数据源。
+- 共享合同拒绝缺失/重复provenance、跨状态重复、excluded secret重叠、非法时间/置信度与无事件的观察/交流/推理来源；通用Knowledge合同同步补齐四个来源字段。
+- TypeScript Repository原子保存来源并验证事件属于同一NPC Campaign；原生NPC对话与Adventure上下文读取执行同等状态、Actor、时间、置信度和事件校验。
+- schema 6数据库按原数组顺序确定性回填IMPORT来源，过滤excluded secret；旧`.emtavern` schema 1/2缺列时在隔离导入阶段补齐后再执行严格领域重载。
+- 存档JSON列清单、TypeScript/Rust导出导入及双向fixture已同步，记录`DEC-089`；未提前实现T04传闻来源化、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 完整79个Vitest文件/448项测试与22项Node测试通过；迁移定向测试覆盖schema 6已知/怀疑/相信及excluded secret回填，Repository与合同覆盖来源往返和非法来源拒绝。
+- Rust workspace格式、全target/feature Clippy及84项测试通过，包含原生NPC/Adventure边界、初始化持久化和Windows纵向E2E。
+- `pnpm archive:interop`完成当前TypeScript/Rust归档双向生成、交叉导入与fixture逐条目比对；桌面前端200 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T03`完成。下一项严格为`V02-M8-T04` Rumor / Claim。

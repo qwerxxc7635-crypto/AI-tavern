@@ -57,7 +57,13 @@ describe('WorldTruth / Claim / Knowledge / Memory', () => {
       target: { kind: 'CLAIM', claimId: claimId('claim-beacon') },
       state: 'SUSPECTED',
       visibility: 'ACTOR_PRIVATE',
-      provenance: { kind: 'COMMUNICATION', sourceId: 'conversation-one' },
+      provenance: {
+        kind: 'COMMUNICATION',
+        sourceId: 'conversation-one',
+        eventId: event,
+        learnedAt: at,
+        confidence: 0.7,
+      },
       revision: 1,
     });
 
@@ -111,7 +117,13 @@ describe('WorldTruth / Claim / Knowledge / Memory', () => {
         target: { kind: 'TRUTH', truthId: worldTruthId('truth-beacon') },
         state: 'KNOWN',
         visibility: 'ACTOR_PRIVATE',
-        provenance: { kind: 'OBSERVATION', sourceId: 'event-observed' },
+        provenance: {
+          kind: 'OBSERVATION',
+          sourceId: 'event-observed',
+          eventId: event,
+          learnedAt: at,
+          confidence: 1,
+        },
         revision: 0,
       }),
     ).toThrow('Revision');

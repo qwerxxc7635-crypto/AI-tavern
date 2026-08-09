@@ -322,7 +322,10 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
       ? Object.freeze([])
       : Object.freeze(
           requireRecordArray(tableRoot[table], `campaign.tables.${table}`, MAX_TABLE_RECORDS).map(
-            (row) => parseStoredRow(row, table),
+            (row) => {
+              const parsed = parseStoredRow(row, table);
+              return table === 'npc_knowledge' ? upgradeLegacyKnowledgeRow(parsed) : parsed;
+            },
           ),
         ),
   );
@@ -733,6 +736,60 @@ function parseStoredRow(value: unknown, label: string): StoredRow {
         return [key, entry];
       }),
     ),
+  );
+}
+
+function upgradeLegacyKnowledgeRow(row: StoredRow): StoredRow {
+  if ('provenance_json' in row) return row;
+  const learnedAt = requireString(row['updated_at'], 'npc_knowledge.updated_at');
+  requireCanonicalTimestamp(learnedAt, 'npc_knowledge.updated_at');
+  const excluded = new Set(parseStoredIdArray(row, 'excluded_secret_fact_ids_json'));
+  const known = parseStoredIdArray(row, 'known_fact_ids_json').filter((id) => !excluded.has(id));
+  const suspected = parseStoredIdArray(row, 'suspected_fact_ids_json').filter(
+    (id) => !excluded.has(id),
+  );
+  const believed = parseStoredIdArray(row, 'false_belief_fact_ids_json').filter(
+    (id) => !excluded.has(id),
+  );
+  const provenance = [
+    ...known.map((factId) => ({
+      factId,
+      state: 'KNOWN',
+      confidence: 1,
+    })),
+    ...suspected.map((factId) => ({
+      factId,
+      state: 'SUSPECTED',
+      confidence: 0.5,
+    })),
+    ...believed.map((factId) => ({
+      factId,
+      state: 'BELIEVED',
+      confidence: 1,
+    })),
+  ]
+    .filter(({ factId }) => !excluded.has(factId))
+    .map(({ factId, state, confidence }) => ({
+      factId,
+      state,
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt,
+      confidence,
+    }));
+  return Object.freeze({
+    ...row,
+    known_fact_ids_json: canonicalJson(known),
+    suspected_fact_ids_json: canonicalJson(suspected),
+    false_belief_fact_ids_json: canonicalJson(believed),
+    provenance_json: canonicalJson(provenance),
+  });
+}
+
+function parseStoredIdArray(row: StoredRow, column: string): readonly string[] {
+  const raw = requireString(row[column], `npc_knowledge.${column}`);
+  return requireArray(parseJson(raw, `npc_knowledge.${column}`), column).map((value, index) =>
+    requireString(value, `${column}[${index}]`),
   );
 }
 
