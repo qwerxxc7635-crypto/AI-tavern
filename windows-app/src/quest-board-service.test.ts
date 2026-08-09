@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { FakeAIProvider } from '@ember-tavern/ai-core';
+import { FakeAIProvider, questStructureSignature } from '@ember-tavern/ai-core';
 
 import {
   WindowsQuestBoardService,
@@ -34,6 +34,7 @@ describe('WindowsQuestBoardService', () => {
     ]);
     expect(gateway.inputs[1]).toMatchObject({
       recentQuestTitles: ['The Fading Beacon'],
+      recentQuestStructures: ['moderate|notable|8-12|agility,knowledge'],
     });
 
     const accepted = await service.accept('campaign-tavern', required(first.quests[0]).id);
@@ -85,6 +86,15 @@ class MemoryQuestGateway implements QuestBoardGateway {
       source: {
         ...this.snapshot.source,
         recentQuestTitles: [...this.snapshot.source.recentQuestTitles, quest.content.title],
+        recentQuestStructures: [
+          ...this.snapshot.source.recentQuestStructures,
+          questStructureSignature({
+            risk: quest.risk,
+            rewardTier: quest.rewardTier,
+            expectedTurns: { min: quest.expectedTurnsMin, max: quest.expectedTurnsMax },
+            recommendedAttributes: quest.recommendedAttributes,
+          }),
+        ],
       },
     };
     return this.snapshot;
@@ -121,6 +131,7 @@ function emptySnapshot(): QuestBoardSnapshot {
       },
       availableNpcs: [npc('npc-owner', 'Ilyra Venn'), npc('npc-resident', 'Tomas Reed')],
       recentQuestTitles: [],
+      recentQuestStructures: [],
     },
     quests: [],
   };

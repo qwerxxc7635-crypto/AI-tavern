@@ -1,6 +1,8 @@
 import type { JsonValue } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
+import { findRepeatedNpcArchetype, findRepeatedPhrase } from './repetition-detector.js';
+
 const text = z.string().trim().min(1).max(4_000);
 const sceneText = z.string().trim().min(1).max(12_000);
 const shortText = z.string().trim().min(1).max(200);
@@ -257,6 +259,7 @@ export const GenerateNpcsInputSchema = z
       })
       .strict(),
     existingNpcNames: z.array(shortText).max(20),
+    existingNpcArchetypes: z.array(text).max(20),
     requestedCount: z.number().int().min(1).max(8),
   })
   .strict();
@@ -295,7 +298,36 @@ export const GenerateNpcsOutputSchema = z
       )
       .length(3),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    const archetype = findRepeatedNpcArchetype(output.npcs);
+    if (archetype !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['npcs'],
+        message: `repeated NPC archetype: ${archetype}`,
+      });
+    }
+    const phrase = findRepeatedPhrase([
+      ...output.npcs.flatMap((npc) => [
+        npc.identity,
+        npc.appearance,
+        npc.personality,
+        npc.goal,
+        npc.secret,
+        npc.speechStyle,
+        npc.visitReason ?? '',
+      ]),
+      ...output.rumors.map((rumor) => rumor.statement),
+    ]);
+    if (phrase !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['npcs'],
+        message: `repeated phrase: ${phrase}`,
+      });
+    }
+  });
 
 export const NpcReplyInputSchema = z
   .object({
@@ -336,7 +368,17 @@ export const NpcReplyOutputSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    const phrase = findRepeatedPhrase([
+      output.reply,
+      ...output.suggestedTopics,
+      output.memoryCandidate ?? '',
+    ]);
+    if (phrase !== null) {
+      context.addIssue({ code: 'custom', path: ['reply'], message: `repeated phrase: ${phrase}` });
+    }
+  });
 
 export const GenerateQuestInputSchema = z
   .object({
@@ -346,6 +388,7 @@ export const GenerateQuestInputSchema = z
     availableNpcs: z.array(npcBrief).max(12),
     playerConcept: text,
     recentQuestTitles: z.array(shortText).max(20),
+    recentQuestStructures: z.array(shortText).max(20),
   })
   .strict();
 export const GenerateQuestOutputSchema = z
@@ -362,6 +405,21 @@ export const GenerateQuestOutputSchema = z
   .refine((quest) => quest.expectedTurns.max >= quest.expectedTurns.min, {
     message: 'expectedTurns.max must be at least min',
     path: ['expectedTurns', 'max'],
+  })
+  .superRefine((quest, context) => {
+    const phrase = findRepeatedPhrase([
+      quest.content.title,
+      quest.content.summary,
+      quest.content.objective,
+      quest.content.failureCost,
+    ]);
+    if (phrase !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['content'],
+        message: `repeated phrase: ${phrase}`,
+      });
+    }
   });
 
 export const GenerateAdventurePlanInputSchema = z

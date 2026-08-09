@@ -73,4 +73,19 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(3),
     change: 'Source each tavern rumor as a lightweight NPC Claim with basis and confidence.',
   }),
+  Object.freeze({
+    task: 'GENERATE_NPCS',
+    version: promptVersion(4),
+    change: 'Avoid repeated phrases and duplicate NPC identity/personality archetypes.',
+  }),
+  Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(3),
+    change: 'Reject substantial phrase repetition inside a generated reply.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_QUEST',
+    version: promptVersion(2),
+    change: 'Avoid recent quest structures and substantial repeated phrases.',
+  }),
 ]);

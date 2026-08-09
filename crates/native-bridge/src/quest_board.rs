@@ -4,7 +4,8 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    repetition::find_repeated_phrase, repetition::quest_structure_signature, validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -39,6 +40,7 @@ pub struct QuestGenerationSource {
     pub world: QuestWorldContext,
     pub available_npcs: Vec<QuestNpcBrief>,
     pub recent_quest_titles: Vec<String>,
+    pub recent_quest_structures: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -167,6 +169,7 @@ impl CampaignStore {
             "availableNpcs": source.available_npcs,
             "playerConcept": source.player_concept,
             "recentQuestTitles": source.recent_quest_titles,
+            "recentQuestStructures": source.recent_quest_structures,
         });
         if command.generation.input != expected_input
             || command.generation.context
@@ -176,6 +179,16 @@ impl CampaignStore {
                     "publisherNpcId": command.publisher_npc_id,
                 })
         {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        let structure = quest_structure_signature(
+            &output.risk,
+            &output.reward_tier,
+            output.expected_turns.min,
+            output.expected_turns.max,
+            &output.recommended_attributes,
+        );
+        if source.recent_quest_structures.contains(&structure) {
             return Err(CampaignStoreError::InvalidData);
         }
         validate_references(&transaction, &command.campaign_id, &source, &output)?;
@@ -339,14 +352,29 @@ fn load_source(
     if available_npcs.is_empty() {
         return Err(CampaignStoreError::InvalidData);
     }
-    let recent_quest_titles = load_quests(connection, campaign_id)?
+    let recent_quests = load_quests(connection, campaign_id)?
         .into_iter()
         .rev()
         .take(20)
         .collect::<Vec<_>>()
         .into_iter()
         .rev()
-        .map(|quest| quest.content.title)
+        .collect::<Vec<_>>();
+    let recent_quest_titles = recent_quests
+        .iter()
+        .map(|quest| quest.content.title.clone())
+        .collect();
+    let recent_quest_structures = recent_quests
+        .iter()
+        .map(|quest| {
+            quest_structure_signature(
+                &quest.risk,
+                &quest.reward_tier,
+                quest.expected_turns_min,
+                quest.expected_turns_max,
+                &quest.recommended_attributes,
+            )
+        })
         .collect();
     Ok(QuestGenerationSource {
         tavern_id,
@@ -356,6 +384,7 @@ fn load_source(
         world,
         available_npcs,
         recent_quest_titles,
+        recent_quest_structures,
     })
 }
 
@@ -446,6 +475,16 @@ fn validate_output(output: &QuestOutput) -> Result<(), CampaignStoreError> {
         &output.content.failure_cost,
     ] {
         validate_text(value, 4_000)?;
+    }
+    if find_repeated_phrase([
+        output.content.title.as_str(),
+        output.content.summary.as_str(),
+        output.content.objective.as_str(),
+        output.content.failure_cost.as_str(),
+    ])
+    .is_some()
+    {
+        return Err(CampaignStoreError::InvalidData);
     }
     if !["LOW", "MODERATE", "HIGH", "EXTREME"].contains(&output.risk.as_str())
         || !["BASIC", "NOTABLE", "RARE", "LEGENDARY"].contains(&output.reward_tier.as_str())
@@ -665,6 +704,29 @@ mod tests {
                 .quests
                 .is_empty()
         );
+
+        let first = store
+            .commit_quest_generation(command(&snapshot, "npc-owner", 1))
+            .expect("first distinct quest");
+        let mut repeated = command(&first, "npc-owner", 2);
+        repeated.generation.validated_output["risk"] = json!("MODERATE");
+        repeated.generation.validated_output["recommendedAttributes"] =
+            json!(["knowledge", "agility"]);
+        repeated.generation.validated_output["expectedTurns"] = json!({ "min": 8, "max": 12 });
+        repeated.generation.validated_output["rewardTier"] = json!("NOTABLE");
+        repeated.generation.raw_response_text = repeated.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_quest_generation(repeated),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        assert_eq!(
+            store
+                .quest_board_snapshot("campaign-quests")
+                .expect("board after repeated structure")
+                .quests
+                .len(),
+            1
+        );
     }
 
     fn seed_board(store: &CampaignStore) {
@@ -750,21 +812,39 @@ mod tests {
             "availableNpcs": snapshot.source.available_npcs,
             "playerConcept": snapshot.source.player_concept,
             "recentQuestTitles": snapshot.source.recent_quest_titles,
+            "recentQuestStructures": snapshot.source.recent_quest_structures,
         });
-        let output = json!({
-            "content": {
-                "title": "The Fading Beacon",
-                "summary": "Investigate the failing lighthouse.",
-                "objective": "Restore the beacon.",
-                "failureCost": "Ships remain trapped."
-            },
-            "risk": "MODERATE",
-            "recommendedAttributes": ["knowledge", "agility"],
-            "expectedTurns": { "min": 8, "max": 12 },
-            "rewardTier": "NOTABLE",
-            "relatedNpcIds": [],
-            "relatedFactIds": []
-        });
+        let output = if index == 1 {
+            json!({
+                "content": {
+                    "title": "The Fading Beacon",
+                    "summary": "Investigate the failing lighthouse.",
+                    "objective": "Restore the beacon.",
+                    "failureCost": "Ships remain trapped."
+                },
+                "risk": "MODERATE",
+                "recommendedAttributes": ["knowledge", "agility"],
+                "expectedTurns": { "min": 8, "max": 12 },
+                "rewardTier": "NOTABLE",
+                "relatedNpcIds": [],
+                "relatedFactIds": []
+            })
+        } else {
+            json!({
+                "content": {
+                    "title": "The Broken Causeway",
+                    "summary": "Escort the harbor masons at low tide.",
+                    "objective": "Recover the missing signal bell.",
+                    "failureCost": "The inland road remains cut off."
+                },
+                "risk": "HIGH",
+                "recommendedAttributes": ["physique", "charisma"],
+                "expectedTurns": { "min": 9, "max": 12 },
+                "rewardTier": "RARE",
+                "relatedNpcIds": [],
+                "relatedFactIds": []
+            })
+        };
         QuestGenerationCommit {
             campaign_id: "campaign-quests".to_owned(),
             publisher_npc_id: publisher_npc_id.to_owned(),
@@ -772,7 +852,7 @@ mod tests {
                 request_id: format!("quest-request-{index}"),
                 generation_record_id: format!("quest-generation-{index}"),
                 idempotency_key: format!("quest-key-{index}"),
-                prompt_version: 1,
+                prompt_version: 2,
                 input,
                 context: json!({
                     "tavernId": snapshot.source.tavern_id,

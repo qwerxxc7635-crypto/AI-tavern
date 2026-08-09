@@ -170,6 +170,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         longTermProblem: 'A strange cellar light.',
       },
       existingNpcNames: ['Ilyra'],
+      existingNpcArchetypes: ['innkeeper|practical and observant'],
       requestedCount: 1,
     },
     output: {
@@ -252,6 +253,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       availableNpcs: [npc],
       playerConcept: 'Curious scout',
       recentQuestTitles: [],
+      recentQuestStructures: [],
     },
     output: questOutput,
   },
@@ -457,17 +459,19 @@ describe('versioned AI task schemas', () => {
       task === 'GENERATE_ADVENTURE_TURN'
         ? 5
         : task === 'GENERATE_NPCS'
-          ? 3
-          : [
-                'GENERATE_CHARACTER_TRAITS',
-                'COMPLETE_CHARACTER_BACKGROUND',
-                'NPC_REPLY',
-                'GENERATE_WORLD_EVENT',
-                'SUMMARIZE_ADVENTURE',
-                'RESOLVE_DICE_RESULT',
-              ].includes(task)
-            ? 2
-            : 1;
+          ? 4
+          : task === 'NPC_REPLY'
+            ? 3
+            : [
+                  'GENERATE_CHARACTER_TRAITS',
+                  'COMPLETE_CHARACTER_BACKGROUND',
+                  'GENERATE_QUEST',
+                  'GENERATE_WORLD_EVENT',
+                  'SUMMARIZE_ADVENTURE',
+                  'RESOLVE_DICE_RESULT',
+                ].includes(task)
+              ? 2
+              : 1;
     expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);
@@ -540,5 +544,48 @@ describe('versioned AI task schemas', () => {
     const input = fixtures.RESOLVE_DICE_RESULT.input as Record<string, unknown>;
     expect(schema.safeParse({ ...input, total: 13 }).success).toBe(false);
     expect(schema.safeParse({ ...input, result: 'FAILURE' }).success).toBe(false);
+  });
+
+  it('rejects repeated NPC archetypes, quest phrases, and dialogue phrases', () => {
+    const roster = fixtures.GENERATE_NPCS.output as {
+      npcs: Array<Record<string, unknown>>;
+      rumors: unknown[];
+    };
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_NPCS.output.safeParse({
+        ...roster,
+        npcs: [
+          roster.npcs[0],
+          {
+            ...roster.npcs[0],
+            name: 'Nessa',
+            appearance: 'A salt-stained blue cloak.',
+            goal: 'Chart the flooded causeway.',
+            secret: 'Once followed a false harbor light.',
+            speechStyle: 'Short nautical comparisons.',
+          },
+        ],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_QUEST.output.safeParse({
+        ...questOutput,
+        content: {
+          ...questOutput.content,
+          summary: 'The abandoned lighthouse door must remain sealed until dawn.',
+          objective: 'The abandoned lighthouse door must remain sealed until dawn.',
+        },
+      }).success,
+    ).toBe(false);
+
+    const reply = fixtures.NPC_REPLY.output as Record<string, unknown>;
+    expect(
+      AI_TASK_SCHEMAS.NPC_REPLY.output.safeParse({
+        ...reply,
+        reply: 'The abandoned lighthouse door must remain sealed until dawn.',
+        memoryCandidate: 'The abandoned lighthouse door must remain sealed until dawn.',
+      }).success,
+    ).toBe(false);
   });
 });

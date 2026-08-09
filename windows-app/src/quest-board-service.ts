@@ -4,6 +4,8 @@ import {
   FakeAIProvider,
   GenerateQuestInputSchema,
   GenerateQuestOutputSchema,
+  hasRepeatedQuestStructure,
+  questStructureSignature,
   validateAIOutput,
   type AIProvider,
   type NormalizedAIRequest,
@@ -47,6 +49,7 @@ export interface QuestGenerationSource {
   };
   readonly availableNpcs: readonly QuestNpcBrief[];
   readonly recentQuestTitles: readonly string[];
+  readonly recentQuestStructures: readonly string[];
 }
 
 export interface QuestView {
@@ -184,6 +187,7 @@ export class WindowsQuestBoardService {
         availableNpcs: snapshot.source.availableNpcs,
         playerConcept: snapshot.source.playerConcept,
         recentQuestTitles: snapshot.source.recentQuestTitles,
+        recentQuestStructures: snapshot.source.recentQuestStructures,
       });
       snapshot = await this.gateway.commit({
         campaignId: id,
@@ -222,6 +226,10 @@ export class WindowsQuestBoardService {
     const validated = validateAIOutput('GENERATE_QUEST', response.content);
     if (!validated.ok) throw new QuestBoardServiceError(validated.error.code);
     const output = GenerateQuestOutputSchema.parse(validated.validatedOutput);
+    const sourceInput = GenerateQuestInputSchema.parse(input);
+    if (hasRepeatedQuestStructure(output, sourceInput.recentQuestStructures)) {
+      throw new QuestBoardServiceError('REPETITION_DETECTED');
+    }
     return {
       ...identity,
       promptVersion: request.promptVersion,
@@ -264,15 +272,27 @@ function defaultIdentity(): RequestIdentity {
 function parseSnapshot(value: unknown, expectedCampaignId: string): QuestBoardSnapshot {
   const record = requireRecord(value);
   const source = parseSource(record['source']);
+  const quests = Object.freeze(requireArray(record['quests']).map(parseQuest));
   const storedCampaignId = campaignId(requireText(record['campaignId']));
   if (storedCampaignId !== expectedCampaignId) {
     throw new TypeError('Quest board belongs to another campaign');
+  }
+  const expectedStructures = quests.slice(-20).map((quest) =>
+    questStructureSignature({
+      risk: quest.risk,
+      rewardTier: quest.rewardTier,
+      expectedTurns: { min: quest.expectedTurnsMin, max: quest.expectedTurnsMax },
+      recommendedAttributes: quest.recommendedAttributes,
+    }),
+  );
+  if (JSON.stringify(source.recentQuestStructures) !== JSON.stringify(expectedStructures)) {
+    throw new TypeError('Quest repetition history is inconsistent');
   }
   return Object.freeze({
     campaignId: storedCampaignId,
     campaignState: requireText(record['campaignState']),
     source,
-    quests: Object.freeze(requireArray(record['quests']).map(parseQuest)),
+    quests,
   });
 }
 
@@ -294,6 +314,9 @@ function parseSource(value: unknown): QuestGenerationSource {
     }),
     availableNpcs: Object.freeze(requireArray(record['availableNpcs']).map(parseNpc)),
     recentQuestTitles: Object.freeze(requireArray(record['recentQuestTitles']).map(requireText)),
+    recentQuestStructures: Object.freeze(
+      requireArray(record['recentQuestStructures']).map(requireText),
+    ),
   });
 }
 

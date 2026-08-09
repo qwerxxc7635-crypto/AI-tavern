@@ -56,19 +56,20 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_NPCS: define(
     'GENERATE_NPCS',
     'WORLD_DESIGNER',
-    'Create the requested number of non-owner tavern NPCs. Give each independent motives, secrets, speech, and a valid residency-specific visit reason. Also create exactly three rumors attributed to generated NPC names. Classify each source as witness, hearsay, personal belief, or faction message and give the Claim confidence independently from its hidden veracity proposal.',
-    3,
+    'Create the requested number of non-owner tavern NPCs. Give each a distinct identity and personality archetype unlike existingNpcArchetypes, with independent motives, secrets, speech, and a valid residency-specific visit reason. Do not repeat substantial phrases. Also create exactly three rumors attributed to generated NPC names. Classify each source as witness, hearsay, personal belief, or faction message and give the Claim confidence independently from its hidden veracity proposal.',
+    4,
   ),
   NPC_REPLY: define(
     'NPC_REPLY',
     'NPC_ACTOR',
-    'Reply only from this NPC perspective. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
-    2,
+    'Reply only from this NPC perspective without repeating substantial phrases inside the response. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
+    3,
   ),
   GENERATE_QUEST: define(
     'GENERATE_QUEST',
     'WORLD_DESIGNER',
-    'Create a short-session quest grounded in supplied facts and NPCs. Separate narrative content from program-controlled risk and reward proposals.',
+    'Create a short-session quest grounded in supplied facts and NPCs. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. Separate narrative content from program-controlled risk and reward proposals.',
+    2,
   ),
   GENERATE_ADVENTURE_PLAN: define(
     'GENERATE_ADVENTURE_PLAN',

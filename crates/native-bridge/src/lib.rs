@@ -8,6 +8,7 @@ mod model_settings;
 mod npc_dialogue;
 mod quest_board;
 mod randomness_settings;
+mod repetition;
 mod save_archive;
 mod settlement;
 mod tavern_initialization;

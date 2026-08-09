@@ -98,6 +98,7 @@ export {
   standardizeAIError,
 } from './standard-ai-error.js';
 export type { StandardAIErrorCode } from './standard-ai-error.js';
+export * from './repetition-detector.js';
 export {
   providerConfigFromResolved,
   resolveModelConfig,

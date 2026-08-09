@@ -45,6 +45,12 @@ type ContextBlock = {
 
 当前酒馆传闻使用`world_facts.kind=RUMOR`作为轻量Claim兼容投影，而不是WorldTruth。投影必须携带独立claimId、来源NPC、WITNESS/HEARSAY/PERSONAL_BELIEF/FACTION_MESSAGE传播方式、confidence和revision；可重建的Claim只公开Actor来源与陈述，不携带隐藏veracity。FACTION_MESSAGE仅表示NPC转述的势力消息，不建立完整World Voices或势力Actor系统。
 
+## 重复抑制边界
+
+重复抑制是生成候选的本地验证器，不是新的事实或SQLite真相源。规范化长句检测按句末标点切分、折叠大小写/标点/空白，只比较至少12个字母或数字的完整句段；NPC回复同时与最近同Actor的NPC消息比较。任务结构签名固定为`risk|rewardTier|min-max|sortedAttributes`，与最近20项任务比较；NPC原型签名固定为规范化的`identity|personality`，与酒馆现有NPC及同批候选比较。
+
+Prompt会携带最近任务结构或现有NPC原型用于生成时避让，但模型输出仍须经过Schema、Application/Windows Service和原生事务边界的确定性复核。命中任一检测即拒绝提交，不允许AI直接绕过，也不引入embedding、模糊相似度模型或第二套持久状态。
+
 ## 隐私与 Inspector
 
 Inspector 默认只显示块类型、来源、版本、预算、hash 前缀、纳入原因和已遮罩摘要。`secret` 内容、credential、Authorization、完整系统 prompt 与未公开世界真相不显示。调试导出必须显式选择、二次清洗且不进入游戏存档。

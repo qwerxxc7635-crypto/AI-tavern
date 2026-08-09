@@ -1914,3 +1914,19 @@ FACTION_MESSAGE只表示某NPC转述的势力消息，不建立Faction Actor、�
 ### 影响与边界
 
 随机性偏好不是Campaign事实，不进入`.emtavern`，修改后也不追溯既有请求。它只影响模型采样，绝不改变无偏D20、属性修正、DC、结果判定、事务校验或其他Hard Logic。T05不实现T06重复抑制、真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-092：重复抑制采用确定性签名并在提交前失败关闭
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T06`、AI输出必须经过结构与业务验证及SQLite唯一真相源红线
+
+### 决定与理由
+
+重复长句按句末标点切分，统一大小写、标点与空白后只比较至少12个字母或数字的完整句段，避免把短连接词误报为重复；NPC回复候选除内部字段外，还与最近同Actor的NPC消息比较。任务结构以risk、rewardTier、expectedTurns区间和排序后的recommendedAttributes形成稳定签名，并与最近20项任务比较。NPC原型以规范化identity与personality形成签名，并与酒馆已有NPC及同批候选比较。
+
+`GENERATE_NPCS`、`NPC_REPLY`与`GENERATE_QUEST`分别升级prompt/schema版本，在输入中携带现有原型或最近任务结构以帮助生成避让；Fake Provider也按历史输入产生确定性的不同离线候选。TypeScript Schema、Application/Windows Service和原生SQLite提交路径都重新验证对应规则，任何命中均在事务写入前失败关闭，不产生NPC、传闻、任务、消息、关系或GenerationRecord的部分写入。
+
+### 影响与边界
+
+这些签名只是请求期派生验证数据，不新增数据库列、不进入`.emtavern`，也不成为世界事实。精确规范化规则可解释且跨双实现复现，但不会捕获所有语义近义改写；T06不引入embedding、付费相似度模型、自动改写循环或T07 Context Budget，也不接入真实Provider、正式用户数据或iOS。

@@ -5,6 +5,7 @@ import {
   buildNpcDialogueContext,
   compressContextHistory,
   contextBudgetForTask,
+  findRepeatedPhrase,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -152,6 +153,17 @@ export class NpcDialogueUseCases {
     const output = NpcReplyOutputSchema.parse(
       await this.generateValidated('NPC_REPLY', command, input),
     );
+    const repeatedPhrase = findRepeatedPhrase(
+      [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
+      messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
+    );
+    if (repeatedPhrase !== null) {
+      this.fail(command, 'REPETITION_DETECTED', 'NPC reply repeats recent generated text', false);
+      throw new AIOrchestrationError(
+        'REPETITION_DETECTED',
+        'NPC reply repeats recent generated text',
+      );
+    }
     const timestamp = this.now();
     const conversation: Conversation =
       existing ??

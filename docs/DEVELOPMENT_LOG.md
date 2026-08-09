@@ -3263,3 +3263,24 @@
 ### 结论
 
 - `V02-M8-T05`完成。下一项严格为`V02-M8-T06` Repetition Reduction。
+
+## 2026-08-09 — V02-M8-T06 降低生成内容重复
+
+### 实现
+
+- 新增TypeScript与Rust一致的确定性重复检测器：规范化长句至少12个字母或数字才参与比较，任务结构签名由风险、奖励、回合区间和排序属性组成，NPC原型签名由identity与personality组成。
+- `GENERATE_NPCS`、`NPC_REPLY`与`GENERATE_QUEST`分别升级schema/prompt为v4、v3与v2；提示词携带已有NPC原型或最近任务结构，并明确禁止重复长句。
+- 酒馆初始化同时检查现有店主和同批NPC原型；任务生成与最近20项任务比较结构；NPC对话与最近同Actor的NPC消息比较生成句段。
+- TypeScript Schema、Application/Windows Service与原生SQLite事务前均执行验证，命中后以明确错误失败关闭；原生测试确认NPC、传闻、任务、消息、关系与生成审计均无部分写入。
+- Fake Provider根据历史上下文产生可重复测试且彼此不同的离线任务和NPC回复；记录`DEC-092`并同步Changelog与架构文档，未实现T07 Context Budget、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 定向schema、prompt、detector、Windows Service、Application与原生测试通过，覆盖规范化长句、历史NPC回复、任务结构和NPC原型三类命中及零写入路径。
+- 完整81个Vitest文件/456项测试与22项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及87项测试通过，包含Windows纵向E2E在模型切换和存档导入后的连续不同回复。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对；桌面前端202 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T06`完成。下一项严格为`V02-M8-T07` Context Budget。

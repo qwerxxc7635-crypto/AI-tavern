@@ -6,6 +6,8 @@ import {
   GenerateNpcsOutputSchema,
   GenerateTavernInputSchema,
   GenerateTavernOutputSchema,
+  findRepeatedNpcArchetype,
+  npcArchetypeSignature,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -221,6 +223,7 @@ export class WindowsTavernService {
         longTermProblem: tavern.longTermProblem,
       },
       existingNpcNames: snapshot.npcs.map(({ name }) => name),
+      existingNpcArchetypes: snapshot.npcs.map(npcArchetypeSignature),
       requestedCount: 3,
     });
     return this.gateway.commitNpcs({
@@ -263,7 +266,11 @@ export class WindowsTavernService {
     if (task === 'GENERATE_TAVERN') {
       GenerateTavernOutputSchema.parse(validated.validatedOutput);
     } else {
-      GenerateNpcsOutputSchema.parse(validated.validatedOutput);
+      const output = GenerateNpcsOutputSchema.parse(validated.validatedOutput);
+      const source = GenerateNpcsInputSchema.parse(input);
+      if (findRepeatedNpcArchetype(output.npcs, source.existingNpcArchetypes) !== null) {
+        throw new TavernServiceError('REPETITION_DETECTED');
+      }
     }
     return {
       ...identity,

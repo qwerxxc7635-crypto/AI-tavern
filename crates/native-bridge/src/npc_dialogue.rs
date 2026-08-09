@@ -4,7 +4,9 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    repetition::{find_repeated_phrase, find_repeated_phrase_against},
+    validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -140,6 +142,27 @@ impl CampaignStore {
             return Err(CampaignStoreError::InvalidData);
         }
 
+        let prior_conversation_id =
+            conversation_id(&transaction, &command.campaign_id, &command.npc_id)?;
+        let prior_npc_messages = match &prior_conversation_id {
+            None => Vec::new(),
+            Some(id) => load_messages(&transaction, id)?
+                .into_iter()
+                .filter(|message| message.role == "NPC")
+                .map(|message| message.content)
+                .collect::<Vec<_>>(),
+        };
+        if find_repeated_phrase_against(
+            std::iter::once(output.reply.as_str())
+                .chain(output.suggested_topics.iter().map(String::as_str))
+                .chain(output.memory_candidate.iter().map(String::as_str)),
+            prior_npc_messages.iter().map(String::as_str),
+        )
+        .is_some()
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+
         let relationship = load_relationship(&transaction, &command.npc_id)?;
         let next_relationship = DialogueRelationshipView {
             trust: next_score(relationship.trust, output.relationship_proposal.trust)?,
@@ -154,8 +177,7 @@ impl CampaignStore {
             )?,
         };
         let at = current_timestamp()?;
-        let conversation_id = conversation_id(&transaction, &command.campaign_id, &command.npc_id)?
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let conversation_id = prior_conversation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
         transaction.execute(
             "INSERT OR IGNORE INTO conversations (
                id, campaign_id, kind, npc_id, adventure_id, created_at, updated_at
@@ -760,6 +782,15 @@ fn validate_output(output: &NpcReplyOutput) -> Result<(), CampaignStoreError> {
     if let Some(memory) = &output.memory_candidate {
         validate_text(memory, 4_000)?;
     }
+    if find_repeated_phrase(
+        std::iter::once(output.reply.as_str())
+            .chain(output.suggested_topics.iter().map(String::as_str))
+            .chain(output.memory_candidate.iter().map(String::as_str)),
+    )
+    .is_some()
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
     for proposal in [
         output.relationship_proposal.trust,
         output.relationship_proposal.closeness,
@@ -948,11 +979,33 @@ mod tests {
             store.commit_npc_dialogue(invalid),
             Err(CampaignStoreError::InvalidData)
         ));
+        let mut repeated = command(&snapshot, 1, "Hello.");
+        repeated.generation.validated_output["reply"] =
+            json!("The abandoned lighthouse door must remain sealed until dawn.");
+        repeated.generation.validated_output["memoryCandidate"] =
+            json!("The abandoned lighthouse door must remain sealed until dawn.");
+        repeated.generation.raw_response_text = repeated.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_dialogue(repeated),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        let first = store
+            .commit_npc_dialogue(command(&snapshot, 1, "Show me the cellar."))
+            .expect("first distinct reply");
+        let mut repeated_history = command(&first, 2, "What should I avoid?");
+        repeated_history.generation.validated_output["reply"] =
+            json!("Stay close and touch nothing warm.");
+        repeated_history.generation.raw_response_text =
+            repeated_history.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_dialogue(repeated_history),
+            Err(CampaignStoreError::InvalidData)
+        ));
         let after = store
             .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
             .expect("unchanged snapshot");
-        assert!(after.messages.is_empty());
-        assert_eq!(after.relationship.trust, 0);
+        assert_eq!(after.messages.len(), 2);
+        assert_eq!(after.relationship.trust, 1);
     }
 
     #[test]
@@ -1073,8 +1126,13 @@ mod tests {
         index: usize,
         player_message: &str,
     ) -> NpcDialogueCommit {
+        let reply = if index == 1 {
+            "Stay close and touch nothing warm."
+        } else {
+            "The cellar stones are cooling, so we can proceed."
+        };
         let output = json!({
-            "reply": "Stay close and touch nothing warm.",
+            "reply": reply,
             "mood": "Wary",
             "suggestedTopics": ["The old tunnel"],
             "memoryCandidate": null,
@@ -1093,7 +1151,7 @@ mod tests {
                 request_id: format!("dialogue-request-{index}"),
                 generation_record_id: format!("dialogue-generation-{index}"),
                 idempotency_key: format!("dialogue-key-{index}"),
-                prompt_version: 1,
+                prompt_version: 3,
                 input,
                 context: json!({ "npcId": "npc-owner" }),
                 request: json!({ "task": "NPC_REPLY" }),

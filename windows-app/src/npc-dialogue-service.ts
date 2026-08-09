@@ -4,6 +4,7 @@ import {
   FakeAIProvider,
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
+  findRepeatedPhrase,
   validateAIOutput,
   type AIProvider,
   type NormalizedAIRequest,
@@ -162,6 +163,13 @@ export class WindowsNpcDialogueService {
     const validated = validateAIOutput('NPC_REPLY', response.content);
     if (!validated.ok) throw new NpcDialogueServiceError(validated.error.code);
     const output = NpcReplyOutputSchema.parse(validated.validatedOutput);
+    const repeatedPhrase = findRepeatedPhrase(
+      [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
+      snapshot.messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
+    );
+    if (repeatedPhrase !== null) {
+      throw new NpcDialogueServiceError('REPETITION_DETECTED');
+    }
     return this.gateway.commit({
       campaignId: campaign,
       npcId: npc,

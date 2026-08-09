@@ -5,7 +5,10 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::{CampaignStore, CampaignStoreError, current_timestamp, validate_id};
+use crate::{
+    CampaignStore, CampaignStoreError, current_timestamp, repetition::find_repeated_phrase,
+    repetition::npc_archetype_signature, validate_id,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -311,6 +314,13 @@ impl CampaignStore {
         if output.npcs.iter().any(|npc| npc.profile.name == owner.name) {
             return Err(CampaignStoreError::InvalidData);
         }
+        let owner_archetype = npc_archetype_signature(&owner.identity, &owner.personality);
+        if output.npcs.iter().any(|npc| {
+            npc_archetype_signature(&npc.profile.identity, &npc.profile.personality)
+                == owner_archetype
+        }) {
+            return Err(CampaignStoreError::InvalidData);
+        }
         let expected_input = serde_json::json!({
             "world": source.world,
             "tavern": {
@@ -320,6 +330,7 @@ impl CampaignStore {
                 "longTermProblem": tavern.long_term_problem,
             },
             "existingNpcNames": [owner.name],
+            "existingNpcArchetypes": [owner_archetype],
             "requestedCount": 3,
         });
         let expected_context = serde_json::json!({
@@ -832,19 +843,35 @@ fn validate_roster_output(output: &NpcRosterOutput) -> Result<(), CampaignStoreE
         return Err(CampaignStoreError::InvalidData);
     }
     let mut names = HashSet::new();
+    let mut archetypes = HashSet::new();
+    let mut phrases = Vec::new();
     for npc in &output.npcs {
         validate_npc(&npc.profile)?;
         if !names.insert(npc.profile.name.as_str())
+            || !archetypes.insert(npc_archetype_signature(
+                &npc.profile.identity,
+                &npc.profile.personality,
+            ))
             || (npc.residency == "TEMPORARY_VISITOR") != npc.visit_reason.is_some()
         {
             return Err(CampaignStoreError::InvalidData);
         }
         if let Some(reason) = &npc.visit_reason {
             validate_text(reason, 4_000)?;
+            phrases.push(reason.as_str());
         }
+        phrases.extend([
+            npc.profile.identity.as_str(),
+            npc.profile.appearance.as_str(),
+            npc.profile.personality.as_str(),
+            npc.profile.goal.as_str(),
+            npc.profile.secret.as_str(),
+            npc.profile.speech_style.as_str(),
+        ]);
     }
     for rumor in &output.rumors {
         validate_text(&rumor.statement, 4_000)?;
+        phrases.push(rumor.statement.as_str());
         if !names.contains(rumor.source_npc_name.as_str())
             || !matches!(
                 rumor.source_basis.as_str(),
@@ -856,6 +883,9 @@ fn validate_roster_output(output: &NpcRosterOutput) -> Result<(), CampaignStoreE
         {
             return Err(CampaignStoreError::InvalidData);
         }
+    }
+    if find_repeated_phrase(phrases).is_some() {
+        return Err(CampaignStoreError::InvalidData);
     }
     Ok(())
 }
@@ -1146,6 +1176,17 @@ mod tests {
             store.commit_npc_roster_generation(duplicate_owner),
             Err(CampaignStoreError::InvalidData)
         ));
+        let mut duplicate_archetype = roster_command(&store, tavern_id.clone());
+        duplicate_archetype.generation.validated_output["npcs"][0]["identity"] =
+            Value::String("Role of Ilyra Venn".to_owned());
+        duplicate_archetype.generation.validated_output["npcs"][0]["personality"] =
+            Value::String("Temperament of Ilyra Venn".to_owned());
+        duplicate_archetype.generation.raw_response_text =
+            duplicate_archetype.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_roster_generation(duplicate_archetype),
+            Err(CampaignStoreError::InvalidData)
+        ));
         let mut invalid_rumor_source = roster_command(&store, tavern_id);
         invalid_rumor_source.generation.validated_output["rumors"][0]["confidence"] = json!(2.0);
         invalid_rumor_source.generation.raw_response_text =
@@ -1283,6 +1324,7 @@ mod tests {
                         "longTermProblem": tavern.long_term_problem,
                     },
                     "existingNpcNames": [owner.name],
+                    "existingNpcArchetypes": [npc_archetype_signature(&owner.identity, &owner.personality)],
                     "requestedCount": 3,
                 }),
                 serde_json::json!({"source": source, "tavernId": tavern_id}),
@@ -1294,12 +1336,12 @@ mod tests {
     fn npc_json(name: &str) -> Value {
         serde_json::json!({
             "name": name,
-            "identity": "Traveler",
-            "appearance": "Weathered clothes.",
-            "personality": "Observant and practical.",
-            "goal": "Keep the road open.",
-            "secret": "Knows a hidden route.",
-            "speechStyle": "Measured questions.",
+            "identity": format!("Role of {name}"),
+            "appearance": format!("{name} wears weathered clothes."),
+            "personality": format!("Temperament of {name}"),
+            "goal": format!("{name} wants to keep a road open."),
+            "secret": format!("{name} knows a different hidden route."),
+            "speechStyle": format!("{name} asks measured questions."),
             "currentMood": "Concerned",
         })
     }
@@ -1322,7 +1364,10 @@ mod tests {
             request_id: format!("request-{suffix}"),
             generation_record_id: format!("generation-{suffix}"),
             idempotency_key: format!("tavern:{suffix}"),
-            prompt_version: 1,
+            prompt_version: match task {
+                "GENERATE_NPCS" => 4,
+                _ => 1,
+            },
             input,
             context,
             request: serde_json::json!({"task": task}),

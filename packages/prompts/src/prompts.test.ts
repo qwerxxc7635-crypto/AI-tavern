@@ -56,8 +56,7 @@ describe('central prompt catalog', () => {
       const expectedVersion = [
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
-        'GENERATE_NPCS',
-        'NPC_REPLY',
+        'GENERATE_QUEST',
         'GENERATE_WORLD_EVENT',
         'SUMMARIZE_ADVENTURE',
         'RESOLVE_DICE_RESULT',
@@ -67,7 +66,13 @@ describe('central prompt catalog', () => {
       expect(TASK_PROMPTS[task]).toMatchObject({
         task,
         version:
-          task === 'GENERATE_ADVENTURE_TURN' ? 4 : task === 'GENERATE_NPCS' ? 3 : expectedVersion,
+          task === 'GENERATE_ADVENTURE_TURN'
+            ? 4
+            : task === 'GENERATE_NPCS'
+              ? 4
+              : task === 'NPC_REPLY'
+                ? 3
+                : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }
@@ -75,7 +80,10 @@ describe('central prompt catalog', () => {
       expect.objectContaining({ task: 'GENERATE_ADVENTURE_TURN', version: 4 }),
     );
     expect(PROMPT_HISTORY).toContainEqual(
-      expect.objectContaining({ task: 'GENERATE_NPCS', version: 3 }),
+      expect.objectContaining({ task: 'GENERATE_NPCS', version: 4 }),
+    );
+    expect(PROMPT_HISTORY).toContainEqual(
+      expect.objectContaining({ task: 'GENERATE_QUEST', version: 2 }),
     );
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toMatch(/3-5 distinct suggestions/);
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('knownFacts');
@@ -83,6 +91,8 @@ describe('central prompt catalog', () => {
     expect(TASK_PROMPTS.RESOLVE_DICE_RESULT.instruction).toMatch(
       /raw, modifier, total, DC, and result/,
     );
+    expect(TASK_PROMPTS.GENERATE_NPCS.instruction).toContain('existingNpcArchetypes');
+    expect(TASK_PROMPTS.GENERATE_QUEST.instruction).toContain('recentQuestStructures');
   });
 
   it('centralizes authority, privacy, validation, and JSON rules', () => {

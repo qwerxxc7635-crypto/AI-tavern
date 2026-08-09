@@ -198,6 +198,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                         "longTermProblem": tavern.long_term_problem,
                     },
                     "existingNpcNames": [owner.name],
+                    "existingNpcArchetypes": [crate::repetition::npc_archetype_signature(&owner.identity, &owner.personality)],
                     "requestedCount": 3,
                 }),
                 json!({"source": source, "tavernId": tavern_id}),
@@ -262,6 +263,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                     "availableNpcs": board.source.available_npcs,
                     "playerConcept": board.source.player_concept,
                     "recentQuestTitles": board.source.recent_quest_titles,
+                    "recentQuestStructures": board.source.recent_quest_structures,
                 }),
                 json!({
                     "tavernId": board.source.tavern_id,
@@ -554,7 +556,12 @@ fn character_audit(
         request_id: format!("e2e-character-request-{suffix}"),
         generation_record_id: format!("e2e-character-generation-{suffix}"),
         idempotency_key: format!("e2e:character:{suffix}"),
-        prompt_version: 1,
+        prompt_version: match task {
+            "GENERATE_NPCS" => 4,
+            "NPC_REPLY" => 3,
+            "GENERATE_QUEST" => 2,
+            _ => 1,
+        },
         input,
         context,
         request: json!({"task":task}),
@@ -574,7 +581,12 @@ fn audit(
         request_id: format!("e2e-request-{suffix}"),
         generation_record_id: format!("e2e-generation-{suffix}"),
         idempotency_key: format!("e2e:{suffix}"),
-        prompt_version: 1,
+        prompt_version: match task {
+            "GENERATE_NPCS" => 4,
+            "NPC_REPLY" => 3,
+            "GENERATE_QUEST" => 2,
+            _ => 1,
+        },
         input,
         context,
         request: json!({"task":task,"modelName":"ember-fake-v1"}),
@@ -586,12 +598,12 @@ fn audit(
 fn npc_output(name: &str) -> Value {
     json!({
         "name":name,
-        "identity":"Traveler",
-        "appearance":"Weathered clothes.",
-        "personality":"Observant and practical.",
-        "goal":"Keep the road open.",
-        "secret":"Knows a hidden route.",
-        "speechStyle":"Measured questions.",
+        "identity":format!("Role of {name}"),
+        "appearance":format!("{name} wears weathered clothes."),
+        "personality":format!("Temperament of {name}"),
+        "goal":format!("{name} wants to keep a road open."),
+        "secret":format!("{name} knows a different hidden route."),
+        "speechStyle":format!("{name} asks measured questions."),
         "currentMood":"Concerned"
     })
 }
@@ -609,8 +621,13 @@ fn dialogue_command(
     index: usize,
     player_message: &str,
 ) -> NpcDialogueCommit {
+    let reply = match index {
+        1 => "Stay close and touch nothing warm.",
+        2 => "The lower stones have cooled, so the passage can be approached carefully.",
+        _ => "Beyond the harbor road, fresh wagon tracks turn toward the northern ridge.",
+    };
     let output = json!({
-        "reply":"Stay close and touch nothing warm.",
+        "reply":reply,
         "mood":"Wary",
         "suggestedTopics":["The old tunnel"],
         "memoryCandidate":null,

@@ -39,8 +39,14 @@ describe('WindowsTavernService', () => {
     expect(gateway.npcCommits[0]).toMatchObject({
       generation: {
         requestId: 'tavern-request-2',
-        promptVersion: 3,
-        input: { requestedCount: 3, existingNpcNames: ['Ilyra Venn'] },
+        promptVersion: 4,
+        input: {
+          requestedCount: 3,
+          existingNpcNames: ['Ilyra Venn'],
+          existingNpcArchetypes: [
+            'innkeeper and retired route warden|practical observant and slow to trust',
+          ],
+        },
       },
     });
   });

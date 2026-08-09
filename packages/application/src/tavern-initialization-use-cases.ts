@@ -3,6 +3,8 @@ import {
   GenerateNpcsOutputSchema,
   GenerateTavernInputSchema,
   GenerateTavernOutputSchema,
+  findRepeatedNpcArchetype,
+  npcArchetypeSignature,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -209,12 +211,13 @@ export class TavernInitializationUseCases {
         longTermProblem: tavern.longTermProblem,
       },
       existingNpcNames: [owner.name],
+      existingNpcArchetypes: [npcArchetypeSignature(owner)],
       requestedCount: 3,
     });
     const output = GenerateNpcsOutputSchema.parse(
       await this.generateValidated('GENERATE_NPCS', command, input),
     );
-    validateInitialRoster(output, owner.name);
+    validateInitialRoster(output, owner);
     const timestamp = this.now();
     const profiles = output.npcs.map((draft, index): NpcProfile =>
       Object.freeze({
@@ -524,16 +527,17 @@ function npcRecord(
 
 function validateInitialRoster(
   output: ReturnType<typeof GenerateNpcsOutputSchema.parse>,
-  ownerName: string,
+  owner: NpcProfile,
 ): void {
   const residents = output.npcs.filter(({ residency }) => residency === 'RESIDENT');
   const visitors = output.npcs.filter(({ residency }) => residency === 'TEMPORARY_VISITOR');
-  const names = [ownerName, ...output.npcs.map(({ name }) => name)];
+  const names = [owner.name, ...output.npcs.map(({ name }) => name)];
   if (
     output.npcs.length !== 3 ||
     residents.length !== 2 ||
     visitors.length !== 1 ||
     new Set(names).size !== names.length ||
+    findRepeatedNpcArchetype(output.npcs, [npcArchetypeSignature(owner)]) !== null ||
     output.npcs.some(
       ({ residency, visitReason }) =>
         (residency === 'TEMPORARY_VISITOR') !== (visitReason !== null),
