@@ -3326,3 +3326,23 @@
 ### 结论
 
 - `V02-M8-T08`完成。下一项严格为`V02-M9-T01` Shared Gate。
+
+## 2026-08-09 — V02-M9-T01 完成 Shared Gate
+
+### 实现
+
+- `pnpm check:shared`统一纳入release metadata、zh-CN玩家语言与跨语言存档互操作，并保留既有Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、全target/feature Clippy和Rust workspace测试。
+- CI workflow自测新增本地Shared Gate类别锁定，防止release、语言、archive或Rust门禁从本地入口静默漂移。
+- 新增`docs/audit/V0_2_SHARED_GATE.md`，记录当前环境、命令、时间、测试统计、门禁映射、边界与原始证据SHA-256；原始UTF-8输出保存在Git忽略的`.local/evidence`。
+- 记录`DEC-095`；Shared Gate不冒充Windows或macOS平台专属验收，未接入真实Provider、付费API、正式用户数据或iOS。
+
+### 验证
+
+- 首次结构化运行在23项Node测试阶段失败：新增自测用单行字符串匹配多行Clippy调用；失败证据原样保留，修正测试断言并单独验证3项CI workflow测试后重新执行全门禁。
+- 通过记录退出码为0：Prettier、release metadata、zh-CN门禁、ESLint、TypeScript、82个Vitest文件/461项测试及23项Node测试全部通过。
+- rustfmt、全workspace/target/feature Clippy及87项Rust测试通过；SQLite迁移/备份/事务、Provider合同、Context、Orchestrator和Security类别均有对应测试覆盖。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对。
+
+### 结论
+
+- `V02-M9-T01`完成。下一项严格为`V02-M9-T02` Windows Gate。

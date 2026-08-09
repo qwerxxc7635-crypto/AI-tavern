@@ -1962,3 +1962,19 @@ ContextManifest补齐每个条目的stability，AITaskOrchestrator在Provider前
 ### 影响与边界
 
 Inspector不写SQLite、不新增schema、不进入`.emtavern`，应用重启后清空；刷新按钮只重读内存快照。T08不实现Prompt全文预览、秘密内容开关、诊断导出、Provider精确缓存账单、真实Provider/付费API、正式用户数据或iOS。下一阶段严格进入M9双平台验收。
+
+## DEC-095：Shared Gate使用单一可执行入口与结构化UTF-8证据
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M9-T01`、双平台共享开发/test gate与审计证据要求
+
+### 决定与理由
+
+本地`pnpm check:shared`必须与CI共享质量口径保持一致，顺序执行release metadata、zh-CN玩家语言、Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、全workspace/target/feature Clippy、Rust workspace测试和TypeScript/Rust存档互操作。脚本测试显式锁定这些入口，避免后续重构静默移除类别。
+
+长命令通过`run-with-evidence.mjs`记录命令数组、UTC起止时间、退出码、signal以及UTF-8 stdout/stderr；`.local/evidence`继续忽略，防止大体积运行输出污染源码提交，仓库内审计摘要记录环境、统计与SHA-256。失败证据不得以通过记录覆盖；修复门禁或自测后另建通过证据。
+
+### 影响与边界
+
+Shared Gate证明共享代码与合同在当前开发环境通过，但不代替平台实机验收。Rust平台合同、Windows纵向测试或macOS本地开发测试均不得冒充Credential Manager、WebView2、NSIS安装生命周期、Keychain、WKWebView或`.app`启动证据；这些仍按M9-T02、T03独立收集。该决定不启用真实Provider、付费API、正式用户数据或iOS。

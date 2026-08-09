@@ -60,7 +60,8 @@
 - `V02-M8-T06`：DONE；生成结果在写入前检测规范化重复长句、最近任务结构签名和NPC身份/性格原型签名，命中即拒绝且不产生部分写入。
 - `V02-M8-T07`：DONE；所有Windows Provider调用前执行任务级字符预算，历史型Schema固定数量上限，长历史只保留最新窗口与带总数的有损抽样摘要。
 - `V02-M8-T08`：DONE；“我的/上下文”显示最近实际请求的block、token、来源、revision、stability、纳入/省略、hash前缀与会话缓存状态，且不显示内容或secret来源。
-- 下一执行项严格进入 `V02-M9-T01` Shared Gate。
+- `V02-M9-T01`：DONE；本地共享门禁统一覆盖发布元数据、玩家语言、Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、Clippy、Rust workspace与跨语言存档互操作，并保留结构化UTF-8证据。
+- 下一执行项严格进入 `V02-M9-T02` Windows Gate。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1038,6 +1039,8 @@ NPC Prompt 只接收允许知道的信息。
 - context
 - orchestrator
 - security
+
+当前macOS开发环境已通过统一`pnpm check:shared`：Prettier、release metadata、zh-CN玩家语言、ESLint、TypeScript、82个Vitest文件/461项、23项Node测试、rustfmt、全target/feature Clippy、87项Rust测试及TypeScript/Rust存档双向互操作全部成功。SQLite、Provider、Context、Orchestrator与Security由对应TypeScript/Node/Rust测试组覆盖；结构化证据与类别映射见`docs/audit/V0_2_SHARED_GATE.md`。本任务不冒充Windows安装或macOS应用包验收，平台专属证据仍分别属于T02与T03。
 
 ---
 
