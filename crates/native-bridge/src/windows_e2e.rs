@@ -10,6 +10,14 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
     let database_path = directory.path().join("ember-tavern.sqlite");
     let archive_path = directory.path().join("windows-release.emtavern");
     let store = CampaignStore::open(&database_path).expect("open release database");
+    assert!(store.list().expect("first-launch campaign list").is_empty());
+    assert!(
+        store
+            .model_settings()
+            .expect("first-launch model settings")
+            .profiles
+            .is_empty()
+    );
     store
         .create_at(
             CAMPAIGN_ID.to_owned(),
@@ -106,7 +114,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             "description": value.description,
         })).collect::<Vec<_>>(),
     });
-    let completed_character = store
+    let proposed_character = store
         .commit_character_completion(CharacterCompletionCommit {
             campaign_id: CAMPAIGN_ID.to_owned(),
             character: character.clone(),
@@ -124,7 +132,17 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                 background_output,
             ),
         })
-        .expect("complete character");
+        .expect("propose complete character");
+    assert_eq!(proposed_character.campaign_state, "CREATING_CHARACTER");
+    let completed_character = store
+        .confirm_character_candidate(CharacterCandidateConfirm {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            candidate_id: proposed_character
+                .candidate
+                .expect("complete character candidate")
+                .id,
+        })
+        .expect("confirm character");
     assert_eq!(completed_character.campaign_state, "GENERATING_TAVERN");
 
     let source = store
@@ -167,9 +185,9 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             roster_npc("TEMPORARY_VISITOR", "Sera Holt", json!("Waiting for the causeway."))
         ],
         "rumors": [
-            {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","veracity":"TRUE"},
-            {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","veracity":"PARTIAL"},
-            {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","veracity":"UNKNOWN"}
+            {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","sourceBasis":"WITNESS","confidence":0.9,"veracity":"TRUE"},
+            {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","sourceBasis":"FACTION_MESSAGE","confidence":0.6,"veracity":"PARTIAL"},
+            {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","sourceBasis":"HEARSAY","confidence":0.4,"veracity":"UNKNOWN"}
         ]
     });
     let completed_tavern = store
@@ -188,6 +206,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                         "longTermProblem": tavern.long_term_problem,
                     },
                     "existingNpcNames": [owner.name],
+                    "existingNpcArchetypes": [crate::repetition::npc_archetype_signature(&owner.identity, &owner.personality)],
                     "requestedCount": 3,
                 }),
                 json!({"source": source, "tavernId": tavern_id}),
@@ -252,6 +271,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                     "availableNpcs": board.source.available_npcs,
                     "playerConcept": board.source.player_concept,
                     "recentQuestTitles": board.source.recent_quest_titles,
+                    "recentQuestStructures": board.source.recent_quest_structures,
                 }),
                 json!({
                     "tavernId": board.source.tavern_id,
@@ -296,6 +316,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             .submit_adventure_action(AdventureActionSubmit {
                 campaign_id: CAMPAIGN_ID.to_owned(),
                 adventure_id: adventure_id.clone(),
+                action_mode: "ACTION".to_owned(),
                 player_action: format!("Take release action {turn_number}"),
             })
             .expect("submit adventure action");
@@ -421,25 +442,78 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         4
     );
     reopened
+        .connect()
+        .expect("connect for interrupted request")
+        .execute_batch(
+            "UPDATE campaigns
+               SET state = 'RECOVERY_REQUIRED', resume_state = 'TAVERN'
+               WHERE id = 'campaign-windows-e2e';
+             INSERT INTO pending_ai_requests (
+               id, campaign_id, turn_id, idempotency_key, task, status, model_profile_id,
+               input_json, context_json, attempt_count, last_error_json, created_at, updated_at
+             ) VALUES (
+               'e2e-interrupted-request', 'campaign-windows-e2e', NULL,
+               'e2e:interrupted-request', 'NPC_REPLY', 'SENDING', NULL,
+               '{}', '{}', 1, NULL,
+               '2026-08-01T14:30:00.000Z', '2026-08-01T14:30:00.000Z'
+             );",
+        )
+        .expect("persist interrupted request before crash");
+    drop(reopened);
+
+    let recovered = CampaignStore::open(&database_path).expect("restart after interrupted request");
+    let recovery = recovered
+        .campaign_recovery(CAMPAIGN_ID)
+        .expect("inspect interrupted request");
+    assert_eq!(recovery.resume_state, "TAVERN");
+    assert_eq!(recovery.unfinished_request_count, 1);
+    assert_eq!(
+        recovered
+            .restore_campaign_after_failure(CAMPAIGN_ID)
+            .expect("restore last committed state")
+            .state,
+        "TAVERN"
+    );
+    assert_eq!(
+        recovered
+            .connect()
+            .expect("verify cancelled request")
+            .query_row(
+                "SELECT status FROM pending_ai_requests WHERE id = 'e2e-interrupted-request'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .expect("interrupted request status"),
+        "CANCELLED"
+    );
+    assert_eq!(
+        recovered
+            .continue_campaign(CAMPAIGN_ID)
+            .expect("continue after recovery")
+            .state,
+        "TAVERN"
+    );
+
+    recovered
         .export_campaign_archive(CAMPAIGN_ID, &archive_path, "0.1.0")
         .expect("export save archive");
     assert_eq!(
-        reopened
+        recovered
             .inspect_campaign_archive(&archive_path)
             .expect("inspect exported archive")
             .campaign_id,
         CAMPAIGN_ID
     );
-    reopened
+    recovered
         .connect()
         .expect("connect for local delete")
         .execute("DELETE FROM campaigns WHERE id = ?1", [CAMPAIGN_ID])
         .expect("delete local campaign");
-    assert!(reopened.list().expect("empty campaign list").is_empty());
-    reopened
+    assert!(recovered.list().expect("empty campaign list").is_empty());
+    recovered
         .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
         .expect("reimport campaign");
-    drop(reopened);
+    drop(recovered);
 
     let imported = CampaignStore::open(&database_path).expect("restart imported campaign");
     assert_eq!(
@@ -543,7 +617,12 @@ fn character_audit(
         request_id: format!("e2e-character-request-{suffix}"),
         generation_record_id: format!("e2e-character-generation-{suffix}"),
         idempotency_key: format!("e2e:character:{suffix}"),
-        prompt_version: 1,
+        prompt_version: match task {
+            "GENERATE_NPCS" => 4,
+            "NPC_REPLY" => 3,
+            "GENERATE_QUEST" => 2,
+            _ => 1,
+        },
         input,
         context,
         request: json!({"task":task}),
@@ -563,7 +642,12 @@ fn audit(
         request_id: format!("e2e-request-{suffix}"),
         generation_record_id: format!("e2e-generation-{suffix}"),
         idempotency_key: format!("e2e:{suffix}"),
-        prompt_version: 1,
+        prompt_version: match task {
+            "GENERATE_NPCS" => 4,
+            "NPC_REPLY" => 3,
+            "GENERATE_QUEST" => 2,
+            _ => 1,
+        },
         input,
         context,
         request: json!({"task":task,"modelName":"ember-fake-v1"}),
@@ -575,12 +659,12 @@ fn audit(
 fn npc_output(name: &str) -> Value {
     json!({
         "name":name,
-        "identity":"Traveler",
-        "appearance":"Weathered clothes.",
-        "personality":"Observant and practical.",
-        "goal":"Keep the road open.",
-        "secret":"Knows a hidden route.",
-        "speechStyle":"Measured questions.",
+        "identity":format!("Role of {name}"),
+        "appearance":format!("{name} wears weathered clothes."),
+        "personality":format!("Temperament of {name}"),
+        "goal":format!("{name} wants to keep a road open."),
+        "secret":format!("{name} knows a different hidden route."),
+        "speechStyle":format!("{name} asks measured questions."),
         "currentMood":"Concerned"
     })
 }
@@ -598,8 +682,13 @@ fn dialogue_command(
     index: usize,
     player_message: &str,
 ) -> NpcDialogueCommit {
+    let reply = match index {
+        1 => "Stay close and touch nothing warm.",
+        2 => "The lower stones have cooled, so the passage can be approached carefully.",
+        _ => "Beyond the harbor road, fresh wagon tracks turn toward the northern ridge.",
+    };
     let output = json!({
-        "reply":"Stay close and touch nothing warm.",
+        "reply":reply,
         "mood":"Wary",
         "suggestedTopics":["The old tunnel"],
         "memoryCandidate":null,
@@ -656,7 +745,11 @@ fn adventure_turn_output(ending: bool) -> Value {
         json!({
             "sceneText":"Warm light leaks through the old cellar lock.",
             "speakerNpcIds":[],
-            "suggestedActions":[{"text":"Study the lock."}],
+            "suggestedActions":[
+                {"text":"Study the lock."},
+                {"text":"Ask the keeper about the old key."},
+                {"text":"Observe the warm marks on the frame."}
+            ],
             "checkRequest":{
                 "attribute":"knowledge",
                 "difficulty":11,
@@ -724,25 +817,41 @@ fn model_update(
     use_as_default: bool,
     use_as_fallback: bool,
 ) -> ModelSettingsUpdate {
+    let normalized_base_url = base_url.unwrap_or_else(|| "http://localhost:11434/v1/".to_owned());
+    let capabilities = ModelCapabilitiesRegistration {
+        text: true,
+        streaming: false,
+        system_messages: true,
+        json_mode: true,
+        json_schema: false,
+        tool_calling: false,
+        reasoning: false,
+        context_window_tokens: Some(32_768),
+        cost_status: "UNKNOWN".to_owned(),
+        checked_at: "2026-08-01T14:00:00Z".to_owned(),
+    };
+    let endpoint_fingerprint = model_endpoint_fingerprint(preset_key, &normalized_base_url);
+    let capability_source = CapabilitySource::Unknown;
+    let probe_fingerprint = model_probe_fingerprint(
+        &endpoint_fingerprint,
+        model_name,
+        capability_source,
+        &capabilities,
+    )
+    .unwrap();
     ModelSettingsUpdate {
         preset_key: preset_key.to_owned(),
         provider_display_name: display_name.to_owned(),
-        base_url,
+        base_url: Some(normalized_base_url),
+        endpoint_fingerprint,
         credential_ref: None,
+        credential_action: CredentialAction::Keep,
         model_name: model_name.to_owned(),
         model_display_name: model_name.to_owned(),
-        capabilities: ModelCapabilitiesRegistration {
-            text: true,
-            streaming: false,
-            system_messages: true,
-            json_mode: true,
-            json_schema: false,
-            tool_calling: false,
-            reasoning: false,
-            context_window_tokens: Some(32_768),
-            cost_status: "UNKNOWN".to_owned(),
-            checked_at: "2026-08-01T14:00:00Z".to_owned(),
-        },
+        capabilities,
+        capability_source,
+        probe_fingerprint,
+        probe_receipt_id: Uuid::new_v4().to_string(),
         use_as_default,
         use_as_fallback,
     }

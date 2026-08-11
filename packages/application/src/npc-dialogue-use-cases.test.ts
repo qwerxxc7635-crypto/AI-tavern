@@ -143,7 +143,12 @@ describe('NpcDialogueUseCases', () => {
       expect(JSON.stringify(generation?.request)).not.toContain(
         'The owner hid a royal seal beneath the floor.',
       );
-      expect(JSON.stringify(generation?.request)).toContain('Earlier history:');
+      expect(JSON.stringify(generation?.request)).not.toContain(
+        'A visitor alone saw the bell chamber map.',
+      );
+      expect(JSON.stringify(generation?.request)).toContain(
+        'Earlier history (12 entries; sampled):',
+      );
       expect(JSON.stringify(generation?.request)).toContain('dialogue-history-62');
       expect(JSON.stringify(generation?.request)).not.toContain('dialogue-history-30');
       expect(JSON.stringify(generation?.request)).toContain('memory-history-19');
@@ -167,7 +172,9 @@ describe('NpcDialogueUseCases', () => {
       const memoryGeneration = new GenerationRecordRepository(sqlite).get(
         generationRecordId('generation-memories'),
       );
-      expect(JSON.stringify(memoryGeneration?.request)).toContain('Earlier history:');
+      expect(JSON.stringify(memoryGeneration?.request)).toContain(
+        'Earlier history (52 entries; sampled):',
+      );
       expect(JSON.stringify(memoryGeneration?.request)).toContain('dialogue-history-62');
       expect(JSON.stringify(memoryGeneration?.request)).not.toContain('dialogue-history-30');
       expect(new NpcRepository(sqlite).listMemories(npcKey).at(-1)).toEqual(memories[0]);
@@ -223,6 +230,16 @@ function seedCampaign(database: TransactionalSqliteDatabase): void {
     createdAt: at,
   });
   worlds.addFact({
+    id: worldFactId('fact-unrelated'),
+    campaignId: campaignKey,
+    kind: 'DEVELOPING_FACT',
+    statement: 'A visitor alone saw the bell chamber map.',
+    locationId: locationKey,
+    factionIds: [],
+    supersedesFactId: null,
+    createdAt: at,
+  });
+  worlds.addFact({
     id: worldFactId('fact-excluded'),
     campaignId: campaignKey,
     kind: 'DEVELOPING_FACT',
@@ -246,6 +263,16 @@ function seedCampaign(database: TransactionalSqliteDatabase): void {
       suspectedFactIds: [],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [worldFactId('fact-excluded')],
+      provenance: [
+        {
+          factId: worldFactId('fact-known'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: at,
+          confidence: 1,
+        },
+      ],
     }),
     at,
   );

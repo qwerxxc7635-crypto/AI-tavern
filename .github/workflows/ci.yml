@@ -9,7 +9,11 @@ permissions:
 
 jobs:
   quality:
-    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -37,6 +41,12 @@ jobs:
       - name: Check formatting
         run: pnpm format:check
 
+      - name: Check release metadata synchronization
+        run: pnpm release:check
+
+      - name: Check player-facing zh-CN resources
+        run: pnpm i18n:check
+
       - name: Lint TypeScript
         run: pnpm lint
 
@@ -54,3 +64,84 @@ jobs:
 
       - name: Test Rust
         run: cargo test --workspace
+
+      - name: Verify current TypeScript and Rust save interoperability
+        run: pnpm archive:interop
+
+  windows-release:
+    needs: quality
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Windows vertical slice evidence
+        run: node scripts/run-with-evidence.mjs --output artifacts/evidence/windows-e2e.json -- pnpm test:windows-e2e
+      - name: Build NSIS release with evidence
+        run: node scripts/run-with-evidence.mjs --output artifacts/evidence/windows-nsis-build.json -- pnpm --dir windows-app tauri build --bundles nsis
+      - name: Credential Manager, WebView2, install, launch and uninstall evidence
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem -Path target/release/bundle/nsis -Filter '*-setup.exe' -File
+          if ($installer.Count -ne 1) { throw "Expected one NSIS installer, found $($installer.Count)." }
+          node scripts/run-with-evidence.mjs --output artifacts/evidence/windows-install-gate-command.json -- pwsh -NoProfile -ExecutionPolicy Bypass -File scripts/windows-release-gate.ps1 -InstallerPath $installer[0].FullName -EvidenceOutput artifacts/evidence/windows-install-lifecycle.json
+      - name: Hash release bundle
+        run: node scripts/collect-release-evidence.mjs --root target/release/bundle/nsis --output artifacts/evidence/windows-release-files.json
+      - name: Upload Windows release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ember-tavern-windows-release-evidence
+          path: |
+            target/release/bundle/nsis
+            artifacts/evidence
+          if-no-files-found: error
+
+  macos-build:
+    needs: quality
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Build macOS app with evidence
+        run: node scripts/run-with-evidence.mjs --output artifacts/evidence/macos-app-build.json -- pnpm --dir windows-app tauri build --bundles app
+      - name: Keychain, WKWebView, app launch and PlatformPaths evidence
+        run: node scripts/run-with-evidence.mjs --output artifacts/evidence/macos-lifecycle-gate-command.json -- node scripts/macos-release-gate.mjs --app 'target/release/bundle/macos/Ember Tavern.app' --output artifacts/evidence/macos-lifecycle.json
+      - name: Hash macOS app bundle
+        run: node scripts/collect-release-evidence.mjs --root target/release/bundle/macos --output artifacts/evidence/macos-release-files.json
+      - name: Upload macOS build evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ember-tavern-macos-build-evidence
+          path: |
+            target/release/bundle/macos
+            artifacts/evidence
+          if-no-files-found: error

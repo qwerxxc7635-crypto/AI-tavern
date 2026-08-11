@@ -35,7 +35,7 @@ import {
 } from './task-schemas.js';
 
 export interface AITaskSchemaDefinition {
-  readonly schemaVersion: 1 | 2;
+  readonly schemaVersion: 1 | 2 | 3 | 4 | 5;
   readonly input: z.ZodType;
   readonly output: z.ZodType;
 }
@@ -60,9 +60,9 @@ export const AI_TASK_SCHEMAS = Object.freeze({
     2,
   ),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
-  GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 2),
-  NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 2),
-  GENERATE_QUEST: definition(GenerateQuestInputSchema, GenerateQuestOutputSchema),
+  GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
+  NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 3),
+  GENERATE_QUEST: definition(GenerateQuestInputSchema, GenerateQuestOutputSchema, 2),
   GENERATE_ADVENTURE_PLAN: definition(
     GenerateAdventurePlanInputSchema,
     GenerateAdventurePlanOutputSchema,
@@ -70,9 +70,9 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_ADVENTURE_TURN: definition(
     GenerateAdventureTurnInputSchema,
     GenerateAdventureTurnOutputSchema,
-    2,
+    5,
   ),
-  RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema),
+  RESOLVE_DICE_RESULT: definition(ResolveDiceResultInputSchema, ResolveDiceResultOutputSchema, 2),
   GENERATE_WORLD_EVENT: definition(
     GenerateWorldEventInputSchema,
     GenerateWorldEventOutputSchema,

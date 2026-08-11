@@ -69,6 +69,10 @@ describe('adventure protocol', () => {
     const checkId = checkRequestId('check-1');
     const result: DiceResult = {
       checkRequestId: checkId,
+      raw: 12,
+      modifier: 4,
+      dc: 14,
+      result: 'SUCCESS',
       d20: 12,
       attributeModifier: 3,
       equipmentModifier: 1,

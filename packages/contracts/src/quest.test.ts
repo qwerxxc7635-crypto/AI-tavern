@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   campaignId,
+  claimId,
   isoTimestamp,
   itemId,
   npcId,
@@ -21,6 +22,7 @@ describe('rumor, quest and item contracts', () => {
   it('keeps player-facing rumor content separate from hidden veracity', () => {
     const rumor: Rumor = {
       id: rumorId('rumor-beacon'),
+      claimId: claimId('claim-rumor-beacon'),
       campaignId: campaign,
       tavernId: tavernId('tavern-ember'),
       content: {
@@ -28,6 +30,9 @@ describe('rumor, quest and item contracts', () => {
         details: 'A courier claims to have seen guild colors near the wreck.',
       },
       sourceNpcId: npcId('npc-courier'),
+      sourceBasis: 'HEARSAY',
+      confidence: 0.5,
+      claimRevision: 1,
       relatedFactIds: [worldFactId('fact-beacon')],
       veracity: 'UNKNOWN',
       createdAt: now,

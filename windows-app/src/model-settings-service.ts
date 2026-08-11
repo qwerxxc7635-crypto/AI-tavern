@@ -2,32 +2,106 @@ import { invoke } from '@tauri-apps/api/core';
 
 export type PresetKey = 'deepseek' | 'qwen' | 'openrouter' | 'ollama' | 'custom';
 
+export const DEEPSEEK_FLASH_PROFILE = Object.freeze({
+  apiModelId: 'deepseek-v4-flash',
+  uiDisplayName: 'DeepSeek-V4-Flash-0731',
+});
+
+export interface ConnectionProfileDefinition {
+  readonly key: PresetKey;
+  readonly name: string;
+  readonly baseUrl: string;
+  readonly defaultModel: string;
+  readonly endpointMode: 'FIXED' | 'CONFIGURABLE';
+  readonly credentialMode: 'REQUIRED' | 'OPTIONAL' | 'NONE';
+}
+
+export const CONNECTION_PROFILES: readonly ConnectionProfileDefinition[] = Object.freeze([
+  Object.freeze({
+    key: 'deepseek',
+    name: 'DeepSeek',
+    baseUrl: 'https://api.deepseek.com/',
+    defaultModel: DEEPSEEK_FLASH_PROFILE.apiModelId,
+    endpointMode: 'FIXED',
+    credentialMode: 'REQUIRED',
+  }),
+  Object.freeze({
+    key: 'qwen',
+    name: 'Qwen',
+    baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1/',
+    defaultModel: 'qwen3.7-plus',
+    endpointMode: 'FIXED',
+    credentialMode: 'REQUIRED',
+  }),
+  Object.freeze({
+    key: 'openrouter',
+    name: 'OpenRouter',
+    baseUrl: 'https://openrouter.ai/api/v1/',
+    defaultModel: '',
+    endpointMode: 'FIXED',
+    credentialMode: 'REQUIRED',
+  }),
+  Object.freeze({
+    key: 'ollama',
+    name: 'Ollama',
+    baseUrl: 'http://localhost:11434/v1/',
+    defaultModel: '',
+    endpointMode: 'CONFIGURABLE',
+    credentialMode: 'NONE',
+  }),
+  Object.freeze({
+    key: 'custom',
+    name: 'OpenAI-Compatible',
+    baseUrl: '',
+    defaultModel: '',
+    endpointMode: 'CONFIGURABLE',
+    credentialMode: 'OPTIONAL',
+  }),
+]);
+
+export function getConnectionProfile(key: PresetKey): ConnectionProfileDefinition {
+  const profile = CONNECTION_PROFILES.find((candidate) => candidate.key === key);
+  if (profile === undefined) throw new TypeError('Connection profile is invalid');
+  return profile;
+}
+
 export interface ModelProfile {
   readonly id: string;
   readonly providerId: string;
   readonly presetKey: PresetKey;
   readonly providerDisplayName: string;
   readonly baseUrl: string | null;
+  readonly endpointFingerprint: string | null;
   readonly hasCredential: boolean;
   readonly modelName: string;
   readonly modelDisplayName: string;
   readonly capabilities: ModelCapabilities | null;
+  readonly capabilitySource: CapabilitySource | null;
+  readonly probeFingerprint: string | null;
 }
+
+export type CapabilitySource = 'PROVIDER_RESPONSE' | 'PRESET_METADATA' | 'UNKNOWN';
 
 export interface ModelSettingsSnapshot {
   readonly profiles: readonly ModelProfile[];
   readonly defaultModelProfileId: string | null;
   readonly fallbackModelProfileId: string | null;
+  readonly pendingCredentialCleanupCount: number;
 }
 
 export interface ModelSettingsUpdate {
   readonly presetKey: PresetKey;
   readonly providerDisplayName: string;
   readonly baseUrl: string | null;
+  readonly endpointFingerprint: string;
   readonly credentialRef: string | null;
+  readonly credentialAction: 'KEEP' | 'REPLACE' | 'CLEAR';
   readonly modelName: string;
   readonly modelDisplayName: string;
   readonly capabilities: ModelCapabilities;
+  readonly capabilitySource: CapabilitySource;
+  readonly probeFingerprint: string;
+  readonly probeReceiptId: string;
   readonly useAsDefault: boolean;
   readonly useAsFallback: boolean;
 }
@@ -36,6 +110,15 @@ export interface ProbeModel {
   readonly name: string;
   readonly displayName: string;
   readonly capabilities: ModelCapabilities;
+  readonly capabilitySource: CapabilitySource;
+  readonly probeFingerprint: string;
+}
+
+export interface ProbeResult {
+  readonly receiptId: string;
+  readonly normalizedBaseUrl: string;
+  readonly endpointFingerprint: string;
+  readonly models: readonly ProbeModel[];
 }
 
 export interface ModelCapabilities {
@@ -61,7 +144,7 @@ export interface ModelSettingsGateway {
     readonly presetKey: PresetKey;
     readonly baseUrl: string | null;
     readonly credentialRef: string | null;
-  }): Promise<readonly ProbeModel[]>;
+  }): Promise<ProbeResult>;
 }
 
 export const tauriModelSettingsGateway: ModelSettingsGateway = {
@@ -88,7 +171,14 @@ export const tauriModelSettingsGateway: ModelSettingsGateway = {
   },
   async probe(input) {
     const value = requireRecord(await invoke<unknown>('provider_probe', { input }));
-    return requireArray(value['models']).map(parseProbeModel);
+    return Object.freeze({
+      receiptId: requireId(value['receiptId']),
+      normalizedBaseUrl: requireText(value['normalizedBaseUrl']),
+      endpointFingerprint: requireFingerprint(value['endpointFingerprint']),
+      models: Object.freeze(
+        requireArray(value['models']).map((model) => parseProbeModel(model, input.presetKey)),
+      ),
+    });
   },
 };
 
@@ -98,6 +188,9 @@ export function parseModelSettingsSnapshot(value: unknown): ModelSettingsSnapsho
     profiles: Object.freeze(requireArray(record['profiles']).map(parseProfile)),
     defaultModelProfileId: optionalId(record['defaultModelProfileId']),
     fallbackModelProfileId: optionalId(record['fallbackModelProfileId']),
+    pendingCredentialCleanupCount: requireNonNegativeInteger(
+      record['pendingCredentialCleanupCount'],
+    ),
   });
 }
 
@@ -107,27 +200,55 @@ function parseProfile(value: unknown): ModelProfile {
   if (!['deepseek', 'qwen', 'openrouter', 'ollama', 'custom'].includes(presetKey)) {
     throw new TypeError('Provider preset is invalid');
   }
+  const modelName = requireText(record['modelName']);
   return Object.freeze({
     id: requireText(record['id']),
     providerId: requireText(record['providerId']),
     presetKey,
     providerDisplayName: requireText(record['providerDisplayName']),
     baseUrl: optionalText(record['baseUrl']),
+    endpointFingerprint: optionalFingerprint(record['endpointFingerprint']),
     hasCredential: requireBoolean(record['hasCredential']),
-    modelName: requireText(record['modelName']),
-    modelDisplayName: requireText(record['modelDisplayName']),
+    modelName,
+    modelDisplayName: canonicalModelDisplayName(
+      presetKey,
+      modelName,
+      requireText(record['modelDisplayName']),
+    ),
     capabilities:
       record['capabilities'] === null ? null : parseCapabilities(record['capabilities']),
+    capabilitySource:
+      record['capabilitySource'] === null
+        ? null
+        : requireCapabilitySource(record['capabilitySource']),
+    probeFingerprint: optionalFingerprint(record['probeFingerprint']),
   });
 }
 
-function parseProbeModel(value: unknown): ProbeModel {
+function parseProbeModel(value: unknown, presetKey: PresetKey): ProbeModel {
   const record = requireRecord(value);
+  const modelName = requireText(record['name']);
   return Object.freeze({
-    name: requireText(record['name']),
-    displayName: requireText(record['displayName']),
+    name: modelName,
+    displayName: canonicalModelDisplayName(
+      presetKey,
+      modelName,
+      requireText(record['displayName']),
+    ),
     capabilities: parseCapabilities(record['capabilities']),
+    capabilitySource: requireCapabilitySource(record['capabilitySource']),
+    probeFingerprint: requireFingerprint(record['probeFingerprint']),
   });
+}
+
+function canonicalModelDisplayName(
+  presetKey: PresetKey,
+  modelName: string,
+  providerDisplayName: string,
+): string {
+  return presetKey === 'deepseek' && modelName === DEEPSEEK_FLASH_PROFILE.apiModelId
+    ? DEEPSEEK_FLASH_PROFILE.uiDisplayName
+    : providerDisplayName;
 }
 
 function parseCapabilities(value: unknown): ModelCapabilities {
@@ -181,9 +302,39 @@ function optionalId(value: unknown): string | null {
   return optionalText(value);
 }
 
+function requireId(value: unknown): string {
+  const id = requireText(value);
+  if (!/^[0-9a-f-]{36}$/.test(id)) throw new TypeError('Probe receipt is invalid');
+  return id;
+}
+
+function requireFingerprint(value: unknown): string {
+  const fingerprint = requireText(value);
+  if (!/^[0-9a-f]{64}$/.test(fingerprint)) throw new TypeError('Probe fingerprint is invalid');
+  return fingerprint;
+}
+
+function optionalFingerprint(value: unknown): string | null {
+  return value === null ? null : requireFingerprint(value);
+}
+
+function requireCapabilitySource(value: unknown): CapabilitySource {
+  if (value !== 'PROVIDER_RESPONSE' && value !== 'PRESET_METADATA' && value !== 'UNKNOWN') {
+    throw new TypeError('Capability source is invalid');
+  }
+  return value;
+}
+
 function requireBoolean(value: unknown): boolean {
   if (typeof value !== 'boolean') throw new TypeError('Model settings flag is invalid');
   return value;
+}
+
+function requireNonNegativeInteger(value: unknown): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 0) {
+    throw new TypeError('Model settings count is invalid');
+  }
+  return value as number;
 }
 
 function requireTimestamp(value: unknown): string {

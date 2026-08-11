@@ -32,13 +32,21 @@ export function resolveD20Check(input: D20CheckInput, random: D20RandomSource): 
   const d20 = random.nextD20();
   assertIntegerInRange(d20, 1, 20, 'd20');
 
-  const total = d20 + input.attributeValue + input.equipmentModifier + input.statusModifier;
+  const modifier = input.attributeValue + input.equipmentModifier + input.statusModifier;
+  if (!Number.isSafeInteger(modifier)) {
+    throw new D20RuleError('check modifier must be a safe integer');
+  }
+  const total = d20 + modifier;
   if (!Number.isSafeInteger(total)) {
     throw new D20RuleError('check total must be a safe integer');
   }
 
   return Object.freeze({
     checkRequestId: input.checkRequestId,
+    raw: d20,
+    modifier,
+    dc: input.difficulty,
+    result: total >= input.difficulty ? 'SUCCESS' : 'FAILURE',
     d20,
     attributeModifier: input.attributeValue,
     equipmentModifier: input.equipmentModifier,

@@ -31,6 +31,7 @@ import {
 } from '@ember-tavern/contracts';
 
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
+import { parseStoredDiceResult } from './dice-result-validation.js';
 import { GameEventRepository } from './game-event-repository.js';
 import {
   parseJson,
@@ -624,23 +625,43 @@ function parsePlayerAction(value: unknown): PlayerAction {
     row['kind'],
     'PlayerAction.kind',
   );
+  const mode =
+    row['mode'] === undefined
+      ? Object.freeze({})
+      : Object.freeze({
+          mode: requireEnum(
+            ['ACTION', 'DIALOGUE', 'OBSERVE'] as const,
+            row['mode'],
+            'PlayerAction.mode',
+          ),
+        });
   switch (kind) {
     case 'SUGGESTED':
       return Object.freeze({
         kind,
+        ...mode,
         optionId: actionOptionId(requireString(row['optionId'], 'PlayerAction.optionId')),
         text: requireString(row['text'], 'PlayerAction.text'),
       });
     case 'FREEFORM':
-      return Object.freeze({ kind, text: requireString(row['text'], 'PlayerAction.text') });
+      return Object.freeze({
+        kind,
+        ...mode,
+        text: requireString(row['text'], 'PlayerAction.text'),
+      });
     case 'USE_ITEM':
       return Object.freeze({
         kind,
+        ...mode,
         itemId: itemId(requireString(row['itemId'], 'PlayerAction.itemId')),
         intent: requireString(row['intent'], 'PlayerAction.intent'),
       });
     case 'EXIT_ADVENTURE':
-      return Object.freeze({ kind, reason: requireString(row['reason'], 'PlayerAction.reason') });
+      return Object.freeze({
+        kind,
+        ...mode,
+        reason: requireString(row['reason'], 'PlayerAction.reason'),
+      });
   }
 }
 
@@ -656,19 +677,7 @@ function parseCheckRequest(value: unknown): CheckRequest {
 }
 
 function parseDiceResult(value: unknown): DiceResult {
-  const row = requireRecord(value, 'DiceResult');
-  return Object.freeze({
-    checkRequestId: checkRequestId(
-      requireString(row['checkRequestId'], 'DiceResult.checkRequestId'),
-    ),
-    d20: requireNumber(row['d20'], 'DiceResult.d20'),
-    attributeModifier: requireNumber(row['attributeModifier'], 'DiceResult.attributeModifier'),
-    equipmentModifier: requireNumber(row['equipmentModifier'], 'DiceResult.equipmentModifier'),
-    statusModifier: requireNumber(row['statusModifier'], 'DiceResult.statusModifier'),
-    total: requireNumber(row['total'], 'DiceResult.total'),
-    difficulty: requireDifficulty(row['difficulty']),
-    success: requireBoolean(row['success'], 'DiceResult.success'),
-  });
+  return parseStoredDiceResult(value);
 }
 
 function parseClues(value: unknown): readonly Clue[] {

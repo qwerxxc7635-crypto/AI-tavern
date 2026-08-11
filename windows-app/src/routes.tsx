@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Navigate, NavLink, Outlet, Route, Routes, useLocation } from 'react-router-dom';
 
+import { playerText } from './localization/index.js';
 import { AppErrorBoundary } from './ui-states.js';
 
 const sectionPages = () => import('./section-pages.js');
@@ -36,17 +37,18 @@ const ArchivesPage = lazy(() =>
 const SettingsPage = lazy(() =>
   import('./model-settings-page.js').then(({ ModelSettingsPage: page }) => ({ default: page })),
 );
+const MyPage = lazy(() => import('./my-page.js').then(({ MyPage: page }) => ({ default: page })));
 const RecoveryPage = lazy(() =>
   import('./recovery-page.js').then(({ RecoveryPage: page }) => ({ default: page })),
 );
 
 export const WINDOWS_NAVIGATION = [
-  { path: '/tavern', label: '酒馆', marker: 'T' },
-  { path: '/quests', label: '任务', marker: 'Q' },
-  { path: '/adventure', label: '冒险', marker: 'A' },
-  { path: '/character', label: '角色', marker: 'C' },
-  { path: '/archives', label: '档案', marker: 'R' },
-  { path: '/settings', label: '设置', marker: 'S' },
+  { path: '/tavern', label: playerText.navigation.tavern, marker: 'T' },
+  { path: '/quests', label: playerText.navigation.quests, marker: 'Q' },
+  { path: '/adventure', label: playerText.navigation.adventure, marker: 'A' },
+  { path: '/character', label: playerText.navigation.character, marker: 'C' },
+  { path: '/archives', label: playerText.navigation.archives, marker: 'R' },
+  { path: '/my', label: playerText.navigation.my, marker: 'M' },
 ] as const;
 
 export function AppRoutes() {
@@ -100,6 +102,7 @@ export function AppRoutes() {
         <Route path="adventure" element={<AdventurePage />} />
         <Route path="character" element={<CharacterPage />} />
         <Route path="archives" element={<ArchivesPage />} />
+        <Route path="my" element={<MyPage />} />
         <Route path="settings" element={<SettingsPage />} />
         <Route path="*" element={<RouteNotFound />} />
       </Route>
@@ -111,7 +114,11 @@ export function AppShell() {
   const location = useLocation();
   const current =
     WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname) ??
-    (location.pathname === '/npc' ? { label: 'NPC 对话' } : undefined);
+    (location.pathname === '/npc'
+      ? { label: playerText.navigation.npcDialogue }
+      : location.pathname === '/settings'
+        ? { label: playerText.navigation.modelSettings }
+        : undefined);
   const campaignId = new URLSearchParams(location.search).get('campaignId');
 
   return (
@@ -122,11 +129,11 @@ export function AppShell() {
             <span />
           </span>
           <div>
-            <p>Ember Tavern</p>
-            <span>炉火酒馆</span>
+            <p>{playerText.common.brandName}</p>
+            <span>{playerText.common.brandSubtitle}</span>
           </div>
         </div>
-        <nav className="navigation" aria-label="主导航">
+        <nav className="navigation" aria-label={playerText.navigation.ariaLabel}>
           {WINDOWS_NAVIGATION.map(({ path, label, marker }) => (
             <NavLink key={path} to={{ pathname: path, search: location.search }}>
               <span className="navigation__marker" aria-hidden="true">
@@ -138,18 +145,20 @@ export function AppShell() {
         </nav>
         <p className="sidebar__status">
           <span aria-hidden="true" />
-          本地离线
+          {playerText.common.localOffline}
         </p>
       </aside>
 
       <div className="workspace">
         <header className="titlebar">
           <div>
-            <p className="eyebrow">Current room</p>
-            <p className="titlebar__title">{current?.label ?? '未知路径'}</p>
+            <p className="eyebrow">{playerText.titlebar.eyebrow}</p>
+            <p className="titlebar__title">{current?.label ?? playerText.titlebar.unknownRoute}</p>
           </div>
           <p className="titlebar__mode">
-            {campaignId === null ? 'Local session' : `存档 ${campaignId.slice(0, 8)}`}
+            {campaignId === null
+              ? playerText.titlebar.localSession
+              : playerText.titlebar.campaign(campaignId.slice(0, 8))}
           </p>
         </header>
         <AppErrorBoundary key={location.pathname}>
@@ -166,9 +175,9 @@ export function AppLoading() {
   return (
     <main className="system-state" aria-live="polite" aria-busy="true">
       <span className="loading-glyph" aria-hidden="true" />
-      <p className="eyebrow">Preparing room</p>
-      <h1>正在整理桌面…</h1>
-      <p>本地内容加载完成后会自动继续。</p>
+      <p className="eyebrow">{playerText.loading.eyebrow}</p>
+      <h1>{playerText.loading.title}</h1>
+      <p>{playerText.loading.description}</p>
     </main>
   );
 }
@@ -176,11 +185,11 @@ export function AppLoading() {
 function RouteNotFound() {
   return (
     <main className="system-state">
-      <p className="eyebrow">Route unavailable</p>
-      <h1>这条路还没有点灯。</h1>
-      <p>返回酒馆，继续查看当前可用内容。</p>
+      <p className="eyebrow">{playerText.routeUnavailable.eyebrow}</p>
+      <h1>{playerText.routeUnavailable.title}</h1>
+      <p>{playerText.routeUnavailable.description}</p>
       <NavLink className="text-link" to="/tavern">
-        返回酒馆
+        {playerText.common.backToTavern}
       </NavLink>
     </main>
   );

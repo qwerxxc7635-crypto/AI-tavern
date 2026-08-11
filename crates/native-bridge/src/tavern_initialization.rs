@@ -2,10 +2,13 @@ use std::collections::HashSet;
 
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use uuid::Uuid;
 
-use crate::{CampaignStore, CampaignStoreError, current_timestamp, validate_id};
+use crate::{
+    CampaignStore, CampaignStoreError, current_timestamp, repetition::find_repeated_phrase,
+    repetition::npc_archetype_signature, validate_id,
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -63,8 +66,10 @@ pub struct TavernNpcView {
 #[serde(rename_all = "camelCase")]
 pub struct RumorView {
     pub id: String,
+    pub claim_id: String,
     pub statement: String,
     pub source_npc_id: String,
+    pub source_basis: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -155,6 +160,8 @@ struct RosterNpcDraft {
 struct RumorDraft {
     statement: String,
     source_npc_name: String,
+    source_basis: String,
+    confidence: f64,
     veracity: String,
 }
 
@@ -307,6 +314,13 @@ impl CampaignStore {
         if output.npcs.iter().any(|npc| npc.profile.name == owner.name) {
             return Err(CampaignStoreError::InvalidData);
         }
+        let owner_archetype = npc_archetype_signature(&owner.identity, &owner.personality);
+        if output.npcs.iter().any(|npc| {
+            npc_archetype_signature(&npc.profile.identity, &npc.profile.personality)
+                == owner_archetype
+        }) {
+            return Err(CampaignStoreError::InvalidData);
+        }
         let expected_input = serde_json::json!({
             "world": source.world,
             "tavern": {
@@ -316,6 +330,7 @@ impl CampaignStore {
                 "longTermProblem": tavern.long_term_problem,
             },
             "existingNpcNames": [owner.name],
+            "existingNpcArchetypes": [owner_archetype],
             "requestedCount": 3,
         });
         let expected_context = serde_json::json!({
@@ -345,7 +360,7 @@ impl CampaignStore {
                 .iter()
                 .enumerate()
                 .filter(|(_, rumor)| rumor.source_npc_name == npc.profile.name)
-                .map(|(rumor_index, _)| rumor_ids[rumor_index].clone())
+                .map(|(rumor_index, rumor)| (rumor_ids[rumor_index].clone(), rumor.confidence))
                 .collect::<Vec<_>>();
             insert_npc(
                 &transaction,
@@ -379,8 +394,12 @@ impl CampaignStore {
                     rumor.statement,
                     tavern.location_id,
                     serde_json::json!({
+                        "claimId": format!("claim-{}", rumor_ids[index]),
+                        "claimRevision": 1,
+                        "confidence": rumor.confidence,
                         "veracity": rumor.veracity,
                         "sourceNpcId": npc_ids[source_index],
+                        "sourceBasis": rumor.source_basis,
                     })
                     .to_string(),
                     at,
@@ -572,10 +591,41 @@ fn load_rumors(
                 .and_then(|record| record.get("sourceNpcId"))
                 .and_then(Value::as_str)
                 .ok_or(rusqlite::Error::InvalidQuery)?;
+            let claim_id = detail
+                .as_object()
+                .and_then(|record| record.get("claimId"))
+                .and_then(Value::as_str)
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let source_basis = detail
+                .as_object()
+                .and_then(|record| record.get("sourceBasis"))
+                .and_then(Value::as_str)
+                .filter(|value| {
+                    matches!(
+                        *value,
+                        "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+                    )
+                })
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let confidence = detail
+                .as_object()
+                .and_then(|record| record.get("confidence"))
+                .and_then(Value::as_f64)
+                .filter(|value| value.is_finite() && (0.0..=1.0).contains(value))
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let revision = detail
+                .as_object()
+                .and_then(|record| record.get("claimRevision"))
+                .and_then(Value::as_i64)
+                .filter(|value| *value >= 1)
+                .ok_or(rusqlite::Error::InvalidQuery)?;
+            let _ = (confidence, revision);
             Ok(RumorView {
                 id: row.get(0)?,
+                claim_id: claim_id.to_owned(),
                 statement: row.get(1)?,
                 source_npc_id: source.to_owned(),
+                source_basis: source_basis.to_owned(),
             })
         })?
         .collect::<Result<Vec<_>, _>>()
@@ -617,7 +667,7 @@ fn insert_npc(
     transaction: &Transaction<'_>,
     insert: NpcInsert<'_>,
     npc: &NpcDraft,
-    known_fact_ids: &[String],
+    known_facts: &[(String, f64)],
     at: &str,
 ) -> Result<(), CampaignStoreError> {
     let visit = insert.visit_reason.map(|reason| {
@@ -656,9 +706,32 @@ fn insert_npc(
     transaction.execute(
         "INSERT INTO npc_knowledge (
            npc_id, known_fact_ids_json, suspected_fact_ids_json,
-           false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
-         ) VALUES (?1, ?2, '[]', '[]', '[]', ?3)",
-        params![insert.npc_id, to_json(&known_fact_ids)?, at],
+           false_belief_fact_ids_json, excluded_secret_fact_ids_json,
+           provenance_json, updated_at
+         ) VALUES (?1, ?2, '[]', '[]', '[]', ?3, ?4)",
+        params![
+            insert.npc_id,
+            to_json(
+                &known_facts
+                    .iter()
+                    .map(|(fact_id, _)| fact_id)
+                    .collect::<Vec<_>>()
+            )?,
+            to_json(
+                &known_facts
+                    .iter()
+                    .map(|(fact_id, confidence)| json!({
+                        "factId": fact_id,
+                        "state": "KNOWN",
+                        "source": "LOCAL_RULE",
+                        "eventId": null,
+                        "learnedAt": at,
+                        "confidence": confidence
+                    }))
+                    .collect::<Vec<_>>()
+            )?,
+            at
+        ],
     )?;
     transaction.execute(
         "INSERT INTO npc_relationships (
@@ -770,24 +843,49 @@ fn validate_roster_output(output: &NpcRosterOutput) -> Result<(), CampaignStoreE
         return Err(CampaignStoreError::InvalidData);
     }
     let mut names = HashSet::new();
+    let mut archetypes = HashSet::new();
+    let mut phrases = Vec::new();
     for npc in &output.npcs {
         validate_npc(&npc.profile)?;
         if !names.insert(npc.profile.name.as_str())
+            || !archetypes.insert(npc_archetype_signature(
+                &npc.profile.identity,
+                &npc.profile.personality,
+            ))
             || (npc.residency == "TEMPORARY_VISITOR") != npc.visit_reason.is_some()
         {
             return Err(CampaignStoreError::InvalidData);
         }
         if let Some(reason) = &npc.visit_reason {
             validate_text(reason, 4_000)?;
+            phrases.push(reason.as_str());
         }
+        phrases.extend([
+            npc.profile.identity.as_str(),
+            npc.profile.appearance.as_str(),
+            npc.profile.personality.as_str(),
+            npc.profile.goal.as_str(),
+            npc.profile.secret.as_str(),
+            npc.profile.speech_style.as_str(),
+        ]);
     }
     for rumor in &output.rumors {
         validate_text(&rumor.statement, 4_000)?;
+        phrases.push(rumor.statement.as_str());
         if !names.contains(rumor.source_npc_name.as_str())
+            || !matches!(
+                rumor.source_basis.as_str(),
+                "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+            )
+            || !rumor.confidence.is_finite()
+            || !(0.0..=1.0).contains(&rumor.confidence)
             || !["UNKNOWN", "TRUE", "PARTIAL", "FALSE"].contains(&rumor.veracity.as_str())
         {
             return Err(CampaignStoreError::InvalidData);
         }
+    }
+    if find_repeated_phrase(phrases).is_some() {
+        return Err(CampaignStoreError::InvalidData);
     }
     Ok(())
 }
@@ -979,6 +1077,18 @@ mod tests {
             1
         );
         assert_eq!(completed.rumors.len(), 3);
+        assert!(completed.rumors.iter().all(|rumor| {
+            rumor.claim_id.starts_with("claim-")
+                && matches!(
+                    rumor.source_basis.as_str(),
+                    "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+                )
+        }));
+        assert!(
+            !serde_json::to_string(&completed.rumors)
+                .expect("serialize player rumor view")
+                .contains("veracity")
+        );
         assert_eq!(completed.clocks.len(), 3);
         assert!(
             completed
@@ -995,6 +1105,29 @@ mod tests {
         assert_eq!(restored.npcs, completed.npcs);
         assert_eq!(restored.rumors, completed.rumors);
         assert_eq!(restored.clocks, completed.clocks);
+        let connection = final_store.connect().expect("inspect provenance");
+        let mut statement = connection
+            .prepare("SELECT provenance_json FROM npc_knowledge ORDER BY npc_id")
+            .expect("prepare provenance query");
+        let rows = statement
+            .query_map([], |row| row.get::<_, String>(0))
+            .expect("query provenance")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect provenance");
+        assert_eq!(rows.len(), 4);
+        assert!(rows.iter().all(|row| {
+            serde_json::from_str::<Vec<Value>>(row).is_ok_and(|entries| {
+                entries.iter().all(|entry| {
+                    entry["source"] == "LOCAL_RULE"
+                        && entry["state"] == "KNOWN"
+                        && entry["eventId"].is_null()
+                        && entry["learnedAt"].as_str().is_some()
+                        && entry["confidence"]
+                            .as_f64()
+                            .is_some_and(|value| (0.0..=1.0).contains(&value))
+                })
+            })
+        }));
     }
 
     #[test]
@@ -1034,13 +1167,32 @@ mod tests {
             .tavern
             .expect("tavern")
             .id;
-        let mut duplicate_owner = roster_command(&store, tavern_id);
+        let mut duplicate_owner = roster_command(&store, tavern_id.clone());
         duplicate_owner.generation.validated_output["npcs"][0]["name"] =
             Value::String("Ilyra Venn".to_owned());
         duplicate_owner.generation.raw_response_text =
             duplicate_owner.generation.validated_output.to_string();
         assert!(matches!(
             store.commit_npc_roster_generation(duplicate_owner),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        let mut duplicate_archetype = roster_command(&store, tavern_id.clone());
+        duplicate_archetype.generation.validated_output["npcs"][0]["identity"] =
+            Value::String("Role of Ilyra Venn".to_owned());
+        duplicate_archetype.generation.validated_output["npcs"][0]["personality"] =
+            Value::String("Temperament of Ilyra Venn".to_owned());
+        duplicate_archetype.generation.raw_response_text =
+            duplicate_archetype.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_roster_generation(duplicate_archetype),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        let mut invalid_rumor_source = roster_command(&store, tavern_id);
+        invalid_rumor_source.generation.validated_output["rumors"][0]["confidence"] = json!(2.0);
+        invalid_rumor_source.generation.raw_response_text =
+            invalid_rumor_source.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_roster_generation(invalid_rumor_source),
             Err(CampaignStoreError::InvalidData)
         ));
         let snapshot = store
@@ -1152,9 +1304,9 @@ mod tests {
                 ),
             ],
             "rumors": [
-                {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","veracity":"TRUE"},
-                {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","veracity":"PARTIAL"},
-                {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","veracity":"UNKNOWN"},
+                {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","sourceBasis":"WITNESS","confidence":0.9,"veracity":"TRUE"},
+                {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","sourceBasis":"FACTION_MESSAGE","confidence":0.6,"veracity":"PARTIAL"},
+                {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","sourceBasis":"HEARSAY","confidence":0.4,"veracity":"UNKNOWN"},
             ],
         });
         NpcRosterGenerationCommit {
@@ -1172,6 +1324,7 @@ mod tests {
                         "longTermProblem": tavern.long_term_problem,
                     },
                     "existingNpcNames": [owner.name],
+                    "existingNpcArchetypes": [npc_archetype_signature(&owner.identity, &owner.personality)],
                     "requestedCount": 3,
                 }),
                 serde_json::json!({"source": source, "tavernId": tavern_id}),
@@ -1183,12 +1336,12 @@ mod tests {
     fn npc_json(name: &str) -> Value {
         serde_json::json!({
             "name": name,
-            "identity": "Traveler",
-            "appearance": "Weathered clothes.",
-            "personality": "Observant and practical.",
-            "goal": "Keep the road open.",
-            "secret": "Knows a hidden route.",
-            "speechStyle": "Measured questions.",
+            "identity": format!("Role of {name}"),
+            "appearance": format!("{name} wears weathered clothes."),
+            "personality": format!("Temperament of {name}"),
+            "goal": format!("{name} wants to keep a road open."),
+            "secret": format!("{name} knows a different hidden route."),
+            "speechStyle": format!("{name} asks measured questions."),
             "currentMood": "Concerned",
         })
     }
@@ -1211,7 +1364,10 @@ mod tests {
             request_id: format!("request-{suffix}"),
             generation_record_id: format!("generation-{suffix}"),
             idempotency_key: format!("tavern:{suffix}"),
-            prompt_version: 1,
+            prompt_version: match task {
+                "GENERATE_NPCS" => 4,
+                _ => 1,
+            },
             input,
             context,
             request: serde_json::json!({"task": task}),

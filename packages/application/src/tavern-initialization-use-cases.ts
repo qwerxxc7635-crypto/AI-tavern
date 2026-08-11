@@ -3,6 +3,8 @@ import {
   GenerateNpcsOutputSchema,
   GenerateTavernInputSchema,
   GenerateTavernOutputSchema,
+  findRepeatedNpcArchetype,
+  npcArchetypeSignature,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -13,6 +15,7 @@ import {
 import {
   createNpcKnowledge,
   createNpcRelationship,
+  claimId,
   transitionCampaign,
   type AiRequestId,
   type Campaign,
@@ -46,6 +49,7 @@ import {
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 
 import { AIOrchestrationError, type AITurnGenerationOptions } from './ai-turn-orchestrator.js';
+import { executePrimaryAITask } from './ai-task-orchestrator.js';
 
 export interface TavernIdentityFactory {
   tavern(name: string): TavernId;
@@ -162,6 +166,7 @@ export class TavernInitializationUseCases {
       null,
       command.playerCharacterId,
       [],
+      timestamp,
     );
     try {
       this.requests.commitTavernOnce(
@@ -206,12 +211,13 @@ export class TavernInitializationUseCases {
         longTermProblem: tavern.longTermProblem,
       },
       existingNpcNames: [owner.name],
+      existingNpcArchetypes: [npcArchetypeSignature(owner)],
       requestedCount: 3,
     });
     const output = GenerateNpcsOutputSchema.parse(
       await this.generateValidated('GENERATE_NPCS', command, input),
     );
-    validateInitialRoster(output, owner.name);
+    validateInitialRoster(output, owner);
     const timestamp = this.now();
     const profiles = output.npcs.map((draft, index): NpcProfile =>
       Object.freeze({
@@ -233,18 +239,28 @@ export class TavernInitializationUseCases {
       }),
     );
     const rumorFacts: readonly WorldFact[] = Object.freeze(
-      output.rumors.map((rumor, index) =>
-        Object.freeze({
-          id: this.identities.fact(rumor.statement, index),
+      output.rumors.map((rumor, index) => {
+        const id = this.identities.fact(rumor.statement, index);
+        const source = profiles.find(({ name }) => name === rumor.sourceNpcName);
+        if (source === undefined) {
+          throw new AIOrchestrationError('INVALID_NPC_ROSTER', 'Rumor source NPC is missing');
+        }
+        return Object.freeze({
+          id,
           campaignId: command.campaignId,
           kind: 'RUMOR' as const,
+          claimId: claimId(`claim-${id}`),
+          sourceNpcId: source.id,
+          sourceBasis: rumor.sourceBasis,
+          confidence: rumor.confidence,
+          claimRevision: 1,
           statement: rumor.statement,
           locationId: tavern.locationId,
           factionIds: Object.freeze([]),
           veracity: rumor.veracity,
           createdAt: timestamp,
-        }),
-      ),
+        });
+      }),
     );
     const records = profiles.map((profile, index) => {
       const draft = output.npcs[index];
@@ -269,7 +285,14 @@ export class TavernInitializationUseCases {
             }
           : null,
         character.id,
-        sourcedRumors.map((fact) => requireFact(fact).id),
+        sourcedRumors.map((fact) => {
+          const required = requireFact(fact);
+          return {
+            factId: required.id,
+            confidence: required.kind === 'RUMOR' ? required.confidence : 1,
+          };
+        }),
+        timestamp,
       );
     });
     const nextCampaign =
@@ -371,7 +394,15 @@ export class TavernInitializationUseCases {
     this.requests.startAttempt(command.requestId, this.now());
     let raw: string;
     try {
-      const response = await this.provider.generate(request, this.providerConfig);
+      const response = await executePrimaryAITask(
+        this.provider,
+        this.providerConfig,
+        command.campaignId,
+        request,
+        inputJson,
+        command.modelProfileId,
+        model.capabilities,
+      );
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
       }
@@ -462,17 +493,26 @@ function npcRecord(
   profile: NpcProfile,
   visitor: NpcInitializationRecord['visitor'],
   playerCharacterId: PlayerCharacterId,
-  knownFactIds: readonly WorldFactId[],
+  knownFacts: readonly { readonly factId: WorldFactId; readonly confidence: number }[],
+  learnedAt: IsoTimestamp,
 ): NpcInitializationRecord {
   return Object.freeze({
     profile: Object.freeze(profile),
     visitor: visitor === null ? null : Object.freeze(visitor),
     knowledge: createNpcKnowledge({
       npcId: profile.id,
-      knownFactIds,
+      knownFactIds: knownFacts.map(({ factId }) => factId),
       suspectedFactIds: [],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [],
+      provenance: knownFacts.map(({ factId, confidence }) => ({
+        factId,
+        state: 'KNOWN',
+        source: 'LOCAL_RULE',
+        eventId: null,
+        learnedAt,
+        confidence,
+      })),
     }),
     relationship: createNpcRelationship({
       npcId: profile.id,
@@ -487,16 +527,17 @@ function npcRecord(
 
 function validateInitialRoster(
   output: ReturnType<typeof GenerateNpcsOutputSchema.parse>,
-  ownerName: string,
+  owner: NpcProfile,
 ): void {
   const residents = output.npcs.filter(({ residency }) => residency === 'RESIDENT');
   const visitors = output.npcs.filter(({ residency }) => residency === 'TEMPORARY_VISITOR');
-  const names = [ownerName, ...output.npcs.map(({ name }) => name)];
+  const names = [owner.name, ...output.npcs.map(({ name }) => name)];
   if (
     output.npcs.length !== 3 ||
     residents.length !== 2 ||
     visitors.length !== 1 ||
     new Set(names).size !== names.length ||
+    findRepeatedNpcArchetype(output.npcs, [npcArchetypeSignature(owner)]) !== null ||
     output.npcs.some(
       ({ residency, visitReason }) =>
         (residency === 'TEMPORARY_VISITOR') !== (visitReason !== null),

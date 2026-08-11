@@ -1,6 +1,8 @@
 import {
   GenerateQuestInputSchema,
   GenerateQuestOutputSchema,
+  hasRepeatedQuestStructure,
+  questStructureSignature,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -40,6 +42,7 @@ import {
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 
 import { AIOrchestrationError, type AITurnGenerationOptions } from './ai-turn-orchestrator.js';
+import { executePrimaryAITask } from './ai-task-orchestrator.js';
 
 export interface QuestGenerationRequest {
   readonly campaignId: CampaignId;
@@ -104,18 +107,31 @@ export class QuestUseCases {
         'Quest publisher is not an active tavern NPC',
       );
     }
+    const recentQuests = this.quests.listByCampaign(command.campaignId).slice(-20);
+    const recentQuestStructures = recentQuests.map((quest) =>
+      questStructureSignature({
+        risk: quest.risk,
+        rewardTier: quest.rewardTier,
+        expectedTurns: quest.expectedTurns,
+        recommendedAttributes: quest.recommendedAttributes,
+      }),
+    );
     const input = GenerateQuestInputSchema.parse({
       world: worldContext(world),
       tavernName: tavern.name,
       publisher: npcBrief(publisher),
       availableNpcs: availableNpcs.map(npcBrief),
       playerConcept: character.concept,
-      recentQuestTitles: this.quests
-        .listByCampaign(command.campaignId)
-        .slice(-20)
-        .map(({ content }) => content.title),
+      recentQuestTitles: recentQuests.map(({ content }) => content.title),
+      recentQuestStructures,
     });
     const output = GenerateQuestOutputSchema.parse(await this.generateValidated(command, input));
+    if (hasRepeatedQuestStructure(output, recentQuestStructures)) {
+      throw new AIOrchestrationError(
+        'QUEST_REPETITION_DETECTED',
+        'Generated quest repeats a recent structure',
+      );
+    }
     if (output.expectedTurns.min < 8 || output.expectedTurns.max > 12) {
       throw new AIOrchestrationError(
         'QUEST_LENGTH_INVALID',
@@ -234,7 +250,15 @@ export class QuestUseCases {
     this.requests.startAttempt(command.requestId, this.now());
     let raw: string;
     try {
-      const response = await this.provider.generate(request, this.providerConfig);
+      const response = await executePrimaryAITask(
+        this.provider,
+        this.providerConfig,
+        command.campaignId,
+        request,
+        inputJson,
+        command.modelProfileId,
+        model.capabilities,
+      );
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
       }

@@ -71,7 +71,11 @@ const questOutput = {
 const adventureTurnOutput = {
   sceneText: 'Warm light leaks through the lock.',
   speakerNpcIds: [],
-  suggestedActions: [{ text: 'Use a thin tool.' }],
+  suggestedActions: [
+    { text: 'Use a thin tool.' },
+    { text: 'Ask the keeper about the lock.' },
+    { text: 'Inspect the warm hinges.' },
+  ],
   checkRequest: { attribute: 'knowledge', difficulty: 11, reason: 'Study the old lock.' },
   discoveredClues: ['The lock is warm from inside.'],
   statePatchProposals: [patch],
@@ -166,6 +170,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         longTermProblem: 'A strange cellar light.',
       },
       existingNpcNames: ['Ilyra'],
+      existingNpcArchetypes: ['innkeeper|practical and observant'],
       requestedCount: 1,
     },
     output: {
@@ -187,16 +192,22 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         {
           statement: 'A warm light moves beneath the cellar.',
           sourceNpcName: 'Tomas',
+          sourceBasis: 'WITNESS',
+          confidence: 0.9,
           veracity: 'TRUE',
         },
         {
           statement: 'The guild pays for tunnel maps.',
           sourceNpcName: 'Tomas',
+          sourceBasis: 'FACTION_MESSAGE',
+          confidence: 0.6,
           veracity: 'PARTIAL',
         },
         {
           statement: 'A courier crossed the flooded causeway.',
           sourceNpcName: 'Tomas',
+          sourceBasis: 'HEARSAY',
+          confidence: 0.4,
           veracity: 'UNKNOWN',
         },
       ],
@@ -214,9 +225,14 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         currentStatus: 'ACTIVE',
       },
       relationship: { trust: 1, closeness: 0, awe: 0, obligation: 0 },
-      knownFacts: ['The cellar has an old door.'],
-      suspectedFacts: ['The lighthouse keeper used the tunnel.'],
-      falseBeliefs: [],
+      knowledge: [
+        { targetKind: 'TRUTH', state: 'KNOWN', statement: 'The cellar has an old door.' },
+        {
+          targetKind: 'CLAIM',
+          state: 'SUSPECTED',
+          statement: 'The lighthouse keeper used the tunnel.',
+        },
+      ],
       recentMessages: [{ role: 'PLAYER', content: 'What is below the cellar?' }],
       longTermMemories: ['Mira previously helped close the harbor gate.'],
       playerMessage: 'Show me the door.',
@@ -237,6 +253,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       availableNpcs: [npc],
       playerConcept: 'Curious scout',
       recentQuestTitles: [],
+      recentQuestStructures: [],
     },
     output: questOutput,
   },
@@ -300,10 +317,32 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       },
       currentTurnNumber: 1,
       currentScene: 'The cellar door is sealed.',
+      sceneFrame: {
+        sceneId: 'scene-1',
+        location: 'Lighthouse cellar',
+        participants: ['player-1'],
+        pressure: [{ id: 'clock-storm', kind: 'WORLD_CLOCK', level: 2 }],
+        affordances: [],
+        pendingConsequences: [],
+        returnPoint: { eventId: 'event-quest-accepted', summary: 'The cellar door is sealed.' },
+        revision: 1,
+      },
       longTermSummary: null,
       recentTurns: [],
       discoveredClues: [],
       relatedNpcs: [npc],
+      knownFacts: [
+        { id: 'fact-cellar', kind: 'DEVELOPING_FACT', statement: 'The cellar door is warm.' },
+      ],
+      npcKnowledge: [
+        {
+          npcId: npc.id,
+          knownFacts: ['The cellar door is warm.'],
+          suspectedFacts: [],
+          falseBeliefs: [],
+        },
+      ],
+      playerActionMode: 'OBSERVE',
       playerAction: 'Inspect the lock.',
     },
     output: adventureTurnOutput,
@@ -313,9 +352,11 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       scene: 'The cellar door is sealed.',
       action: 'Inspect the lock.',
       attribute: 'knowledge',
-      difficulty: 11,
+      raw: 10,
+      modifier: 4,
       total: 14,
-      success: true,
+      dc: 11,
+      result: 'SUCCESS',
     },
     output: {
       narration: 'Mira identifies a hidden catch.',
@@ -414,17 +455,23 @@ describe('versioned AI task schemas', () => {
 
   it.each(AI_TASKS)('%s has a current version and accepts its own fixture', (task) => {
     const definition = AI_TASK_SCHEMAS[task];
-    const expectedVersion = [
-      'GENERATE_CHARACTER_TRAITS',
-      'COMPLETE_CHARACTER_BACKGROUND',
-      'GENERATE_NPCS',
-      'NPC_REPLY',
-      'GENERATE_ADVENTURE_TURN',
-      'GENERATE_WORLD_EVENT',
-      'SUMMARIZE_ADVENTURE',
-    ].includes(task)
-      ? 2
-      : 1;
+    const expectedVersion =
+      task === 'GENERATE_ADVENTURE_TURN'
+        ? 5
+        : task === 'GENERATE_NPCS'
+          ? 4
+          : task === 'NPC_REPLY'
+            ? 3
+            : [
+                  'GENERATE_CHARACTER_TRAITS',
+                  'COMPLETE_CHARACTER_BACKGROUND',
+                  'GENERATE_QUEST',
+                  'GENERATE_WORLD_EVENT',
+                  'SUMMARIZE_ADVENTURE',
+                  'RESOLVE_DICE_RESULT',
+                ].includes(task)
+              ? 2
+              : 1;
     expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);
@@ -450,6 +497,123 @@ describe('versioned AI task schemas', () => {
       AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.output.safeParse({
         ...adventureTurnOutput,
         unvalidatedExtra: true,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires three to five unique suggestions for an active adventure turn', () => {
+    const schema = AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.output;
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        suggestedActions: adventureTurnOutput.suggestedActions.slice(0, 2),
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        suggestedActions: [
+          ...adventureTurnOutput.suggestedActions,
+          { text: '  use A thin TOOL.  ' },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
+  it('forbids suggestions after an adventure reaches its ending', () => {
+    const schema = AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.output;
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        adventureState: 'ENDING',
+        checkRequest: null,
+        suggestedActions: [],
+      }).success,
+    ).toBe(true);
+    expect(
+      schema.safeParse({
+        ...adventureTurnOutput,
+        adventureState: 'ENDING',
+        checkRequest: null,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects a dice narration input that contradicts local hard logic', () => {
+    const schema = AI_TASK_SCHEMAS.RESOLVE_DICE_RESULT.input;
+    const input = fixtures.RESOLVE_DICE_RESULT.input as Record<string, unknown>;
+    expect(schema.safeParse({ ...input, total: 13 }).success).toBe(false);
+    expect(schema.safeParse({ ...input, result: 'FAILURE' }).success).toBe(false);
+  });
+
+  it('rejects repeated NPC archetypes, quest phrases, and dialogue phrases', () => {
+    const roster = fixtures.GENERATE_NPCS.output as {
+      npcs: Array<Record<string, unknown>>;
+      rumors: unknown[];
+    };
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_NPCS.output.safeParse({
+        ...roster,
+        npcs: [
+          roster.npcs[0],
+          {
+            ...roster.npcs[0],
+            name: 'Nessa',
+            appearance: 'A salt-stained blue cloak.',
+            goal: 'Chart the flooded causeway.',
+            secret: 'Once followed a false harbor light.',
+            speechStyle: 'Short nautical comparisons.',
+          },
+        ],
+      }).success,
+    ).toBe(false);
+
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_QUEST.output.safeParse({
+        ...questOutput,
+        content: {
+          ...questOutput.content,
+          summary: 'The abandoned lighthouse door must remain sealed until dawn.',
+          objective: 'The abandoned lighthouse door must remain sealed until dawn.',
+        },
+      }).success,
+    ).toBe(false);
+
+    const reply = fixtures.NPC_REPLY.output as Record<string, unknown>;
+    expect(
+      AI_TASK_SCHEMAS.NPC_REPLY.output.safeParse({
+        ...reply,
+        reply: 'The abandoned lighthouse door must remain sealed until dawn.',
+        memoryCandidate: 'The abandoned lighthouse door must remain sealed until dawn.',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('rejects unbounded history arrays at every history-bearing prompt boundary', () => {
+    const repeated = (count: number) =>
+      Array.from({ length: count }, (_, index) => `history-entry-${index}`);
+    expect(
+      AI_TASK_SCHEMAS.NPC_REPLY.input.safeParse({
+        ...(fixtures.NPC_REPLY.input as Record<string, unknown>),
+        recentMessages: repeated(13).map((content) => ({ role: 'PLAYER', content })),
+      }).success,
+    ).toBe(false);
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_ADVENTURE_TURN.input.safeParse({
+        ...(fixtures.GENERATE_ADVENTURE_TURN.input as Record<string, unknown>),
+        recentTurns: repeated(9),
+      }).success,
+    ).toBe(false);
+    expect(
+      AI_TASK_SCHEMAS.GENERATE_WORLD_EVENT.input.safeParse({
+        ...(fixtures.GENERATE_WORLD_EVENT.input as Record<string, unknown>),
+        recentImportantEvents: repeated(11),
+      }).success,
+    ).toBe(false);
+    expect(
+      AI_TASK_SCHEMAS.SUMMARIZE_ADVENTURE.input.safeParse({
+        ...(fixtures.SUMMARIZE_ADVENTURE.input as Record<string, unknown>),
+        turnSummaries: repeated(10),
       }).success,
     ).toBe(false);
   });

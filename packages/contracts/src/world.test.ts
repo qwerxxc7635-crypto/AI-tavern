@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
   campaignId,
+  claimId,
   factionId,
   isoTimestamp,
   isLockedWorldFact,
@@ -102,6 +103,11 @@ describe('world contracts', () => {
         ...baseFact,
         id: worldFactId('fact-rumor'),
         kind: 'RUMOR',
+        claimId: claimId('claim-rumor'),
+        sourceNpcId: npcId('npc-courier'),
+        sourceBasis: 'HEARSAY',
+        confidence: 0.5,
+        claimRevision: 1,
         veracity: 'UNKNOWN',
         statement: 'The guild caused the beacon failure.',
       },

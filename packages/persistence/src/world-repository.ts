@@ -1,6 +1,9 @@
 import {
   WORLD_BIBLE_LOCKABLE_FIELDS,
+  RUMOR_SOURCE_BASES,
   campaignId,
+  claimId,
+  createClaimFromRumor,
   factionId,
   isoTimestamp,
   locationId,
@@ -98,6 +101,17 @@ export class WorldRepository {
   }
 
   public addFact(fact: WorldFact): void {
+    if (fact.kind === 'RUMOR') {
+      createClaimFromRumor(fact);
+      const source = this.database
+        .prepare('SELECT 1 FROM npcs WHERE id = ? AND campaign_id = ?')
+        .get(fact.sourceNpcId, fact.campaignId);
+      if (source === undefined) {
+        throw new PersistenceDataError(
+          `Rumor source NPC is outside the campaign: ${fact.sourceNpcId}`,
+        );
+      }
+    }
     const stored = factStorage(fact);
     this.database
       .prepare(
@@ -121,20 +135,35 @@ export class WorldRepository {
 
   public getFact(id: WorldFactId): WorldFact | null {
     const row = this.database.prepare('SELECT * FROM world_facts WHERE id = ?').get(id);
-    return row === undefined ? null : mapWorldFact(row);
+    if (row === undefined) return null;
+    const fact = mapWorldFact(row);
+    this.validateRumorSource(fact);
+    return fact;
   }
 
   public listFacts(id: CampaignId): readonly WorldFact[] {
-    return Object.freeze(
-      this.database
-        .prepare(
-          `SELECT * FROM world_facts
+    const facts = this.database
+      .prepare(
+        `SELECT * FROM world_facts
            WHERE campaign_id = ?
            ORDER BY created_at, id`,
-        )
-        .all(id)
-        .map(mapWorldFact),
-    );
+      )
+      .all(id)
+      .map(mapWorldFact);
+    for (const fact of facts) this.validateRumorSource(fact);
+    return Object.freeze(facts);
+  }
+
+  private validateRumorSource(fact: WorldFact): void {
+    if (fact.kind !== 'RUMOR') return;
+    const source = this.database
+      .prepare('SELECT 1 FROM npcs WHERE id = ? AND campaign_id = ?')
+      .get(fact.sourceNpcId, fact.campaignId);
+    if (source === undefined) {
+      throw new PersistenceDataError(
+        `Rumor source NPC is outside the campaign: ${fact.sourceNpcId}`,
+      );
+    }
   }
 }
 
@@ -256,7 +285,17 @@ function factStorage(fact: WorldFact): {
     case 'TEMPORARY_NARRATIVE':
       return { detail: { expiresAt: fact.expiresAt }, supersedesFactId: null };
     case 'RUMOR':
-      return { detail: { veracity: fact.veracity }, supersedesFactId: null };
+      return {
+        detail: {
+          claimId: fact.claimId,
+          sourceNpcId: fact.sourceNpcId,
+          sourceBasis: fact.sourceBasis,
+          confidence: fact.confidence,
+          claimRevision: fact.claimRevision,
+          veracity: fact.veracity,
+        },
+        supersedesFactId: null,
+      };
     case 'FALSE_BELIEF':
       return { detail: { believedByNpcIds: fact.believedByNpcIds }, supersedesFactId: null };
   }
@@ -302,12 +341,28 @@ function mapWorldFact(value: unknown): WorldFact {
           expiresAt: expiresAt === null ? null : isoTimestamp(expiresAt),
         });
       }
-      case 'RUMOR':
+      case 'RUMOR': {
+        const confidence = requireNumber(detail['confidence'], 'detail.confidence');
+        const claimRevision = requireNumber(detail['claimRevision'], 'detail.claimRevision');
+        if (
+          confidence < 0 ||
+          confidence > 1 ||
+          !Number.isInteger(claimRevision) ||
+          claimRevision < 1
+        ) {
+          throw new PersistenceDataError('Rumor claim confidence or revision is invalid');
+        }
         return Object.freeze({
           ...base,
           kind,
+          claimId: claimId(requireString(detail['claimId'], 'detail.claimId')),
+          sourceNpcId: npcId(requireString(detail['sourceNpcId'], 'detail.sourceNpcId')),
+          sourceBasis: requireEnum(RUMOR_SOURCE_BASES, detail['sourceBasis'], 'detail.sourceBasis'),
+          confidence,
+          claimRevision,
           veracity: requireEnum(RUMOR_VERACITIES, detail['veracity'], 'detail.veracity'),
         });
+      }
       case 'FALSE_BELIEF':
         return Object.freeze({
           ...base,

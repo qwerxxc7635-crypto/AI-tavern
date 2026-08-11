@@ -9,6 +9,7 @@ import {
   type WorldDraft,
 } from './world-creation-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { playerText } from './localization/index.js';
 
 type WorldCreationActions = Pick<
   WindowsWorldCreationService,
@@ -87,7 +88,7 @@ export function WorldCreationPage({
   if (campaignId === null) {
     return (
       <main className="world-studio world-studio--message">
-        <p className="eyebrow">Missing chronicle</p>
+        <p className="eyebrow">{playerText.coreUi.missingChronicle}</p>
         <h1>先选择一个存档。</h1>
         <Link className="text-link" to="/saves">
           返回存档首页
@@ -100,7 +101,7 @@ export function WorldCreationPage({
     return (
       <main className="world-studio world-studio--message" aria-live="polite" aria-busy="true">
         <span className="loading-glyph" aria-hidden="true" />
-        <p className="eyebrow">Reading the atlas</p>
+        <p className="eyebrow">{playerText.coreUi.readingAtlas}</p>
         <h1>正在展开世界地图…</h1>
       </main>
     );
@@ -132,7 +133,7 @@ export function WorldCreationPage({
         </header>
         <section className="world-hero">
           <div>
-            <p className="eyebrow">World bible review</p>
+            <p className="eyebrow">{playerText.coreUi.worldBibleReview}</p>
             <input
               aria-label="世界名称"
               className="world-title-input"
@@ -234,7 +235,7 @@ export function WorldCreationPage({
 
           <aside className="world-tools">
             <section>
-              <p className="eyebrow">Field locks</p>
+              <p className="eyebrow">{playerText.coreUi.fieldLocks}</p>
               <h2>锁定字段</h2>
               <p>锁定后，局部重新生成不能改变这些内容。先解锁并保存，才能再次编辑。</p>
               <div className="lock-list">
@@ -258,7 +259,7 @@ export function WorldCreationPage({
             </section>
 
             <section>
-              <p className="eyebrow">Refine locally</p>
+              <p className="eyebrow">{playerText.coreUi.refineLocally}</p>
               <h2>局部修改</h2>
               <textarea
                 aria-label="修改要求"
@@ -308,7 +309,7 @@ export function WorldCreationPage({
           <WorldReferenceGroup title="主要势力" entries={current.factions} />
           <WorldReferenceGroup title="重要地点" entries={current.locations} />
           <div>
-            <p className="eyebrow">Story hooks</p>
+            <p className="eyebrow">{playerText.coreUi.storyHooks}</p>
             <h2>剧情线索</h2>
             <ul>
               {current.storyHooks.map((hook) => (
@@ -323,7 +324,7 @@ export function WorldCreationPage({
 
   return (
     <main className="world-studio world-studio--message" role="alert">
-      <p className="eyebrow">World stage unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.worldStageUnavailable}</p>
       <h1>这个存档不在世界构筑阶段。</h1>
       <Link className="text-link" to="/saves">
         返回存档首页
@@ -335,7 +336,7 @@ export function WorldCreationPage({
 function WorldMessage({ title }: { readonly title: string }) {
   return (
     <main className="world-studio world-studio--message" role="alert">
-      <p className="eyebrow">World stage unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.worldStageUnavailable}</p>
       <h1>{title}</h1>
       <Link className="text-link" to="/saves">
         返回存档首页
@@ -368,10 +369,10 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
     <main className="world-studio world-studio--options">
       <header className="world-studio__topline">
         <Link to="/saves">← 存档首页</Link>
-        <p>Step 01 · 世界构筑</p>
+        <p>{playerText.coreUi.worldCreationStep}</p>
       </header>
       <section className="world-options__intro">
-        <p className="eyebrow">Shape a new realm</p>
+        <p className="eyebrow">{playerText.coreUi.shapeNewRealm}</p>
         <h1>给炉火一张地图。</h1>
         <p>基础选项决定边界；自定义构想可以留空。所有结果都会先预览，再由你确认。</p>
       </section>
@@ -572,7 +573,7 @@ function WorldReferenceGroup({
 }) {
   return (
     <div>
-      <p className="eyebrow">World reference</p>
+      <p className="eyebrow">{playerText.coreUi.worldReference}</p>
       <h2>{title}</h2>
       <ul>
         {entries.map((entry) => (

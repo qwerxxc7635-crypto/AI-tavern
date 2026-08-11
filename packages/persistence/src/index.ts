@@ -22,11 +22,17 @@ export type {
 export { DatabaseStartupError, prepareDatabaseFile } from './database-startup.mjs';
 export type { DatabaseStartupFailureCode, DatabaseStartupResult } from './database-startup.mjs';
 export { GameEventRepository } from './game-event-repository.js';
+export { EventLedgerRepository } from './event-ledger-repository.js';
+export type { AppendEventLedgerEntry } from './event-ledger-repository.js';
+export { AICandidateRepository, AICandidateTransitionError } from './ai-candidate-repository.js';
+export type { CreateAICandidate } from './ai-candidate-repository.js';
 export { GenerationRecordRepository } from './generation-record-repository.js';
 export type {
   CompleteGenerationRecord,
   CreateGenerationRecord,
 } from './generation-record-repository.js';
+export { CacheMetricsRepository } from './cache-metrics-repository.js';
+export type { CacheMetric, CacheMetricInput } from './cache-metrics-repository.js';
 export { ModelProfileRepository } from './model-profile-repository.js';
 export type {
   RegisteredModelCapabilities,

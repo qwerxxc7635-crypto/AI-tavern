@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   GenerateWorldInputSchema,
   GenerateWorldOutputSchema,
   RefineWorldInputSchema,
@@ -22,6 +23,12 @@ import {
   type WorldBibleLockableField,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export type WorldDraft = ReturnType<typeof GenerateWorldOutputSchema.parse>;
 
@@ -121,6 +128,7 @@ export class WindowsWorldCreationService {
     private readonly createIdentity: (
       task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     ) => WorldRequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(campaignIdValue: string): Promise<WorldCreationSnapshot> {
@@ -179,7 +187,10 @@ export class WindowsWorldCreationService {
     const identity = this.createIdentity(task);
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new WorldCreationServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget(task, input);
+    await recordContextInspection(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task,
@@ -187,7 +198,7 @@ export class WindowsWorldCreationService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 4_000,
       timeoutMs: 5_000,
     };
@@ -217,7 +228,12 @@ export class WindowsWorldCreationService {
   }
 }
 
-export const windowsWorldCreationService = new WindowsWorldCreationService();
+export const windowsWorldCreationService = new WindowsWorldCreationService(
+  tauriWorldCreationGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class WorldCreationServiceError extends Error {
   public constructor(public readonly code: string) {

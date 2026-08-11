@@ -1,6 +1,26 @@
 export { AIOrchestrationError, AITurnOrchestrator } from './ai-turn-orchestrator.js';
 export type { AITurnGenerationOptions, ExecuteAITurn } from './ai-turn-orchestrator.js';
+export {
+  AI_ERROR_CATEGORIES,
+  AI_ROUTE_KINDS,
+  AITaskExecutionError,
+  AITaskOrchestrator,
+  classifyAIOrchestrationError,
+} from './ai-task-orchestrator.js';
+export type {
+  AIErrorCategory,
+  AIExecutionRoute,
+  AIRouteKind,
+  AITaskRequest,
+  AITaskResult,
+} from './ai-task-orchestrator.js';
 export { AIRequestRecoveryUseCases } from './ai-request-recovery-use-cases.js';
+export { AICandidateUseCases } from './ai-candidate-use-cases.js';
+export type {
+  ConfirmAICandidate,
+  ProposeAICandidate,
+  ReviseAICandidate,
+} from './ai-candidate-use-cases.js';
 export type { RecoverAITurnCommand } from './ai-request-recovery-use-cases.js';
 export { StructuredOutputRepairUseCases } from './structured-output-repair-use-cases.js';
 export type { RepairStructuredTurnOutputCommand } from './structured-output-repair-use-cases.js';

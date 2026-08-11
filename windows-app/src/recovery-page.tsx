@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import type { CampaignSummary } from './campaign-gateway.js';
+import { playerText } from './localization/index.js';
 import {
   tauriRecoveryGateway,
   type CampaignRecoverySnapshot,
@@ -61,7 +62,7 @@ export function RecoveryPage({
   return (
     <main className="recovery-page">
       <header>
-        <p className="eyebrow">Recovery center</p>
+        <p className="eyebrow">{playerText.coreUi.recoveryCenter}</p>
         <h1>恢复未完成的操作</h1>
         <p>检测到上次生成或提交没有完整结束。恢复操作不会重复提交已完成回合。</p>
       </header>

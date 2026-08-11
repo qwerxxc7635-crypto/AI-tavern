@@ -13,6 +13,7 @@ import {
 } from '@ember-tavern/ai-core';
 import {
   actionOptionId,
+  aiOperationId,
   adventureId,
   aiRequestId,
   campaignId,
@@ -125,7 +126,12 @@ describe('AITurnOrchestrator', () => {
           modelName: 'ember-fake-v1',
           responseFormat: { kind: 'TEXT' },
         }),
-        providerConfig,
+        expect.objectContaining({
+          id: providerConfig.id,
+          baseUrl: providerConfig.baseUrl,
+          credentialRef: providerConfig.credentialRef,
+          options: providerConfig.options,
+        }),
       );
       expect(new PendingAiRequestRepository(sqlite).get(command.requestId)).toMatchObject({
         status: 'COMMITTED',
@@ -395,6 +401,17 @@ describe('AITurnOrchestrator', () => {
         validateDomainAndBuildCommit: (output: unknown) => commitFromOutput(sqlite, output),
       };
 
+      await expect(
+        repair.repairTurn({
+          ...repairCommand,
+          requestId: aiRequestId('request-orchestrator-drifted-repair'),
+          generationRecordId: generationRecordId('generation-orchestrator-drifted-repair'),
+          idempotencyKey: idempotencyKey('campaign-orchestrator:turn-1:drifted-repair'),
+          generationOptions: { ...repairCommand.generationOptions, temperature: 0.5 },
+        }),
+      ).rejects.toMatchObject({ code: 'RESOLVED_MODEL_CONFIG_DRIFT' });
+      expect(generate).toHaveBeenCalledTimes(1);
+
       await expect(repair.repairTurn(repairCommand)).resolves.toBe('COMMITTED');
       await expect(repair.repairTurn(repairCommand)).resolves.toBe('ALREADY_COMMITTED');
       expect(generate).toHaveBeenCalledTimes(2);
@@ -511,6 +528,7 @@ describe('AITurnOrchestrator', () => {
 
 function executeCommand(database: TransactionalSqliteDatabase, buildContext: () => unknown) {
   return {
+    operationId: aiOperationId('operation-orchestrator'),
     requestId: aiRequestId('request-orchestrator'),
     generationRecordId: generationRecordId('generation-orchestrator'),
     campaignId: campaignKey,
@@ -540,6 +558,7 @@ function contextFromSqlite(database: TransactionalSqliteDatabase) {
   const adventures = new AdventureRepository(database);
   const adventure = requireEntity(adventures.get(adventureKey), 'Adventure');
   const npc = requireEntity(new NpcRepository(database).get(npcKey), 'NPC');
+  const npcKnowledge = new NpcRepository(database).getKnowledge(npcKey);
   return buildAdventureTurnContext({
     world,
     playerCharacter: player,
@@ -549,6 +568,8 @@ function contextFromSqlite(database: TransactionalSqliteDatabase) {
     turns: adventures.listTurns(adventureKey),
     clues: adventures.getClues(adventureKey),
     relatedNpcs: [npc],
+    worldFacts: new WorldRepository(database).listFacts(campaignKey),
+    npcKnowledge: npcKnowledge === null ? [] : [npcKnowledge],
     playerAction: 'Study the lock.',
     longTermSummary: null,
   });

@@ -9,6 +9,7 @@ import {
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
+  aiOperationId,
   npcId,
   schemaVersion,
   transitionAdventureState,
@@ -325,6 +326,9 @@ export class AdventureTurnUseCases {
             turns: this.adventures.listTurns(adventure.id),
             clues: this.adventures.getClues(adventure.id),
             relatedNpcs: this.relatedNpcs(adventure.questId, command.campaignId),
+            worldFacts: this.worlds.listFacts(command.campaignId),
+            npcKnowledge: this.relatedNpcKnowledge(adventure.questId, command.campaignId),
+            playerActionMode: action.mode ?? 'ACTION',
             playerAction: actionText(action),
             longTermSummary: this.priorAdventureSummary(command.campaignId, adventure.id),
           },
@@ -370,9 +374,11 @@ export class AdventureTurnUseCases {
       scene: turn.sceneText,
       action: actionText(action),
       attribute: check.attribute,
-      difficulty: check.difficulty,
+      raw: result.raw,
+      modifier: result.modifier,
       total: result.total,
-      success: result.success,
+      dc: result.dc,
+      result: result.result,
     });
     await this.orchestrator.execute({
       ...generation(command),
@@ -596,6 +602,13 @@ export class AdventureTurnUseCases {
     });
   }
 
+  private relatedNpcKnowledge(questIdValue: Adventure['questId'], campaignId: CampaignId) {
+    return this.requireQuest(questIdValue, campaignId).relatedNpcIds.flatMap((id) => {
+      const knowledge = this.npcs.getKnowledge(id);
+      return knowledge === null ? [] : [knowledge];
+    });
+  }
+
   private requireAdventure(id: AdventureId, campaignId: CampaignId): Adventure {
     const adventure = this.adventures.get(id);
     if (adventure === null || adventure.campaignId !== campaignId) {
@@ -649,6 +662,7 @@ function completedTurnSnapshotPrefix(adventure: AdventureId): string {
 
 function generation(command: ResolveAdventureTurnCommand) {
   return {
+    operationId: aiOperationId(command.idempotencyKey),
     requestId: command.requestId,
     generationRecordId: command.generationRecordId,
     campaignId: command.campaignId,

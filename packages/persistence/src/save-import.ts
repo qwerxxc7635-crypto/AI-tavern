@@ -29,10 +29,24 @@ import {
 } from './conversation-item-clock-repository.js';
 import { GameEventRepository } from './game-event-repository.js';
 import { GenerationRecordRepository } from './generation-record-repository.js';
-import { currentSchemaVersion } from './migrations.mjs';
 import { PlayerCharacterRepository } from './player-character-repository.js';
 import { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 import { SnapshotRepository } from './snapshot-repository.js';
+import {
+  MAX_ARCHIVE_BYTES,
+  MAX_EVENT_RECORDS,
+  MAX_GENERATION_RECORDS,
+  MAX_JSON_ARRAY_LENGTH,
+  MAX_TABLE_RECORDS,
+  MAX_TOTAL_RECORDS,
+  addExpandedBytes,
+  archiveEntrySizeLimit,
+  validateArchiveEntryResources,
+  validateJsonTextResources,
+  validateJsonValueResources,
+  validateRecordCount,
+} from './save-resource-limits.js';
+import { findSecretInJson, findSecretInText } from './save-secret-scanner.js';
 import type { SqliteValue, TransactionalSqliteDatabase } from './sqlite-port.js';
 import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 import { WorldRepository } from './world-repository.js';
@@ -42,8 +56,8 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 type ImportMode = 'CREATE' | 'OVERWRITE';
 
 const FORMAT_VERSION = 1;
-const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES = 1024 * 1024 * 1024;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
+const LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -70,6 +84,7 @@ type CampaignTable =
   | 'npc_relationships'
   | 'quests'
   | 'adventures'
+  | 'scene_frames'
   | 'adventure_turns'
   | 'conversations'
   | 'messages'
@@ -86,12 +101,15 @@ const CAMPAIGN_TABLES = [
   'npc_relationships',
   'quests',
   'adventures',
+  'scene_frames',
   'adventure_turns',
   'conversations',
   'messages',
   'items',
   'world_clocks',
 ] as const satisfies readonly CampaignTable[];
+
+const LEGACY_CAMPAIGN_TABLES = CAMPAIGN_TABLES.filter((table) => table !== 'scene_frames');
 
 const INSERT_ORDER = [
   'world_bibles',
@@ -103,6 +121,7 @@ const INSERT_ORDER = [
   'npc_relationships',
   'quests',
   'adventures',
+  'scene_frames',
   'adventure_turns',
   'conversations',
   'messages',
@@ -209,12 +228,23 @@ interface ParsedArchive {
 }
 
 function parseArchive(archive: Uint8Array): ParsedArchive {
-  const entries = readZipEntries(archive);
-  const manifestText = decodeEntry(entries, 'manifest.json');
-  const checksumText = decodeEntry(entries, 'checksum.json');
-  const manifest = parseCanonicalDocument(manifestText, 'manifest.json');
-  const checksum = parseCanonicalDocument(checksumText, 'checksum.json');
-  validateChecksums(entries, checksum);
+  const zip = readZipArchive(archive);
+  const checksum = parseCanonicalDocument(
+    decodeUtf8(zip.read('checksum.json'), 'checksum.json'),
+    'checksum.json',
+  );
+  const expectedChecksums = validateChecksumDocument(checksum);
+  const readVerified = (name: keyof typeof expectedChecksums): Uint8Array => {
+    const bytes = zip.read(name);
+    if (sha256(bytes) !== expectedChecksums[name]) {
+      throw new PersistenceDataError(`Save checksum mismatch: ${name}`);
+    }
+    return bytes;
+  };
+  const manifest = parseCanonicalDocument(
+    decodeUtf8(readVerified('manifest.json'), 'manifest.json'),
+    'manifest.json',
+  );
   const campaignIdValue = requireString(manifest['campaignId'], 'manifest.campaignId');
   const importedCampaignId = campaignId(campaignIdValue);
   requireExactKeys(
@@ -242,19 +272,22 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     manifest['databaseSchemaVersion'],
     'manifest.databaseSchemaVersion',
   );
-  if (databaseVersion !== currentSchemaVersion) {
+  if (
+    databaseVersion !== LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION &&
+    databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION
+  ) {
     throw new PersistenceDataError(
-      databaseVersion > currentSchemaVersion
-        ? `Save schema ${databaseVersion} is newer than supported schema ${currentSchemaVersion}`
+      databaseVersion > ARCHIVE_DATABASE_SCHEMA_VERSION
+        ? `Save schema ${databaseVersion} is newer than supported schema ${ARCHIVE_DATABASE_SCHEMA_VERSION}`
         : `Save schema ${databaseVersion} requires an unavailable migration`,
     );
   }
   const campaignDocument = parseCanonicalDocument(
-    decodeEntry(entries, 'campaign.json'),
+    decodeUtf8(readVerified('campaign.json'), 'campaign.json'),
     'campaign.json',
   );
   const generationDocument = parseCanonicalDocument(
-    decodeEntry(entries, 'generations.json'),
+    decodeUtf8(readVerified('generations.json'), 'generations.json'),
     'generations.json',
   );
   requireEnvelope(campaignDocument, importedCampaignId, databaseVersion, 'campaign.json');
@@ -279,16 +312,31 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     throw new PersistenceDataError('Campaign archive model bindings are not portable');
   }
   const tableRoot = requireRecord(campaignDocument['tables'], 'campaign.tables');
-  requireExactKeys(tableRoot, [...CAMPAIGN_TABLES], 'campaign.tables');
-  const tables = campaignTableRecord((table) =>
-    Object.freeze(
-      requireArray(tableRoot[table], `campaign.tables.${table}`).map((row) =>
-        parseStoredRow(row, table),
-      ),
-    ),
+  const archiveTables =
+    databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION
+      ? LEGACY_CAMPAIGN_TABLES
+      : CAMPAIGN_TABLES;
+  requireExactKeys(tableRoot, [...archiveTables], 'campaign.tables');
+  const parsedTables = campaignTableRecord((table) =>
+    databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION && table === 'scene_frames'
+      ? Object.freeze([])
+      : Object.freeze(
+          requireRecordArray(tableRoot[table], `campaign.tables.${table}`, MAX_TABLE_RECORDS).map(
+            (row) => {
+              const parsed = parseStoredRow(row, table);
+              return table === 'npc_knowledge' ? upgradeLegacyKnowledgeRow(parsed) : parsed;
+            },
+          ),
+        ),
   );
+  const tables = upgradeLegacyRumorRows(parsedTables);
+  const tableRecordCount = Object.values(tables).reduce((total, rows) => total + rows.length, 0);
   const generations = Object.freeze(
-    requireArray(generationDocument['records'], 'generations.records').map((row) => {
+    requireRecordArray(
+      generationDocument['records'],
+      'generations.records',
+      MAX_GENERATION_RECORDS,
+    ).map((row) => {
       const parsed = parseStoredRow(row, 'generation_records');
       if (parsed['campaign_id'] !== importedCampaignId || parsed['model_profile_id'] !== null) {
         throw new PersistenceDataError('Generation archive scope or model binding is invalid');
@@ -296,7 +344,14 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
       return parsed;
     }),
   );
-  const events = parseEvents(decodeEntry(entries, 'events.ndjson'), importedCampaignId);
+  const events = parseEvents(
+    decodeUtf8(readVerified('events.ndjson'), 'events.ndjson'),
+    importedCampaignId,
+  );
+  validateSceneFrameArchive(tables, events, importedCampaignId);
+  if (1 + tableRecordCount + generations.length + events.length > MAX_TOTAL_RECORDS) {
+    throw new PersistenceDataError('Save archive exceeds the total record limit');
+  }
   validateManifestCounts(manifest, events.length, generations.length);
   return Object.freeze({
     campaignId: importedCampaignId,
@@ -308,10 +363,152 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
   });
 }
 
-function validateChecksums(
-  entries: ReadonlyMap<string, Uint8Array>,
-  checksum: Record<string, unknown>,
+function validateSceneFrameArchive(
+  tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>,
+  events: readonly StoredRow[],
+  expectedCampaignId: CampaignId,
 ): void {
+  const adventures = new Map(
+    tables.adventures.map((row) => [
+      requireString(row['id'], 'adventure id'),
+      requireString(row['campaign_id'], 'adventure campaign id'),
+    ]),
+  );
+  const eventIds = new Set(events.map((row) => requireString(row['id'], 'event id')));
+  for (const row of tables.scene_frames) {
+    requireExactKeys(
+      row,
+      [
+        'adventure_id',
+        'campaign_id',
+        'scene_id',
+        'location',
+        'participants_json',
+        'pressure_json',
+        'affordances_json',
+        'pending_consequences_json',
+        'return_point_json',
+        'revision',
+        'updated_at',
+      ],
+      'scene_frames row',
+    );
+    const adventureKey = requireString(row['adventure_id'], 'scene frame adventure id');
+    const campaignKey = requireString(row['campaign_id'], 'scene frame campaign id');
+    if (campaignKey !== expectedCampaignId || adventures.get(adventureKey) !== campaignKey) {
+      throw new PersistenceDataError('Scene frame campaign does not match its adventure');
+    }
+    requireBoundedText(row['scene_id'], 'scene frame scene id', 200);
+    requireBoundedText(row['location'], 'scene frame location', 4_000);
+    requireCanonicalTimestamp(row['updated_at'], 'scene frame updated_at');
+    requirePositiveInteger(row['revision'], 'scene frame revision');
+    const participants = parseSceneArray(row, 'participants_json', 'participants');
+    const pressure = parseSceneArray(row, 'pressure_json', 'pressure');
+    const affordances = parseSceneArray(row, 'affordances_json', 'affordances');
+    const pending = parseSceneArray(row, 'pending_consequences_json', 'pending consequences');
+    if (
+      participants.length < 1 ||
+      participants.length > 30 ||
+      pressure.length > 30 ||
+      affordances.length > 10 ||
+      pending.length > 20
+    ) {
+      throw new PersistenceDataError('Scene frame collection size is invalid');
+    }
+    const participantIds = participants.map((value, index) =>
+      requireBoundedText(value, `scene frame participant ${index}`, 200),
+    );
+    if (new Set(participantIds).size !== participantIds.length) {
+      throw new PersistenceDataError('Scene frame participants must be unique');
+    }
+    pressure.forEach((value, index) => {
+      const record = requireRecord(value, `scene frame pressure ${index}`);
+      requireExactKeys(record, ['id', 'kind', 'level'], `scene frame pressure ${index}`);
+      requireBoundedText(record['id'], `scene frame pressure ${index}.id`, 200);
+      requireBoundedText(record['kind'], `scene frame pressure ${index}.kind`, 200);
+      const level = record['level'];
+      if (typeof level !== 'number' || !Number.isSafeInteger(level) || level < 0) {
+        throw new PersistenceDataError(`scene frame pressure ${index}.level is invalid`);
+      }
+    });
+    affordances.forEach((value, index) => {
+      const record = requireRecord(value, `scene frame affordance ${index}`);
+      requireExactKeys(record, ['id', 'label', 'preconditions'], `scene frame affordance ${index}`);
+      requireBoundedText(record['id'], `scene frame affordance ${index}.id`, 200);
+      requireBoundedText(record['label'], `scene frame affordance ${index}.label`, 4_000);
+      requireArray(
+        record['preconditions'],
+        `scene frame affordance ${index}.preconditions`,
+      ).forEach((value, conditionIndex) =>
+        requireBoundedText(
+          value,
+          `scene frame affordance ${index}.preconditions.${conditionIndex}`,
+          4_000,
+        ),
+      );
+      if (
+        requireArray(record['preconditions'], `scene frame affordance ${index}.preconditions`)
+          .length > 20
+      ) {
+        throw new PersistenceDataError(
+          `scene frame affordance ${index}.preconditions has too many entries`,
+        );
+      }
+    });
+    pending.forEach((value, index) => {
+      const record = requireRecord(value, `scene frame pending consequence ${index}`);
+      requireExactKeys(
+        record,
+        ['id', 'trigger', 'payload'],
+        `scene frame pending consequence ${index}`,
+      );
+      requireBoundedText(record['id'], `scene frame pending consequence ${index}.id`, 200);
+      requireBoundedText(
+        record['trigger'],
+        `scene frame pending consequence ${index}.trigger`,
+        200,
+      );
+    });
+    const returnPoint = requireRecord(
+      parseStoredJson(row, 'return_point_json'),
+      'scene frame return point',
+    );
+    requireExactKeys(returnPoint, ['eventId', 'summary'], 'scene frame return point');
+    const returnEventId = requireBoundedText(
+      returnPoint['eventId'],
+      'scene frame return point event id',
+      200,
+    );
+    requireBoundedText(returnPoint['summary'], 'scene frame return point summary', 12_000);
+    if (!eventIds.has(returnEventId)) {
+      throw new PersistenceDataError('Scene frame return point event is missing from the archive');
+    }
+  }
+}
+
+function parseSceneArray(row: StoredRow, column: string, label: string): readonly unknown[] {
+  return requireArray(parseStoredJson(row, column), `scene frame ${label}`);
+}
+
+function parseStoredJson(row: StoredRow, column: string): unknown {
+  const text = requireString(row[column], `scene_frames.${column}`);
+  return parseJson(text, `scene_frames.${column}`);
+}
+
+function requireBoundedText(value: unknown, label: string, maximum: number): string {
+  const text = requireString(value, label);
+  if (text.trim() !== text || text.length > maximum) {
+    throw new PersistenceDataError(`${label} must be trimmed and at most ${maximum} characters`);
+  }
+  return text;
+}
+
+function validateChecksumDocument(checksum: Record<string, unknown>): Readonly<{
+  'campaign.json': string;
+  'events.ndjson': string;
+  'generations.json': string;
+  'manifest.json': string;
+}> {
   requireExactKeys(checksum, ['algorithm', 'files', 'formatVersion'], 'checksum.json');
   if (checksum['algorithm'] !== 'SHA-256' || checksum['formatVersion'] !== FORMAT_VERSION) {
     throw new PersistenceDataError('Unsupported checksum manifest');
@@ -319,12 +516,21 @@ function validateChecksums(
   const files = requireRecord(checksum['files'], 'checksum.files');
   const hashedNames = ['campaign.json', 'events.ndjson', 'generations.json', 'manifest.json'];
   requireExactKeys(files, hashedNames, 'checksum.files');
-  for (const name of hashedNames) {
-    const expected = requireString(files[name], `checksum.files.${name}`);
-    if (!/^[0-9a-f]{64}$/u.test(expected) || sha256(requireEntry(entries, name)) !== expected) {
-      throw new PersistenceDataError(`Save checksum mismatch: ${name}`);
-    }
-  }
+  const result = Object.fromEntries(
+    hashedNames.map((name) => {
+      const expected = requireString(files[name], `checksum.files.${name}`);
+      if (!/^[0-9a-f]{64}$/u.test(expected)) {
+        throw new PersistenceDataError(`Save checksum is invalid: ${name}`);
+      }
+      return [name, expected];
+    }),
+  );
+  return Object.freeze(result) as Readonly<{
+    'campaign.json': string;
+    'events.ndjson': string;
+    'generations.json': string;
+    'manifest.json': string;
+  }>;
 }
 
 function validateManifestCounts(
@@ -367,6 +573,7 @@ function parseEvents(text: string, expectedCampaignId: CampaignId): readonly Sto
   if (text.length === 0) return Object.freeze([]);
   if (!text.endsWith('\n')) throw new PersistenceDataError('events.ndjson must end with LF');
   const lines = text.slice(0, -1).split('\n');
+  validateRecordCount('events.ndjson', lines.length, MAX_EVENT_RECORDS);
   return Object.freeze(
     lines.map((line, index) => {
       if (line.length === 0) throw new PersistenceDataError('events.ndjson contains an empty line');
@@ -524,14 +731,110 @@ function parseStoredRow(value: unknown, label: string): StoredRow {
         if (label === 'generation_records' && key === 'raw_response_text') {
           scanJsonTextIfPresent(entry);
         }
+        if (typeof entry === 'string' && findSecretInText(entry, `${label}.${key}`) !== null) {
+          throw new PersistenceDataError('Imported save contains forbidden secret text');
+        }
         return [key, entry];
       }),
     ),
   );
 }
 
+function upgradeLegacyKnowledgeRow(row: StoredRow): StoredRow {
+  if ('provenance_json' in row) return row;
+  const learnedAt = requireString(row['updated_at'], 'npc_knowledge.updated_at');
+  requireCanonicalTimestamp(learnedAt, 'npc_knowledge.updated_at');
+  const excluded = new Set(parseStoredIdArray(row, 'excluded_secret_fact_ids_json'));
+  const known = parseStoredIdArray(row, 'known_fact_ids_json').filter((id) => !excluded.has(id));
+  const suspected = parseStoredIdArray(row, 'suspected_fact_ids_json').filter(
+    (id) => !excluded.has(id),
+  );
+  const believed = parseStoredIdArray(row, 'false_belief_fact_ids_json').filter(
+    (id) => !excluded.has(id),
+  );
+  const provenance = [
+    ...known.map((factId) => ({
+      factId,
+      state: 'KNOWN',
+      confidence: 1,
+    })),
+    ...suspected.map((factId) => ({
+      factId,
+      state: 'SUSPECTED',
+      confidence: 0.5,
+    })),
+    ...believed.map((factId) => ({
+      factId,
+      state: 'BELIEVED',
+      confidence: 1,
+    })),
+  ]
+    .filter(({ factId }) => !excluded.has(factId))
+    .map(({ factId, state, confidence }) => ({
+      factId,
+      state,
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt,
+      confidence,
+    }));
+  return Object.freeze({
+    ...row,
+    known_fact_ids_json: canonicalJson(known),
+    suspected_fact_ids_json: canonicalJson(suspected),
+    false_belief_fact_ids_json: canonicalJson(believed),
+    provenance_json: canonicalJson(provenance),
+  });
+}
+
+function upgradeLegacyRumorRows(
+  tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>,
+): Readonly<Record<CampaignTable, readonly StoredRow[]>> {
+  const sourceByFact = new Map<string, string>();
+  for (const knowledge of tables.npc_knowledge) {
+    const npc = requireString(knowledge['npc_id'], 'npc_knowledge.npc_id');
+    for (const factId of parseStoredIdArray(knowledge, 'known_fact_ids_json')) {
+      if (!sourceByFact.has(factId)) sourceByFact.set(factId, npc);
+    }
+  }
+  const worldFacts = tables.world_facts.map((row) => {
+    if (row['kind'] !== 'RUMOR') return row;
+    const factId = requireString(row['id'], 'world_facts.id');
+    const detailText = requireString(row['detail_json'], 'world_facts.detail_json');
+    const detail = requireRecord(parseJson(detailText, 'world_facts.detail_json'), 'rumor detail');
+    if ('claimId' in detail) return row;
+    const sourceNpcId =
+      typeof detail['sourceNpcId'] === 'string' ? detail['sourceNpcId'] : sourceByFact.get(factId);
+    if (sourceNpcId === undefined) {
+      throw new PersistenceDataError(`Legacy rumor has no attributable NPC source: ${factId}`);
+    }
+    return Object.freeze({
+      ...row,
+      detail_json: canonicalJson({
+        ...detail,
+        claimId: `claim-${factId}`,
+        claimRevision: 1,
+        confidence: 0.5,
+        sourceBasis: 'HEARSAY',
+        sourceNpcId,
+      }),
+    });
+  });
+  return Object.freeze({ ...tables, world_facts: Object.freeze(worldFacts) });
+}
+
+function parseStoredIdArray(row: StoredRow, column: string): readonly string[] {
+  const raw = requireString(row[column], `npc_knowledge.${column}`);
+  return requireArray(parseJson(raw, `npc_knowledge.${column}`), column).map((value, index) =>
+    requireString(value, `${column}[${index}]`),
+  );
+}
+
 function scanJsonTextIfPresent(value: StoredScalar): void {
   if (typeof value !== 'string') return;
+  if (findSecretInText(value, 'generation_records.raw_response_text') !== null) {
+    throw new PersistenceDataError('Imported save contains forbidden secret text');
+  }
   const trimmed = value.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return;
   try {
@@ -552,39 +855,38 @@ function parseCanonicalDocument(text: string, label: string): Record<string, unk
 }
 
 function parseJson(text: string, label: string): unknown {
+  validateJsonTextResources(text, label);
   try {
-    return JSON.parse(text) as unknown;
+    const value = JSON.parse(text) as unknown;
+    validateJsonValueResources(value, label);
+    return value;
   } catch (error) {
     throw new PersistenceDataError(`${label} is not valid JSON`, { cause: error });
   }
 }
 
 function assertNoSecretKeys(value: unknown, path: string): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoSecretKeys(entry, `${path}[${index}]`));
-    return;
-  }
-  if (value === null || typeof value !== 'object') return;
-  for (const [key, entry] of Object.entries(value)) {
-    const normalized = key.replaceAll(/[_-]/g, '').toLowerCase();
-    if (
-      normalized.includes('apikey') ||
-      normalized === 'authorization' ||
-      normalized === 'bearer' ||
-      normalized.includes('accesstoken') ||
-      normalized.includes('secretkey') ||
-      normalized.includes('credentialref') ||
-      normalized === 'cookie' ||
-      normalized === 'password' ||
-      normalized === 'token'
-    ) {
-      throw new PersistenceDataError(`Imported save contains a forbidden secret field at ${path}`);
-    }
-    assertNoSecretKeys(entry, `${path}.${key}`);
+  const detection = findSecretInJson(value, path);
+  if (detection !== null) {
+    throw new PersistenceDataError(
+      `Imported save contains forbidden secret material at ${detection.path}`,
+    );
   }
 }
 
-function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
+interface ZipEntryDescriptor {
+  readonly compressed: Uint8Array;
+  readonly expectedCrc: number;
+  readonly method: number;
+  readonly name: string;
+  readonly uncompressedSize: number;
+}
+
+interface BoundedZipArchive {
+  read(name: string): Uint8Array;
+}
+
+function readZipArchive(archive: Uint8Array): BoundedZipArchive {
   if (archive.length > MAX_ARCHIVE_BYTES || archive.length < 22) {
     throw new PersistenceDataError('Save archive size is invalid');
   }
@@ -609,7 +911,7 @@ function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
   ) {
     throw new PersistenceDataError('Save ZIP central directory is invalid');
   }
-  const entries = new Map<string, Uint8Array>();
+  const entries = new Map<string, ZipEntryDescriptor>();
   let offset = centralOffset;
   let uncompressedTotal = 0;
   for (let index = 0; index < entryCount; index += 1) {
@@ -640,11 +942,9 @@ function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
     viewAt(archive, nameStart, nameLength + extraLength + commentLength, 'ZIP central entry');
     const name = decodeUtf8(archive.slice(nameStart, nameStart + nameLength), 'ZIP entry name');
     validateEntryName(name, entries);
+    validateArchiveEntryResources(name, compressedSize, uncompressedSize);
     offset = nameStart + nameLength + extraLength + commentLength;
-    uncompressedTotal += uncompressedSize;
-    if (uncompressedTotal > MAX_UNCOMPRESSED_BYTES) {
-      throw new PersistenceDataError('Save ZIP exceeds the uncompressed size limit');
-    }
+    uncompressedTotal = addExpandedBytes(uncompressedTotal, uncompressedSize);
     const local = viewAt(archive, localOffset, 30, 'ZIP local header');
     if (
       local.getUint32(0, true) !== 0x04034b50 ||
@@ -665,30 +965,52 @@ function readZipEntries(archive: Uint8Array): ReadonlyMap<string, Uint8Array> {
     const dataStart = localNameStart + localNameLength + localExtraLength;
     const dataEnd = dataStart + compressedSize;
     if (dataEnd > centralOffset) throw new PersistenceDataError('Save ZIP entry range is invalid');
-    const compressed = archive.slice(dataStart, dataEnd);
-    let data: Uint8Array;
-    try {
-      data =
-        method === 0
-          ? compressed
-          : new Uint8Array(inflateRawSync(compressed, { maxOutputLength: uncompressedSize + 1 }));
-    } catch (error) {
-      throw new PersistenceDataError(`Save ZIP entry cannot be decompressed: ${name}`, {
-        cause: error,
-      });
-    }
-    if (data.length !== uncompressedSize || crc32(data) !== expectedCrc) {
-      throw new PersistenceDataError(`Save ZIP CRC or size mismatch: ${name}`);
-    }
-    entries.set(name, data);
+    const compressed = archive.subarray(dataStart, dataEnd);
+    entries.set(
+      name,
+      Object.freeze({
+        compressed,
+        expectedCrc,
+        method,
+        name,
+        uncompressedSize,
+      }),
+    );
   }
   if (offset !== endOffset || entries.size !== ENTRY_NAMES.length) {
     throw new PersistenceDataError('Save ZIP has missing or duplicate entries');
   }
-  return entries;
+  return Object.freeze({
+    read(name: string): Uint8Array {
+      const entry = entries.get(name);
+      if (entry === undefined) throw new PersistenceDataError(`Missing save entry: ${name}`);
+      let data: Uint8Array;
+      try {
+        data =
+          entry.method === 0
+            ? entry.compressed
+            : new Uint8Array(
+                inflateRawSync(entry.compressed, {
+                  maxOutputLength: Math.min(
+                    entry.uncompressedSize + 1,
+                    (archiveEntrySizeLimit(entry.name) ?? 0) + 1,
+                  ),
+                }),
+              );
+      } catch (error) {
+        throw new PersistenceDataError(`Save ZIP entry cannot be decompressed: ${entry.name}`, {
+          cause: error,
+        });
+      }
+      if (data.length !== entry.uncompressedSize || crc32(data) !== entry.expectedCrc) {
+        throw new PersistenceDataError(`Save ZIP CRC or size mismatch: ${entry.name}`);
+      }
+      return data;
+    },
+  });
 }
 
-function validateEntryName(name: string, entries: ReadonlyMap<string, Uint8Array>): void {
+function validateEntryName(name: string, entries: ReadonlyMap<string, unknown>): void {
   if (
     !ENTRY_NAME_SET.has(name) ||
     entries.has(name) ||
@@ -708,10 +1030,6 @@ function viewAt(bytes: Uint8Array, offset: number, length: number, label: string
   return new DataView(bytes.buffer, bytes.byteOffset + offset, length);
 }
 
-function decodeEntry(entries: ReadonlyMap<string, Uint8Array>, name: string): string {
-  return decodeUtf8(requireEntry(entries, name), name);
-}
-
 function decodeUtf8(bytes: Uint8Array, label: string): string {
   try {
     const text = new TextDecoder('utf-8', { fatal: true }).decode(bytes);
@@ -721,12 +1039,6 @@ function decodeUtf8(bytes: Uint8Array, label: string): string {
     if (error instanceof PersistenceDataError) throw error;
     throw new PersistenceDataError(`${label} is not valid UTF-8`, { cause: error });
   }
-}
-
-function requireEntry(entries: ReadonlyMap<string, Uint8Array>, name: string): Uint8Array {
-  const entry = entries.get(name);
-  if (entry === undefined) throw new PersistenceDataError(`Missing save entry: ${name}`);
-  return entry;
 }
 
 function requireImportOptions(options: CampaignSaveImportOptions): void {
@@ -751,7 +1063,16 @@ function requireRecord(value: unknown, label: string): Record<string, unknown> {
 
 function requireArray(value: unknown, label: string): readonly unknown[] {
   if (!Array.isArray(value)) throw new PersistenceDataError(`${label} must be an array`);
+  if (value.length > MAX_JSON_ARRAY_LENGTH) {
+    throw new PersistenceDataError(`${label} exceeds the JSON array limit`);
+  }
   return value;
+}
+
+function requireRecordArray(value: unknown, label: string, limit: number): readonly unknown[] {
+  const records = requireArray(value, label);
+  validateRecordCount(label, records.length, limit);
+  return records;
 }
 
 function requireString(value: unknown, label: string): string {
@@ -796,6 +1117,7 @@ function campaignTableRecord(
     npc_relationships: values('npc_relationships'),
     quests: values('quests'),
     adventures: values('adventures'),
+    scene_frames: values('scene_frames'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),
     messages: values('messages'),

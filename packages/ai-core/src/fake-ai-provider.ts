@@ -115,6 +115,39 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       };
     }
   }
+  if (request.task === 'GENERATE_QUEST') {
+    const input = taskInput(request);
+    const recentStructures = input?.['recentQuestStructures'];
+    if (Array.isArray(recentStructures) && recentStructures.length > 0) {
+      return {
+        content: {
+          title: 'The Broken Causeway',
+          summary: 'Escort the harbor masons while the storm tide is low.',
+          objective: 'Secure the causeway and recover the missing signal bell.',
+          failureCost: 'The inland road remains cut off for another tide.',
+        },
+        risk: 'HIGH',
+        recommendedAttributes: ['physique', 'charisma'],
+        expectedTurns: { min: 9, max: 12 },
+        rewardTier: 'RARE',
+        relatedNpcIds: [],
+        relatedFactIds: [],
+      };
+    }
+  }
+  if (request.task === 'NPC_REPLY') {
+    const input = taskInput(request);
+    const recentMessages = input?.['recentMessages'];
+    if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+      return {
+        reply: 'The lower stones have cooled, so the old tunnel can be approached carefully.',
+        mood: 'Focused',
+        suggestedTopics: ['The tide marks', 'The sealed passage'],
+        memoryCandidate: 'The player returned to ask what lies beyond the cellar threshold.',
+        relationshipProposal: { trust: 1 },
+      };
+    }
+  }
   if (request.task !== 'GENERATE_ADVENTURE_TURN') return base;
   const adventureBase = FAKE_TASK_OUTPUTS.GENERATE_ADVENTURE_TURN;
   const input = taskInput(request);

@@ -7,6 +7,7 @@ import {
   type WindowsNpcDialogueService,
 } from './npc-dialogue-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { playerText } from './localization/index.js';
 
 type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
 
@@ -61,7 +62,7 @@ export function NpcDialoguePage({
   if (snapshot === null) {
     return loadError === null ? (
       <main className="dialogue-room" aria-busy="true">
-        <p className="eyebrow">Opening conversation</p>
+        <p className="eyebrow">{playerText.coreUi.openingConversation}</p>
         <h1>正在回忆先前的谈话…</h1>
       </main>
     ) : (
@@ -77,7 +78,7 @@ export function NpcDialoguePage({
           {snapshot.npc.name.slice(0, 1)}
         </div>
         <div>
-          <p className="eyebrow">Conversation by the fire</p>
+          <p className="eyebrow">{playerText.coreUi.conversationByFire}</p>
           <h1>{snapshot.npc.name}</h1>
           <p>
             {snapshot.npc.identity} · {snapshot.npc.currentMood}
@@ -144,7 +145,7 @@ export function NpcDialoguePage({
 
         <aside className="dialogue-sidebar">
           <section>
-            <p className="eyebrow">Relationship</p>
+            <p className="eyebrow">{playerText.coreUi.relationship}</p>
             <h2>关系状态</h2>
             <Relationship label="信任" value={relationship.trust} />
             <Relationship label="亲近" value={relationship.closeness} />
@@ -152,7 +153,7 @@ export function NpcDialoguePage({
             <Relationship label="人情" value={relationship.obligation} />
           </section>
           <section>
-            <p className="eyebrow">First impression</p>
+            <p className="eyebrow">{playerText.coreUi.firstImpression}</p>
             <h2>眼前的人</h2>
             <p>{snapshot.npc.appearance}</p>
             <p>{snapshot.npc.personality}</p>
@@ -178,7 +179,7 @@ function Relationship({ label, value }: { readonly label: string; readonly value
 function DialogueMessage({ title }: { readonly title: string }) {
   return (
     <main className="dialogue-room">
-      <p className="eyebrow">Conversation unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.conversationUnavailable}</p>
       <h1>{title}</h1>
       <Link className="text-link" to="/tavern">
         返回酒馆

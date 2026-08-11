@@ -31,7 +31,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
 
     assert.equal(result.status, 'MIGRATED');
     assert.equal(result.fromVersion, 0);
-    assert.equal(result.toVersion, 1);
+    assert.equal(result.toVersion, 8);
     assert.notEqual(result.backupPath, null);
     await access(result.backupPath);
 
@@ -45,7 +45,16 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
         .prepare('SELECT version, name FROM schema_migrations ORDER BY version')
         .all()
         .map((row) => ({ ...row })),
-      [{ version: 1, name: 'initial' }],
+      [
+        { version: 1, name: 'initial' },
+        { version: 2, name: 'credential_cleanup_queue' },
+        { version: 3, name: 'provider_probe_consistency' },
+        { version: 4, name: 'ai_candidates' },
+        { version: 5, name: 'event_ledger' },
+        { version: 6, name: 'scene_frames' },
+        { version: 7, name: 'knowledge_provenance' },
+        { version: 8, name: 'rumor_claim_sources' },
+      ],
     );
     assert.equal(migrated.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');
     migrated.close();

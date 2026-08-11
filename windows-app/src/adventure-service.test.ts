@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 import {
   WindowsAdventureService,
   type AdventureGateway,
   type AdventureSnapshot,
+  type AdventureTurnObserver,
 } from './adventure-service.js';
 
 describe('WindowsAdventureService', () => {
@@ -25,6 +27,7 @@ describe('WindowsAdventureService', () => {
       snapshot = await service.act(
         'campaign-adventure',
         adventureIdOf(snapshot),
+        turn % 3 === 1 ? 'ACTION' : turn % 3 === 2 ? 'DIALOGUE' : 'OBSERVE',
         `Take action ${turn}`,
       );
       if (snapshot.state === 'CHECK_REQUIRED') {
@@ -54,13 +57,59 @@ describe('WindowsAdventureService', () => {
     const adventureId = adventureIdOf(snapshot);
 
     const [first, second] = await Promise.all([
-      service.act('campaign-adventure', adventureId, 'Study the lock'),
-      service.act('campaign-adventure', adventureId, 'Study the lock'),
+      service.act('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock'),
+      service.act('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock'),
     ]);
 
     expect(first.currentTurnNumber).toBe(1);
     expect(second).toBe(first);
     expect(gateway.submitCount).toBe(1);
+  });
+
+  it('reports submitted, generation, validation, resolution and commit boundaries in order', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const service = new WindowsAdventureService(gateway);
+    let snapshot = await service.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
+    const phases: string[] = [];
+
+    await service.act(
+      'campaign-adventure',
+      adventureIdOf(snapshot),
+      'ACTION',
+      'Walk around the locked door and inspect the stonework.',
+      phaseObserver(phases),
+    );
+
+    expect(phases).toEqual(['submitted', 'generating', 'validating', 'resolving', 'committed']);
+  });
+
+  it('does not let a UI observer interrupt the persisted turn workflow', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const service = new WindowsAdventureService(gateway);
+    let snapshot = await service.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
+    const fail = () => {
+      throw new Error('observer failed');
+    };
+
+    snapshot = await service.act(
+      'campaign-adventure',
+      adventureIdOf(snapshot),
+      'OBSERVE',
+      'Inspect the mortar beside the old lock.',
+      {
+        onSubmitted: fail,
+        onGenerationStarted: fail,
+        onValidationStarted: fail,
+        onResolutionStarted: fail,
+        onCommitted: fail,
+      },
+    );
+
+    expect(snapshot.currentTurnNumber).toBe(1);
+    expect(gateway.submitCount).toBe(1);
+    expect(gateway.tasks.filter((task) => task === 'GENERATE_ADVENTURE_TURN')).toHaveLength(1);
   });
 
   it('resumes persisted action and dice work without submitting or rolling twice', async () => {
@@ -70,8 +119,8 @@ describe('WindowsAdventureService', () => {
     snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
     const adventureId = adventureIdOf(snapshot);
 
-    await gateway.submit('campaign-adventure', adventureId, 'Study the lock');
-    snapshot = await service.act('campaign-adventure', adventureId, 'Ignored retry text');
+    await gateway.submit('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock');
+    snapshot = await service.act('campaign-adventure', adventureId, 'ACTION', 'Ignored retry text');
     expect(gateway.submitCount).toBe(1);
     expect(snapshot.state).toBe('CHECK_REQUIRED');
 
@@ -87,15 +136,72 @@ describe('WindowsAdventureService', () => {
     let snapshot = await firstRun.prepare('campaign-adventure', 'quest-beacon');
     snapshot = await firstRun.start('campaign-adventure', adventureIdOf(snapshot));
     const adventureId = adventureIdOf(snapshot);
-    await gateway.submit('campaign-adventure', adventureId, 'Persist before restart');
+    await gateway.submit('campaign-adventure', adventureId, 'DIALOGUE', 'Persist before restart');
+
+    const restarted = new WindowsAdventureService(gateway);
+    const phases: string[] = [];
+    snapshot = await restarted.load('campaign-adventure', undefined, phaseObserver(phases));
+
+    expect(snapshot.state).toBe('CHECK_REQUIRED');
+    expect(gateway.submitCount).toBe(1);
+    expect(phases).toEqual(['submitted', 'generating', 'validating', 'resolving', 'committed']);
+  });
+
+  it('persists one roll across repeated clicks and only narrates after reveal', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const service = new WindowsAdventureService(gateway);
+    let snapshot = await service.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await service.start('campaign-adventure', adventureIdOf(snapshot));
+    const adventureId = adventureIdOf(snapshot);
+    snapshot = await service.act('campaign-adventure', adventureId, 'OBSERVE', 'Study the lock');
+    expect(snapshot.state).toBe('CHECK_REQUIRED');
+
+    const [first, repeated] = await Promise.all([
+      service.rollCheck('campaign-adventure', adventureId),
+      service.rollCheck('campaign-adventure', adventureId),
+    ]);
+
+    expect(first).toBe(repeated);
+    expect(first.state).toBe('RESOLVING');
+    expect(gateway.rollCount).toBe(1);
+    expect(gateway.tasks.filter((task) => task === 'RESOLVE_DICE_RESULT')).toHaveLength(0);
+
+    snapshot = await service.rollCheck('campaign-adventure', adventureId);
+    expect(snapshot).toBe(first);
+    expect(gateway.rollCount).toBe(1);
+    snapshot = await service.completeCheck('campaign-adventure', adventureId);
+    expect(snapshot.state).toBe('SCENE');
+    expect(gateway.tasks.filter((task) => task === 'RESOLVE_DICE_RESULT')).toHaveLength(1);
+  });
+
+  it('restores an interrupted persisted roll without rerolling or auto-completing it', async () => {
+    const gateway = new MemoryAdventureGateway();
+    const firstRun = new WindowsAdventureService(gateway);
+    let snapshot = await firstRun.prepare('campaign-adventure', 'quest-beacon');
+    snapshot = await firstRun.start('campaign-adventure', adventureIdOf(snapshot));
+    const adventureId = adventureIdOf(snapshot);
+    await firstRun.act('campaign-adventure', adventureId, 'ACTION', 'Study the lock');
+    const rolled = await firstRun.rollCheck('campaign-adventure', adventureId);
 
     const restarted = new WindowsAdventureService(gateway);
     snapshot = await restarted.load('campaign-adventure');
 
-    expect(snapshot.state).toBe('CHECK_REQUIRED');
-    expect(gateway.submitCount).toBe(1);
+    expect(snapshot).toBe(rolled);
+    expect(snapshot.state).toBe('RESOLVING');
+    expect(gateway.rollCount).toBe(1);
+    expect(gateway.tasks.filter((task) => task === 'RESOLVE_DICE_RESULT')).toHaveLength(0);
   });
 });
+
+function phaseObserver(phases: string[]): AdventureTurnObserver {
+  return {
+    onSubmitted: () => phases.push('submitted'),
+    onGenerationStarted: () => phases.push('generating'),
+    onValidationStarted: () => phases.push('validating'),
+    onResolutionStarted: () => phases.push('resolving'),
+    onCommitted: () => phases.push('committed'),
+  };
+}
 
 class MemoryAdventureGateway implements AdventureGateway {
   public readonly tasks: string[] = [];
@@ -127,7 +233,12 @@ class MemoryAdventureGateway implements AdventureGateway {
     return this.snapshot;
   }
 
-  public async submit(_campaignId: string, _adventureId: string, playerAction: string) {
+  public async submit(
+    _campaignId: string,
+    _adventureId: string,
+    actionMode: AdventureActionMode,
+    playerAction: string,
+  ) {
     this.submitCount += 1;
     const next = this.snapshot.currentTurnNumber + 1;
     const newTurn = {
@@ -135,6 +246,7 @@ class MemoryAdventureGateway implements AdventureGateway {
       turnNumber: next,
       sceneText: this.snapshot.currentScene,
       playerAction,
+      actionMode,
       suggestedActions: [],
       checkRequest: null,
       diceResult: null,
@@ -144,7 +256,7 @@ class MemoryAdventureGateway implements AdventureGateway {
       ...this.snapshot,
       state: 'WAITING_FOR_PLAYER',
       turns: [...this.snapshot.turns, newTurn],
-      turnGenerationContext: turnInput(this.snapshot, playerAction),
+      turnGenerationContext: turnInput(this.snapshot, actionMode, playerAction),
     };
     return this.snapshot;
   }
@@ -186,7 +298,16 @@ class MemoryAdventureGateway implements AdventureGateway {
     const last = lastTurnOf(this.snapshot);
     const updated = {
       ...last,
-      diceResult: { naturalRoll: 12, total: 15, difficulty: 11, success: true },
+      diceResult: {
+        raw: 12,
+        modifier: 3,
+        total: 15,
+        dc: 11,
+        result: 'SUCCESS',
+        attributeModifier: 3,
+        equipmentModifier: 0,
+        statusModifier: 0,
+      } as const,
     };
     this.snapshot = {
       ...this.snapshot,
@@ -196,9 +317,11 @@ class MemoryAdventureGateway implements AdventureGateway {
         scene: last.sceneText,
         action: last.playerAction,
         attribute: 'knowledge',
-        difficulty: 11,
+        raw: 12,
+        modifier: 3,
         total: 15,
-        success: true,
+        dc: 11,
+        result: 'SUCCESS',
       },
     };
     return this.snapshot;
@@ -286,6 +409,7 @@ function initialSnapshot(): AdventureSnapshot {
     clues: [],
     turns: [],
     currentScene: 'Investigate the failing lighthouse.',
+    sceneFrame: sceneFrame(),
     suggestedActions: [],
     turnGenerationContext: null,
     diceGenerationInput: null,
@@ -302,7 +426,11 @@ function clue(id: string, title: string) {
   };
 }
 
-function turnInput(snapshot: AdventureSnapshot, playerAction: string) {
+function turnInput(
+  snapshot: AdventureSnapshot,
+  playerActionMode: AdventureActionMode,
+  playerAction: string,
+) {
   return {
     adventureId: 'adventure-beacon',
     worldRules: ['Magic leaves warmth.'],
@@ -342,10 +470,33 @@ function turnInput(snapshot: AdventureSnapshot, playerAction: string) {
     },
     currentTurnNumber: snapshot.currentTurnNumber,
     currentScene: snapshot.currentScene,
+    sceneFrame: snapshot.sceneFrame,
     longTermSummary: null,
     recentTurns: snapshot.turns.map(({ sceneText }) => sceneText).slice(-10),
     discoveredClues: [],
     relatedNpcs: [],
+    knownFacts: [
+      {
+        id: 'fact-warm-lock',
+        kind: 'DEVELOPING_FACT',
+        statement: 'The cellar lock radiates a faint warmth.',
+      },
+    ],
+    npcKnowledge: [],
+    playerActionMode,
     playerAction,
   };
+}
+
+function sceneFrame() {
+  return {
+    sceneId: 'scene-initial',
+    location: 'Lighthouse approach',
+    participants: ['character-player'],
+    pressure: [],
+    affordances: [],
+    pendingConsequences: [],
+    returnPoint: { eventId: 'event-quest-accepted', summary: 'Approach the lighthouse.' },
+    revision: 1,
+  } as const;
 }

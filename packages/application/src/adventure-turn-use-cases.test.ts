@@ -168,6 +168,10 @@ describe('AdventureTurnUseCases', () => {
       });
       expect(rolled.diceResult).toEqual({
         checkRequestId: checkRequestId(`check:${firstTurnId}`),
+        raw: 7,
+        modifier: 4,
+        dc: 11,
+        result: 'SUCCESS',
         d20: 7,
         attributeModifier: 3,
         equipmentModifier: 1,
@@ -603,7 +607,11 @@ function noCheckProvider(): AIProvider {
         content: JSON.stringify({
           sceneText: 'The passage opens onto a quiet stone stair.',
           speakerNpcIds: [],
-          suggestedActions: [{ text: 'Descend the stair.' }],
+          suggestedActions: [
+            { text: 'Descend the stair.' },
+            { text: 'Ask whether anyone hears movement below.' },
+            { text: 'Inspect the first steps for tracks.' },
+          ],
           checkRequest: null,
           discoveredClues: [],
           statePatchProposals: [],
@@ -628,7 +636,11 @@ function factProvider(statement: string, sceneText: string): AIProvider {
         content: JSON.stringify({
           sceneText,
           speakerNpcIds: [],
-          suggestedActions: [{ text: 'Continue.' }],
+          suggestedActions: [
+            { text: 'Continue.' },
+            { text: 'Speak with the nearest companion.' },
+            { text: 'Observe the route ahead.' },
+          ],
           checkRequest: null,
           discoveredClues: [],
           statePatchProposals: [

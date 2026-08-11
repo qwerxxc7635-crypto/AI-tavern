@@ -2,12 +2,14 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   GenerateAdventurePlanInputSchema,
   GenerateAdventurePlanOutputSchema,
   GenerateAdventureTurnInputSchema,
   GenerateAdventureTurnOutputSchema,
   ResolveDiceResultInputSchema,
   ResolveDiceResultOutputSchema,
+  SceneFrameSchema,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -19,26 +21,31 @@ import {
   campaignId,
   generationRecordId,
   idempotencyKey,
+  type AdventureActionMode,
+  type SceneFrame,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
+import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface AdventureTurnView {
   readonly id: string;
   readonly turnNumber: number;
   readonly sceneText: string;
   readonly playerAction: string;
+  readonly actionMode: AdventureActionMode;
   readonly suggestedActions: readonly { readonly text: string }[];
   readonly checkRequest: {
     readonly attribute: Attribute;
     readonly difficulty: number;
     readonly reason: string;
   } | null;
-  readonly diceResult: {
-    readonly naturalRoll: number;
-    readonly total: number;
-    readonly difficulty: number;
-    readonly success: boolean;
-  } | null;
+  readonly diceResult: D20HardResultView | null;
   readonly resolved: boolean;
 }
 
@@ -88,6 +95,7 @@ export interface AdventureSnapshot {
   }[];
   readonly turns: readonly AdventureTurnView[];
   readonly currentScene: string;
+  readonly sceneFrame: SceneFrame | null;
   readonly suggestedActions: readonly string[];
   readonly turnGenerationContext: unknown | null;
   readonly diceGenerationInput: unknown | null;
@@ -113,7 +121,12 @@ export interface AdventureGateway {
     generation: GenerationAudit,
   ): Promise<AdventureSnapshot>;
   start(campaignId: string, adventureId: string): Promise<AdventureSnapshot>;
-  submit(campaignId: string, adventureId: string, playerAction: string): Promise<AdventureSnapshot>;
+  submit(
+    campaignId: string,
+    adventureId: string,
+    actionMode: AdventureActionMode,
+    playerAction: string,
+  ): Promise<AdventureSnapshot>;
   commitTurn(
     campaignId: string,
     adventureId: string,
@@ -125,6 +138,14 @@ export interface AdventureGateway {
     adventureId: string,
     generation: GenerationAudit,
   ): Promise<AdventureSnapshot>;
+}
+
+export interface AdventureTurnObserver {
+  readonly onSubmitted?: () => void;
+  readonly onGenerationStarted?: () => void;
+  readonly onValidationStarted?: () => void;
+  readonly onResolutionStarted?: () => void;
+  readonly onCommitted?: () => void;
 }
 
 interface RequestIdentity {
@@ -165,10 +186,10 @@ export const tauriAdventureGateway: AdventureGateway = {
       id,
     );
   },
-  async submit(id, adventureId, playerAction) {
+  async submit(id, adventureId, actionMode, playerAction) {
     return parseSnapshot(
       await invoke<unknown>('adventure_action_submit', {
-        command: { campaignId: id, adventureId, playerAction },
+        command: { campaignId: id, adventureId, actionMode, playerAction },
       }),
       id,
     );
@@ -204,19 +225,22 @@ export class WindowsAdventureService {
     private readonly gateway: AdventureGateway = tauriAdventureGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: (task: AITask) => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
-  public load(id: string, questId?: string): Promise<AdventureSnapshot> {
+  public load(
+    id: string,
+    questId?: string,
+    observer?: AdventureTurnObserver,
+  ): Promise<AdventureSnapshot> {
     campaignId(id);
     if (questId !== undefined) requireText(questId);
     return this.singleFlight(id, async () => {
       const snapshot = await this.gateway.load(id, questId);
       if (snapshot.adventureId === null) return snapshot;
       if (snapshot.state === 'WAITING_FOR_PLAYER') {
-        return this.completeTurn(id, snapshot.adventureId, snapshot);
-      }
-      if (snapshot.state === 'RESOLVING') {
-        return this.completeDice(id, snapshot.adventureId, snapshot);
+        notifyAdventureObserver(observer, 'onSubmitted');
+        return this.completeTurn(id, snapshot.adventureId, snapshot, observer);
       }
       return snapshot;
     });
@@ -246,26 +270,47 @@ export class WindowsAdventureService {
     return this.gateway.start(id, adventureId);
   }
 
-  public act(id: string, adventureId: string, action: string): Promise<AdventureSnapshot> {
+  public act(
+    id: string,
+    adventureId: string,
+    actionMode: AdventureActionMode,
+    action: string,
+    observer?: AdventureTurnObserver,
+  ): Promise<AdventureSnapshot> {
     return this.singleFlight(id, async () => {
       requireText(action);
+      requireActionMode(actionMode);
       const current = await this.gateway.load(id);
       if (current.state === 'WAITING_FOR_PLAYER') {
-        return this.completeTurn(id, adventureId, current);
+        notifyAdventureObserver(observer, 'onSubmitted');
+        return this.completeTurn(id, adventureId, current, observer);
       }
-      const pending = await this.gateway.submit(id, adventureId, action);
-      return this.completeTurn(id, adventureId, pending);
+      const pending = await this.gateway.submit(id, adventureId, actionMode, action);
+      notifyAdventureObserver(observer, 'onSubmitted');
+      return this.completeTurn(id, adventureId, pending, observer);
     });
   }
 
   public resolveCheck(id: string, adventureId: string): Promise<AdventureSnapshot> {
+    return this.rollCheck(id, adventureId).then(() => this.completeCheck(id, adventureId));
+  }
+
+  public rollCheck(id: string, adventureId: string): Promise<AdventureSnapshot> {
     return this.singleFlight(id, async () => {
       const current = await this.gateway.load(id);
-      if (current.state === 'RESOLVING') {
-        return this.completeDice(id, adventureId, current);
+      if (current.state === 'RESOLVING') return current;
+      if (current.state !== 'CHECK_REQUIRED') {
+        throw new AdventureServiceError('CHECK_NOT_READY');
       }
-      const rolled = await this.gateway.roll(id, adventureId);
-      return this.completeDice(id, adventureId, rolled);
+      return this.gateway.roll(id, adventureId);
+    });
+  }
+
+  public completeCheck(id: string, adventureId: string): Promise<AdventureSnapshot> {
+    return this.singleFlight(id, async () => {
+      const current = await this.gateway.load(id);
+      if (current.state !== 'RESOLVING') return current;
+      return this.completeDice(id, adventureId, current);
     });
   }
 
@@ -273,15 +318,21 @@ export class WindowsAdventureService {
     id: string,
     adventureId: string,
     pending: AdventureSnapshot,
+    observer?: AdventureTurnObserver,
   ): Promise<AdventureSnapshot> {
+    notifyAdventureObserver(observer, 'onGenerationStarted');
     const input = GenerateAdventureTurnInputSchema.parse(pending.turnGenerationContext);
     const generation = await this.generate(
       'GENERATE_ADVENTURE_TURN',
       input,
       GenerateAdventureTurnOutputSchema.parse,
       { adventureId, turnId: requireLastTurn(pending).id },
+      () => notifyAdventureObserver(observer, 'onValidationStarted'),
     );
-    return this.gateway.commitTurn(id, adventureId, generation);
+    notifyAdventureObserver(observer, 'onResolutionStarted');
+    const committed = await this.gateway.commitTurn(id, adventureId, generation);
+    notifyAdventureObserver(observer, 'onCommitted');
+    return committed;
   }
 
   private async completeDice(
@@ -304,11 +355,15 @@ export class WindowsAdventureService {
     input: unknown,
     parseOutput: (value: unknown) => unknown,
     context: unknown,
+    onValidationStarted?: () => void,
   ): Promise<GenerationAudit> {
     const identity = this.createIdentity(task);
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new AdventureServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget(task, input);
+    await recordContextInspection(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task,
@@ -316,7 +371,7 @@ export class WindowsAdventureService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 8_000,
       timeoutMs: 5_000,
     };
@@ -324,6 +379,7 @@ export class WindowsAdventureService {
     if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
       throw new AdventureServiceError('PROVIDER_IDENTITY_MISMATCH');
     }
+    onValidationStarted?.();
     const validation = validateAIOutput(task, response.content);
     if (!validation.ok) throw new AdventureServiceError(validation.error.code);
     return {
@@ -354,12 +410,28 @@ export class WindowsAdventureService {
   }
 }
 
-export const windowsAdventureService = new WindowsAdventureService();
+export const windowsAdventureService = new WindowsAdventureService(
+  tauriAdventureGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class AdventureServiceError extends Error {
   public constructor(public readonly code: string) {
     super('Adventure operation failed');
     this.name = 'AdventureServiceError';
+  }
+}
+
+function notifyAdventureObserver(
+  observer: AdventureTurnObserver | undefined,
+  event: keyof AdventureTurnObserver,
+): void {
+  try {
+    observer?.[event]?.();
+  } catch {
+    // UI observation must never change the persisted adventure workflow.
   }
 }
 
@@ -386,6 +458,12 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
   const attributes = requireRecord(player['attributes']);
   const quest = requireRecord(record['quest']);
   const content = requireRecord(quest['content']);
+  const currentScene = requireText(record['currentScene']);
+  const sceneFrame =
+    record['sceneFrame'] === null ? null : SceneFrameSchema.parse(record['sceneFrame']);
+  if (sceneFrame !== null && sceneFrame.returnPoint.summary !== currentScene) {
+    throw new TypeError('Adventure scene does not match its recovery frame');
+  }
   return Object.freeze({
     campaignId: storedCampaignId,
     campaignState: requireText(record['campaignState']),
@@ -419,7 +497,8 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
     items: Object.freeze(requireArray(record['items']).map(parseItem)),
     clues: Object.freeze(requireArray(record['clues']).map(parseClue)),
     turns: Object.freeze(requireArray(record['turns']).map(parseTurn)),
-    currentScene: requireText(record['currentScene']),
+    currentScene,
+    sceneFrame,
     suggestedActions: Object.freeze(requireArray(record['suggestedActions']).map(requireText)),
     turnGenerationContext: record['turnGenerationContext'] ?? null,
     diceGenerationInput: record['diceGenerationInput'] ?? null,
@@ -462,12 +541,13 @@ function parseClue(value: unknown) {
 function parseTurn(value: unknown): AdventureTurnView {
   const record = requireRecord(value);
   const check = record['checkRequest'] === null ? null : requireRecord(record['checkRequest']);
-  const dice = record['diceResult'] === null ? null : requireRecord(record['diceResult']);
+  const dice = record['diceResult'];
   return Object.freeze({
     id: requireText(record['id']),
     turnNumber: positiveInteger(record['turnNumber']),
     sceneText: requireText(record['sceneText']),
     playerAction: requireText(record['playerAction']),
+    actionMode: requireActionMode(record['actionMode']),
     suggestedActions: Object.freeze(
       requireArray(record['suggestedActions']).map((value) => {
         const action = requireRecord(value);
@@ -485,15 +565,7 @@ function parseTurn(value: unknown): AdventureTurnView {
             difficulty: positiveInteger(check['difficulty']),
             reason: requireText(check['reason']),
           }),
-    diceResult:
-      dice === null
-        ? null
-        : Object.freeze({
-            naturalRoll: positiveInteger(dice['naturalRoll']),
-            total: integer(dice['total']),
-            difficulty: positiveInteger(dice['difficulty']),
-            success: requireBoolean(dice['success']),
-          }),
+    diceResult: dice === null ? null : parseD20HardResult(dice),
     resolved: requireBoolean(record['resolved']),
   });
 }
@@ -549,6 +621,10 @@ function positiveInteger(value: unknown): number {
 function requireBoolean(value: unknown): boolean {
   if (typeof value !== 'boolean') throw new TypeError('Adventure boolean is invalid');
   return value;
+}
+
+function requireActionMode(value: unknown): AdventureActionMode {
+  return enumValue(['ACTION', 'DIALOGUE', 'OBSERVE'] as const, value);
 }
 
 function enumValue<const Values extends readonly string[]>(

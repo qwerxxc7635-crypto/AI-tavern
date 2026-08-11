@@ -7,6 +7,8 @@ mod character_creation;
 mod model_settings;
 mod npc_dialogue;
 mod quest_board;
+mod randomness_settings;
+mod repetition;
 mod save_archive;
 mod settlement;
 mod tavern_initialization;
@@ -18,6 +20,7 @@ pub use character_creation::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
 pub use quest_board::*;
+pub use randomness_settings::*;
 pub use save_archive::*;
 pub use settlement::*;
 pub use tavern_initialization::*;
@@ -25,8 +28,10 @@ pub use world_creation::*;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use ember_platform_services::{AppInstanceLock, AppInstanceLockError, FileAppInstanceLock};
 use rusqlite::{Connection, OpenFlags, OptionalExtension, TransactionBehavior, params};
 use serde::Serialize;
 use thiserror::Error;
@@ -37,6 +42,20 @@ use time::macros::format_description;
 use uuid::Uuid;
 
 const INITIAL_MIGRATION: &str = include_str!("../../../database/migrations/0001_initial.sql");
+const CREDENTIAL_CLEANUP_MIGRATION: &str =
+    include_str!("../../../database/migrations/0002_credential_cleanup_queue.sql");
+const PROVIDER_PROBE_CONSISTENCY_MIGRATION: &str =
+    include_str!("../../../database/migrations/0003_provider_probe_consistency.sql");
+const AI_CANDIDATES_MIGRATION: &str =
+    include_str!("../../../database/migrations/0004_ai_candidates.sql");
+const EVENT_LEDGER_MIGRATION: &str =
+    include_str!("../../../database/migrations/0005_event_ledger.sql");
+const SCENE_FRAMES_MIGRATION: &str =
+    include_str!("../../../database/migrations/0006_scene_frames.sql");
+const KNOWLEDGE_PROVENANCE_MIGRATION: &str =
+    include_str!("../../../database/migrations/0007_knowledge_provenance.sql");
+const RUMOR_CLAIM_SOURCES_MIGRATION: &str =
+    include_str!("../../../database/migrations/0008_rumor_claim_sources.sql");
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -104,12 +123,19 @@ pub enum CampaignStoreError {
     ArchiveConflict,
     #[error("save archive path is invalid")]
     ArchivePathInvalid,
+    #[error("campaign has an unconfirmed AI candidate")]
+    UnconfirmedCandidate,
+    #[error("application coordination lock is unavailable")]
+    AppLock(#[from] AppInstanceLockError),
+    #[error("database changed while a destructive backup was being created")]
+    ConcurrentModification,
 }
 
 /// Owns a platform database path without exposing SQL or file access to the WebView.
 #[derive(Debug, Clone)]
 pub struct CampaignStore {
     pub(crate) database_path: PathBuf,
+    operation_lock: Arc<FileAppInstanceLock>,
 }
 
 impl CampaignStore {
@@ -118,10 +144,17 @@ impl CampaignStore {
         if let Some(parent) = database_path.parent() {
             std::fs::create_dir_all(parent)?;
         }
+        let operation_lock = Arc::new(FileAppInstanceLock::new(operation_lock_path(
+            &database_path,
+        ))?);
+        let _guard = operation_lock.acquire()?;
         if database_path.exists() {
             create_consistent_backup(&database_path)?;
         }
-        let store = Self { database_path };
+        let store = Self {
+            database_path,
+            operation_lock,
+        };
         let mut connection = store.connect()?;
         apply_migrations(&mut connection)?;
         Ok(store)
@@ -180,16 +213,30 @@ impl CampaignStore {
     }
 
     pub fn delete_campaign(&self, id: &str) -> Result<(), CampaignStoreError> {
+        self.delete_campaign_with_backup_hook(id, || {})
+    }
+
+    fn delete_campaign_with_backup_hook(
+        &self,
+        id: &str,
+        after_backup: impl FnOnce(),
+    ) -> Result<(), CampaignStoreError> {
         validate_id(id)?;
-        let connection = self.connect()?;
+        let _guard = self.operation_lock.acquire()?;
+        let mut connection = self.connect()?;
         if campaign_state(&connection, id)?.is_none() {
             return Err(CampaignStoreError::NotFound);
         }
-        drop(connection);
-
+        let before_backup = database_data_version(&connection)?;
         create_consistent_backup(&self.database_path)?;
-        let mut connection = self.connect()?;
+        after_backup();
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if database_data_version(&transaction)? != before_backup {
+            return Err(CampaignStoreError::ConcurrentModification);
+        }
+        if campaign_state(&transaction, id)?.is_none() {
+            return Err(CampaignStoreError::NotFound);
+        }
         let changed = transaction.execute("DELETE FROM campaigns WHERE id = ?1", [id])?;
         if changed != 1 {
             return Err(CampaignStoreError::NotFound);
@@ -251,6 +298,7 @@ impl CampaignStore {
         id: &str,
     ) -> Result<CampaignSummary, CampaignStoreError> {
         validate_id(id)?;
+        let _guard = self.operation_lock.acquire()?;
         let at = current_timestamp()?;
         let mut connection = self.connect()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -371,6 +419,16 @@ fn create_consistent_backup(database_path: &Path) -> Result<PathBuf, CampaignSto
     result
 }
 
+fn database_data_version(connection: &Connection) -> Result<i64, CampaignStoreError> {
+    Ok(connection.query_row("PRAGMA data_version", [], |row| row.get(0))?)
+}
+
+fn operation_lock_path(database_path: &Path) -> PathBuf {
+    let mut path = OsString::from(database_path.as_os_str());
+    path.push(".operation.lock");
+    PathBuf::from(path)
+}
+
 fn backup_directory(database_path: &Path) -> PathBuf {
     let mut path = OsString::from(database_path.as_os_str());
     path.push(".backups");
@@ -419,32 +477,55 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if latest_version > 1 {
+    if latest_version > 8 {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
-    let applied_name = connection
-        .query_row(
-            "SELECT name FROM schema_migrations WHERE version = 1",
-            [],
-            |row| row.get::<_, String>(0),
-        )
-        .optional()?;
-    if let Some(name) = applied_name {
-        return if name == "initial" {
-            Ok(())
-        } else {
-            Err(CampaignStoreError::IncompatibleSchema)
-        };
-    }
 
-    let applied_at = current_timestamp()?;
-    let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-    transaction.execute_batch(INITIAL_MIGRATION)?;
-    transaction.execute(
-        "INSERT INTO schema_migrations (version, name, applied_at) VALUES (1, 'initial', ?1)",
-        [applied_at],
-    )?;
-    transaction.commit()?;
+    for (version, name, sql) in [
+        (1_i64, "initial", INITIAL_MIGRATION),
+        (
+            2_i64,
+            "credential_cleanup_queue",
+            CREDENTIAL_CLEANUP_MIGRATION,
+        ),
+        (
+            3_i64,
+            "provider_probe_consistency",
+            PROVIDER_PROBE_CONSISTENCY_MIGRATION,
+        ),
+        (4_i64, "ai_candidates", AI_CANDIDATES_MIGRATION),
+        (5_i64, "event_ledger", EVENT_LEDGER_MIGRATION),
+        (6_i64, "scene_frames", SCENE_FRAMES_MIGRATION),
+        (
+            7_i64,
+            "knowledge_provenance",
+            KNOWLEDGE_PROVENANCE_MIGRATION,
+        ),
+        (8_i64, "rumor_claim_sources", RUMOR_CLAIM_SOURCES_MIGRATION),
+    ] {
+        let applied_name = connection
+            .query_row(
+                "SELECT name FROM schema_migrations WHERE version = ?1",
+                [version],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if let Some(applied_name) = applied_name {
+            if applied_name != name {
+                return Err(CampaignStoreError::IncompatibleSchema);
+            }
+            continue;
+        }
+
+        let applied_at = current_timestamp()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute_batch(sql)?;
+        transaction.execute(
+            "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?1, ?2, ?3)",
+            params![version, name, applied_at],
+        )?;
+        transaction.commit()?;
+    }
     Ok(())
 }
 
@@ -701,6 +782,38 @@ mod tests {
     }
 
     #[test]
+    fn permanent_delete_aborts_when_another_store_writes_after_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("delete-concurrency.sqlite");
+        let first = CampaignStore::open(&database_path).unwrap();
+        first
+            .create_at("campaign-race".to_owned(), FIRST_TIME.to_owned())
+            .unwrap();
+        let second = CampaignStore::open(&database_path).unwrap();
+        let concurrent_time = "2026-07-31T03:04:05.006Z";
+
+        let result = first.delete_campaign_with_backup_hook("campaign-race", || {
+            second
+                .touch_at("campaign-race", concurrent_time.to_owned())
+                .unwrap();
+        });
+
+        assert!(matches!(
+            result,
+            Err(CampaignStoreError::ConcurrentModification)
+        ));
+        let connection = first.connect().unwrap();
+        let preserved: String = connection
+            .query_row(
+                "SELECT updated_at FROM campaigns WHERE id = 'campaign-race'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, concurrent_time);
+    }
+
+    #[test]
     fn recovery_cancels_unfinished_requests_and_restores_the_resume_state_atomically() {
         let directory = tempfile::tempdir().expect("temp directory");
         let store =
@@ -765,7 +878,7 @@ mod tests {
                    name TEXT NOT NULL,
                    applied_at TEXT NOT NULL
                  );
-                 INSERT INTO schema_migrations VALUES (2, 'future', '2026-07-31T01:02:03.004Z');",
+                 INSERT INTO schema_migrations VALUES (9, 'future', '2026-07-31T01:02:03.004Z');",
             )
             .expect("seed future schema");
         drop(connection);

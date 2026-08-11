@@ -76,7 +76,7 @@ pub struct EquipmentDraft {
     pub description: String,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct EquipmentView {
     pub id: String,
@@ -97,6 +97,19 @@ pub struct PlayerCharacterView {
     pub updated_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CharacterCandidateView {
+    pub id: String,
+    pub kind: String,
+    pub draft: CharacterDraftInput,
+    pub trait_generation_record_id: String,
+    pub trait_candidates: Vec<CharacterTraitView>,
+    pub selected_traits: Vec<CharacterTraitView>,
+    pub background: Option<CharacterBackgroundView>,
+    pub initial_equipment: Vec<EquipmentView>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterCreationSnapshot {
@@ -104,6 +117,7 @@ pub struct CharacterCreationSnapshot {
     pub draft: Option<CharacterDraftInput>,
     pub trait_generation_record_id: Option<String>,
     pub trait_candidates: Vec<CharacterTraitView>,
+    pub candidate: Option<CharacterCandidateView>,
     pub character: Option<PlayerCharacterView>,
 }
 
@@ -127,6 +141,13 @@ pub struct CharacterCompletionCommit {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CharacterCandidateConfirm {
+    pub campaign_id: String,
+    pub candidate_id: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CharacterGenerationAudit {
     pub request_id: String,
     pub generation_record_id: String,
@@ -137,6 +158,14 @@ pub struct CharacterGenerationAudit {
     pub request: Value,
     pub raw_response_text: String,
     pub validated_output: Value,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredCharacterCandidate {
+    view: CharacterCandidateView,
+    generation: CharacterGenerationAudit,
+    trait_generation: Option<CharacterGenerationAudit>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -177,7 +206,7 @@ impl CampaignStore {
 
         let mut connection = self.connect()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if replayed(
+        if candidate_replayed(
             &transaction,
             &command.generation.idempotency_key,
             &command.campaign_id,
@@ -193,11 +222,16 @@ impl CampaignStore {
             return Err(CampaignStoreError::InvalidState);
         }
         let at = current_timestamp()?;
-        insert_generation(
+        let supersedes =
+            load_latest_candidate(&transaction, &command.campaign_id)?.map(|stored| stored.view.id);
+        let candidate = build_trait_candidate(&command, output, &at);
+        insert_candidate(
             &transaction,
             &command.campaign_id,
             "GENERATE_CHARACTER_TRAITS",
             &command.generation,
+            &candidate,
+            supersedes.as_deref(),
             &at,
         )?;
         transaction.commit()?;
@@ -218,7 +252,7 @@ impl CampaignStore {
         validate_background(&output)?;
         let mut connection = self.connect()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
-        if replayed(
+        if candidate_replayed(
             &transaction,
             &command.generation.idempotency_key,
             &command.campaign_id,
@@ -242,21 +276,89 @@ impl CampaignStore {
 
         let at = current_timestamp()?;
         let equipment = build_equipment(&command.character, &output.initial_equipment);
-        insert_character(
-            &transaction,
-            &command.character,
-            &command.selected_traits,
-            &output.background,
-            &equipment,
-            &at,
-        )?;
-        insert_generation(
+        let source_candidate_id = candidate_id(&command.trait_generation_record_id);
+        let candidate = CharacterCandidateView {
+            id: candidate_id(&command.generation.generation_record_id),
+            kind: "COMPLETE_CHARACTER".to_owned(),
+            draft: command.character.clone(),
+            trait_generation_record_id: command.trait_generation_record_id.clone(),
+            trait_candidates: load_trait_candidates(
+                &transaction,
+                &command.campaign_id,
+                &command.trait_generation_record_id,
+            )?,
+            selected_traits: command.selected_traits.clone(),
+            background: Some(output.background),
+            initial_equipment: equipment,
+        };
+        insert_candidate(
             &transaction,
             &command.campaign_id,
             "COMPLETE_CHARACTER_BACKGROUND",
             &command.generation,
+            &candidate,
+            Some(&source_candidate_id),
             &at,
         )?;
+        transaction.commit()?;
+        self.character_creation_snapshot(&command.campaign_id)
+    }
+
+    pub fn confirm_character_candidate(
+        &self,
+        command: CharacterCandidateConfirm,
+    ) -> Result<CharacterCreationSnapshot, CampaignStoreError> {
+        validate_id(&command.campaign_id)?;
+        validate_id(&command.candidate_id)?;
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let existing_status = transaction
+            .query_row(
+                "SELECT status FROM ai_candidates WHERE id = ?1 AND campaign_id = ?2",
+                params![command.candidate_id, command.campaign_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?;
+        if existing_status.as_deref() == Some("ACCEPTED") {
+            if character_exists(&transaction, &command.campaign_id)? {
+                let result = character_snapshot(&transaction, &command.campaign_id)?;
+                transaction.commit()?;
+                return Ok(result);
+            }
+            return Err(CampaignStoreError::InvalidData);
+        }
+        if require_campaign_state(&transaction, &command.campaign_id)? != "CREATING_CHARACTER"
+            || character_exists(&transaction, &command.campaign_id)?
+        {
+            return Err(CampaignStoreError::InvalidState);
+        }
+        let stored = load_candidate_by_id(
+            &transaction,
+            &command.campaign_id,
+            &command.candidate_id,
+            true,
+        )?
+        .ok_or(CampaignStoreError::InvalidState)?;
+        let candidate = &stored.view;
+        if candidate.kind != "COMPLETE_CHARACTER" {
+            return Err(CampaignStoreError::InvalidState);
+        }
+        let background = candidate
+            .background
+            .as_ref()
+            .ok_or(CampaignStoreError::InvalidData)?;
+        validate_character_candidate(candidate, &command.campaign_id)?;
+        validate_stored_candidate_context(&stored)?;
+        let at = current_timestamp()?;
+        insert_character(
+            &transaction,
+            &candidate.draft,
+            &candidate.selected_traits,
+            background,
+            &candidate.initial_equipment,
+            &at,
+        )?;
+        commit_candidate_generations(&transaction, &stored, &at)?;
         let changed = transaction.execute(
             "UPDATE campaigns SET state = 'GENERATING_TAVERN', resume_state = NULL, updated_at = ?1
              WHERE id = ?2 AND state = 'CREATING_CHARACTER'",
@@ -416,6 +518,282 @@ fn validate_background(output: &BackgroundOutput) -> Result<(), CampaignStoreErr
     Ok(())
 }
 
+fn candidate_id(generation_record_id: &str) -> String {
+    format!("character-candidate-{generation_record_id}")
+}
+
+fn build_trait_candidate(
+    command: &CharacterTraitGenerationCommit,
+    output: TraitOutput,
+    _at: &str,
+) -> CharacterCandidateView {
+    let traits = output
+        .traits
+        .into_iter()
+        .enumerate()
+        .map(|(index, value)| CharacterTraitView {
+            id: trait_id(&command.generation.generation_record_id, index),
+            name: value.name,
+            description: value.description,
+        })
+        .collect();
+    CharacterCandidateView {
+        id: candidate_id(&command.generation.generation_record_id),
+        kind: "CHARACTER_TRAITS".to_owned(),
+        draft: command.character.clone(),
+        trait_generation_record_id: command.generation.generation_record_id.clone(),
+        trait_candidates: traits,
+        selected_traits: Vec::new(),
+        background: None,
+        initial_equipment: Vec::new(),
+    }
+}
+
+fn insert_candidate(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+    task: &str,
+    generation: &CharacterGenerationAudit,
+    candidate: &CharacterCandidateView,
+    supersedes: Option<&str>,
+    at: &str,
+) -> Result<(), CampaignStoreError> {
+    let trait_generation = match (candidate.kind.as_str(), supersedes) {
+        ("COMPLETE_CHARACTER", Some(source_id)) => Some(
+            load_candidate_by_id(transaction, campaign_id, source_id, true)?
+                .ok_or(CampaignStoreError::InvalidData)?
+                .generation,
+        ),
+        _ => None,
+    };
+    let stored = StoredCharacterCandidate {
+        view: candidate.clone(),
+        generation: generation.clone(),
+        trait_generation,
+    };
+    let provenance = serde_json::json!({
+        "revisionKind": if supersedes.is_some() { "REGENERATE" } else { "INITIAL" },
+        "requestId": generation.request_id,
+        "providerId": "windows-offline-fake",
+        "modelName": generation.request.get("modelName").and_then(Value::as_str).unwrap_or("ember-fake-v1"),
+        "resolvedModelFingerprint": "offline-fake:ember-fake-v1",
+        "contextManifestHash": generation.idempotency_key,
+    });
+    transaction.execute(
+        "INSERT INTO ai_candidates (
+           id, campaign_id, operation_id, task, generation_record_id, payload_json,
+           validation_json, provenance_json, expected_revision, status,
+           supersedes_candidate_id, superseded_by_candidate_id, created_at, updated_at
+         ) VALUES (?1, ?2, ?3, ?4, NULL, ?5, ?6, ?7, 0, 'PROPOSED', ?8, NULL, ?9, ?9)",
+        params![
+            candidate.id,
+            campaign_id,
+            generation.idempotency_key,
+            task,
+            json(&stored)?,
+            serde_json::to_string(&serde_json::json!({
+                "schemaValid": true,
+                "domainValid": true,
+                "validatedAt": at,
+                "checks": ["ai-output-schema", "character-domain-rules", "campaign-boundary"]
+            }))
+            .map_err(|_| CampaignStoreError::InvalidData)?,
+            serde_json::to_string(&provenance).map_err(|_| CampaignStoreError::InvalidData)?,
+            supersedes,
+            at,
+        ],
+    )?;
+    if let Some(source_id) = supersedes {
+        let changed = transaction.execute(
+            "UPDATE ai_candidates
+             SET status = 'SUPERSEDED', superseded_by_candidate_id = ?1, updated_at = ?2
+             WHERE id = ?3 AND campaign_id = ?4 AND status = 'PROPOSED'",
+            params![candidate.id, at, source_id, campaign_id],
+        )?;
+        if changed != 1 {
+            return Err(CampaignStoreError::InvalidState);
+        }
+    }
+    Ok(())
+}
+
+fn load_candidate_by_id(
+    connection: &Connection,
+    campaign_id: &str,
+    id: &str,
+    require_proposed: bool,
+) -> Result<Option<StoredCharacterCandidate>, CampaignStoreError> {
+    let row = connection
+        .query_row(
+            "SELECT payload_json FROM ai_candidates
+             WHERE id = ?1 AND campaign_id = ?2 AND expected_revision = 0
+               AND (?3 = 0 OR status = 'PROPOSED')",
+            params![id, campaign_id, i64::from(require_proposed)],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    row.map(|raw| {
+        let stored: StoredCharacterCandidate =
+            serde_json::from_str(&raw).map_err(|_| CampaignStoreError::InvalidData)?;
+        validate_character_candidate(&stored.view, campaign_id)?;
+        Ok(stored)
+    })
+    .transpose()
+}
+
+fn load_latest_candidate(
+    connection: &Connection,
+    campaign_id: &str,
+) -> Result<Option<StoredCharacterCandidate>, CampaignStoreError> {
+    let id = connection
+        .query_row(
+            "SELECT id FROM ai_candidates
+             WHERE campaign_id = ?1 AND status = 'PROPOSED'
+               AND task IN ('GENERATE_CHARACTER_TRAITS', 'COMPLETE_CHARACTER_BACKGROUND')
+             ORDER BY updated_at DESC, id DESC LIMIT 1",
+            [campaign_id],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?;
+    id.map(|value| load_candidate_by_id(connection, campaign_id, &value, true))
+        .transpose()
+        .map(|value| value.flatten())
+}
+
+fn validate_character_candidate(
+    candidate: &CharacterCandidateView,
+    campaign_id: &str,
+) -> Result<(), CampaignStoreError> {
+    validate_id(&candidate.id)?;
+    validate_character_draft(&candidate.draft, campaign_id)?;
+    validate_id(&candidate.trait_generation_record_id)?;
+    if candidate.trait_candidates.len() != 6 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    for value in &candidate.trait_candidates {
+        validate_id(&value.id)?;
+        validate_text(&value.name, 200)?;
+        validate_text(&value.description, 4_000)?;
+    }
+    let offered = candidate
+        .trait_candidates
+        .iter()
+        .map(|value| value.id.as_str())
+        .collect::<HashSet<_>>();
+    if offered.len() != candidate.trait_candidates.len()
+        || candidate
+            .selected_traits
+            .iter()
+            .any(|value| !offered.contains(value.id.as_str()))
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    for item in &candidate.initial_equipment {
+        validate_id(&item.id)?;
+        validate_text(&item.name, 200)?;
+        validate_text(&item.description, 4_000)?;
+        let valid_effect = item.effect == serde_json::json!({"kind": "NONE"})
+            || item.effect.as_object().is_some_and(|effect| {
+                effect.get("kind").and_then(Value::as_str) == Some("CHECK_MODIFIER")
+                    && effect.get("modifier").and_then(Value::as_i64) == Some(1)
+                    && effect
+                        .get("attribute")
+                        .and_then(Value::as_str)
+                        .is_some_and(|value| {
+                            ["physique", "agility", "knowledge", "charisma"].contains(&value)
+                        })
+                    && effect.len() == 3
+            });
+        if !valid_effect {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    match candidate.kind.as_str() {
+        "CHARACTER_TRAITS"
+            if candidate.selected_traits.is_empty()
+                && candidate.background.is_none()
+                && candidate.initial_equipment.is_empty() => {}
+        "COMPLETE_CHARACTER"
+            if candidate.selected_traits.len() == 2
+                && candidate.background.is_some()
+                && !candidate.initial_equipment.is_empty()
+                && candidate.initial_equipment.len() <= 4 => {}
+        _ => return Err(CampaignStoreError::InvalidData),
+    }
+    Ok(())
+}
+
+fn validate_stored_candidate_context(
+    stored: &StoredCharacterCandidate,
+) -> Result<(), CampaignStoreError> {
+    let trait_generation = stored
+        .trait_generation
+        .as_ref()
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let expected_trait_input = serde_json::json!({
+        "concept": stored.view.draft.concept,
+        "classArchetype": stored.view.draft.class_archetype,
+        "personalGoal": stored.view.draft.personal_goal,
+        "storyPreferences": stored.view.draft.story_preferences,
+    });
+    let expected_trait_context = serde_json::json!({ "character": stored.view.draft });
+    let selected = stored
+        .view
+        .selected_traits
+        .iter()
+        .map(|value| {
+            serde_json::json!({
+                "name": value.name,
+                "description": value.description,
+            })
+        })
+        .collect::<Vec<_>>();
+    let expected_background_input = serde_json::json!({
+        "name": stored.view.draft.name,
+        "concept": stored.view.draft.concept,
+        "classDisplayName": stored.view.draft.class_display_name,
+        "personalGoal": stored.view.draft.personal_goal,
+        "traits": selected,
+    });
+    let expected_background_context = serde_json::json!({
+        "character": stored.view.draft,
+        "selectedTraits": stored.view.selected_traits,
+        "traitGenerationRecordId": stored.view.trait_generation_record_id,
+    });
+    if trait_generation.input != expected_trait_input
+        || trait_generation.context != expected_trait_context
+        || stored.generation.input != expected_background_input
+        || stored.generation.context != expected_background_context
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(())
+}
+
+fn candidate_replayed(
+    connection: &Connection,
+    key: &str,
+    campaign_id: &str,
+    task: &str,
+) -> Result<bool, CampaignStoreError> {
+    let candidate = connection
+        .query_row(
+            "SELECT campaign_id, task FROM ai_candidates WHERE operation_id = ?1",
+            [key],
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+        )
+        .optional()?;
+    match candidate {
+        Some((stored_campaign, stored_task))
+            if stored_campaign == campaign_id && stored_task == task =>
+        {
+            Ok(true)
+        }
+        Some(_) => Err(CampaignStoreError::InvalidState),
+        None => replayed(connection, key, campaign_id, task),
+    }
+}
+
 fn replayed(
     connection: &Connection,
     key: &str,
@@ -499,25 +877,10 @@ fn validate_selected_traits(
     if selected.len() != 2 || selected[0].id == selected[1].id {
         return Err(CampaignStoreError::InvalidData);
     }
-    let output: String = connection
-        .query_row(
-            "SELECT g.validated_output_json
-             FROM generation_records g
-             JOIN pending_ai_requests p ON p.id = g.request_id
-             WHERE g.id = ?1 AND g.campaign_id = ?2
-               AND g.task = 'GENERATE_CHARACTER_TRAITS' AND p.status = 'COMMITTED'",
-            params![generation_record_id, campaign_id],
-            |row| row.get(0),
-        )
-        .optional()?
-        .ok_or(CampaignStoreError::InvalidData)?;
-    let candidates: TraitOutput =
-        serde_json::from_str(&output).map_err(|_| CampaignStoreError::InvalidData)?;
-    validate_trait_drafts(&candidates.traits)?;
+    let candidates = load_trait_candidates(connection, campaign_id, generation_record_id)?;
     for selected_trait in selected {
         validate_id(&selected_trait.id)?;
         let index = candidates
-            .traits
             .iter()
             .position(|candidate| {
                 candidate.name == selected_trait.name
@@ -527,6 +890,68 @@ fn validate_selected_traits(
         if selected_trait.id != trait_id(generation_record_id, index) {
             return Err(CampaignStoreError::InvalidData);
         }
+    }
+    Ok(())
+}
+
+fn load_trait_candidates(
+    connection: &Connection,
+    campaign_id: &str,
+    generation_record_id: &str,
+) -> Result<Vec<CharacterTraitView>, CampaignStoreError> {
+    let stored = load_candidate_by_id(
+        connection,
+        campaign_id,
+        &candidate_id(generation_record_id),
+        true,
+    )?
+    .ok_or(CampaignStoreError::InvalidData)?;
+    if stored.view.kind != "CHARACTER_TRAITS"
+        || stored.view.trait_generation_record_id != generation_record_id
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(stored.view.trait_candidates)
+}
+
+fn commit_candidate_generations(
+    transaction: &Transaction<'_>,
+    stored: &StoredCharacterCandidate,
+    at: &str,
+) -> Result<(), CampaignStoreError> {
+    let trait_generation = stored
+        .trait_generation
+        .as_ref()
+        .ok_or(CampaignStoreError::InvalidData)?;
+    validate_generation_audit(trait_generation, "GENERATE_CHARACTER_TRAITS")?;
+    validate_generation_audit(&stored.generation, "COMPLETE_CHARACTER_BACKGROUND")?;
+    insert_generation(
+        transaction,
+        &stored.view.draft.campaign_id,
+        "GENERATE_CHARACTER_TRAITS",
+        trait_generation,
+        at,
+    )?;
+    insert_generation(
+        transaction,
+        &stored.view.draft.campaign_id,
+        "COMPLETE_CHARACTER_BACKGROUND",
+        &stored.generation,
+        at,
+    )?;
+    let changed = transaction.execute(
+        "UPDATE ai_candidates
+         SET status = 'ACCEPTED', generation_record_id = ?1, updated_at = ?2
+         WHERE id = ?3 AND campaign_id = ?4 AND status = 'PROPOSED'",
+        params![
+            stored.generation.generation_record_id,
+            at,
+            stored.view.id,
+            stored.view.draft.campaign_id
+        ],
+    )?;
+    if changed != 1 {
+        return Err(CampaignStoreError::InvalidState);
     }
     Ok(())
 }
@@ -625,9 +1050,16 @@ fn character_snapshot(
 ) -> Result<CharacterCreationSnapshot, CampaignStoreError> {
     let state = require_campaign_state(connection, campaign_id)?;
     let character = load_character(connection, campaign_id)?;
-    let latest = load_latest_traits(connection, campaign_id)?;
-    let (trait_generation_record_id, trait_candidates, generated_draft) = latest
-        .map(|(record, traits, draft)| (Some(record), traits, Some(draft)))
+    let candidate = load_latest_candidate(connection, campaign_id)?.map(|stored| stored.view);
+    let (trait_generation_record_id, trait_candidates, generated_draft) = candidate
+        .as_ref()
+        .map(|value| {
+            (
+                Some(value.trait_generation_record_id.clone()),
+                value.trait_candidates.clone(),
+                Some(value.draft.clone()),
+            )
+        })
         .unwrap_or((None, Vec::new(), None));
     let draft = character
         .as_ref()
@@ -638,60 +1070,9 @@ fn character_snapshot(
         draft,
         trait_generation_record_id,
         trait_candidates,
+        candidate,
         character,
     })
-}
-
-fn load_latest_traits(
-    connection: &Connection,
-    campaign_id: &str,
-) -> Result<Option<(String, Vec<CharacterTraitView>, CharacterDraftInput)>, CampaignStoreError> {
-    let row = connection
-        .query_row(
-            "SELECT g.id, g.validated_output_json, p.context_json
-             FROM generation_records g
-             JOIN pending_ai_requests p ON p.id = g.request_id
-             WHERE g.campaign_id = ?1 AND g.task = 'GENERATE_CHARACTER_TRAITS'
-               AND p.status = 'COMMITTED'
-             ORDER BY g.completed_at DESC, g.id DESC LIMIT 1",
-            [campaign_id],
-            |row| {
-                Ok((
-                    row.get::<_, String>(0)?,
-                    row.get::<_, String>(1)?,
-                    row.get::<_, String>(2)?,
-                ))
-            },
-        )
-        .optional()?;
-    row.map(|(record_id, raw, context_raw)| {
-        let output: TraitOutput =
-            serde_json::from_str(&raw).map_err(|_| CampaignStoreError::InvalidData)?;
-        validate_trait_drafts(&output.traits)?;
-        let traits = output
-            .traits
-            .into_iter()
-            .enumerate()
-            .map(|(index, value)| CharacterTraitView {
-                id: trait_id(&record_id, index),
-                name: value.name,
-                description: value.description,
-            })
-            .collect();
-        let context: Value =
-            serde_json::from_str(&context_raw).map_err(|_| CampaignStoreError::InvalidData)?;
-        let draft: CharacterDraftInput = serde_json::from_value(
-            context
-                .as_object()
-                .and_then(|value| value.get("character"))
-                .cloned()
-                .ok_or(CampaignStoreError::InvalidData)?,
-        )
-        .map_err(|_| CampaignStoreError::InvalidData)?;
-        validate_character_draft(&draft, campaign_id)?;
-        Ok((record_id, traits, draft))
-    })
-    .transpose()
 }
 
 fn load_character(
@@ -871,12 +1252,51 @@ mod tests {
         assert_eq!(resumed.draft, Some(draft()));
         assert_eq!(resumed.trait_candidates, traits.trait_candidates);
         let selected = resumed.trait_candidates[..2].to_vec();
-        let completed = reopened
+        let proposed = reopened
             .commit_character_completion(background_command(
                 resumed.trait_generation_record_id.expect("trait record id"),
                 selected,
             ))
-            .expect("complete character");
+            .expect("propose complete character");
+        assert_eq!(proposed.campaign_state, "CREATING_CHARACTER");
+        assert!(proposed.character.is_none());
+        let connection = reopened.connect().expect("candidate boundary connection");
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM player_characters", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("character count"),
+            0
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM items", [], |row| row.get::<_, i64>(0))
+                .expect("item count"),
+            0
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM generation_records", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("generation count"),
+            0
+        );
+        drop(connection);
+        assert!(matches!(
+            reopened.export_campaign_archive(
+                "campaign-character",
+                directory.path().join("unconfirmed.emtavern"),
+                "0.2.0"
+            ),
+            Err(CampaignStoreError::UnconfirmedCandidate)
+        ));
+        let candidate_id = proposed.candidate.expect("complete candidate").id;
+        let completed = reopened
+            .confirm_character_candidate(CharacterCandidateConfirm {
+                campaign_id: "campaign-character".to_owned(),
+                candidate_id: candidate_id.clone(),
+            })
+            .expect("confirm character");
         assert_eq!(completed.campaign_state, "GENERATING_TAVERN");
         let character = completed.character.expect("character");
         assert_eq!(character.initial_equipment.len(), 2);
@@ -887,6 +1307,35 @@ mod tests {
                 "attribute": "agility",
                 "modifier": 1
             })
+        );
+        let connection = reopened.connect().expect("confirmed evidence connection");
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM generation_records", [], |row| row
+                    .get::<_, i64>(0))
+                .expect("committed generation count"),
+            2
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT status FROM ai_candidates WHERE id = ?1",
+                    [&candidate_id],
+                    |row| row.get::<_, String>(0)
+                )
+                .expect("candidate status"),
+            "ACCEPTED"
+        );
+        drop(connection);
+        assert_eq!(
+            reopened
+                .confirm_character_candidate(CharacterCandidateConfirm {
+                    campaign_id: "campaign-character".to_owned(),
+                    candidate_id,
+                })
+                .expect("idempotent confirmation")
+                .campaign_state,
+            "GENERATING_TAVERN"
         );
         drop(reopened);
 

@@ -87,6 +87,10 @@ function boardSnapshot(): QuestBoardSnapshot {
       },
       availableNpcs: [],
       recentQuestTitles: ['The Fading Beacon', 'The Lost Courier'],
+      recentQuestStructures: [
+        'moderate|notable|8-12|agility,knowledge',
+        'moderate|notable|8-12|agility,knowledge',
+      ],
     },
     quests: [quest('quest-one', 'The Fading Beacon'), quest('quest-two', 'The Lost Courier')],
   };

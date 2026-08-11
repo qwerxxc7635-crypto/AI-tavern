@@ -1,18 +1,25 @@
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
+  adventureId,
   aiRequestId,
   campaignId,
+  claimId,
   createCampaign,
+  createNpcKnowledge,
   gameEventId,
   generationRecordId,
   isoTimestamp,
+  locationId,
   modelProfileId,
+  npcId,
   promptVersion,
   schemaVersion,
   snapshotId,
+  questId,
+  tavernId,
   transitionCampaign,
   worldFactId,
 } from '@ember-tavern/contracts';
@@ -21,10 +28,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { applyMigrations } from './migrations.mjs';
 import {
   CampaignRepository,
+  AdventureRepository,
   GameEventRepository,
   GenerationRecordRepository,
+  NpcRepository,
   PersistenceDataError,
   SnapshotRepository,
+  QuestRepository,
+  TavernRepository,
+  WorldRepository,
   exportCampaignSave,
   importCampaignSave,
 } from './index.js';
@@ -48,6 +60,16 @@ afterEach(() => {
 });
 
 describe('exportCampaignSave', () => {
+  it('emits the current TypeScript archive for the interop gate when requested', () => {
+    const output = process.env['EMBER_TS_ARCHIVE_OUTPUT'];
+    if (output === undefined) return;
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    writeFileSync(output, exported.bytes);
+  });
+
   it('exports complete campaign content and audit files without device credentials', () => {
     const exported = exportCampaignSave(database, campaignKey, {
       createdAt: at,
@@ -80,7 +102,7 @@ describe('exportCampaignSave', () => {
     expect(manifest).toMatchObject({
       application: 'ember-tavern',
       campaignId: campaignKey,
-      databaseSchemaVersion: 1,
+      databaseSchemaVersion: 2,
       formatVersion: 1,
       files: {
         'campaign.json': { records: 1 },
@@ -91,8 +113,9 @@ describe('exportCampaignSave', () => {
     expect(campaignRow['default_model_profile_id']).toBeNull();
     expect(campaignRow['fallback_model_profile_id']).toBeNull();
     expect(campaignRow['task_model_overrides_json']).toBe('{}');
-    expect(requireArray(tables['world_facts'])).toHaveLength(1);
-    expect(Object.keys(tables)).toHaveLength(14);
+    expect(requireArray(tables['world_facts'])).toHaveLength(2);
+    expect(requireArray(tables['scene_frames'])).toHaveLength(1);
+    expect(Object.keys(tables)).toHaveLength(15);
     expect(events).toHaveLength(1);
     expect(parseObject(events[0] ?? '')).toMatchObject({
       id: gameEventId('event-export'),
@@ -111,6 +134,7 @@ describe('exportCampaignSave', () => {
     expect(archiveText).not.toContain(secret);
     expect(archiveText).not.toContain('credential_ref');
     expect(archiveText).not.toContain('provider-secret');
+    expect(archiveText).not.toContain('randomness_profile_v1');
     expect(native.prepare('SELECT COUNT(*) AS count FROM campaigns').get()).toEqual({ count: 1 });
   });
 
@@ -131,6 +155,43 @@ describe('exportCampaignSave', () => {
     expect(native.prepare('PRAGMA foreign_key_check').all()).toEqual([]);
   });
 
+  it('rejects secret material in request, response and diagnostic values', () => {
+    for (const [column, value] of [
+      ['request_json', '{"message":"provider returned sk-or-v1-1234567890abcdef"}'],
+      ['raw_response_text', 'Provider echoed Authorization: Bearer abcdefghijklmnop'],
+      ['validation_error_json', '{"message":"API key: abcdefghijklmnop"}'],
+    ] as const) {
+      native
+        .prepare(
+          `UPDATE generation_records
+           SET request_json = '{}', raw_response_text = NULL, validation_error_json = NULL
+           WHERE id = ?`,
+        )
+        .run(generationRecordId('generation-export'));
+      native
+        .prepare(`UPDATE generation_records SET ${column} = ? WHERE id = ?`)
+        .run(value, generationRecordId('generation-export'));
+      expect(() =>
+        exportCampaignSave(database, campaignKey, {
+          createdAt: at,
+          generatorVersion: '0.1.0',
+        }),
+      ).toThrow(/secret/u);
+    }
+  });
+
+  it('rejects a known test secret in an ordinary narrative field', () => {
+    native
+      .prepare('UPDATE world_facts SET statement = ? WHERE id = ?')
+      .run('TOP_SECRET_API_KEY_SHOULD_NOT_EXPORT', worldFactId('fact-export'));
+    expect(() =>
+      exportCampaignSave(database, campaignKey, {
+        createdAt: at,
+        generatorVersion: '0.1.0',
+      }),
+    ).toThrow(/secret/u);
+  });
+
   it('rejects a missing campaign without leaving the connection in a transaction', () => {
     expect(() =>
       exportCampaignSave(database, campaignId('campaign-missing'), {
@@ -144,6 +205,31 @@ describe('exportCampaignSave', () => {
 });
 
 describe('importCampaignSave', () => {
+  it('imports the current Rust archive during the interop gate when provided', async () => {
+    const input = process.env['EMBER_RUST_ARCHIVE_INPUT'];
+    if (input === undefined) return;
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
+    const imported = await importCampaignSave(database, new Uint8Array(readFileSync(input)), {
+      mode: 'CREATE',
+      importedAt: isoTimestamp('2026-08-02T01:00:00.000Z'),
+      snapshotId: snapshotId('snapshot-current-rust-interop'),
+    });
+    expect(imported.campaign.id).toBe(campaignKey);
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id = ?').get('fact-export'),
+    ).toEqual({ statement: 'The beacon is lit.' });
+    expect(new WorldRepository(database).getFact(worldFactId('rumor-export'))).toMatchObject({
+      claimId: claimId('claim-rumor-export'),
+      sourceBasis: 'HEARSAY',
+      confidence: 0.5,
+    });
+    expect(
+      native
+        .prepare('SELECT revision FROM scene_frames WHERE adventure_id = ?')
+        .get('adventure-export'),
+    ).toEqual({ revision: 4 });
+  });
+
   it('imports the Rust v1 fixture without device state', async () => {
     const archive = new Uint8Array(
       readFileSync(new URL('../test-fixtures/rust-export-v1.emtavern', import.meta.url)),
@@ -212,6 +298,16 @@ describe('importCampaignSave', () => {
         .prepare('SELECT default_model_profile_id FROM campaigns WHERE id = ?')
         .get(campaignKey),
     ).toEqual({ default_model_profile_id: null });
+    expect(new NpcRepository(database).getKnowledge(npcId('npc-export'))?.provenance).toEqual([
+      {
+        factId: worldFactId('fact-export'),
+        state: 'KNOWN',
+        source: 'IMPORT',
+        eventId: null,
+        learnedAt: at,
+        confidence: 1,
+      },
+    ]);
 
     const continued = transitionCampaign(
       imported.campaign,
@@ -295,6 +391,26 @@ describe('importCampaignSave', () => {
     expect(native.prepare('SELECT COUNT(*) AS count FROM save_snapshots').get()).toEqual({
       count: 0,
     });
+  });
+
+  it('rejects a ZIP entry whose declared expansion exceeds the ratio budget', async () => {
+    const exported = exportCampaignSave(database, campaignKey, {
+      createdAt: at,
+      generatorVersion: '0.1.0',
+    });
+    const bomb = exported.bytes.slice();
+    const central = findCentralEntry(bomb, 'campaign.json');
+    const compressedSize = central.getUint32(20, true);
+    central.setUint32(24, compressedSize * 101, true);
+
+    await expect(
+      importCampaignSave(database, bomb, {
+        mode: 'OVERWRITE',
+        importedAt: isoTimestamp('2026-08-01T13:05:30.000Z'),
+        snapshotId: snapshotId('snapshot-import-ratio-bomb'),
+        prepareOverwriteBackup: () => undefined,
+      }),
+    ).rejects.toThrow(/compression ratio/u);
   });
 
   it('rolls back all rows when repository-level domain validation fails', async () => {
@@ -387,6 +503,135 @@ function seed(sqlite: TransactionalSqliteDatabase): void {
     payload: { worldName: 'Ember Coast' },
     occurredAt: at,
   });
+  const tavernKey = tavernId('tavern-export');
+  const npcKey = npcId('npc-export');
+  const questKey = questId('quest-export');
+  const adventureKey = adventureId('adventure-export');
+  const taverns = new TavernRepository(sqlite);
+  taverns.create({
+    id: tavernKey,
+    campaignId: campaignKey,
+    locationId: locationId('location-export'),
+    name: 'Ember Cup',
+    position: 'Harbor road',
+    environment: 'Warm stone hall',
+    specialRules: [],
+    longTermProblem: 'The beacon is fading.',
+    ownerNpcId: npcKey,
+    residentNpcIds: [npcKey],
+    visitorNpcIds: [],
+    createdAt: at,
+    updatedAt: at,
+  });
+  new NpcRepository(sqlite).create({
+    id: npcKey,
+    campaignId: campaignKey,
+    tavernId: tavernKey,
+    residency: 'OWNER',
+    name: 'Ilyra',
+    identity: 'Innkeeper',
+    appearance: 'Red coat',
+    personality: 'Observant',
+    goal: 'Keep the harbor road open.',
+    secret: 'Knows an old route.',
+    speechStyle: 'Measured',
+    currentMood: 'Concerned',
+    currentStatus: 'ACTIVE',
+    createdAt: at,
+    updatedAt: at,
+  });
+  taverns.assignOwner(tavernKey, npcKey);
+  new WorldRepository(sqlite).addFact({
+    id: worldFactId('rumor-export'),
+    claimId: claimId('claim-rumor-export'),
+    campaignId: campaignKey,
+    kind: 'RUMOR',
+    statement: 'A sailor heard the beacon lens was moved.',
+    locationId: locationId('location-export'),
+    factionIds: [],
+    sourceNpcId: npcKey,
+    sourceBasis: 'HEARSAY',
+    confidence: 0.5,
+    claimRevision: 1,
+    veracity: 'UNKNOWN',
+    createdAt: at,
+  });
+  new NpcRepository(sqlite).saveKnowledge(
+    createNpcKnowledge({
+      npcId: npcKey,
+      knownFactIds: [worldFactId('fact-export')],
+      suspectedFactIds: [],
+      falseBeliefFactIds: [],
+      excludedSecretFactIds: [],
+      provenance: [
+        {
+          factId: worldFactId('fact-export'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: at,
+          confidence: 1,
+        },
+      ],
+    }),
+    at,
+  );
+  new QuestRepository(sqlite).create({
+    id: questKey,
+    campaignId: campaignKey,
+    publisherNpcId: npcKey,
+    content: {
+      title: 'The Fading Beacon',
+      summary: 'Investigate the failing lighthouse.',
+      objective: 'Restore the beacon.',
+      failureCost: 'Ships remain trapped.',
+    },
+    status: 'ACCEPTED',
+    risk: 'MODERATE',
+    recommendedAttributes: ['knowledge', 'agility'],
+    expectedTurns: { min: 8, max: 12 },
+    rewardTier: 'NOTABLE',
+    relatedNpcIds: [npcKey],
+    relatedFactIds: [],
+    createdAt: at,
+    updatedAt: at,
+  });
+  new AdventureRepository(sqlite).create({
+    id: adventureKey,
+    campaignId: campaignKey,
+    questId: questKey,
+    state: 'WAITING_FOR_PLAYER',
+    plan: {
+      adventureId: adventureKey,
+      objective: 'Restore the beacon.',
+      risk: 'MODERATE',
+      expectedTurns: { min: 8, max: 12 },
+      coreScenes: ['Lighthouse approach'],
+      necessaryClueIds: [],
+      majorObstacles: ['Storm winds'],
+      possibleEndings: ['Beacon restored', 'Harbor remains closed'],
+      failureCost: 'Ships remain trapped.',
+    },
+    currentTurnNumber: 0,
+    createdAt: at,
+    updatedAt: at,
+  });
+  sqlite
+    .prepare(
+      `INSERT INTO scene_frames (
+         adventure_id, campaign_id, scene_id, location, participants_json, pressure_json,
+         affordances_json, pending_consequences_json, return_point_json, revision, updated_at
+       ) VALUES (?, ?, ?, ?, ?, '[]', '[]', '[]', ?, 4, ?)`,
+    )
+    .run(
+      adventureKey,
+      campaignKey,
+      'scene-export',
+      'Lighthouse approach',
+      JSON.stringify([npcKey]),
+      JSON.stringify({ eventId: gameEventId('event-export'), summary: 'Lighthouse approach' }),
+      at,
+    );
   const generations = new GenerationRecordRepository(sqlite);
   generations.create({
     id: generationRecordId('generation-export'),
@@ -407,6 +652,9 @@ function seed(sqlite: TransactionalSqliteDatabase): void {
   sqlite
     .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
     .run('private-test-setting', `{"apiKey":"${secret}"}`, at);
+  sqlite
+    .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+    .run('randomness_profile_v1', JSON.stringify({ profile: 'HIGH', customTemperature: null }), at);
 }
 
 function readStoredZip(bytes: Uint8Array): ReadonlyMap<string, Uint8Array> {
@@ -473,6 +721,23 @@ function findBytes(haystack: Uint8Array, needle: Uint8Array): number {
     return index;
   }
   return -1;
+}
+
+function findCentralEntry(bytes: Uint8Array, expectedName: string): DataView {
+  const end = new DataView(bytes.buffer, bytes.byteOffset + bytes.length - 22, 22);
+  let offset = end.getUint32(16, true);
+  const count = end.getUint16(10, true);
+  for (let index = 0; index < count; index += 1) {
+    const central = new DataView(bytes.buffer, bytes.byteOffset + offset, 46);
+    if (central.getUint32(0, true) !== 0x02014b50) throw new Error('Invalid central header');
+    const nameLength = central.getUint16(28, true);
+    const extraLength = central.getUint16(30, true);
+    const commentLength = central.getUint16(32, true);
+    const name = new TextDecoder().decode(bytes.slice(offset + 46, offset + 46 + nameLength));
+    if (name === expectedName) return central;
+    offset += 46 + nameLength + extraLength + commentLength;
+  }
+  throw new Error(`Missing central entry: ${expectedName}`);
 }
 
 function adaptDatabase(database: DatabaseSync): TransactionalSqliteDatabase {

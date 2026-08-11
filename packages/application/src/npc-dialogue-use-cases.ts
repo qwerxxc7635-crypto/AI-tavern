@@ -5,6 +5,7 @@ import {
   buildNpcDialogueContext,
   compressContextHistory,
   contextBudgetForTask,
+  findRepeatedPhrase,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
@@ -46,6 +47,7 @@ import {
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 
 import { AIOrchestrationError, type AITurnGenerationOptions } from './ai-turn-orchestrator.js';
+import { executePrimaryAITask } from './ai-task-orchestrator.js';
 
 export interface DialogueIdentityFactory {
   memory(summary: string, index: number): NpcMemoryId;
@@ -151,6 +153,17 @@ export class NpcDialogueUseCases {
     const output = NpcReplyOutputSchema.parse(
       await this.generateValidated('NPC_REPLY', command, input),
     );
+    const repeatedPhrase = findRepeatedPhrase(
+      [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
+      messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
+    );
+    if (repeatedPhrase !== null) {
+      this.fail(command, 'REPETITION_DETECTED', 'NPC reply repeats recent generated text', false);
+      throw new AIOrchestrationError(
+        'REPETITION_DETECTED',
+        'NPC reply repeats recent generated text',
+      );
+    }
     const timestamp = this.now();
     const conversation: Conversation =
       existing ??
@@ -347,7 +360,15 @@ export class NpcDialogueUseCases {
     this.requests.startAttempt(command.requestId, this.now());
     let raw: string;
     try {
-      const response = await this.provider.generate(request, this.providerConfig);
+      const response = await executePrimaryAITask(
+        this.provider,
+        this.providerConfig,
+        command.campaignId,
+        request,
+        inputJson,
+        command.modelProfileId,
+        model.capabilities,
+      );
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
       }

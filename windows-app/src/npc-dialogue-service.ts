@@ -2,8 +2,10 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
+  findRepeatedPhrase,
   validateAIOutput,
   type AIProvider,
   type NormalizedAIRequest,
@@ -17,6 +19,12 @@ import {
   isoTimestamp,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface DialogueNpcView {
   readonly id: string;
@@ -115,6 +123,7 @@ export class WindowsNpcDialogueService {
     private readonly gateway: NpcDialogueGateway = tauriNpcDialogueGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: () => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(campaign: string, npc: string): Promise<NpcDialogueSnapshot> {
@@ -136,7 +145,10 @@ export class WindowsNpcDialogueService {
     const identity = this.createIdentity();
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new NpcDialogueServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget('NPC_REPLY', input);
+    await recordContextInspection('NPC_REPLY', input);
     const prompt = formatTaskPrompt('NPC_REPLY', input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task: 'NPC_REPLY',
@@ -144,7 +156,7 @@ export class WindowsNpcDialogueService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 2_000,
       timeoutMs: 5_000,
     };
@@ -155,6 +167,13 @@ export class WindowsNpcDialogueService {
     const validated = validateAIOutput('NPC_REPLY', response.content);
     if (!validated.ok) throw new NpcDialogueServiceError(validated.error.code);
     const output = NpcReplyOutputSchema.parse(validated.validatedOutput);
+    const repeatedPhrase = findRepeatedPhrase(
+      [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
+      snapshot.messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
+    );
+    if (repeatedPhrase !== null) {
+      throw new NpcDialogueServiceError('REPETITION_DETECTED');
+    }
     return this.gateway.commit({
       campaignId: campaign,
       npcId: npc,
@@ -172,7 +191,12 @@ export class WindowsNpcDialogueService {
   }
 }
 
-export const windowsNpcDialogueService = new WindowsNpcDialogueService();
+export const windowsNpcDialogueService = new WindowsNpcDialogueService(
+  tauriNpcDialogueGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class NpcDialogueServiceError extends Error {
   public constructor(public readonly code: string) {

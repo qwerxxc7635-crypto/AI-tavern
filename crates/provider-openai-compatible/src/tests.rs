@@ -19,13 +19,13 @@ struct CapturedRequest {
     body: Vec<u8>,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 struct CredentialCleanup {
     store: SecretStore,
     reference: CredentialRef,
 }
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 impl Drop for CredentialCleanup {
     fn drop(&mut self) {
         let _ = self.store.delete(&self.reference);
@@ -257,7 +257,7 @@ enabled_provider_contract_test!(
     EnabledProviderContract::Custom
 );
 
-#[cfg(target_os = "windows")]
+#[cfg(any(target_os = "windows", target_os = "macos"))]
 #[tokio::test]
 async fn contract_generates_text_with_an_os_stored_credential() {
     let response = r#"{"id":"provider-1","model":"ember-model","choices":[{"message":{"content":"A quiet coast."},"finish_reason":"stop"}],"usage":{"prompt_tokens":9,"completion_tokens":4,"total_tokens":13}}"#;
@@ -288,7 +288,18 @@ async fn contract_generates_text_with_an_os_stored_credential() {
     let mut requests = captured.lock().await;
     let head = String::from_utf8_lossy(&requests[0].head);
     assert!(head.starts_with("POST /v1/chat/completions HTTP/1.1"));
-    assert!(head.contains("authorization: Bearer "));
+    let authorization = head
+        .lines()
+        .find(|line| line.to_ascii_lowercase().starts_with("authorization:"))
+        .unwrap();
+    assert!(
+        authorization
+            .split_once(':')
+            .unwrap()
+            .1
+            .trim()
+            .starts_with("Bearer ")
+    );
     let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(body["messages"][0]["role"], "system");
     assert!(body.get("response_format").is_none());
@@ -430,6 +441,13 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
     assert_eq!(DeepSeekPreset::KEY, "deepseek");
     assert_eq!(DEEPSEEK_BASE_URL, "https://api.deepseek.com/");
     assert_eq!(DEEPSEEK_DEFAULT_MODEL, "deepseek-v4-flash");
+    assert_eq!(DEEPSEEK_FLASH_DISPLAY_NAME, "DeepSeek-V4-Flash-0731");
+    assert_eq!(
+        DeepSeekPreset::model(DEEPSEEK_DEFAULT_MODEL)
+            .unwrap()
+            .display_name,
+        DEEPSEEK_FLASH_DISPLAY_NAME
+    );
     assert_eq!(
         DeepSeekPreset::model("deepseek-v4-pro"),
         Some(PresetModel {
@@ -473,7 +491,14 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
         "choices": [{
             "message": { "content": world_content.to_string() },
             "finish_reason": "stop"
-        }]
+        }],
+        "usage": {
+            "prompt_tokens": 1400,
+            "completion_tokens": 120,
+            "total_tokens": 1520,
+            "prompt_cache_hit_tokens": 1000,
+            "prompt_cache_miss_tokens": 400
+        }
     })
     .to_string();
     let (base_url, captured) = server(vec![(200, models), (200, world)]).await;
@@ -504,6 +529,8 @@ async fn deepseek_preset_lists_current_models_and_generates_a_world_locally() {
     assert_eq!(generated_world["factions"].as_array().unwrap().len(), 1);
     assert_eq!(generated_world["locations"].as_array().unwrap().len(), 1);
     assert_eq!(generated_world["storyHooks"].as_array().unwrap().len(), 1);
+    assert_eq!(response.usage.prompt_cache_hit_tokens, Some(1_000));
+    assert_eq!(response.usage.prompt_cache_miss_tokens, Some(400));
 
     let requests = captured.lock().await;
     let body: Value = serde_json::from_slice(&requests[1].body).unwrap();
@@ -634,7 +661,8 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
         "speakerNpcIds": [],
         "suggestedActions": [
             { "text": "Brace the sea gate." },
-            { "text": "Inspect the lens housing." }
+            { "text": "Inspect the lens housing." },
+            { "text": "Ask the keeper about the pulse." }
         ],
         "checkRequest": null,
         "discoveredClues": ["Salt-crusted lens key"],
@@ -676,7 +704,7 @@ async fn openrouter_discovers_a_free_model_and_generates_an_adventure_turn_local
     let turn: Value = serde_json::from_str(&response.content).unwrap();
     assert_eq!(turn["adventureState"], "WAITING_FOR_PLAYER");
     assert!(turn["sceneText"].as_str().unwrap().contains("beacon"));
-    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 2);
+    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 3);
     assert_eq!(turn["discoveredClues"].as_array().unwrap().len(), 1);
 
     let requests = captured.lock().await;
@@ -698,7 +726,8 @@ async fn ollama_lists_installed_models_and_generates_structured_content_offline(
         "speakerNpcIds": [],
         "suggestedActions": [
             { "text": "Follow the chalk marks." },
-            { "text": "Listen for movement." }
+            { "text": "Listen for movement." },
+            { "text": "Inspect the dry passage walls." }
         ],
         "checkRequest": null,
         "discoveredClues": [],
@@ -734,7 +763,7 @@ async fn ollama_lists_installed_models_and_generates_structured_content_offline(
         .unwrap();
     let turn: Value = serde_json::from_str(&response.content).unwrap();
     assert_eq!(turn["adventureState"], "WAITING_FOR_PLAYER");
-    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 2);
+    assert_eq!(turn["suggestedActions"].as_array().unwrap().len(), 3);
 
     let requests = captured.lock().await;
     let model_head = String::from_utf8_lossy(&requests[0].head);

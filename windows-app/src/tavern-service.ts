@@ -2,10 +2,13 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   GenerateNpcsInputSchema,
   GenerateNpcsOutputSchema,
   GenerateTavernInputSchema,
   GenerateTavernOutputSchema,
+  findRepeatedNpcArchetype,
+  npcArchetypeSignature,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -20,6 +23,12 @@ import {
   isoTimestamp,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface TavernWorldContext {
   readonly name: string;
@@ -71,8 +80,10 @@ export interface TavernNpcView {
 
 export interface RumorView {
   readonly id: string;
+  readonly claimId: string;
   readonly statement: string;
   readonly sourceNpcId: string;
+  readonly sourceBasis: 'WITNESS' | 'HEARSAY' | 'PERSONAL_BELIEF' | 'FACTION_MESSAGE';
 }
 
 export interface WorldClockView {
@@ -161,6 +172,7 @@ export class WindowsTavernService {
     private readonly gateway: TavernGateway = tauriTavernGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: (task: TavernTask) => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(id: string): Promise<TavernSnapshot> {
@@ -213,6 +225,7 @@ export class WindowsTavernService {
         longTermProblem: tavern.longTermProblem,
       },
       existingNpcNames: snapshot.npcs.map(({ name }) => name),
+      existingNpcArchetypes: snapshot.npcs.map(npcArchetypeSignature),
       requestedCount: 3,
     });
     return this.gateway.commitNpcs({
@@ -233,7 +246,10 @@ export class WindowsTavernService {
     const identity = this.createIdentity(task);
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new TavernServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget(task, input);
+    await recordContextInspection(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task,
@@ -241,7 +257,7 @@ export class WindowsTavernService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 6_000,
       timeoutMs: 5_000,
     };
@@ -254,7 +270,11 @@ export class WindowsTavernService {
     if (task === 'GENERATE_TAVERN') {
       GenerateTavernOutputSchema.parse(validated.validatedOutput);
     } else {
-      GenerateNpcsOutputSchema.parse(validated.validatedOutput);
+      const output = GenerateNpcsOutputSchema.parse(validated.validatedOutput);
+      const source = GenerateNpcsInputSchema.parse(input);
+      if (findRepeatedNpcArchetype(output.npcs, source.existingNpcArchetypes) !== null) {
+        throw new TavernServiceError('REPETITION_DETECTED');
+      }
     }
     return {
       ...identity,
@@ -268,7 +288,12 @@ export class WindowsTavernService {
   }
 }
 
-export const windowsTavernService = new WindowsTavernService();
+export const windowsTavernService = new WindowsTavernService(
+  tauriTavernGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class TavernServiceError extends Error {
   public constructor(public readonly code: string) {
@@ -377,10 +402,16 @@ function parseNpc(value: unknown): TavernNpcView {
 
 function parseRumor(value: unknown): RumorView {
   const record = requireRecord(value);
+  const sourceBasis = requireString(record['sourceBasis']);
+  if (!['WITNESS', 'HEARSAY', 'PERSONAL_BELIEF', 'FACTION_MESSAGE'].includes(sourceBasis)) {
+    throw new TypeError('Rumor source basis is invalid');
+  }
   return Object.freeze({
     id: requireString(record['id']),
+    claimId: requireString(record['claimId']),
     statement: requireString(record['statement']),
     sourceNpcId: requireString(record['sourceNpcId']),
+    sourceBasis: sourceBasis as RumorView['sourceBasis'],
   });
 }
 

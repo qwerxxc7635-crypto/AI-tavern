@@ -4,13 +4,28 @@ import type { CampaignId, IsoTimestamp } from '@ember-tavern/contracts';
 
 import { PersistenceDataError } from './campaign-repository.js';
 import { currentSchemaVersion } from './migrations.mjs';
+import {
+  MAX_ARCHIVE_BYTES,
+  MAX_EVENT_RECORDS,
+  MAX_GENERATION_RECORDS,
+  MAX_TABLE_RECORDS,
+  MAX_TOTAL_RECORDS,
+  MAX_UNCOMPRESSED_BYTES,
+  archiveEntrySizeLimit,
+  validateJsonTextResources,
+  validateJsonValueResources,
+  validateRecordCount,
+} from './save-resource-limits.js';
+import { findSecretInJson, findSecretInText } from './save-secret-scanner.js';
 import type { TransactionalSqliteDatabase } from './sqlite-port.js';
 
 type StoredScalar = string | number | null;
 type StoredRow = Readonly<Record<string, StoredScalar>>;
 
 const FORMAT_VERSION = 1;
-const MAX_ARCHIVE_BYTES = 256 * 1024 * 1024;
+// Device-only schema migrations (for example, credential cleanup bookkeeping)
+// must not change the portable campaign archive contract.
+const ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -36,6 +51,7 @@ type CampaignTable =
   | 'npc_relationships'
   | 'quests'
   | 'adventures'
+  | 'scene_frames'
   | 'adventure_turns'
   | 'conversations'
   | 'messages'
@@ -56,6 +72,7 @@ const TABLE_QUERIES: Readonly<Record<CampaignTable, string>> = {
     WHERE npcs.campaign_id = ? ORDER BY npc_relationships.npc_id`,
   quests: 'SELECT * FROM quests WHERE campaign_id = ? ORDER BY id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
+  scene_frames: 'SELECT * FROM scene_frames WHERE campaign_id = ? ORDER BY adventure_id',
   adventure_turns: `SELECT adventure_turns.* FROM adventure_turns
     JOIN adventures ON adventures.id = adventure_turns.adventure_id
     WHERE adventures.campaign_id = ?
@@ -95,6 +112,7 @@ const JSON_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
     'suspected_fact_ids_json',
     'false_belief_fact_ids_json',
     'excluded_secret_fact_ids_json',
+    'provenance_json',
   ]),
   quests: new Set([
     'content_json',
@@ -103,6 +121,13 @@ const JSON_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
     'related_fact_ids_json',
   ]),
   adventures: new Set(['plan_json', 'clues_json', 'ending_json']),
+  scene_frames: new Set([
+    'participants_json',
+    'pressure_json',
+    'affordances_json',
+    'pending_consequences_json',
+    'return_point_json',
+  ]),
   adventure_turns: new Set([
     'speaker_npc_ids_json',
     'suggested_actions_json',
@@ -166,14 +191,21 @@ export function exportCampaignSave(
   }
 
   const encoded = encodeFiles(captured);
+  for (const entry of encoded.entries) {
+    assertNoSecretText(new TextDecoder().decode(entry.data), `export.${entry.name}`);
+  }
   const uncompressedSize = encoded.entries.reduce((total, entry) => total + entry.data.length, 0);
-  if (uncompressedSize > MAX_ARCHIVE_BYTES) {
-    throw new PersistenceDataError('Exported save exceeds the 256 MiB archive limit');
+  if (
+    uncompressedSize > MAX_UNCOMPRESSED_BYTES ||
+    encoded.entries.some((entry) => entry.data.length > (archiveEntrySizeLimit(entry.name) ?? 0))
+  ) {
+    throw new PersistenceDataError('Exported save exceeds a resource limit');
   }
   const bytes = encodeStoredZip(encoded.entries, options.createdAt);
   if (bytes.length > MAX_ARCHIVE_BYTES) {
-    throw new PersistenceDataError('Exported save exceeds the 256 MiB archive limit');
+    throw new PersistenceDataError('Exported save exceeds the 32 MiB archive limit');
   }
+  assertNoSecretText(new TextDecoder().decode(bytes), 'export archive bytes');
   return Object.freeze({
     fileName: `${safeFileStem(campaignId)}.emtavern`,
     bytes,
@@ -219,6 +251,15 @@ function captureSave(
       .all(campaignId)
       .map((row) => normalizeRow('generation_records', row)),
   );
+  let totalRecords = 1;
+  for (const [table, rows] of Object.entries(tables)) {
+    validateRecordCount(`campaign.tables.${table}`, rows.length, MAX_TABLE_RECORDS);
+    totalRecords += rows.length;
+  }
+  validateRecordCount('events.ndjson', eventRows.length, MAX_EVENT_RECORDS);
+  validateRecordCount('generations.records', generationRows.length, MAX_GENERATION_RECORDS);
+  totalRecords += eventRows.length + generationRows.length;
+  validateRecordCount('archive total', totalRecords, MAX_TOTAL_RECORDS);
   const normalizedCampaign = Object.freeze({
     ...campaign,
     default_model_profile_id: null,
@@ -232,7 +273,7 @@ function captureSave(
     application: 'ember-tavern',
     campaignId,
     createdAt: options.createdAt,
-    databaseSchemaVersion: currentSchemaVersion,
+    databaseSchemaVersion: ARCHIVE_DATABASE_SCHEMA_VERSION,
     files: Object.freeze({
       'campaign.json': Object.freeze({ mediaType: 'application/json', records: 1 }),
       'events.ndjson': Object.freeze({
@@ -252,14 +293,14 @@ function captureSave(
     campaignDocument: Object.freeze({
       campaign: normalizedCampaign,
       campaignId,
-      databaseSchemaVersion: currentSchemaVersion,
+      databaseSchemaVersion: ARCHIVE_DATABASE_SCHEMA_VERSION,
       formatVersion: FORMAT_VERSION,
       tables,
     }),
     eventRows,
     generationDocument: Object.freeze({
       campaignId,
-      databaseSchemaVersion: currentSchemaVersion,
+      databaseSchemaVersion: ARCHIVE_DATABASE_SCHEMA_VERSION,
       formatVersion: FORMAT_VERSION,
       records: normalizedGenerations,
     }),
@@ -346,6 +387,10 @@ function normalizeRow(table: string, value: unknown): StoredRow {
           if (table === 'generation_records' && column === 'raw_response_text') {
             scanJsonTextIfPresent(entry);
           }
+          if (typeof entry === 'string') {
+            validateJsonValueResources(entry, `${table}.${column}`);
+            assertNoSecretText(entry, `${table}.${column}`);
+          }
           return [column, entry];
         }
         throw new PersistenceDataError(`${table}.${column} has an unsupported storage type`);
@@ -355,12 +400,14 @@ function normalizeRow(table: string, value: unknown): StoredRow {
 }
 
 function normalizeJsonText(text: string, label: string): string {
+  validateJsonTextResources(text, label);
   let value: unknown;
   try {
     value = JSON.parse(text) as unknown;
   } catch (error) {
     throw new PersistenceDataError(`${label} is not valid JSON`, { cause: error });
   }
+  validateJsonValueResources(value, label);
   assertNoSecretKeys(value, label);
   return canonicalJson(value);
 }
@@ -370,39 +417,28 @@ function scanJsonTextIfPresent(value: StoredScalar): void {
   const trimmed = value.trim();
   if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return;
   try {
-    assertNoSecretKeys(JSON.parse(trimmed) as unknown, 'generation_records.raw_response_text');
+    validateJsonTextResources(trimmed, 'generation_records.raw_response_text');
+    const decoded = JSON.parse(trimmed) as unknown;
+    validateJsonValueResources(decoded, 'generation_records.raw_response_text');
+    assertNoSecretKeys(decoded, 'generation_records.raw_response_text');
   } catch (error) {
     if (error instanceof PersistenceDataError) throw error;
   }
 }
 
 function assertNoSecretKeys(value: unknown, path: string): void {
-  if (Array.isArray(value)) {
-    value.forEach((entry, index) => assertNoSecretKeys(entry, `${path}[${index}]`));
-    return;
-  }
-  if (value === null || typeof value !== 'object') return;
-  for (const [key, entry] of Object.entries(value)) {
-    if (isForbiddenSecretKey(key)) {
-      throw new PersistenceDataError(`Save export contains forbidden secret field at ${path}`);
-    }
-    assertNoSecretKeys(entry, `${path}.${key}`);
+  const detection = findSecretInJson(value, path);
+  if (detection !== null) {
+    throw new PersistenceDataError(
+      `Save export contains forbidden secret material at ${detection.path}`,
+    );
   }
 }
 
-function isForbiddenSecretKey(key: string): boolean {
-  const normalized = key.replaceAll(/[_-]/g, '').toLowerCase();
-  return (
-    normalized.includes('apikey') ||
-    normalized === 'authorization' ||
-    normalized === 'bearer' ||
-    normalized.includes('accesstoken') ||
-    normalized.includes('secretkey') ||
-    normalized.includes('credentialref') ||
-    normalized === 'cookie' ||
-    normalized === 'password' ||
-    normalized === 'token'
-  );
+function assertNoSecretText(value: string, path: string): void {
+  if (findSecretInText(value, path) !== null) {
+    throw new PersistenceDataError(`Save export contains forbidden secret text at ${path}`);
+  }
 }
 
 function readRecord(value: unknown, label: string): Record<string, unknown> {
@@ -443,6 +479,7 @@ function campaignTableRecord(
     npc_relationships: values('npc_relationships'),
     quests: values('quests'),
     adventures: values('adventures'),
+    scene_frames: values('scene_frames'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),
     messages: values('messages'),

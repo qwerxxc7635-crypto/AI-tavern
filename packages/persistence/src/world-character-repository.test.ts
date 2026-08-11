@@ -5,6 +5,7 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
   campaignId,
+  claimId,
   characterTraitId,
   createCampaign,
   createPlayerAttributes,
@@ -157,6 +158,11 @@ const facts: readonly WorldFact[] = [
     ...baseFact,
     id: worldFactId('fact-rumor'),
     kind: 'RUMOR',
+    claimId: claimId('claim-rumor'),
+    sourceNpcId: npcId('npc-captain'),
+    sourceBasis: 'FACTION_MESSAGE',
+    confidence: 0.6,
+    claimRevision: 1,
     veracity: 'PARTIAL',
     statement: 'The guild caused the failure.',
   },
@@ -231,6 +237,23 @@ describe('WorldRepository', () => {
 
   it('round-trips all five WorldFact variants and preserves the append-only chain', () => {
     const repository = new WorldRepository(sqlite);
+    database.exec(`
+      INSERT INTO taverns (
+        id, campaign_id, location_id, name, position, environment, special_rules_json,
+        long_term_problem, changes_json, created_at, updated_at
+      ) VALUES (
+        'tavern-facts', 'campaign-1', 'location-harbor', 'Ember', 'Harbor', 'Warm',
+        '[]', 'None', '[]', '2026-07-30T10:00:00.000Z', '2026-07-30T10:00:00.000Z'
+      );
+      INSERT INTO npcs (
+        id, campaign_id, tavern_id, residency, name, identity, appearance, personality,
+        goal, secret, speech_style, current_mood, current_status, memories_json, created_at, updated_at
+      ) VALUES (
+        'npc-captain', 'campaign-1', 'tavern-facts', 'OWNER', 'Captain', 'Sailor', 'Coat',
+        'Watchful', 'Protect', 'None', 'Brief', 'Calm', 'ACTIVE', '[]',
+        '2026-07-30T10:00:00.000Z', '2026-07-30T10:00:00.000Z'
+      );
+    `);
     for (const fact of facts) repository.addFact(fact);
     expect(repository.listFacts(campaign)).toEqual(
       [...facts].sort((left, right) => left.id.localeCompare(right.id)),

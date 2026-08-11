@@ -29,7 +29,9 @@ SQLite是游戏状态的唯一真实数据源，包含：
 
 ## API Key
 
-API Key保存在Windows系统安全凭据库，服务标识为`com.embertavern.model-provider`。SQLite、普通JSON、应用输出和`.emtavern`只允许保存形如`credential:v1:...`的不透明引用，不保存密钥明文。
+API Key保存在Windows系统安全凭据库，服务标识为`com.embertavern.model-provider`。SQLite只保存形如`credential:v1:...`的不透明引用，不保存密钥明文；`.emtavern`连同该引用也排除。
+
+存档导出会扫描敏感字段名、嵌套字段值、普通文本、请求/响应/错误审计和最终ZIP字节；命中Authorization、常见Provider Key/JWT或显式测试密钥等高置信模式时整体拒绝导出。诊断文本使用共享redaction路径。该机制不会主动导出系统凭据，但无法证明任意变形或无已知结构的玩家文本绝不含敏感信息；不要把密钥粘贴到剧情输入，分享存档前仍应将其视为私人内容。
 
 在设置页测试连接时：
 

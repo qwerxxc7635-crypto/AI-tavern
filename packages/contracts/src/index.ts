@@ -22,7 +22,52 @@ export type {
   JsonValue,
   PendingAiRequest,
 } from './pending-ai-request.js';
+export { AI_CANDIDATE_STATUSES } from './ai-candidate.js';
+export type {
+  AICandidate,
+  AICandidateProvenance,
+  AICandidateStatus,
+  AICandidateValidationEvidence,
+} from './ai-candidate.js';
+export { LEDGER_AGGREGATE_TYPES, LEDGER_EVENT_TYPES, LEDGER_SOURCES } from './event-ledger.js';
+export type {
+  EventLedgerEntry,
+  LedgerAggregateType,
+  LedgerEventType,
+  LedgerSource,
+} from './event-ledger.js';
 export {
+  KNOWLEDGE_ACTOR_TYPES,
+  KNOWLEDGE_PROVENANCE_KINDS,
+  KNOWLEDGE_STATES,
+  KNOWLEDGE_VISIBILITIES,
+  TRUTH_AUTHORITIES,
+  TRUTH_VISIBILITIES,
+  KnowledgeModelError,
+  createClaim,
+  createClaimFromRumor,
+  createKnowledge,
+  createMemory,
+  createWorldTruth,
+} from './knowledge.js';
+export type {
+  Claim,
+  ClaimSource,
+  Knowledge,
+  KnowledgeActor,
+  KnowledgeActorType,
+  KnowledgeProvenance,
+  KnowledgeProvenanceKind,
+  KnowledgeState,
+  KnowledgeTarget,
+  KnowledgeVisibility,
+  Memory,
+  TruthAuthority,
+  TruthVisibility,
+  WorldTruth,
+} from './knowledge.js';
+export {
+  ADVENTURE_ACTION_MODES,
   ADVENTURE_STATES,
   ADVENTURE_TRANSITIONS,
   AdventureTransitionError,
@@ -30,6 +75,7 @@ export {
 } from './adventure.js';
 export type {
   Adventure,
+  AdventureActionMode,
   AdventureEnding,
   AdventureOutcome,
   AdventurePlan,
@@ -40,6 +86,7 @@ export type {
   Clue,
   DiceResult,
   PlayerAction,
+  SceneFrame,
 } from './adventure.js';
 export { QUEST_STATUSES } from './quest.js';
 export type {
@@ -55,10 +102,20 @@ export type {
   RumorContent,
   RumorTruthStatus,
 } from './quest.js';
-export { RelationshipValueError, createNpcKnowledge, createNpcRelationship } from './tavern.js';
+export {
+  NPC_KNOWLEDGE_SOURCES,
+  NPC_KNOWLEDGE_STATES,
+  NpcKnowledgeError,
+  RelationshipValueError,
+  createNpcKnowledge,
+  createNpcRelationship,
+} from './tavern.js';
 export type {
   NpcKnowledge,
   NpcKnowledgeInput,
+  NpcKnowledgeProvenance,
+  NpcKnowledgeSource,
+  NpcKnowledgeState,
   NpcMemory,
   NpcProfile,
   NpcRelationship,
@@ -87,7 +144,7 @@ export type {
   PlayerAttributesInput,
   PlayerCharacter,
 } from './character.js';
-export { WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
+export { RUMOR_SOURCE_BASES, WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
 export type {
   DevelopingFact,
   Faction,
@@ -97,6 +154,7 @@ export type {
   Location,
   LockedRuleFact,
   RumorFact,
+  RumorSourceBasis,
   RumorVeracity,
   TemporaryNarrativeFact,
   WorldBible,
@@ -124,6 +182,8 @@ export type {
 } from './campaign.js';
 export {
   actionOptionId,
+  aiCandidateId,
+  aiOperationId,
   aiRequestId,
   adventureId,
   campaignId,
@@ -132,6 +192,7 @@ export {
   compatibleEnum,
   conversationId,
   factionId,
+  eventLedgerId,
   gameEventId,
   generationRecordId,
   idempotencyKey,
@@ -155,9 +216,15 @@ export {
   turnId,
   worldClockId,
   worldFactId,
+  worldTruthId,
+  claimId,
+  knowledgeId,
+  memoryId,
 } from './foundation.js';
 export type {
   ActionOptionId,
+  AiCandidateId,
+  AiOperationId,
   AiRequestId,
   AdventureId,
   CampaignId,
@@ -166,6 +233,7 @@ export type {
   CompatibleEnum,
   ConversationId,
   FactionId,
+  EventLedgerId,
   GameEventId,
   GenerationRecordId,
   IdempotencyKey,
@@ -188,4 +256,8 @@ export type {
   TurnId,
   WorldClockId,
   WorldFactId,
+  WorldTruthId,
+  ClaimId,
+  KnowledgeId,
+  MemoryId,
 } from './foundation.js';

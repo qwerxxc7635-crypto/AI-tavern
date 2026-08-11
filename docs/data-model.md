@@ -102,7 +102,7 @@ erDiagram
 | `supersedes_fact_id` | TEXT NULL FK → world_facts.id ON DELETE RESTRICT | 发展事实替代链 |
 | `created_at` | TEXT | 创建时间 |
 
-索引：`idx_world_facts_campaign_kind(campaign_id, kind)`、`idx_world_facts_campaign_created(campaign_id, created_at)`、`idx_world_facts_supersedes(supersedes_fact_id)`。JSON：`detail_json`只保存判别联合专属字段，如锁定字段、过期时间、传闻真伪或相信该错误认知的NPC ID；共有字段保持独立列。
+索引：`idx_world_facts_campaign_kind(campaign_id, kind)`、`idx_world_facts_campaign_created(campaign_id, created_at)`、`idx_world_facts_supersedes(supersedes_fact_id)`。JSON：`detail_json`只保存判别联合专属字段，如锁定字段、过期时间、传闻Claim投影或相信该错误认知的NPC ID；共有字段保持独立列。`RUMOR`不是WorldTruth，其detail必须保存claimId、sourceNpcId、sourceBasis、confidence、claimRevision及仅本地可见的veracity。
 
 ### 3.4 `player_characters`
 
@@ -180,9 +180,10 @@ erDiagram
 | `suspected_fact_ids_json` | TEXT JSON | 怀疑数组 |
 | `false_belief_fact_ids_json` | TEXT JSON | 错误认知数组 |
 | `excluded_secret_fact_ids_json` | TEXT JSON | 明确不可知秘密数组 |
+| `provenance_json` | TEXT JSON | 每个活动知识事实的state、source、eventId、learnedAt与confidence；与四个兼容投影同一权威行 |
 | `updated_at` | TEXT | 修改时间 |
 
-索引：主键满足按NPC读取。JSON中的ID由Repository验证属于同一Campaign；不使用全知事实查询构建NPC上下文。
+索引：主键满足按NPC读取。JSON中的ID由Repository验证属于同一Campaign；provenance必须与活动知识ID一一对应，观察/交流/推理来源必须引用同Campaign事件，明确排除的秘密不得拥有活动provenance。不使用全知事实查询构建NPC上下文。
 
 ### 3.8 `npc_relationships`
 
@@ -426,6 +427,10 @@ erDiagram
 
 应用设置仅保存设备级非秘密偏好。API Key、令牌和Campaign游戏事实都不得写入此表。
 
+保留键`deepseek_cache_metrics_v1`的值为最多200项有界数组，每项只含task type、cache hit/miss tokens、由二者计算的ratio、64位小写十六进制prefix hash与记录时间；禁止写完整Prompt、消息、上下文、request ID或credential。该设备遥测不属于Campaign可移植事实。
+
+保留键`randomness_profile_v1`保存`profile`与`customTemperature`：CONSERVATIVE/BALANCED/HIGH必须分别解析为0.2/0.7/1.1且自定义值为空，CUSTOM必须携带0至2的有限自定义值。该设置只控制生成请求采样，导出存档不携带，也不得改变本地D20或其他Hard Logic。
+
 ## 5. JSON列清单与边界
 
 | 表 | JSON列 |
@@ -436,7 +441,7 @@ erDiagram
 | player_characters | story_preferences_json, content_boundaries_json, attributes_json, traits_json, background_json, initial_equipment_ids_json |
 | taverns | special_rules_json, changes_json |
 | npcs | visit_json, memories_json |
-| npc_knowledge | known_fact_ids_json, suspected_fact_ids_json, false_belief_fact_ids_json, excluded_secret_fact_ids_json |
+| npc_knowledge | known_fact_ids_json, suspected_fact_ids_json, false_belief_fact_ids_json, excluded_secret_fact_ids_json, provenance_json |
 | quests | content_json, recommended_attributes_json, related_npc_ids_json, related_fact_ids_json |
 | adventures | plan_json, clues_json, ending_json |
 | adventure_turns | speaker_npc_ids_json, suggested_actions_json, player_action_json, check_request_json, dice_result_json |

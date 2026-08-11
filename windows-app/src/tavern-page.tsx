@@ -3,10 +3,12 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import {
   windowsTavernService,
+  type RumorView,
   type TavernNpcView,
   type TavernSnapshot,
   type WindowsTavernService,
 } from './tavern-service.js';
+import { playerText } from './localization/index.js';
 
 type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
 
@@ -62,7 +64,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
         <div className="hearth-loader" aria-hidden="true">
           <span />
         </div>
-        <p className="eyebrow">Lighting the hearth</p>
+        <p className="eyebrow">{playerText.coreUi.lightingHearth}</p>
         <h1>正在点亮酒馆…</h1>
         <p>Fake Provider 的内容会先验证，再由本地 SQLite 提交。</p>
       </main>
@@ -79,7 +81,9 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
     <main className="tavern-room">
       <section className="tavern-header">
         <div>
-          <p className="eyebrow">{snapshot.source.world.currentRegion} · Local chronicle</p>
+          <p className="eyebrow">
+            {snapshot.source.world.currentRegion} · {playerText.coreUi.localChronicle}
+          </p>
           <h1>{tavern.name}</h1>
           <p className="tavern-header__position">{tavern.position}</p>
         </div>
@@ -103,7 +107,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
       </section>
       {tavern.changes.length === 0 ? null : (
         <section className="tavern-changes">
-          <p className="eyebrow">Returned stories</p>
+          <p className="eyebrow">{playerText.coreUi.returnedStories}</p>
           <h2>冒险留下的变化</h2>
           <ul>
             {tavern.changes.map((change) => (
@@ -120,7 +124,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
         <section className="tavern-patrons">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">People by the fire</p>
+              <p className="eyebrow">{playerText.coreUi.peopleByFire}</p>
               <h2>今晚的面孔</h2>
             </div>
             <span>{snapshot.npcs.length} 人</span>
@@ -152,7 +156,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
           {selectedNpc === null ? null : (
             <article className="selected-patron" aria-live="polite">
               <div>
-                <p className="eyebrow">Selected patron</p>
+                <p className="eyebrow">{playerText.coreUi.selectedPatron}</p>
                 <h3>{selectedNpc.name}</h3>
               </div>
               <p>{selectedNpc.appearance}</p>
@@ -175,21 +179,24 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
 
         <aside className="tavern-sidebar">
           <section className="rumor-board">
-            <p className="eyebrow">Whispers</p>
+            <p className="eyebrow">{playerText.coreUi.whispers}</p>
             <h2>炉边传闻</h2>
             <ol>
               {snapshot.rumors.map((rumor, index) => (
                 <li key={rumor.id}>
                   <span>{(index + 1).toString().padStart(2, '0')}</span>
                   <p>{rumor.statement}</p>
-                  <small>— {npcName(snapshot.npcs, rumor.sourceNpcId)}</small>
+                  <small>
+                    — {npcName(snapshot.npcs, rumor.sourceNpcId)} ·{' '}
+                    {rumorSourceLabel(rumor.sourceBasis)}
+                  </small>
                 </li>
               ))}
             </ol>
           </section>
 
           <section className="quest-door">
-            <p className="eyebrow">Quest board</p>
+            <p className="eyebrow">{playerText.coreUi.questBoard}</p>
             <h2>告示板</h2>
             <p>常驻者会把需要帮手的事情钉在这里。任务详情与接受操作由任务页面处理。</p>
             <Link
@@ -205,7 +212,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
       <section className="clock-board" aria-label="世界时钟">
         <div className="section-heading">
           <div>
-            <p className="eyebrow">World pressure</p>
+            <p className="eyebrow">{playerText.coreUi.worldPressure}</p>
             <h2>世界时钟</h2>
           </div>
           <span>SQLite 事实</span>
@@ -239,10 +246,23 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
   );
 }
 
+function rumorSourceLabel(source: RumorView['sourceBasis']): string {
+  switch (source) {
+    case 'WITNESS':
+      return '亲历';
+    case 'HEARSAY':
+      return '转述';
+    case 'PERSONAL_BELIEF':
+      return '个人判断';
+    case 'FACTION_MESSAGE':
+      return '势力消息';
+  }
+}
+
 function TavernMessage({ title }: { readonly title: string }) {
   return (
     <main className="tavern-room tavern-room--loading" role="alert">
-      <p className="eyebrow">Tavern unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.tavernUnavailable}</p>
       <h1>{title}</h1>
       <Link className="text-link" to="/saves">
         返回存档首页

@@ -1,12 +1,23 @@
 import type { JsonValue } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
+import { findRepeatedNpcArchetype, findRepeatedPhrase } from './repetition-detector.js';
+
 const text = z.string().trim().min(1).max(4_000);
+const sceneText = z.string().trim().min(1).max(12_000);
 const shortText = z.string().trim().min(1).max(200);
 const identifier = z.string().trim().min(1).max(200);
 const stringList = z.array(text).max(30);
 const identifierList = z.array(identifier).max(50);
 const attribute = z.enum(['physique', 'agility', 'knowledge', 'charisma']);
+const adventureActionMode = z.enum(['ACTION', 'DIALOGUE', 'OBSERVE']);
+const worldFactKind = z.enum([
+  'LOCKED_RULE',
+  'DEVELOPING_FACT',
+  'TEMPORARY_NARRATIVE',
+  'RUMOR',
+  'FALSE_BELIEF',
+]);
 const questRisk = z.enum(['LOW', 'MODERATE', 'HIGH', 'EXTREME']);
 const rewardTier = z.enum(['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY']);
 const jsonValueSchema: z.ZodType<JsonValue> = z.lazy(() =>
@@ -248,6 +259,7 @@ export const GenerateNpcsInputSchema = z
       })
       .strict(),
     existingNpcNames: z.array(shortText).max(20),
+    existingNpcArchetypes: z.array(text).max(20),
     requestedCount: z.number().int().min(1).max(8),
   })
   .strict();
@@ -278,13 +290,44 @@ export const GenerateNpcsOutputSchema = z
           .object({
             statement: text,
             sourceNpcName: shortText,
+            sourceBasis: z.enum(['WITNESS', 'HEARSAY', 'PERSONAL_BELIEF', 'FACTION_MESSAGE']),
+            confidence: z.number().min(0).max(1),
             veracity: z.enum(['UNKNOWN', 'TRUE', 'PARTIAL', 'FALSE']),
           })
           .strict(),
       )
       .length(3),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    const archetype = findRepeatedNpcArchetype(output.npcs);
+    if (archetype !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['npcs'],
+        message: `repeated NPC archetype: ${archetype}`,
+      });
+    }
+    const phrase = findRepeatedPhrase([
+      ...output.npcs.flatMap((npc) => [
+        npc.identity,
+        npc.appearance,
+        npc.personality,
+        npc.goal,
+        npc.secret,
+        npc.speechStyle,
+        npc.visitReason ?? '',
+      ]),
+      ...output.rumors.map((rumor) => rumor.statement),
+    ]);
+    if (phrase !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['npcs'],
+        message: `repeated phrase: ${phrase}`,
+      });
+    }
+  });
 
 export const NpcReplyInputSchema = z
   .object({
@@ -292,13 +335,21 @@ export const NpcReplyInputSchema = z
     currentRegion: shortText,
     npc: npcContextCard,
     relationship,
-    knownFacts: stringList,
-    suspectedFacts: stringList,
-    falseBeliefs: stringList,
+    knowledge: z
+      .array(
+        z
+          .object({
+            targetKind: z.enum(['TRUTH', 'CLAIM']),
+            state: z.enum(['KNOWN', 'SUSPECTED', 'BELIEVED']),
+            statement: text,
+          })
+          .strict(),
+      )
+      .max(100),
     recentMessages: z
       .array(z.object({ role: z.enum(['PLAYER', 'NPC']), content: text }).strict())
-      .max(20),
-    longTermMemories: stringList,
+      .max(12),
+    longTermMemories: stringList.max(9),
     playerMessage: text,
   })
   .strict();
@@ -317,7 +368,17 @@ export const NpcReplyOutputSchema = z
       })
       .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    const phrase = findRepeatedPhrase([
+      output.reply,
+      ...output.suggestedTopics,
+      output.memoryCandidate ?? '',
+    ]);
+    if (phrase !== null) {
+      context.addIssue({ code: 'custom', path: ['reply'], message: `repeated phrase: ${phrase}` });
+    }
+  });
 
 export const GenerateQuestInputSchema = z
   .object({
@@ -327,6 +388,7 @@ export const GenerateQuestInputSchema = z
     availableNpcs: z.array(npcBrief).max(12),
     playerConcept: text,
     recentQuestTitles: z.array(shortText).max(20),
+    recentQuestStructures: z.array(shortText).max(20),
   })
   .strict();
 export const GenerateQuestOutputSchema = z
@@ -343,6 +405,21 @@ export const GenerateQuestOutputSchema = z
   .refine((quest) => quest.expectedTurns.max >= quest.expectedTurns.min, {
     message: 'expectedTurns.max must be at least min',
     path: ['expectedTurns', 'max'],
+  })
+  .superRefine((quest, context) => {
+    const phrase = findRepeatedPhrase([
+      quest.content.title,
+      quest.content.summary,
+      quest.content.objective,
+      quest.content.failureCost,
+    ]);
+    if (phrase !== null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['content'],
+        message: `repeated phrase: ${phrase}`,
+      });
+    }
   });
 
 export const GenerateAdventurePlanInputSchema = z
@@ -352,7 +429,7 @@ export const GenerateAdventurePlanInputSchema = z
       .object({ id: identifier, content: questContent, risk: questRisk, expectedTurns: turnRange })
       .strict(),
     playerSummary: text,
-    relevantFacts: stringList,
+    relevantFacts: stringList.max(30),
   })
   .strict();
 export const GenerateAdventurePlanOutputSchema = z
@@ -374,6 +451,25 @@ export const GenerateAdventurePlanOutputSchema = z
     path: ['expectedTurns', 'max'],
   });
 
+export const SceneFrameSchema = z
+  .object({
+    sceneId: identifier,
+    location: text,
+    participants: identifierList.min(1).max(30),
+    pressure: z
+      .array(z.object({ id: identifier, kind: shortText, level: z.number().int().min(0) }).strict())
+      .max(30),
+    affordances: z
+      .array(z.object({ id: identifier, label: text, preconditions: stringList.max(20) }).strict())
+      .max(10),
+    pendingConsequences: z
+      .array(z.object({ id: identifier, trigger: shortText, payload: jsonValueSchema }).strict())
+      .max(20),
+    returnPoint: z.object({ eventId: identifier, summary: sceneText }).strict(),
+    revision: z.number().int().min(1),
+  })
+  .strict();
+
 export const GenerateAdventureTurnInputSchema = z
   .object({
     adventureId: identifier,
@@ -382,11 +478,28 @@ export const GenerateAdventureTurnInputSchema = z
     quest: questContext,
     adventurePlan: adventurePlanContext,
     currentTurnNumber: z.number().int().min(0),
-    currentScene: text,
+    currentScene: sceneText,
+    sceneFrame: SceneFrameSchema,
     longTermSummary: text.nullable(),
-    recentTurns: stringList.max(10),
+    recentTurns: stringList.max(8),
     discoveredClues: stringList,
     relatedNpcs: z.array(npcBrief).max(12),
+    knownFacts: z
+      .array(z.object({ id: identifier, kind: worldFactKind, statement: text }).strict())
+      .max(30),
+    npcKnowledge: z
+      .array(
+        z
+          .object({
+            npcId: identifier,
+            knownFacts: stringList,
+            suspectedFacts: stringList,
+            falseBeliefs: stringList,
+          })
+          .strict(),
+      )
+      .max(12),
+    playerActionMode: adventureActionMode,
     playerAction: text,
   })
   .strict();
@@ -407,18 +520,56 @@ export const GenerateAdventureTurnOutputSchema = z
     statePatchProposals: z.array(statePatchProposal).max(20),
     adventureState: z.enum(['SCENE', 'WAITING_FOR_PLAYER', 'CHECK_REQUIRED', 'ENDING']),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    const count = output.suggestedActions.length;
+    if (output.adventureState === 'ENDING' ? count !== 0 : count < 3 || count > 5) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestedActions'],
+        message: 'Active scenes require 3-5 suggestions; endings require none',
+      });
+    }
+    const normalized = output.suggestedActions.map(({ text }) => text.toLocaleLowerCase('zh-CN'));
+    if (new Set(normalized).size !== normalized.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestedActions'],
+        message: 'Suggested actions must be unique',
+      });
+    }
+  });
 
 export const ResolveDiceResultInputSchema = z
   .object({
     scene: text,
     action: text,
     attribute,
-    difficulty: z.union([z.literal(8), z.literal(11), z.literal(14), z.literal(17)]),
+    raw: z.number().int().min(1).max(20),
+    modifier: z.number().int(),
     total: z.number().int(),
-    success: z.boolean(),
+    dc: z.union([z.literal(8), z.literal(11), z.literal(14), z.literal(17)]),
+    result: z.enum(['SUCCESS', 'FAILURE']),
   })
-  .strict();
+  .strict()
+  .superRefine((input, context) => {
+    if (input.raw + input.modifier !== input.total) {
+      context.addIssue({
+        code: 'custom',
+        path: ['total'],
+        message: 'total must equal raw plus modifier',
+      });
+    }
+    const resultIsSuccess = input.result === 'SUCCESS';
+    const totalMeetsDc = input.total >= input.dc;
+    if (resultIsSuccess !== totalMeetsDc) {
+      context.addIssue({
+        code: 'custom',
+        path: ['result'],
+        message: 'result must be derived from total and DC',
+      });
+    }
+  });
 export const ResolveDiceResultOutputSchema = z
   .object({
     narration: text,
@@ -453,7 +604,7 @@ export const GenerateWorldEventInputSchema = z
           .strict(),
       )
       .max(12),
-    recentImportantEvents: stringList,
+    recentImportantEvents: stringList.max(10),
     currentChapter: text,
   })
   .strict();
@@ -471,7 +622,7 @@ export const GenerateWorldEventOutputSchema = z
 export const SummarizeAdventureInputSchema = z
   .object({
     questTitle: shortText,
-    turnSummaries: stringList.min(1).max(100),
+    turnSummaries: stringList.min(1).max(9),
     ending: z.enum(['SUCCESS', 'PARTIAL_SUCCESS', 'FAILURE']),
     discoveredClues: stringList,
     relatedNpcs: z
@@ -517,7 +668,7 @@ export const SummarizeAdventureOutputSchema = z
   .strict();
 
 export const ExtractMemoriesInputSchema = z
-  .object({ npc: npcBrief, turnIds: identifierList, transcript: stringList.min(1).max(100) })
+  .object({ npc: npcBrief, turnIds: identifierList.max(50), transcript: stringList.min(1).max(13) })
   .strict();
 export const ExtractMemoriesOutputSchema = z
   .object({
@@ -530,8 +681,8 @@ export const ExtractMemoriesOutputSchema = z
 export const CheckConsistencyInputSchema = z
   .object({
     world: worldContext,
-    lockedRules: stringList,
-    knownFacts: stringList,
+    lockedRules: stringList.max(30),
+    knownFacts: stringList.max(30),
     proposedContent: text,
   })
   .strict();

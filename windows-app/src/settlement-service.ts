@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
+  compressContextHistory,
+  contextBudgetForTask,
   GenerateWorldEventInputSchema,
   GenerateWorldEventOutputSchema,
   SummarizeAdventureInputSchema,
@@ -18,7 +21,14 @@ import {
   idempotencyKey,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
 import type { AdventureSnapshot } from './adventure-service.js';
+import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface AdventureArchive {
   readonly campaignId: string;
@@ -29,12 +39,7 @@ export interface AdventureArchive {
   readonly keyDecisions: readonly string[];
   readonly unresolvedThreads: readonly string[];
   readonly nextDirections: readonly string[];
-  readonly diceResults: readonly {
-    readonly naturalRoll: number;
-    readonly total: number;
-    readonly difficulty: number;
-    readonly success: boolean;
-  }[];
+  readonly diceResults: readonly D20HardResultView[];
   readonly participantNpcs: readonly { readonly id: string; readonly name: string }[];
   readonly unresolvedClues: readonly {
     readonly id: string;
@@ -100,6 +105,7 @@ export class WindowsSettlementService {
   public constructor(
     private readonly gateway: SettlementGateway = tauriSettlementGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
   public list(id: string) {
     campaignId(id);
@@ -122,7 +128,11 @@ export class WindowsSettlementService {
     const relatedNpcIds = [s.quest.publisherNpcId];
     const summaryInput = SummarizeAdventureInputSchema.parse({
       questTitle: s.quest.content.title,
-      turnSummaries: s.turns.map((t) => `${t.playerAction}: ${t.sceneText}`),
+      turnSummaries: compressContextHistory(
+        s.turns.map((t) => `${t.playerAction}: ${t.sceneText}`),
+        contextBudgetForTask('SUMMARIZE_ADVENTURE').recentTurnLimit,
+        contextBudgetForTask('SUMMARIZE_ADVENTURE').historicalSummaryMaxCharacters,
+      ),
       ending: 'SUCCESS',
       discoveredClues: s.clues.filter((c) => c.discoveredInTurnId !== null).map((c) => c.title),
       relatedNpcs: relatedNpcIds.map((npcId) => ({
@@ -166,7 +176,10 @@ export class WindowsSettlementService {
     const suffix = crypto.randomUUID();
     const model = (await this.provider.listModels()).find((m) => m.name === 'ember-fake-v1');
     if (model === undefined) throw new Error('Fake model unavailable');
+    assertTaskContextBudget(task, input);
+    await recordContextInspection(task, input);
     const prompt = formatTaskPrompt(task, input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(`${task.toLowerCase()}-${suffix}`),
       task,
@@ -174,7 +187,7 @@ export class WindowsSettlementService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 8000,
       timeoutMs: 5000,
     };
@@ -197,7 +210,11 @@ export class WindowsSettlementService {
     };
   }
 }
-export const windowsSettlementService = new WindowsSettlementService();
+export const windowsSettlementService = new WindowsSettlementService(
+  tauriSettlementGateway,
+  new FakeAIProvider(),
+  tauriRandomnessTemperatureSource,
+);
 function parseArchive(value: unknown, id: string): AdventureArchive {
   const r = requireRecord(value);
   if (requireString(r['campaignId']) !== id) throw new TypeError('Archive campaign mismatch');
@@ -210,15 +227,7 @@ function parseArchive(value: unknown, id: string): AdventureArchive {
     keyDecisions: stringArray(r['keyDecisions']),
     unresolvedThreads: stringArray(r['unresolvedThreads']),
     nextDirections: stringArray(r['nextDirections']),
-    diceResults: requireArray(r['diceResults']).map((v) => {
-      const x = requireRecord(v);
-      return {
-        naturalRoll: requireInteger(x['naturalRoll']),
-        total: requireInteger(x['total']),
-        difficulty: requireInteger(x['difficulty']),
-        success: requireBoolean(x['success']),
-      };
-    }),
+    diceResults: requireArray(r['diceResults']).map(parseD20HardResult),
     participantNpcs: requireArray(r['participantNpcs']).map((v) => {
       const x = requireRecord(v);
       return { id: requireString(x['id']), name: requireString(x['name']) };
@@ -270,10 +279,6 @@ function requireString(v: unknown): string {
 }
 function requireInteger(v: unknown): number {
   if (typeof v !== 'number' || !Number.isSafeInteger(v)) throw new TypeError('Expected integer');
-  return v;
-}
-function requireBoolean(v: unknown): boolean {
-  if (typeof v !== 'boolean') throw new TypeError('Expected boolean');
   return v;
 }
 function stringArray(v: unknown) {

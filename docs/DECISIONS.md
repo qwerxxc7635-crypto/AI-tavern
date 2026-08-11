@@ -1252,3 +1252,793 @@ Tauri只暴露按Campaign ID调用的命令；React负责显示待取消数量�
 ### 可逆性
 
 未来如需支持显式企业内网 Provider，必须新增独立、可见、可测试的用户授权策略，不能放宽默认公网策略。新增 Tauri 能力或资源来源必须由具体功能和配置回归测试证明必要性，不得恢复宽泛默认集合。
+
+## DEC-051：v0.2 AI 生成统一经过任务编排器和候选边界
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.2 总执行提示词、竞品研究与 `docs/architecture/AI_PIPELINE.md`
+
+### 决定与理由
+
+所有 AI 功能统一走 UI → Application → AI Task Orchestrator → Context/Router/Provider/Schema/Domain → Candidate/Narrative。UI 不得构造或调用 Provider；模型响应先形成可验证候选，只有接受命令能在 revision-guarded SQLite 事务中修改状态。D20、数值、合法性、知识可见性和事务继续是本地 hard logic。
+
+这使 prompt preview、重试、错误分类、provider 路由和审计共享同一条实际执行路径，并阻止新功能继续复制 Windows 前端中的 provider 调用。
+
+### 影响与边界
+
+M2 必须先建立任务注册表、orchestrator 和 candidate infrastructure，M3～M8 才能接入。v0.2 不引入完整 Event Sourcing、自治 agent 或 UI provider SDK。
+
+## DEC-052：ContextBlock、轻量 Event Ledger 与四层知识模型共同构成连续性边界
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：RePoG 因果/知识/恢复研究、TavernAI prompt 可解释性、SillyTavern context 预算研究
+
+### 决定与理由
+
+所有 AI 上下文使用带来源、revision、稳定性、预算、隐私与 hash 的 ContextBlock；稳定、半稳定和动态块分别序列化，preview 与实际发送共享 manifest。SQLite 聚合仍保存当前状态，最小 Event Ledger 只承担幂等、revision、审计和连续性，不成为完整事件溯源系统。
+
+WorldTruth、Claim、Knowledge 与 Memory 正式分离。SceneFrame 持久化地点、参与者、压力、可行动作、未决后果和恢复点。Memory 或模型摘要不能反向创建 Truth。
+
+### 影响与边界
+
+Context Inspector 默认遮罩 secret、完整系统 prompt 和未公开世界真相。完整 World Voices、Session 0 和聊天分支树延期。
+
+## DEC-053：双平台通过 ports/adapters 达成，Windows 发布优先且 macOS 是强制开发门禁
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`docs/architecture/V0_2_TARGET_ARCHITECTURE.md` 与 v0.2 Architecture Gate
+
+### 决定与理由
+
+SecureVault、PlatformPaths、FileDialog、AppInstanceLock、AppLifecycle 与 ReleaseMetadata 定义为共享 ports，Windows 和 macOS 以 adapters 实现。业务层不得硬编码 `%APPDATA%`、Keychain、Credential Manager 或平台路径。测试可注入隔离根目录。
+
+Windows 仍是 v0.2.0 正式候选平台；macOS 必须能构建、启动和完成核心开发验收，但本轮不承诺签名发行。iOS 继续延期。
+
+### 影响与边界
+
+Architecture Gate 后先完成 M0 路径和脚本治理，再关闭 M1 安全问题。任何散落平台条件或平台 API 进入 domain/application 都视为 Gate 回归。
+
+## DEC-054：凭据采用暂存认领与持久清理队列
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-002、`V02-M1-T02`
+
+### 决定与理由
+
+系统安全凭据库是秘密的唯一存储；SQLite 只保存不透明引用和不含秘密的 `credential_cleanup_queue`。新秘密写入系统库后立即登记为 `ROLLBACK` 待清理项，模型设置的 `REPLACE` 事务负责认领新引用并同时把旧引用登记为 `REPLACED`。`CLEAR` 或用户删除则在清空当前引用的同一事务登记 `CLEARED`。
+
+删除系统项成功后才移除队列；失败保留任务并增加 attempts，应用重启后继续恢复。设置协议显式区分 `KEEP`、`REPLACE`、`CLEAR`，禁止用含混的 `null` 表示“保持还是清空”。
+
+### 影响与边界
+
+UI 不得到历史引用，只能看到待清理数量和平台中立状态。`.emtavern` 不导出设备级清理队列；因此活动 SQLite migration 2 与 Campaign archive schema 1 独立演进。macOS 使用 Keychain，Windows 使用 Credential Manager，domain/application 不依赖任何平台 API。
+
+## DEC-055：可移植存档使用固定小预算与逐条目解析
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-003、`V02-M1-T03`
+
+### 决定与理由
+
+`.emtavern` v1压缩包上限为32 MiB、展开总量64 MiB、单条目压缩比100:1，并为五个固定条目设置64 KiB/16 MiB/32 MiB独立预算。JSON深度、数组、字符串、事件、生成记录、单表和总记录数也有固定上限，导入与导出共用相同政策。
+
+读取器先只扫描中央目录和声明尺寸。TypeScript按需使用带`maxOutputLength`的有界解压，Rust按需读取单条目；每个数据条目在SHA-256验证后立即解析，不再把所有展开字节放进同一个Map。JSON在通用解析器和递归规范化前先做非递归深度/字符串扫描，解析后再迭代验证容器。
+
+### 影响与边界
+
+本决定取代 DEC-044/DEC-045 中256 MiB压缩包、1 GiB展开量和一次性展开的旧资源参数，不改变五文件格式、archive schema、校验和或导入事务语义。命中预算表示档案不受支持，不能通过提高进程内存、跳过校验或在正式数据库中边读边写来兼容。
+
+## DEC-056：存档秘密边界采用高置信全字符串扫描与显式拒绝
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-004、`V02-M1-T04`
+
+### 决定与理由
+
+可移植存档对敏感键名、所有字符串值、嵌套JSON、普通文本和生成请求/响应/错误审计执行同一高置信扫描。模式覆盖Authorization Header、常见Provider Key/JWT前缀、credential引用和测试密钥；四个数据文件编码后及最终ZIP字节还要再次扫描。命中时整体拒绝，不在导出副本中静默改写原始生成审计。
+
+诊断展示使用共享redaction函数替换已知模式，不能自行打印原文。为了避免把普通奇幻叙事中的“secret”等词误判为凭据，扫描只使用带结构/前缀/最小长度的高置信模式。
+
+### 影响与边界
+
+系统凭据库仍是API Key唯一来源，SQLite中的不透明引用也不得进入`.emtavern`。扫描显著降低Provider回显或误粘贴秘密的外泄风险，但不是任意熵或任意编码秘密的数学证明；隐私文档必须保留这一边界，后续新增Provider格式须扩展共享模式与测试。
+
+## DEC-057：Provider配置只能由短期探测回执冻结
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-005、`V02-M1-T05`
+
+### 决定与理由
+
+Provider探测由原生composition root签发随机短期回执，回执精确绑定预设、规范化Base URL、端点SHA-256指纹、模型标识、能力来源及完整能力登记。保存命令必须同时通过运行时回执比对和持久层确定性指纹校验；应用重启、回执过期或任一字段变化都要求重新探测。
+
+DeepSeek、Qwen与OpenRouter固定使用预设端点；Ollama与自定义兼容服务允许用户地址，但探测和保存必须使用同一个规范化值。能力来源只有Provider响应、预设元数据或未知三类；未知时采用保守值，禁止按品牌或模型名扩大能力。
+
+### 影响与边界
+
+SQLite migration 3只保存不含秘密的端点/探测指纹与能力来源，不保存回执注册表。端点或选中模型更新时，同一Provider旧模型和默认/备用引用在一个事务中失效，避免路由器读取旧能力。回执不是长期授权或网络信任替代品；请求仍必须通过Secure HTTP的SSRF、DNS固定和禁重定向边界。
+
+## DEC-058：破坏性操作使用跨进程锁与数据库版本重确认
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-006、`V02-M1-T06`
+
+### 决定与理由
+
+`AppInstanceLock`定义为平台port，以数据库相邻的跨平台排他文件锁实现。桌面composition root非阻塞持有独立的全生命周期实例锁，确保正式应用单实例；`CampaignStore`对启动备份、恢复、导入和永久删除持有操作锁到提交或回滚结束。
+
+永久删除和覆盖导入在同一SQLite连接上记录`PRAGMA data_version`、完成一致性备份、取得`BEGIN IMMEDIATE`并重新检查版本与目标。若备份期间任何其他连接提交，操作以`CONCURRENT_MODIFICATION`取消并保留最新数据库，而不是用较旧备份继续删除或覆盖。
+
+### 影响与边界
+
+跨进程锁负责协调正式实例和破坏性操作，SQLite事务负责事实写入原子性，data-version负责发现未遵守应用锁的旧实例或独立Store；三者不能互相替代。锁文件不含用户数据，进程退出由操作系统释放。并发冲突必须显式重试，不能绕过备份或降低事务级别。
+
+## DEC-059：存档互操作由当前实现交叉生成并锁定逻辑内容
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-007、`V02-M1-T07`
+
+### 决定与理由
+
+`.emtavern`兼容门禁不能只读取历史二进制样本。`pnpm archive:interop`必须用当前TypeScript exporter生成、当前Rust importer读取，再用当前Rust exporter生成、当前TypeScript importer读取；生成的五个条目还必须与提交夹具逐项比较。
+
+来源清单固定producer、source test、创建时间和提交文件SHA-256。regenerate-and-diff比较ZIP条目顺序、名称和完整内容，同时忽略ZIP central/local header中的平台`made by`差异，因为该字段在Windows和Unix由库生成且不属于存档协议。
+
+### 影响与边界
+
+CI必须显式运行交叉命令。修改任一导出格式时需要在同一变更中证明另一实现可导入，并审查更新两份夹具和来源哈希；不得只让同语言导入器跟随修改。archive schema仍为1，逻辑条目或内容改变必须走兼容策略而非静默更新夹具。
+
+## DEC-060：发布证据使用双平台CI与结构化UTF-8记录
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：v0.1 第二轮审查 SR2-008/SR2-009、`V02-M1-T08`
+
+### 决定与理由
+
+共享质量门禁必须同时在Windows和macOS执行。Windows另行运行发布纵向测试并构建NSIS，macOS另行构建`.app`；两类bundle都生成逐文件SHA-256清单并上传，避免以单元测试全绿替代真实打包证明。
+
+关键命令统一由跨平台Node包装器记录UTF-8 JSON，字段固定为命令数组、ISO开始/结束时间、退出码、signal、stdout与stderr。产物证据独立记录平台、架构、相对路径、字节数与SHA-256，symlink或空bundle拒绝。
+
+### 影响与边界
+
+CI构建证明源码能在托管双平台环境编译和打包，不等同于M9实机启动、交互、视觉、签名或安装/卸载验收。失败日志仍要上传，且不能通过删除产物哈希、忽略退出码或转码丢失stderr来保持绿色。SR2-010必须由最终连续流程截图关闭。
+
+## DEC-061：AI生成统一使用显式任务执行信封
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T01`、Architecture Gate AI Pipeline
+
+### 决定与理由
+
+所有应用层Provider生成必须经过`AITaskOrchestrator`。执行信封同时绑定task type、request ID、operation ID、Campaign/Actor、route kind、attempt、Provider配置、模型档案和模型名；Provider调用前验证请求与route一致，返回后验证响应身份和token usage一致。
+
+重试、备用模型和结构修复不在adapter中隐式发生，而由Application分别以`RETRY`、`FALLBACK`和`REPAIR` route显式发起。Orchestrator把Provider错误归一到十类稳定应用错误，但保留具体code与retryable语义；网络传输失败归Provider类，只有SSRF/地址/DNS/重定向等边界拒绝归network-policy类。
+
+### 影响与边界
+
+AI UI不得持有或调用Provider。现有八类Application生成路径都通过统一入口，旧的请求生命周期和GenerationRecord仍保持兼容；M2后续任务将分别补入ContextBlock、ResolvedModelConfig、Candidate Pattern和Event Ledger，本决定不提前实现它们，也不自动连接真实模型或付费API。
+
+## DEC-062：Context装配使用不可截断块与可复核manifest
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T02`、Architecture Gate Context/Memory Model
+
+### 决定与理由
+
+所有Provider执行必须携带`ContextAssembly`，其中只有完整`ContextBlock`和不含content的`ContextManifest`。块包含类型、来源及revision、stable/semi-stable/dynamic阶段、priority、token budget、privacy class、版本和对规范化内容及语义字段计算的SHA-256。
+
+装配顺序固定为阶段、任务type顺序、priority降序、id升序；relevance低于任务阈值或超出块/总预算的可选块整体排除，required块放不下则失败。Orchestrator在调用Provider前重新计算hash并核对manifest，禁止把裁剪后的无效JSON或被替换内容送入模型。
+
+### 影响与边界
+
+现有NPC、冒险和世界事件builder继续负责知识边界与任务schema，它们的已过滤结果进入统一任务块，不把裸Repository对象交给Provider。manifest可用于后续Inspector和缓存判断，但默认不含content；secret块的展示和调试导出仍必须遵循隐私遮罩。Context token采用确定性UTF-8估算而非Provider账单值，实际usage仍以Provider归一响应为准。
+
+## DEC-063：Provider调用只消费带指纹的冻结模型配置
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T03`、目标架构Provider三层
+
+### 决定与理由
+
+每次请求在完成路由和prompt格式化后创建`ResolvedModelConfig`。规范化endpoint、Connection Profile身份/类型/options、credential reference、模型档案与名称、完整能力、temperature/max-output/timeout、prompt task/version/response format及cache profile全部进入规范化JSON SHA-256 fingerprint。
+
+Orchestrator在调用Provider前复算fingerprint并与route和ProviderRequest逐值核对，adapter只接收从冻结配置重新投影的ProviderConfig，不接收仍可编辑的原对象。结构修复读取原GenerationRecord中的fingerprint并要求新解析结果完全一致，防止同一次修复静默改变模型、能力、端点或生成参数。
+
+### 影响与边界
+
+GenerationRecord只保存fingerprint，不保存ResolvedModelConfig整体，避免credential reference进入可移植生成审计并触发秘密边界。真正的API Key仍只在原生SecureVault边界按reference解析；fingerprint既不是secret也不能反推出凭据。普通retry/fallback是新operation，可显式解析新配置；repair必须沿用原冻结配置，否则fail closed。
+
+## DEC-064：AI Candidate不可变修订并与领域提交原子确认
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T04`、目标架构Candidate Pattern
+
+### 决定与理由
+
+结构化AI结果在schema和domain检查均成功后才能创建`PROPOSED` Candidate。payload、validation evidence、request/provider/model、resolved/context fingerprint、expected revision和operation ID保存在SQLite；编辑与重新生成不覆盖原payload，而是创建`EDIT`或`REGENERATE`新项并原子把旧项转为`SUPERSEDED`。
+
+确认命令取得`BEGIN IMMEDIATE`，重新核对Campaign、`PROPOSED`状态和expected revision，调用本地领域commit后再转为`ACCEPTED`并一起提交。领域写入或状态转换任一失败都回滚；重复确认已accepted项不重复执行commit。拒绝只允许`PROPOSED -> REJECTED`。
+
+### 影响与边界
+
+Provider response仍不能直接写Candidate：调用方必须提供schema/domain成功证据，Candidate存储还会拒绝高置信credential字段和值。migration 4已由TypeScript和Rust启动路径共同应用。当前通用基础设施本身不扩大`.emtavern` schema 1；在具体功能切换为可跨会话的未确认Candidate前，必须同时定义其可移植策略，不能静默丢失用户确认中的提案。
+
+## DEC-065：最小Event Ledger独立于状态投影并强制连续revision
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M2-T05`、Architecture Gate State/Events
+
+### 决定与理由
+
+新增独立`event_ledger`而不把现有`game_events`改造成完整Event Sourcing。Ledger字段固定为event/operation/aggregate、提交后revision、版本化payload、source和数据库时间；首批封闭注册character、quest、turn、dice、scene、knowledge、snapshot与recovery。
+
+数据库唯一约束锁定`operation_id + event_type + aggregate_id`和aggregate revision，触发器要求每个aggregate从1开始连续递增；Repository再校验正整数版本、注册枚举、规范aggregate ID和高置信credential。Candidate确认的领域commit回调可在同一事务写ledger，失败时投影、ledger和Candidate状态共同回滚。
+
+### 影响与边界
+
+应用启动继续读取SQLite状态投影，不重放Ledger。migration 5由TypeScript和Rust共同应用，native archive仍只接受本地schema 5但portable archive schema保持1；因此新Ledger目前是基础设施而非已承诺跨设备数据。在具体业务把Ledger作为持久审计依赖前，必须同步升级TS/Rust可移植格式，不能忽略导入类型、版本、revision连续性或资源预算。
+
+## DEC-066：API Binding以revision和operation拒绝迟到异步结果
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M3-T04`、目标架构显式状态机红线
+
+### 决定与理由
+
+API Binding使用独立纯状态机表达`editing`、`testing`、`choosing_model`、`saving`、`saved`和`failed`，不再以React `busy`布尔值推断流程。每次连接配置或Key变化递增revision并清除探测证据；测试和保存各自取得operation ID，完成事件只有同时匹配当前operation与revision才可改变状态。
+
+测试超时进入可重试的`failed`，主动取消回到`editing`并使迟到结果无效。保存失败保留同revision的已验证模型证据以允许显式重试；测试期间允许编辑并立即失效旧操作，保存期间锁定表单，避免已经可能提交的持久写入与界面配置分叉。
+
+### 影响与边界
+
+探测回执仍由原生短期registry逐值绑定端点、模型与能力，前端状态机不能替代安全门禁。逻辑取消无法中断已进入操作系统或HTTP栈的底层调用，但结果会被丢弃，临时credential清理由原异步操作的`finally`继续执行。T05将基于该状态机补充credential replace/clear/remove/cleanup health，不在本任务混入凭据生命周期界面。
+
+## DEC-067：DeepSeek稳定前缀由版本化五段Profile定义
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T02`、DeepSeek缓存前缀约束
+
+### 决定与理由
+
+Prompt编译在任何动态task input之前构造`deepseek-v4-flash-prefix` version 1，段序固定为System Contract、Game Rules、Output Schema、Prompt Profile和Stable World Truths。Prompt Profile显式包含task、逻辑角色、任务指令、schema名、任务prompt version和stable profile version；实际输出schema进入固定段，而不只依赖Provider response format参数。
+
+Stable World Truths由调用方显式提供并在进入Profile时递归复制冻结。字段或值含timestamp、request ID、UUID、transient error、cache metrics或UI debug时拒绝；请求输入继续位于稳定Profile之后。当前通用formatter以空world truths保持现有调用兼容，M4-T04接入ContextBlock布局时再传入经知识边界过滤的稳定事实。
+
+### 影响与边界
+
+Profile结构适用于所有Provider-neutral prompt，DeepSeek可直接利用相同前缀；它不改变SQLite事实权威、schema验证或Provider capability选择。T02只固定语义段与版本，T03负责规范JSON的键、数组、空白、数值、枚举和换行字节；不得把T02现有`JSON.stringify`误写成已经满足最终确定性序列化。
+
+## DEC-068：Prompt与Context hash共享同一Canonical JSON字节规范
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T03`、ContextBlock确定性红线
+
+### 决定与理由
+
+稳定Prompt段和ContextBlock/hash统一调用`ai-core`的canonical JSON，不保留第二套缓存专用序列化。对象key先做NFC和换行归一化再按码点排序；Unicode等价重复key拒绝。对象/数组不插入多余空白，数组保留调用方给定的语义顺序，string及enum按NFC与LF规范化，finite number使用JavaScript JSON规范表示（含`-0 -> 0`），非有限数拒绝。
+
+Prompt每段固定为`[SECTION_ENUM] + LF + canonical JSON`，段间恰好两个LF，末尾无换行。这样同一语义对象不受属性插入顺序、Unicode组合形式或操作系统CRLF影响，同时不会擅自排序具有叙事/时间语义的数组。
+
+### 影响与边界
+
+共享canonical string规则会同时影响后续新建ContextBlock hash、token估算和ResolvedModelConfig fingerprint，这是有意统一而不是存档格式升级；现有已持久化hash仍是不可变审计值，不在启动时重写。序列化只保证输入相同得到相同字节，不保证不同Prompt Profile版本命中同一缓存；版本变化必须改变profile/hash。
+
+## DEC-069：Context Cache Layout以五段和stability fail closed
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T04`、ContextBlock stable/semi-stable/dynamic模型
+
+### 决定与理由
+
+Stable Prompt Profile之后固定五段：Long-term Summary、Relevant Lore/Knowledge、Recent History、Current Scene/State、Player Action。summary/memory/lore/knowledge只允许`semi_stable`；history/scene/state/dice/action/user_input只允许`dynamic`。类型未注册或stability层级不符时布局构建失败，不把动态行动降级放进可复用前缀。
+
+Layout从已完成预算/相关性筛选的ContextAssembly投影，内部保留type、source revision、block version、content hash和content；Provider prompt只序列化type/revision/version/content。block/source ID及其参与计算的content hash不进入Prompt，避免随机UUID间接破坏缓存。半稳定块按语义type/hash排序，动态块按语义type、source revision、hash排序；历史和行动数组本身仍保持canonical JSON的语义顺序。
+
+### 影响与边界
+
+Provider-neutral formatter可显式接收stable world truths及layout，把五个context段放在`TASK_INPUT`之前；原调用不传layout时保持兼容。当前云游戏生成仍未启用，因此不会用Fake路径伪造DeepSeek命中；后续实际生成路径必须先从知识边界过滤后的细粒度ContextBlock构建layout，不能把现有复合`task`块冒充缓存分层。
+
+## DEC-070：Cache metrics是有界设备遥测且不保存Prompt
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M4-T05`、DeepSeek cache隐私要求
+
+### 决定与理由
+
+OpenAI-compatible usage增加可选`prompt_cache_hit_tokens`与`prompt_cache_miss_tokens`，缺失保持unknown而非推算。可缓存prefix只由Stable Prompt Profile与两个semi-stable Context段的规范UTF-8字节计算SHA-256；动态history/scene/action及task input不进入prefix hash。
+
+本地指标每项只含task type、hit、miss、按`hit/(hit+miss)`计算的ratio、prefix hash和记录时间。最多保留最近200项，使用现有device-local `app_settings.deepseek_cache_metrics_v1`原子更新，不提升Campaign schema或改动`.emtavern`。读取时拒绝未知字段，因而完整Prompt、messages、context、request ID或credential不能混入指标对象。
+
+### 影响与边界
+
+指标是设备观测而非游戏事实，不随Campaign导出；ratio为当次Provider usage的描述，不承诺固定命中率。当前Provider adapter已能解析真实响应字段，但测试只使用本地mock HTTP；云游戏生成尚未启用时不会伪造指标。若未来多进程写入，仍必须在`BEGIN IMMEDIATE`内读改写，不能用无锁JSON覆盖。
+
+## DEC-071：产品版本以根package.json为权威源
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T01`、双平台发布一致性
+
+### 决定与理由
+
+产品版本权威值为根`package.json.version`，当前固定`0.2.0`。Rust workspace只在根`Cargo.toml [workspace.package]`声明镜像值，所有内部crate改用`version.workspace = true`，消除六个独立Rust版本源；Tauri config、Windows/npm workspace及iOS占位manifest同步为0.2.0。
+
+运行时“我的”页面通过Tauri app metadata读取打包版本，不在React源码重复硬编码。存档导出继续使用编译期`CARGO_PKG_VERSION`；release metadata现有门禁要求根package与Tauri相等。历史v0.1验收文档和存档兼容夹具保持原版本，不因当前产品版本更新而改写历史。
+
+### 影响与边界
+
+T01先建立权威源并对齐所有消费者；T02必须提供从根版本同步/校验Tauri、Cargo workspace及npm manifests的脚本和CI门禁，避免人工漂移。iOS仅更新占位manifest，不开始iOS功能开发或构建验收。
+
+## DEC-072：发布信息由Changelog当前区段确定性生成
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T02`、单一版本源与双平台发布门禁
+
+### 决定与理由
+
+根`package.json.version`继续是版本权威源；`CHANGELOG.md`以显式current-release标记圈定尚未发布的当前区段，`release:sync`将版本同步到全部npm manifests、Tauri、Cargo workspace与成员声明，并从该区段的条目确定性生成`release-info.json`和前端只读模块。Cargo metadata负责刷新lockfile，避免Rust镜像只改manifest而遗漏锁文件。
+
+`release:check`严格只读，逐项核对npm、Tauri、Cargo workspace/成员/lockfile、Changelog标题、release-info及生成模块，并在Windows/macOS共享CI中执行。运行时版本仍从Tauri metadata读取；生成模块只提供channel、status和更新摘要，避免建立第二个版本源。
+
+### 影响与边界
+
+当前版本保持`development / unreleased`，不在未完成双平台发布验收前伪造发布日期、签名或发布状态。正式发布任务必须显式把current-release区段冻结为真实日期与发布状态，并再次运行同步/检查；历史`0.1.0`记录不补造未知日期。脚本只管理发布元数据，不访问Provider、正式用户数据或iOS功能实现。
+
+## DEC-073：玩家文案以单一zh-CN资源入口为基础
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T03`、全中文化约束
+
+### 决定与理由
+
+Windows应用当前唯一活动locale固定为`zh-CN`，玩家文案从类型安全的`playerText`资源入口读取，不提供缺键时回落英文或直接显示资源key的路径。资源允许显式格式化函数承载存档短ID等动态值，避免调用方拼接可翻译句式；应用启动把HTML根`lang`设置为`zh-CN`，让辅助技术取得准确语言信息。
+
+T03先迁移所有跨流程入口：品牌/导航、标题栏、加载/未知路由/错误边界和原生存档文件对话框。T04按游戏流程迁移页面、按钮、表单、空状态、错误、确认、恢复、D20、API、Privacy、Changelog与accessibility label；在迁移完成前不得声明全应用中文覆盖完成。
+
+### 影响与边界
+
+本任务不引入第三方i18n运行时、locale自动侦测或用户切换，也不创建未要求的英文资源。内部协议枚举、Provider/模型产品名和开发诊断不属于玩家句式，但一旦进入UI仍须由zh-CN资源提供展示文本。iOS保持DEFERRED。
+
+## DEC-074：核心UI中文化但保留明确技术专名
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T04`、全中文化允许项
+
+### 决定与理由
+
+核心Windows流程的页面眉题、按钮、表单、空/错/确认/恢复状态、D20、API/隐私说明、Changelog与accessibility label均以中文呈现。`editing/testing/choosing_model/saving/saved/failed`和`development/unreleased`等机器值必须经zh-CN资源映射，未知值显示中文未知状态，不把原值回落给玩家。
+
+允许保留的英文只限Provider/模型名称、model ID、API字段、URL、代码标识及玩家/AI专有名词，例如DeepSeek、OpenRouter、API Key、Base URL、SQLite、D20和NPC；Connection Profile、Campaign、页面eyebrow和发布状态不属于允许直接展示的机器词，分别改为连接配置、游戏存档和中文状态。
+
+### 影响与边界
+
+资源层继续是新玩家文案的入口；T04清除现有核心流程的可见英文并补齐Changelog中文标题，但不引入第二locale或iOS实现。T05必须建立自动化英文回归门禁，区分允许的技术专名与意外新增的玩家句式，不能只依赖本次人工扫描。
+
+## DEC-075：英文回归门禁按玩家可见AST边界检查
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M5-T05`、全中文化允许项
+
+### 决定与理由
+
+英文门禁解析生产TSX AST，只检查JSX正文、title/label/description/detail/note/eyebrow/placeholder/alt/aria-label等玩家属性，以及confirm和setError/setLoadError/setStatus/setTransferNotice消息；同时检查zh-CN资源值、Changelog和release-info highlights。className、key、路由、内部条件枚举、测试夹具与服务诊断不属于玩家显示面，不进入扫描。
+
+允许词表封闭在Provider/模型名、model ID、API字段、URL、代码标识及玩家/AI专名范围，文件扩展名`.emtavern`作为存档格式标识放行。门禁不以“字符串含中文”作为通过条件；同一字符串里的意外英文词仍会报出文件、行号、词和原文。CI在Windows/macOS共享quality job执行`pnpm i18n:check`。
+
+### 影响与边界
+
+首轮运行发现并修复任务告示、发布者、温度参数、检查器、统一发布信息和Schema等真实遗漏，同时排除CSS类名/路由误报。后续新增玩家消息若通过新的调用方式进入UI，必须扩展AST抽取测试，不得靠扩大允许词表隐藏普通英文句式。此门禁不扫描玩家生成内容或模型专名。
+
+## DEC-076：车卡由单一视口滚动容器保证缩放可达性
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T01`、860×600至1920×1080及125%/150%缩放验收
+
+### 决定与理由
+
+独立车卡路由不依赖被`body overflow:hidden`锁住的文档滚动，而由`.character-studio`持有`100dvh`高度、纵向滚动和横向裁切；滚动条槽固定，防止内容增减造成布局跳动。主操作使用safe-area感知的sticky底部位置，在长表单和低高度视口中仍可到达且不会落入设备安全区。
+
+900 CSS像素及以下切换为单栏并移除按钮最小宽度；以上采用最小28rem主栏和18rem辅栏。该阈值覆盖860物理宽度和1180宽度150%缩放，同时让1366宽度150%仍有足够空间保持双栏。640 CSS像素及以下减少顶部/介绍留白和标题尺寸，不隐藏字段或操作。
+
+### 影响与边界
+
+本任务只改变布局和滚动，不新增summary/basics/attributes等T02结构，也不改变车卡生成、验证或SQLite提交。自动合同覆盖四个指定物理尺寸乘100%/125%/150%共12组（含低高度分支）；真实Windows/macOS渲染矩阵仍需在M9环境验收中留存截图证据，不能以静态合同冒充实机证据。
+
+## DEC-077：车卡八分区是现有角色事实的只读投影
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T02`、SQLite唯一真相源与任务边界
+
+### 决定与理由
+
+已确认角色卡按固定顺序呈现summary、basics、attributes、background、personality、traits、equipment和AI controls八区。每区以`data-character-section`稳定标识并有玩家可见中文标题，便于布局和后续状态接线测试，不把展示分区名写入数据库。
+
+当前领域模型没有独立personality字段，因此个性区只投影已持久化的personalGoal、storyPreferences和contentBoundaries；不得为了匹配页面标题虚构新事实或迁移存档。AI controls区只披露已确认角色不会被AI自动覆盖并提供既有“进入酒馆”操作，不提前加入T03状态机或T04候选提交。
+
+### 影响与边界
+
+基础区对可空性别/年龄显示“未填写”，属性区读取四项已验证值，背景/特质/装备均读取提交后的SQLite视图。八区重组不改变CharacterDraft、PlayerCharacter、原生命令、`.emtavern`或AI请求；未来若新增真实personality字段，必须按schema/migration/portable archive完整流程另行设计。
+
+## DEC-078：AI车卡状态以revision和operation拒绝迟到结果
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T03`、目标架构显式状态机红线
+
+### 决定与理由
+
+AI车卡以纯reducer表达idle、generating、validating、preview、editing、confirming、committed，不再用单一busy推断阶段。草稿或预览选择变化递增revision并清除active operation；Provider返回时通过observer在结构验证前进入validating，只有operation ID和revision同时匹配才可接受preview或commit结果。
+
+恢复已有trait candidates进入preview，恢复已确认角色进入committed；生成/验证失败和确认失败回到editing并保留明确失败种类供重试。页面busy只由generating/validating/confirming派生，中文live status不直接展示机器枚举。
+
+### 影响与边界
+
+该状态机阻止迟到结果更新当前React视图，但T03不改变旧`character_traits_commit`和`character_completion_commit`命令的持久化时机；如果编辑发生在底层命令已经提交后，UI拒绝不能撤回SQLite写入。T04必须把结构化候选改为未确认不落角色事实、确认时原子提交，不能把T03的UI门禁误当作数据门禁。
+
+## DEC-079：AI角色候选持久化但未确认不进入游戏事实
+
+- 日期：2026-08-08
+- 状态：已采纳
+- 依据：`V02-M6-T04`、`V02-M2-T04` Candidate Pattern与SQLite唯一真相源
+
+### 决定与理由
+
+特质生成和完整角色生成都写入既有`ai_candidates`控制面，以便重启后恢复、追踪结构/领域验证证据并用修订链取代旧候选；这类PROPOSED记录不是已确认游戏事实。完整候选包含用户草稿、六个已验证特质、两个已选特质、背景、程序生成的装备效果及两次生成审计，页面必须先展示“未确认候选”，再由独立操作确认。
+
+确认命令在`BEGIN IMMEDIATE`内重新读取PROPOSED候选、复核Campaign归属、expected revision、结构、领域规则、AI原始响应与validated output、输入/上下文绑定，再一次性写入`pending_ai_requests`、`generation_records`、`player_characters`、`items`，把候选转为ACCEPTED并推进Campaign。任一步失败均回滚；已接受候选的同ID确认返回当前快照，不重复写入。
+
+### 影响与边界
+
+“未确认不落库”在本架构中指不落角色、装备、Campaign阶段和已提交生成事实；Candidate自身必须留在本地SQLite，不能退化为易失React内存。当前`.emtavern`格式尚未携带PROPOSED Candidate，因此导出遇到未确认候选时明确失败并提示先完成确认，禁止静默生成缺失进度的归档。没有引入新migration、真实Provider调用、付费API或iOS实现。
+
+## DEC-080：SceneFrame是独立的可恢复投影
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T01`、Architecture Gate的SceneFrame与SQLite唯一真相源红线
+
+### 决定与理由
+
+SceneFrame不嵌入不可变的`adventures.plan_json`，而由migration 6建立一Adventure一行的`scene_frames`投影。初始计划、叙事回合和D20结算在同一个`BEGIN IMMEDIATE`事务中同时更新Adventure聚合、SceneFrame以及`SCENE_COMMITTED` ledger；revision必须逐次加一，重启只读取最后提交成功的frame。
+
+`returnPoint.eventId`锚定`game_events`中的可移植已提交事件，SceneFrame本身进入`.emtavern` Campaign archive schema 2；设备级`event_ledger`不迁移。导入严格验证frame结构、Campaign/Adventure归属和事件锚点；目标设备第一次继续导入场景时允许SCENE ledger从导入revision建立本地审计基线，之后仍要求连续递增。旧schema 1档案没有SceneFrame时允许从已提交Adventure事实派生兼容视图，下一次完整提交再建立正式投影。
+
+### 影响与边界
+
+AI回合上下文固定携带持久SceneFrame，UI snapshot必须验证其恢复摘要与当前场景一致。T01仅建立场景事实和恢复边界，不提前实现T02行动模式或T03的3至5个行动建议，不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-081：冒险意图模式是回合输入事实
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T02`、SQLite唯一真相源与确定性恢复红线
+
+### 决定与理由
+
+冒险输入固定使用`ACTION`、`DIALOGUE`、`OBSERVE`三种机器模式，分别由玩家看到的“行动”“对话”“观察”单选控件产生。模式不是纯UI标签：原生命令在事务前验证它，并与文本一起写入`adventure_turns.player_action_json`；恢复视图和`GENERATE_ADVENTURE_TURN` schema v4/prompt v3继续携带该模式，使模型按改变局势、向参与者交流或获取可观察信息的不同意图解释同一段文本。
+
+既有`.emtavern`回合没有`mode`时按`ACTION`读取，避免为了新增意图破坏schema 1/2旧档案；新写入必须显式提供合法模式。共享`PlayerAction`将mode保持为可选只用于兼容历史事实，当前Windows提交路径不省略它。
+
+### 影响与边界
+
+本任务不改变现有建议数量或生成来源，不提前实现T03的3至5项场景建议，也不改变T04自由输入可用性。未新增SQLite migration、真实Provider/付费API、正式用户数据或iOS实现。
+
+## DEC-082：行动建议受数量合同和知识边界共同约束
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T03`、NPC知识隔离与AI输出必须验证的架构红线
+
+### 决定与理由
+
+`GENERATE_ADVENTURE_TURN`活动场景必须返回3至5条经过去空白、大小写不敏感去重的行动建议；`ENDING`必须返回0条。该合同同时落在共享Zod schema v5与原生提交验证中，任何不合规输出均在游戏事务前失败，不能写入回合、场景帧或游戏事实。
+
+建议生成上下文显式携带持久SceneFrame、Quest、Player Character、相关且非FALSE_BELIEF的World Facts，以及按相关NPC分组的known、suspected和false-belief statements。NPC的excluded secret fact IDs在进入上下文前过滤；NPC认知不提升为全局真相，false belief也不混入known facts。Prompt v4要求建议联合依据这些来源，不能只产出与当前场景无关的通用选项。
+
+### 影响与边界
+
+上下文预算不足时先裁剪历史与非核心知识，但保持NPC简介和知识条目的关联；所有知识仍只来自当前Campaign的SQLite。T03不增加建议自己的行动模式、不改变玩家自由输入是否可用，也不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-083：行动建议不限制玩家自由输入
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T04`、玩家选择权与冒险状态机红线
+
+### 决定与理由
+
+每次Adventure处于`SCENE`、即允许提交下一行动时，页面必须同时呈现可编辑的自由输入框，不要求玩家先选择任何建议。建议按钮只把文本填入同一个输入框，玩家仍可继续修改；任意1至4000字符的非空内容都沿既有ACTION、DIALOGUE或OBSERVE模式提交，并以`FREEFORM`事实写入SQLite。
+
+提交进行中临时禁用控件以避免重复回合，失败后恢复输入并保留玩家原文。`CHECK_REQUIRED`、`RESOLVING`和`ENDING`不属于新的行动机会，必须遵循D20或结算状态机，不能把“永远可用”解释为绕过待决检定或在结局后追加回合。
+
+### 影响与边界
+
+自由输入与建议共用已有4,000字符边界、事务和恢复路径，不新增数据库schema、AI任务或输入来源。T04不提前实现T05的完整显式回合状态机，不接入真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-084：冒险回合控制阶段显式化但不取代SQLite事实
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T05`、显式状态机与SQLite唯一真相源红线
+
+### 决定与理由
+
+Windows冒险回合使用纯reducer固定表达`draft → submitted → generating → validating → resolving → committed → narrating`。其中draft是未提交的本地输入；submitted对应行动提交/持久化边界；generating和validating由Provider及结构验证边界驱动；resolving表示把已验证输出交给原子游戏事务；committed只在SQLite提交返回后到达；narrating表示最新已提交剧情可呈现且允许下一回合。
+
+每次操作绑定递增operation ID与draft revision，乱序事件、旧操作结果及编辑后的迟到事件均被reducer拒绝。submitted、generating、validating和resolving分别映射到明确失败原因，失败保留玩家输入并允许显式重试；重新载入发现SQLite `WAITING_FOR_PLAYER`时复用已有待处理回合继续生成，不重复写玩家行动。载入/恢复失败提供同回合重试与恢复中心入口。
+
+### 影响与边界
+
+该控制状态机不新增SQLite列，也不把React状态提升为游戏真相。持久Adventure状态仍决定可执行命令；页面`resolving`控制阶段与数据库中为D20保留的`RESOLVING`领域状态不是同一个枚举。T05不修改D20数值、动画或T06/T07范围，不接入真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-085：D20先形成不可变硬结果再进入叙事和动画
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T06`、D20程序权威与AI不得修改游戏状态的架构红线
+
+### 决定与理由
+
+D20唯一判定顺序固定为：程序产生1至20的`raw`，把角色属性、装备和状态相加为`modifier`，安全整数加法得到`total`，读取闭集8/11/14/17中的`DC`，最后用`total >= DC`得到`SUCCESS`或`FAILURE`。自然1和20只保留信息性critical aliases，不覆盖上述成功规则。原生随机取样拒绝240至255后再对20取模，避免单字节直接取模偏差。
+
+新持久结果和共享`DiceResult`同时保存canonical raw/modifier/total/DC/result、修正分解以及旧字段别名；读取旧存档时允许从既有d20或naturalRoll等别名构造canonical投影，但任一并存字段冲突、加法不成立、DC非法或结果与total不符都拒绝。冒险页与档案页只渲染校验后的canonical投影，并显示原始点数、总修正、总计、DC和结果。
+
+`RESOLVE_DICE_RESULT`升级为schema/prompt v2，只接收已固定的五个硬结果字段；Schema再次验证算式与结果。模型只能叙述该结果，不能重骰、修改难度或反推成功。SQLite中的DICE_ROLLED事件与回合结果在同一事务写入，动画只能消费该已提交事实。
+
+### 影响与边界
+
+旧别名暂时保留用于schema 1/2存档和已有调用方兼容，所有新逻辑以canonical字段为准。T06不实现动画、skip、reduced motion或中断恢复，这些严格留给T07；不接入真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-086：D20动画是已持久化硬结果的可中断投影
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M7-T07`、SQLite唯一真相源与D20不得重骰的架构红线
+
+### 决定与理由
+
+投骰与结果叙事拆成两个可恢复步骤：原生命令先生成并原子持久化D20硬结果，把Adventure置为`RESOLVING`；Windows页面收到该snapshot后才播放动画。动画结束或玩家跳过时，Service重新读取同一份SQLite结果并生成叙事，不向动画提供随机数入口。
+
+同一Campaign的并发投骰由single-flight合并；重复调用发现`RESOLVING`时直接返回已保存snapshot。启动载入也保留该状态而不自动完成，使刷新或进程中断后能重新展示同一个raw、modifier、total、DC和result。动画结束、fallback timer与skip共享一次性reveal门，卸载时取消timer；减少动态效果偏好下立即揭示固定结果。
+
+### 影响与边界
+
+旧`resolveCheck`保留为顺序调用“锁定结果→完成叙事”的兼容入口，Windows页面使用拆分接口建立明确动画边界。T07不新增骰制、重放历史界面、数据库schema或AI能力，也不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-087：四层知识对象以判别合同阻止反向升级
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T01`、Architecture Gate的WorldTruth/Claim/Knowledge/Memory不可互相冒充红线
+
+### 决定与理由
+
+共享领域层建立四种互不兼容的判别对象：WorldTruth只能由本地规则、用户接受、领域事务或导入授权创建；Claim保存subject/predicate/object、Truth/Event/Actor来源、0至1 confidence和revision；Knowledge绑定单一Actor，只能指向Truth或Claim，并携带known/suspected/believed状态、可见性及观察/交流/推理/导入来源；Memory只保存主观摘要及Knowledge/Event来源。
+
+所有构造器复核规范文本、有限JSON、枚举、confidence、正revision、来源唯一性和Memory非空证据。Memory类型不含truth authority，WorldTruth输入也不接受Memory来源，因此摘要、印象或模型记忆没有反向升级为客观事实的领域入口。
+
+### 影响与边界
+
+本任务建立后续纵向功能共用的最小领域合同，不把新对象伪装成已持久事实，也不立即迁移现有`world_facts`/`npc_knowledge`兼容投影。T02将把Actor Knowledge投影接入NPC Prompt边界；T03再落实source event、learned_at和confidence的SQLite provenance，不在T01提前新增不完整数据库真相源。未接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-088：NPC Prompt只消费本地授权的Actor Knowledge投影
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T02`、有限认知与知识可见性属于本地hard logic的架构红线
+
+### 决定与理由
+
+`NPC_REPLY`输入升级为单一Knowledge投影数组，每项显式标记TRUTH/CLAIM和KNOWN/SUSPECTED/BELIEVED。KNOWN中的非传闻事实才作为Truth；传闻、怀疑与错误认知始终作为Claim。Prompt v2要求只把KNOWN Truth当客观状态，不把SUSPECTED或BELIEVED Claim升级为WorldTruth，也不得推断被省略的世界事实。
+
+TypeScript Context Builder虽然从Repository取得Campaign事实集合，但只按当前NPC的知识ID投影，并过滤excluded secret、其他NPC消息和其他NPC记忆；未知ID、同一ID跨多个认知状态、FALSE_BELIEF进入known/suspected或不属于当前Actor都fail closed。原生Windows路径执行相同规则，直接按允许ID和Campaign查询，并验证Memory内npcId；提交事务重新构造预期上下文，拒绝WebView篡改。
+
+### 影响与边界
+
+NPC自己的secret仍是其角色卡组成部分，可供扮演但受Prompt禁止主动泄露；其他NPC secret没有进入该路径。Adventure的多NPC知识投影属于既有GM上下文，不在T02借机改写。T03将为授权条目补齐持久provenance；本任务未新增数据库schema、真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-089：Knowledge Provenance与NPC兼容投影共用单一SQLite权威行
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T03`、SQLite唯一真相源及Truth/Claim/Knowledge/Memory不可冒充红线
+
+### 决定与理由
+
+不新建第二套Knowledge真相表。schema 7在现有`npc_knowledge`一NPC一行的权威记录上新增`provenance_json`，每个活动事实必须恰有一条包含state、source、eventId、learnedAt和confidence的来源记录。KNOWN、SUSPECTED与旧false belief投影分别对应KNOWN、SUSPECTED与BELIEVED；同一事实不能跨状态重复，excluded secret不能同时成为活动认知。
+
+来源闭集为LOCAL_RULE、OBSERVATION、COMMUNICATION、INFERENCE与IMPORT。观察、交流和推理必须引用同Campaign的`game_events`；本地规则与兼容导入允许无事件。confidence是Actor持有该认知的置信度，不把BELIEVED Claim提升为客观真相。TypeScript Repository在写入和读取时重建领域合同，原生NPC/Adventure上下文在读取时执行相同的状态、时间、置信度、Actor与事件验证。
+
+数据库schema 6升级时按原数组顺序确定性生成IMPORT provenance，怀疑项使用0.5，其余使用1.0，并过滤excluded secret。`.emtavern`格式版本保持2：新存档携带该JSON列；旧schema 1/2存档缺列时，导入隔离事务使用同一规则补齐后再执行领域重载验证。跨语言fixture随新列重新生成并以SHA-256锁定。
+
+### 影响与边界
+
+该迁移只扩展既有NPC认知权威行，不创建WorldTruth或Claim持久源，也不让Memory成为事实。T03不实现传闻来源化、随机性Profile或Context Inspector；这些仍按T04及后续任务顺序执行。未接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-090：酒馆传闻是轻量Claim兼容投影而非WorldTruth
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T04`、传闻隐藏真实性及WorldTruth/Claim不可冒充红线
+
+### 决定与理由
+
+为避免在P2任务中引入完整World Voices或第二套并行数据库，现有`world_facts.kind=RUMOR`行保留为Claim的兼容持久投影，但明确不属于WorldTruth。每条新传闻必须携带独立claimId、来源NPC、WITNESS/HEARSAY/PERSONAL_BELIEF/FACTION_MESSAGE传播方式、0至1 confidence和正claimRevision；`createClaimFromRumor`只把陈述、NPC Actor来源、confidence与revision投影为Claim，绝不携带隐藏veracity。
+
+`GENERATE_NPCS` schema/prompt v3要求模型分别提出传播方式、Claim confidence和隐藏veracity，本地Schema与业务规则再验证来源NPC必须来自本次Roster。TypeScript与原生事务把完整来源元数据和NPC Knowledge一起写入SQLite；来源NPC的Knowledge provenance沿用Claim confidence。Repository、NPC Context与原生读取均验证claim字段、来源NPC Campaign边界和闭集枚举。
+
+schema 8把旧RUMOR保守回填为独立`claim-<factId>`、revision 1、HEARSAY和confidence 0.5；来源优先复用旧detail，其次从持有该传闻的NPC Knowledge确定。旧`.emtavern` schema 1/2在隔离导入时执行同等转换。Windows玩家投影只显示来源NPC与传播方式，不序列化veracity或数值confidence。
+
+### 影响与边界
+
+FACTION_MESSAGE只表示某NPC转述的势力消息，不建立Faction Actor、全局广播、传播图、衰减模拟或World Voices。T04不创建独立Claims表，不改变客观事实授权，不实现T05 Randomness Profiles，不接入真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-091：随机性档位是设备级采样配置且不得影响Hard Logic
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T05`、Provider三层冻结规则、SQLite唯一真相源及D20硬逻辑边界
+
+### 决定与理由
+
+随机性提供CONSERVATIVE（稳健，temperature 0.2）、BALANCED（平衡，默认0.7）、HIGH（高随机，1.1）和CUSTOM（自定义0至2）四档。v0.2只公开所有已支持Provider共有的temperature，不提前暴露top-p、top-k、seed或Provider专属采样器，避免一份设置在不同Adapter产生伪一致语义。
+
+设置以非秘密JSON保存在device-local `app_settings.randomness_profile_v1`，原生读取对闭集、预设映射、自定义存在性、有限值和范围fail closed；缺失设置只解析为BALANCED，不隐式写库。My页面通过Tauri命令读写，七条Windows AI生成Service在构造请求前读取一次实际temperature，并把值冻结进`NormalizedAIRequest`，因此GenerationRecord仍能审计当次真实采样配置。
+
+### 影响与边界
+
+随机性偏好不是Campaign事实，不进入`.emtavern`，修改后也不追溯既有请求。它只影响模型采样，绝不改变无偏D20、属性修正、DC、结果判定、事务校验或其他Hard Logic。T05不实现T06重复抑制、真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-092：重复抑制采用确定性签名并在提交前失败关闭
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T06`、AI输出必须经过结构与业务验证及SQLite唯一真相源红线
+
+### 决定与理由
+
+重复长句按句末标点切分，统一大小写、标点与空白后只比较至少12个字母或数字的完整句段，避免把短连接词误报为重复；NPC回复候选除内部字段外，还与最近同Actor的NPC消息比较。任务结构以risk、rewardTier、expectedTurns区间和排序后的recommendedAttributes形成稳定签名，并与最近20项任务比较。NPC原型以规范化identity与personality形成签名，并与酒馆已有NPC及同批候选比较。
+
+`GENERATE_NPCS`、`NPC_REPLY`与`GENERATE_QUEST`分别升级prompt/schema版本，在输入中携带现有原型或最近任务结构以帮助生成避让；Fake Provider也按历史输入产生确定性的不同离线候选。TypeScript Schema、Application/Windows Service和原生SQLite提交路径都重新验证对应规则，任何命中均在事务写入前失败关闭，不产生NPC、传闻、任务、消息、关系或GenerationRecord的部分写入。
+
+### 影响与边界
+
+这些签名只是请求期派生验证数据，不新增数据库列、不进入`.emtavern`，也不成为世界事实。精确规范化规则可解释且跨双实现复现，但不会捕获所有语义近义改写；T06不引入embedding、付费相似度模型、自动改写循环或T07 Context Budget，也不接入真实Provider、正式用户数据或iOS。
+
+## DEC-093：任务字符预算与有损旧史摘要共同阻止全量History进入Provider
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T07`、Context Assembler预算与最小披露架构红线
+
+### 决定与理由
+
+沿用既有15类任务预算表：紧凑任务12,000字符、NPC/记忆任务16,000、冒险任务22,000。Application路径继续在ContextBlock装配时执行总预算；七条Windows直连AI Service在Prompt格式化前统一调用`assertTaskContextBudget`，因此不可JSON序列化或超预算输入不会到达任何Provider Adapter。
+
+历史型输入Schema把运行期窗口固化为硬上限：NPC最近消息12、长期记忆9、冒险最近回合8、世界事件10、结算回合摘要9；相关事实、规则与一致性事实各不超过30。超过最近窗口的旧记录使用有损摘要：当旧记录多于四项时只抽样最早两项与最晚两项，并记录旧记录总数，禁止把全量条目简单拼接后称为summary。Windows结算与既有Application结算现在使用同一压缩规则。
+
+### 影响与边界
+
+预算与摘要只影响发送给模型的请求期投影，不删除或重写SQLite历史，也不进入`.emtavern`新字段。旧记录仍由本地数据库完整保存，游戏规则可按需查询；模型只获得任务相关的有限窗口。T07不实现T08 Context Inspector、tokenizer精确计数、向量检索、真实Provider/付费API、正式用户数据或iOS。
+
+## DEC-094：Context Inspector只投影Manifest元数据并使用会话级缓存观察
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M8-T08`、Context最小披露和secret默认遮罩红线
+
+### 决定与理由
+
+ContextManifest补齐每个条目的stability，AITaskOrchestrator在Provider前将blockId、source、revision、stability、version与hash重新比对。七条Windows AI生成Service在预算校验后、Prompt格式化前为实际输入生成同一ContextAssembly，并把最近一次Manifest投影保存到仅存在于当前应用进程的Inspector会话状态。
+
+“我的/上下文”只显示block类型、估算token、来源、revision、stability、INCLUDED/OMITTED与原因、12位hash前缀和cache观察。secret来源名统一替换为“已遮罩”，Manifest本身不含content，因此Inspector没有展示完整系统Prompt、块内容、未公开世界真相、API Key或Authorization的接口。HIT/MISS仅表示本次会话是否已观察相同type/source/revision/version/hash；省略块为NOT_APPLICABLE，不冒充Provider账单缓存命中。
+
+### 影响与边界
+
+Inspector不写SQLite、不新增schema、不进入`.emtavern`，应用重启后清空；刷新按钮只重读内存快照。T08不实现Prompt全文预览、秘密内容开关、诊断导出、Provider精确缓存账单、真实Provider/付费API、正式用户数据或iOS。下一阶段严格进入M9双平台验收。
+
+## DEC-095：Shared Gate使用单一可执行入口与结构化UTF-8证据
+
+- 日期：2026-08-09
+- 状态：已采纳
+- 依据：`V02-M9-T01`、双平台共享开发/test gate与审计证据要求
+
+### 决定与理由
+
+本地`pnpm check:shared`必须与CI共享质量口径保持一致，顺序执行release metadata、zh-CN玩家语言、Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、全workspace/target/feature Clippy、Rust workspace测试和TypeScript/Rust存档互操作。脚本测试显式锁定这些入口，避免后续重构静默移除类别。
+
+长命令通过`run-with-evidence.mjs`记录命令数组、UTC起止时间、退出码、signal以及UTF-8 stdout/stderr；`.local/evidence`继续忽略，防止大体积运行输出污染源码提交，仓库内审计摘要记录环境、统计与SHA-256。失败证据不得以通过记录覆盖；修复门禁或自测后另建通过证据。
+
+### 影响与边界
+
+Shared Gate证明共享代码与合同在当前开发环境通过，但不代替平台实机验收。Rust平台合同、Windows纵向测试或macOS本地开发测试均不得冒充Credential Manager、WebView2、NSIS安装生命周期、Keychain、WKWebView或`.app`启动证据；这些仍按M9-T02、T03独立收集。该决定不启用真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-096：Windows Gate使用临时托管机执行真实安装生命周期
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T02`、平台实机证据不得由共享测试冒充及正式数据保护红线
+
+### 决定与理由
+
+Windows Gate只在`CI=true`且`RUNNER_OS=Windows`的全新托管机运行。门禁先拒绝既有Ember Tavern安装与应用数据，再验证Windows Credential Manager真实往返和删除、WebView2 Runtime可执行文件、v0.2.0 NSIS静默安装、HKCU卸载注册、安装后应用版本、应用存活和新WebView2进程，最后静默卸载并确认注册与安装目录移除、应用数据哨兵保留。
+
+纵向切片、NSIS构建、生命周期和发布文件清单分别写入结构化JSON，安装器SHA-256必须在生命周期、文件清单与下载后复算中一致。失败证据不覆盖：CRLF、Windows超时、锁错误码、pnpm子进程及PowerShell空集合严格模式问题均保留独立CI记录，修复后重新从完整双平台门禁开始验收。
+
+### 影响与边界
+
+托管机验收不会覆盖开发者或正式用户安装，也不把卸载删除应用数据当作成功。Windows Gate不替代M9-T03的Keychain、WKWebView、`.app`启动和PlatformPaths；不启用真实Provider、付费API、正式用户数据或iOS。下一任务严格进入macOS Gate。
+
+## DEC-097：macOS Gate以应用实际启动证明PlatformPaths与WKWebView
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T03`、平台专属证据不得由共享合同测试冒充及正式数据保护红线
+
+### 决定与理由
+
+macOS Gate只在`CI=true`、`RUNNER_OS=macOS`的全新托管机运行。门禁先拒绝已存在的应用data/cache/log/WebKit路径，再验证`.app`的bundle ID、v0.2.0版本、可执行文件和系统`WebKit.framework`链接，执行Keychain真实往返/删除，启动包内可执行文件，并同时要求SQLite出现在Tauri解析的macOS Application Support路径、新WebKit进程出现以及应用持续存活。
+
+PlatformPaths不只依赖注入临时根目录的单元合同：实际启动必须创建`Application Support/com.embertavern.windows/ember-tavern.sqlite`，同时记录cache、log、temp绝对根及macOS adapter合同退出成功。清理使用独立授权位，只有全部目标在运行前确认不存在时才允许删除本次运行创建的精确路径；非CI拒绝路径不得清理。
+
+### 影响与边界
+
+该门禁证明当前macOS桌面包使用Keychain、系统WebKit与平台路径，但不执行签名、公证或分发，也不启动iOS。它不访问真实Provider、付费API、正式用户数据或API Key。下一任务严格进入M9-T04四分辨率UI Gate。
+
+## DEC-098：四分辨率UI Gate使用确定性本地投影并与原生平台Gate分离
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T04`、四个指定分辨率、正式数据保护及平台证据不可互相冒充的红线
+
+### 决定与理由
+
+UI Gate固定覆盖存档、世界、车卡、酒馆、NPC、任务、冒险、角色卡、档案、我的、设置和恢复12个核心页面，以及860x600、1180x760、1366x768、1920x1080四个指定视口。每次导航必须等待页面专用最终就绪选择器，再检查截图前后控制台错误、document/main横向溢出与越界裁切；Suspense加载态不得作为最终证据。
+
+视觉数据由只存在于临时QA工作树的确定性Tauri IPC fixture提供。fixture复现本地命令响应，不进入产品提交，不访问真实Provider、付费API、API Key或正式用户数据。48张最终截图与4张缺陷修复前截图进入仓库，并以SHA-256清单固定证据字节。
+
+### 影响与边界
+
+该Gate证明指定页面在四种分辨率下的可读性、布局和基础路由表现，不证明原生打包、系统凭据、WebView生命周期、SQLite路径或安装卸载；这些继续由M9-T02 Windows Gate与M9-T03 macOS Gate独立证明。UI修复必须保留回归合同，下一任务严格进入M9-T05连续纵向流程。
+
+## DEC-099：Vertical Flow以单一SQLite可执行链和隔离原生应用双重取证
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T05`、SR2-010、SQLite唯一事实源及正式数据保护红线
+
+### 决定与理由
+
+纵向门禁必须同时满足两类不可互相替代的证据：Rust E2E在单一真实SQLite Campaign上执行完整状态链，证明原子提交、中断恢复、pending取消、导出/删除/导入和继续；唯一bundle ID `com.embertavern.flowqa`的打包`.app`通过WKWebView和原生命令呈现对应页面、系统文件对话框及恢复入口。可复现截图阶段数据库由同一E2E领域操作生成，不允许静态页面或截图冒充状态转换。
+
+不可逆删除必须使用应用内显式二次确认，不能依赖`window.confirm`等宿主WebView可能不呈现的浏览器原语。实测发现WKWebView未展示确认即删除隔离QA存档后，应用改为先展开永久删除说明，再提供取消和最终确认两个独立控件；取消必须保留Campaign并收起警告。
+
+### 影响与边界
+
+证据bundle、Application Support目录和`.emtavern`归档只属于隔离QA标识；不访问或修改正式用户数据。流程只使用确定性Fake Provider，不配置真实API Key，不调用真实Provider或付费API，也不启动iOS。该Gate关闭SR2-010并将严格下一任务推进到M10-T01 Windows v0.2 Build。

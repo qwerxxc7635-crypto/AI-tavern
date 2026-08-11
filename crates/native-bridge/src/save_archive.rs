@@ -1,8 +1,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs::{self, OpenOptions};
-use std::io::{Cursor, Read, Write};
+use std::io::{Cursor, Read, Seek, Write};
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
+use ember_platform_services::AppInstanceLock;
+use regex::Regex;
 use rusqlite::types::{Value as SqlValue, ValueRef};
 use rusqlite::{
     Connection, OptionalExtension, Transaction, TransactionBehavior, params, params_from_iter,
@@ -17,13 +20,23 @@ use zip::{CompressionMethod, ZipWriter};
 
 use super::{
     CampaignStore, CampaignStoreError, CampaignSummary, create_consistent_backup,
-    current_timestamp, load_campaign, validate_id, validate_timestamp,
+    current_timestamp, database_data_version, load_campaign, validate_id, validate_timestamp,
 };
 
 const FORMAT_VERSION: u64 = 1;
-const DATABASE_SCHEMA_VERSION: u64 = 1;
-const MAX_ARCHIVE_BYTES: u64 = 256 * 1024 * 1024;
-const MAX_UNCOMPRESSED_BYTES: u64 = 1024 * 1024 * 1024;
+const DATABASE_SCHEMA_VERSION: u64 = 2;
+const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 8;
+const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
+const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
+const MAX_COMPRESSION_RATIO: u64 = 100;
+const MAX_JSON_DEPTH: usize = 64;
+const MAX_JSON_ARRAY_LENGTH: usize = 100_000;
+const MAX_JSON_STRING_BYTES: usize = 1_048_576;
+const MAX_EVENT_RECORDS: usize = 100_000;
+const MAX_GENERATION_RECORDS: usize = 20_000;
+const MAX_TABLE_RECORDS: usize = 20_000;
+const MAX_TOTAL_RECORDS: usize = 200_000;
 const ENTRY_NAMES: [&str; 5] = [
     "manifest.json",
     "campaign.json",
@@ -31,7 +44,7 @@ const ENTRY_NAMES: [&str; 5] = [
     "generations.json",
     "checksum.json",
 ];
-const CAMPAIGN_TABLES: [&str; 14] = [
+const LEGACY_CAMPAIGN_TABLES: [&str; 14] = [
     "world_bibles",
     "world_facts",
     "player_characters",
@@ -47,7 +60,24 @@ const CAMPAIGN_TABLES: [&str; 14] = [
     "items",
     "world_clocks",
 ];
-const INSERT_ORDER: [&str; 14] = CAMPAIGN_TABLES;
+const CAMPAIGN_TABLES: [&str; 15] = [
+    "world_bibles",
+    "world_facts",
+    "player_characters",
+    "taverns",
+    "npcs",
+    "npc_knowledge",
+    "npc_relationships",
+    "quests",
+    "adventures",
+    "scene_frames",
+    "adventure_turns",
+    "conversations",
+    "messages",
+    "items",
+    "world_clocks",
+];
+const INSERT_ORDER: [&str; 15] = CAMPAIGN_TABLES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -114,8 +144,18 @@ impl CampaignStore {
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
-        let created_at = current_timestamp()?;
-        let bytes = self.capture_archive(campaign_id, &created_at, generator_version)?;
+        self.export_campaign_archive_at(campaign_id, path, generator_version, &current_timestamp()?)
+    }
+
+    fn export_campaign_archive_at(
+        &self,
+        campaign_id: &str,
+        path: impl AsRef<Path>,
+        generator_version: &str,
+        created_at: &str,
+    ) -> Result<CampaignArchiveExportResult, CampaignStoreError> {
+        validate_timestamp(created_at)?;
+        let bytes = self.capture_archive(campaign_id, created_at, generator_version)?;
         let destination = validate_archive_destination(path.as_ref())?;
         publish_archive(&destination, &bytes)?;
         Ok(CampaignArchiveExportResult {
@@ -129,9 +169,19 @@ impl CampaignStore {
         path: impl AsRef<Path>,
         mode: CampaignArchiveImportMode,
     ) -> Result<CampaignSummary, CampaignStoreError> {
+        self.import_campaign_archive_with_backup_hook(path, mode, || {})
+    }
+
+    fn import_campaign_archive_with_backup_hook(
+        &self,
+        path: impl AsRef<Path>,
+        mode: CampaignArchiveImportMode,
+        after_backup: impl FnOnce(),
+    ) -> Result<CampaignSummary, CampaignStoreError> {
         let bytes = read_archive_path(path.as_ref())?;
         let parsed = parse_archive(&bytes)?;
         let imported_at = current_timestamp()?;
+        let _guard = self.operation_lock.acquire()?;
         let mut connection = self.connect()?;
         let exists = campaign_exists(&connection, &parsed.campaign_id)?;
         match mode {
@@ -141,15 +191,23 @@ impl CampaignStore {
             CampaignArchiveImportMode::Overwrite if !exists => {
                 return Err(CampaignStoreError::ArchiveConflict);
             }
-            CampaignArchiveImportMode::Overwrite => {
-                drop(connection);
-                create_consistent_backup(&self.database_path)?;
-                connection = self.connect()?;
-            }
-            CampaignArchiveImportMode::Create => {}
+            CampaignArchiveImportMode::Overwrite | CampaignArchiveImportMode::Create => {}
+        }
+        let before_backup = if matches!(mode, CampaignArchiveImportMode::Overwrite) {
+            let version = database_data_version(&connection)?;
+            create_consistent_backup(&self.database_path)?;
+            after_backup();
+            Some(version)
+        } else {
+            None
+        };
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        if let Some(version) = before_backup
+            && database_data_version(&transaction)? != version
+        {
+            return Err(CampaignStoreError::ConcurrentModification);
         }
 
-        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let current_exists = campaign_exists(&transaction, &parsed.campaign_id)?;
         if current_exists != matches!(mode, CampaignArchiveImportMode::Overwrite) {
             return Err(CampaignStoreError::ArchiveConflict);
@@ -193,6 +251,17 @@ impl CampaignStore {
         let mut connection = self.connect()?;
         let transaction = connection.transaction()?;
         assert_database_ready(&transaction)?;
+        let has_unconfirmed_candidate = transaction
+            .query_row(
+                "SELECT 1 FROM ai_candidates WHERE campaign_id = ?1 AND status = 'PROPOSED' LIMIT 1",
+                [campaign_id],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if has_unconfirmed_candidate {
+            return Err(CampaignStoreError::UnconfirmedCandidate);
+        }
         let mut campaign = query_one_row(
             &transaction,
             "campaigns",
@@ -207,8 +276,13 @@ impl CampaignStore {
             Value::String("{}".to_owned()),
         );
         let mut tables = Map::new();
+        let mut total_records = 1_usize;
         for table in CAMPAIGN_TABLES {
             let rows = query_campaign_table(&transaction, table, campaign_id)?;
+            validate_record_count(rows.len(), MAX_TABLE_RECORDS)?;
+            total_records = total_records
+                .checked_add(rows.len())
+                .ok_or(CampaignStoreError::ArchiveInvalid)?;
             tables.insert(
                 table.to_owned(),
                 Value::Array(rows.into_iter().map(Value::Object).collect()),
@@ -220,12 +294,19 @@ impl CampaignStore {
             "SELECT * FROM game_events WHERE campaign_id = ?1 ORDER BY occurred_at, id",
             campaign_id,
         )?;
+        validate_record_count(events.len(), MAX_EVENT_RECORDS)?;
         let mut generations = query_rows(
             &transaction,
             "generation_records",
             "SELECT * FROM generation_records WHERE campaign_id = ?1 ORDER BY started_at, id",
             campaign_id,
         )?;
+        validate_record_count(generations.len(), MAX_GENERATION_RECORDS)?;
+        total_records = total_records
+            .checked_add(events.len())
+            .and_then(|total| total.checked_add(generations.len()))
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        validate_record_count(total_records, MAX_TOTAL_RECORDS)?;
         for generation in &mut generations {
             generation.insert("model_profile_id".to_owned(), Value::Null);
         }
@@ -303,6 +384,7 @@ fn query_campaign_table(
         }
         "quests" => "SELECT * FROM quests WHERE campaign_id = ?1 ORDER BY id",
         "adventures" => "SELECT * FROM adventures WHERE campaign_id = ?1 ORDER BY id",
+        "scene_frames" => "SELECT * FROM scene_frames WHERE campaign_id = ?1 ORDER BY adventure_id",
         "adventure_turns" => {
             "SELECT adventure_turns.* FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id WHERE adventures.campaign_id = ?1 ORDER BY adventure_turns.adventure_id, adventure_turns.turn_number, adventure_turns.id"
         }
@@ -394,6 +476,15 @@ fn query_rows(
 }
 
 fn encode_zip(files: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, CampaignStoreError> {
+    let mut uncompressed_total = 0_u64;
+    for name in ENTRY_NAMES {
+        let bytes = files.get(name).ok_or(CampaignStoreError::ArchiveInvalid)?;
+        assert_no_secret_text(
+            std::str::from_utf8(bytes).map_err(|_| CampaignStoreError::ArchiveInvalid)?,
+        )?;
+        validate_archive_entry_resources(name, bytes.len() as u64, bytes.len() as u64)?;
+        uncompressed_total = add_expanded_bytes(uncompressed_total, bytes.len() as u64)?;
+    }
     let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
     let options = SimpleFileOptions::default().compression_method(CompressionMethod::Stored);
     for name in ENTRY_NAMES {
@@ -410,6 +501,7 @@ fn encode_zip(files: &BTreeMap<String, Vec<u8>>) -> Result<Vec<u8>, CampaignStor
     if bytes.len() as u64 > MAX_ARCHIVE_BYTES {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
+    assert_no_secret_text(&String::from_utf8_lossy(&bytes))?;
     Ok(bytes)
 }
 
@@ -423,7 +515,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let allowed = ENTRY_NAMES.into_iter().collect::<BTreeSet<_>>();
-    let mut files = BTreeMap::new();
+    let mut seen = BTreeSet::new();
     let mut uncompressed_total = 0_u64;
     for index in 0..archive.len() {
         let file = archive
@@ -431,7 +523,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
         let name = file.name().to_owned();
         if !allowed.contains(name.as_str())
-            || files.contains_key(&name)
+            || !seen.insert(name.clone())
             || file.is_dir()
             || file.enclosed_name().is_none()
             || file
@@ -444,31 +536,20 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
-        uncompressed_total = uncompressed_total
-            .checked_add(file.size())
-            .ok_or(CampaignStoreError::ArchiveInvalid)?;
-        if uncompressed_total > MAX_UNCOMPRESSED_BYTES {
-            return Err(CampaignStoreError::ArchiveInvalid);
-        }
-        let expected_size = file.size();
-        let mut contents = Vec::with_capacity(
-            usize::try_from(expected_size).map_err(|_| CampaignStoreError::ArchiveInvalid)?,
-        );
-        file.take(expected_size.saturating_add(1))
-            .read_to_end(&mut contents)
-            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
-        if contents.len() as u64 != expected_size {
-            return Err(CampaignStoreError::ArchiveInvalid);
-        }
-        files.insert(name, contents);
+        uncompressed_total = add_expanded_bytes(uncompressed_total, file.size())?;
+        validate_archive_entry_resources(&name, file.compressed_size(), file.size())?;
     }
-    if files.len() != ENTRY_NAMES.len() {
+    if seen.len() != ENTRY_NAMES.len() {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
 
-    let manifest = parse_canonical_document(require_file(&files, "manifest.json")?)?;
-    let checksum = parse_canonical_document(require_file(&files, "checksum.json")?)?;
-    validate_checksum(&files, &checksum)?;
+    let checksum = parse_canonical_document(&read_archive_entry(&mut archive, "checksum.json")?)?;
+    let expected_checksums = validate_checksum_document(&checksum)?;
+    let manifest = parse_canonical_document(&read_verified_archive_entry(
+        &mut archive,
+        &expected_checksums,
+        "manifest.json",
+    )?)?;
     require_exact_keys(
         &manifest,
         &[
@@ -490,7 +571,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         .get("databaseSchemaVersion")
         .and_then(Value::as_u64)
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
-    if database_version != DATABASE_SCHEMA_VERSION {
+    if ![LEGACY_DATABASE_SCHEMA_VERSION, DATABASE_SCHEMA_VERSION].contains(&database_version) {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
     let campaign_id = require_text(manifest.get("campaignId"))?.to_owned();
@@ -501,8 +582,16 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
 
-    let campaign_document = parse_canonical_document(require_file(&files, "campaign.json")?)?;
-    let generation_document = parse_canonical_document(require_file(&files, "generations.json")?)?;
+    let campaign_document = parse_canonical_document(&read_verified_archive_entry(
+        &mut archive,
+        &expected_checksums,
+        "campaign.json",
+    )?)?;
+    let generation_document = parse_canonical_document(&read_verified_archive_entry(
+        &mut archive,
+        &expected_checksums,
+        "generations.json",
+    )?)?;
     validate_envelope(&campaign_document, &campaign_id, database_version)?;
     validate_envelope(&generation_document, &campaign_id, database_version)?;
     require_exact_keys(
@@ -539,12 +628,29 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let table_root = require_object(campaign_document.get("tables"))?;
-    require_exact_keys(table_root, &CAMPAIGN_TABLES)?;
+    let archive_tables: &[&str] = if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
+        &LEGACY_CAMPAIGN_TABLES
+    } else {
+        &CAMPAIGN_TABLES
+    };
+    require_exact_keys(table_root, archive_tables)?;
     let mut tables = BTreeMap::new();
-    for table in CAMPAIGN_TABLES {
-        let rows = require_array(table_root.get(table))?
+    let mut total_records = 1_usize;
+    for &table in archive_tables {
+        let values = require_array(table_root.get(table))?;
+        validate_record_count(values.len(), MAX_TABLE_RECORDS)?;
+        total_records = total_records
+            .checked_add(values.len())
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        let rows = values
             .iter()
-            .map(|value| parse_stored_row(require_object(Some(value))?, table))
+            .map(|value| {
+                let mut row = parse_stored_row(require_object(Some(value))?, table)?;
+                if table == "npc_knowledge" {
+                    upgrade_legacy_knowledge_row(&mut row)?;
+                }
+                Ok::<_, CampaignStoreError>(row)
+            })
             .collect::<Result<Vec<_>, _>>()?;
         for row in &rows {
             if row.contains_key("campaign_id")
@@ -555,7 +661,16 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         }
         tables.insert(table.to_owned(), rows);
     }
-    let generations = require_array(generation_document.get("records"))?
+    upgrade_legacy_rumor_rows(&mut tables)?;
+    if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
+        tables.insert("scene_frames".to_owned(), Vec::new());
+    }
+    let generation_values = require_array(generation_document.get("records"))?;
+    validate_record_count(generation_values.len(), MAX_GENERATION_RECORDS)?;
+    total_records = total_records
+        .checked_add(generation_values.len())
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    let generations = generation_values
         .iter()
         .map(|value| parse_stored_row(require_object(Some(value))?, "generation_records"))
         .collect::<Result<Vec<_>, _>>()?;
@@ -566,7 +681,16 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
     }
-    let events = parse_events(require_file(&files, "events.ndjson")?, &campaign_id)?;
+    let events = parse_events(
+        &read_verified_archive_entry(&mut archive, &expected_checksums, "events.ndjson")?,
+        &campaign_id,
+    )?;
+    total_records = total_records
+        .checked_add(events.len())
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    if total_records > MAX_TOTAL_RECORDS {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
     validate_manifest_counts(&manifest, events.len(), generations.len())?;
     Ok(ParsedArchive {
         campaign_id,
@@ -590,11 +714,14 @@ fn parse_events(
     let text = std::str::from_utf8(bytes).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
     let mut rows = Vec::new();
     for line in text[..text.len() - 1].split('\n') {
+        validate_record_count(rows.len().saturating_add(1), MAX_EVENT_RECORDS)?;
         if line.is_empty() {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        validate_json_text_resources(line.as_bytes())?;
         let value: Value =
             serde_json::from_str(line).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        validate_json_value_resources(&value)?;
         if canonical_json_bytes(&value)? != line.as_bytes() {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
@@ -607,10 +734,9 @@ fn parse_events(
     Ok(rows)
 }
 
-fn validate_checksum(
-    files: &BTreeMap<String, Vec<u8>>,
+fn validate_checksum_document(
     checksum: &Map<String, Value>,
-) -> Result<(), CampaignStoreError> {
+) -> Result<BTreeMap<String, String>, CampaignStoreError> {
     require_exact_keys(checksum, &["algorithm", "files", "formatVersion"])?;
     if checksum.get("algorithm") != Some(&Value::String("SHA-256".to_owned()))
         || checksum.get("formatVersion").and_then(Value::as_u64) != Some(FORMAT_VERSION)
@@ -625,18 +751,19 @@ fn validate_checksum(
     ];
     let expected = require_object(checksum.get("files"))?;
     require_exact_keys(expected, &expected_names)?;
+    let mut result = BTreeMap::new();
     for name in expected_names {
         let digest = require_text(expected.get(name))?;
         if digest.len() != 64
             || !digest
                 .bytes()
                 .all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
-            || sha256(require_file(files, name)?) != digest
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        result.insert(name.to_owned(), digest.to_owned());
     }
-    Ok(())
+    Ok(result)
 }
 
 fn validate_manifest_counts(
@@ -697,6 +824,15 @@ fn parse_stored_row(
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
+        if value
+            .as_str()
+            .is_some_and(|text| text.len() > MAX_JSON_STRING_BYTES)
+        {
+            return Err(CampaignStoreError::ArchiveInvalid);
+        }
+        if let Some(text) = value.as_str() {
+            assert_no_secret_text(text)?;
+        }
         if is_json_column(table, column) && !value.is_null() {
             let text = value.as_str().ok_or(CampaignStoreError::ArchiveInvalid)?;
             if normalize_json_text(text, table, column)? != text {
@@ -720,13 +856,141 @@ fn parse_stored_row(
     Ok(result)
 }
 
+fn upgrade_legacy_knowledge_row(row: &mut Map<String, Value>) -> Result<(), CampaignStoreError> {
+    if row.contains_key("provenance_json") {
+        return Ok(());
+    }
+    let learned_at = row
+        .get("updated_at")
+        .and_then(Value::as_str)
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+        .to_owned();
+    validate_timestamp(&learned_at)?;
+    let parse_ids = |column: &str| -> Result<Vec<String>, CampaignStoreError> {
+        let text = row
+            .get(column)
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        serde_json::from_str(text).map_err(|_| CampaignStoreError::ArchiveInvalid)
+    };
+    let excluded = parse_ids("excluded_secret_fact_ids_json")?
+        .into_iter()
+        .collect::<std::collections::HashSet<_>>();
+    let known = parse_ids("known_fact_ids_json")?
+        .into_iter()
+        .filter(|id| !excluded.contains(id))
+        .collect::<Vec<_>>();
+    let suspected = parse_ids("suspected_fact_ids_json")?
+        .into_iter()
+        .filter(|id| !excluded.contains(id))
+        .collect::<Vec<_>>();
+    let believed = parse_ids("false_belief_fact_ids_json")?
+        .into_iter()
+        .filter(|id| !excluded.contains(id))
+        .collect::<Vec<_>>();
+    let mut entries = Vec::new();
+    for (ids, state, confidence) in [
+        (&known, "KNOWN", 1.0),
+        (&suspected, "SUSPECTED", 0.5),
+        (&believed, "BELIEVED", 1.0),
+    ] {
+        for fact_id in ids {
+            entries.push(json!({
+                "factId": fact_id,
+                "state": state,
+                "source": "IMPORT",
+                "eventId": null,
+                "learnedAt": learned_at,
+                "confidence": confidence,
+            }));
+        }
+    }
+    for (column, ids) in [
+        ("known_fact_ids_json", known),
+        ("suspected_fact_ids_json", suspected),
+        ("false_belief_fact_ids_json", believed),
+    ] {
+        let text = String::from_utf8(canonical_json_bytes(&json!(ids))?)
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        row.insert(column.to_owned(), Value::String(text));
+    }
+    let text = String::from_utf8(canonical_json_bytes(&Value::Array(entries))?)
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    row.insert("provenance_json".to_owned(), Value::String(text));
+    Ok(())
+}
+
+fn upgrade_legacy_rumor_rows(
+    tables: &mut BTreeMap<String, Vec<Map<String, Value>>>,
+) -> Result<(), CampaignStoreError> {
+    let mut source_by_fact = BTreeMap::new();
+    for row in tables
+        .get("npc_knowledge")
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+    {
+        let npc_id = row
+            .get("npc_id")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        let known: Vec<String> = serde_json::from_str(
+            row.get("known_fact_ids_json")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?,
+        )
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        for fact_id in known {
+            source_by_fact
+                .entry(fact_id)
+                .or_insert_with(|| npc_id.to_owned());
+        }
+    }
+    for row in tables
+        .get_mut("world_facts")
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+    {
+        if row.get("kind").and_then(Value::as_str) != Some("RUMOR") {
+            continue;
+        }
+        let fact_id = row
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        let mut detail: Map<String, Value> = serde_json::from_str(
+            row.get("detail_json")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?,
+        )
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        if detail.contains_key("claimId") {
+            continue;
+        }
+        let source_npc_id = detail
+            .get("sourceNpcId")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+            .or_else(|| source_by_fact.get(fact_id).cloned())
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        detail.insert("claimId".to_owned(), json!(format!("claim-{fact_id}")));
+        detail.insert("claimRevision".to_owned(), json!(1));
+        detail.insert("confidence".to_owned(), json!(0.5));
+        detail.insert("sourceBasis".to_owned(), json!("HEARSAY"));
+        detail.insert("sourceNpcId".to_owned(), json!(source_npc_id));
+        let text = String::from_utf8(canonical_json_bytes(&Value::Object(detail))?)
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+        row.insert("detail_json".to_owned(), Value::String(text));
+    }
+    Ok(())
+}
+
 fn normalize_json_text(
     text: &str,
     table: &str,
     column: &str,
 ) -> Result<String, CampaignStoreError> {
+    validate_json_text_resources(text.as_bytes())?;
     let value: Value =
         serde_json::from_str(text).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_json_value_resources(&value)?;
     validate_json_container(table, column, &value)?;
     assert_no_secret_keys(&value)?;
     String::from_utf8(canonical_json_bytes(&value)?).map_err(|_| CampaignStoreError::ArchiveInvalid)
@@ -748,6 +1012,7 @@ fn validate_json_container(
             | ("npcs", "visit_json")
             | ("quests", "content_json")
             | ("adventures", "plan_json" | "ending_json")
+            | ("scene_frames", "return_point_json")
             | (
                 "adventure_turns",
                 "player_action_json" | "check_request_json" | "dice_result_json"
@@ -766,11 +1031,14 @@ fn validate_json_container(
 }
 
 fn scan_json_text_if_present(text: &str) -> Result<(), CampaignStoreError> {
+    assert_no_secret_text(text)?;
     let trimmed = text.trim();
     if !(trimmed.starts_with('{') || trimmed.starts_with('[')) {
         return Ok(());
     }
+    validate_json_text_resources(trimmed.as_bytes())?;
     if let Ok(value) = serde_json::from_str::<Value>(trimmed) {
+        validate_json_value_resources(&value)?;
         assert_no_secret_keys(&value)?;
     }
     Ok(())
@@ -804,9 +1072,42 @@ fn assert_no_secret_keys(value: &Value) -> Result<(), CampaignStoreError> {
                 assert_no_secret_keys(value)?;
             }
         }
+        Value::String(text) => assert_no_secret_text(text)?,
         _ => {}
     }
     Ok(())
+}
+
+fn assert_no_secret_text(text: &str) -> Result<(), CampaignStoreError> {
+    if secret_patterns()
+        .iter()
+        .any(|pattern| pattern.is_match(text))
+    {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(())
+}
+
+fn secret_patterns() -> &'static [Regex] {
+    static PATTERNS: OnceLock<Vec<Regex>> = OnceLock::new();
+    PATTERNS.get_or_init(|| {
+        [
+            r"(?i)\bcredential:v1:[0-9a-f]{8}-[0-9a-f-]{27,}\b",
+            r"(?i)\bsk-(?:or-v1-|ant-api\d{2}-)?[a-z0-9_-]{8,}\b",
+            r"(?i)\bAIza[0-9a-z_-]{20,}\b",
+            r"\bAKIA[0-9A-Z]{16}\b",
+            r"(?i)\bgh[pousr]_[0-9a-z]{20,}\b",
+            r"(?i)\bxox[baprs]-[0-9a-z-]{12,}\b",
+            r"(?i)\beyJ[0-9a-z_-]{8,}\.[0-9a-z_-]{8,}\.[0-9a-z_-]{8,}\b",
+            r"(?i)\b(?:authorization|proxy-authorization)\s*[:=]\s*(?:bearer|basic)\s+[0-9a-z._~+/-]{8,}={0,2}",
+            r"(?i)\bbearer\s+[0-9a-z._~+/-]{12,}={0,2}",
+            r"(?i)\b(?:api[_ -]?key|access[_ -]?token|secret[_ -]?key|password|cookie)\s*[:=]\s*[0-9a-z._~+/-]{8,}={0,2}",
+            r"\bTOP_SECRET_[0-9A-Z_]{8,}\b",
+        ]
+        .into_iter()
+        .map(|pattern| Regex::new(pattern).expect("static secret pattern"))
+        .collect()
+    })
 }
 
 fn is_json_column(table: &str, column: &str) -> bool {
@@ -840,6 +1141,7 @@ fn is_json_column(table: &str, column: &str) -> bool {
                     | "suspected_fact_ids_json"
                     | "false_belief_fact_ids_json"
                     | "excluded_secret_fact_ids_json"
+                    | "provenance_json"
             )
             | (
                 "quests",
@@ -849,6 +1151,14 @@ fn is_json_column(table: &str, column: &str) -> bool {
                     | "related_fact_ids_json"
             )
             | ("adventures", "plan_json" | "clues_json" | "ending_json")
+            | (
+                "scene_frames",
+                "participants_json"
+                    | "pressure_json"
+                    | "affordances_json"
+                    | "pending_consequences_json"
+                    | "return_point_json"
+            )
             | (
                 "adventure_turns",
                 "speaker_npc_ids_json"
@@ -960,6 +1270,18 @@ fn validate_imported_state(
             return Err(CampaignStoreError::ArchiveInvalid);
         }
     }
+    for row in parsed
+        .tables
+        .get("scene_frames")
+        .ok_or(CampaignStoreError::ArchiveInvalid)?
+    {
+        let adventure_id = row
+            .get("adventure_id")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        crate::adventure_play::load_scene_frame(transaction, adventure_id)
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    }
     Ok(())
 }
 
@@ -1024,7 +1346,7 @@ fn assert_database_ready(connection: &Connection) -> Result<(), CampaignStoreErr
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if schema != DATABASE_SCHEMA_VERSION as i64 {
+    if schema != LOCAL_DATABASE_SCHEMA_VERSION {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
     Ok(())
@@ -1158,8 +1480,10 @@ fn parse_canonical_document(bytes: &[u8]) -> Result<Map<String, Value>, Campaign
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let body = &bytes[..bytes.len() - 1];
+    validate_json_text_resources(body)?;
     let value: Value =
         serde_json::from_slice(body).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_json_value_resources(&value)?;
     if canonical_json_bytes(&value)? != body {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
@@ -1182,6 +1506,7 @@ fn canonical_ndjson_bytes(rows: &[Map<String, Value>]) -> Result<Vec<u8>, Campai
 }
 
 fn canonical_json_bytes(value: &Value) -> Result<Vec<u8>, CampaignStoreError> {
+    validate_json_value_resources(value)?;
     let sorted = sort_json(value);
     serde_json::to_vec(&sorted).map_err(|_| CampaignStoreError::ArchiveInvalid)
 }
@@ -1207,14 +1532,37 @@ fn sha256(bytes: &[u8]) -> String {
         .collect()
 }
 
-fn require_file<'a>(
-    files: &'a BTreeMap<String, Vec<u8>>,
+fn read_archive_entry<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
     name: &str,
-) -> Result<&'a [u8], CampaignStoreError> {
-    files
-        .get(name)
-        .map(Vec::as_slice)
-        .ok_or(CampaignStoreError::ArchiveInvalid)
+) -> Result<Vec<u8>, CampaignStoreError> {
+    let file = archive
+        .by_name(name)
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_archive_entry_resources(name, file.compressed_size(), file.size())?;
+    let expected_size = file.size();
+    let mut contents = Vec::with_capacity(
+        usize::try_from(expected_size).map_err(|_| CampaignStoreError::ArchiveInvalid)?,
+    );
+    file.take(expected_size.saturating_add(1))
+        .read_to_end(&mut contents)
+        .map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    if contents.len() as u64 != expected_size {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(contents)
+}
+
+fn read_verified_archive_entry<R: Read + Seek>(
+    archive: &mut ZipArchive<R>,
+    expected: &BTreeMap<String, String>,
+    name: &str,
+) -> Result<Vec<u8>, CampaignStoreError> {
+    let contents = read_archive_entry(archive, name)?;
+    if expected.get(name).map(String::as_str) != Some(sha256(&contents).as_str()) {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(contents)
 }
 
 fn require_object(value: Option<&Value>) -> Result<&Map<String, Value>, CampaignStoreError> {
@@ -1224,19 +1572,130 @@ fn require_object(value: Option<&Value>) -> Result<&Map<String, Value>, Campaign
 }
 
 fn require_array(value: Option<&Value>) -> Result<&Vec<Value>, CampaignStoreError> {
-    value
+    let values = value
         .and_then(Value::as_array)
-        .ok_or(CampaignStoreError::ArchiveInvalid)
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    if values.len() > MAX_JSON_ARRAY_LENGTH {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(values)
 }
 
 fn require_text(value: Option<&Value>) -> Result<&str, CampaignStoreError> {
     let text = value
         .and_then(Value::as_str)
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
-    if text.is_empty() {
+    if text.is_empty() || text.len() > MAX_JSON_STRING_BYTES {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     Ok(text)
+}
+
+fn entry_size_limit(name: &str) -> Result<u64, CampaignStoreError> {
+    match name {
+        "manifest.json" | "checksum.json" => Ok(64 * 1024),
+        "campaign.json" => Ok(32 * 1024 * 1024),
+        "events.ndjson" | "generations.json" => Ok(16 * 1024 * 1024),
+        _ => Err(CampaignStoreError::ArchiveInvalid),
+    }
+}
+
+fn validate_archive_entry_resources(
+    name: &str,
+    compressed_size: u64,
+    uncompressed_size: u64,
+) -> Result<u64, CampaignStoreError> {
+    let limit = entry_size_limit(name)?;
+    if uncompressed_size > limit
+        || (uncompressed_size > 0
+            && (compressed_size == 0
+                || uncompressed_size > compressed_size.saturating_mul(MAX_COMPRESSION_RATIO)))
+    {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(limit)
+}
+
+fn validate_record_count(count: usize, limit: usize) -> Result<(), CampaignStoreError> {
+    if count > limit {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(())
+}
+
+fn add_expanded_bytes(total: u64, entry: u64) -> Result<u64, CampaignStoreError> {
+    let next = total
+        .checked_add(entry)
+        .ok_or(CampaignStoreError::ArchiveInvalid)?;
+    if next > MAX_UNCOMPRESSED_BYTES {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(next)
+}
+
+fn validate_json_text_resources(bytes: &[u8]) -> Result<(), CampaignStoreError> {
+    let mut depth = 0_usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    let mut string_bytes = 0_usize;
+    for byte in bytes {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if *byte == b'\\' {
+                escaped = true;
+            } else if *byte == b'"' {
+                in_string = false;
+            }
+            string_bytes = string_bytes.saturating_add(1);
+            if string_bytes > MAX_JSON_STRING_BYTES.saturating_mul(6) {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+        } else if *byte == b'"' {
+            in_string = true;
+            string_bytes = 0;
+        } else if matches!(*byte, b'{' | b'[') {
+            depth = depth
+                .checked_add(1)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?;
+            if depth > MAX_JSON_DEPTH {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+        } else if matches!(*byte, b'}' | b']') {
+            depth = depth.saturating_sub(1);
+        }
+    }
+    Ok(())
+}
+
+fn validate_json_value_resources(value: &Value) -> Result<(), CampaignStoreError> {
+    let mut pending = vec![(value, 1_usize)];
+    while let Some((current, depth)) = pending.pop() {
+        if depth > MAX_JSON_DEPTH {
+            return Err(CampaignStoreError::ArchiveInvalid);
+        }
+        match current {
+            Value::String(text) if text.len() > MAX_JSON_STRING_BYTES => {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+            Value::Array(values) => {
+                if values.len() > MAX_JSON_ARRAY_LENGTH {
+                    return Err(CampaignStoreError::ArchiveInvalid);
+                }
+                pending.extend(values.iter().map(|entry| (entry, depth + 1)));
+            }
+            Value::Object(values) => {
+                for (key, entry) in values {
+                    if key.len() > MAX_JSON_STRING_BYTES {
+                        return Err(CampaignStoreError::ArchiveInvalid);
+                    }
+                    pending.push((entry, depth + 1));
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn require_exact_keys(
@@ -1322,6 +1781,56 @@ mod tests {
     }
 
     #[test]
+    fn current_archive_interop_gate_imports_typescript_and_emits_rust() {
+        let fallback = tempfile::tempdir().unwrap();
+        let typescript_archive = std::env::var_os("EMBER_TS_ARCHIVE_INPUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| {
+                Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../packages/persistence/test-fixtures/typescript-export-v2.emtavern")
+            });
+        let rust_archive = std::env::var_os("EMBER_RUST_ARCHIVE_OUTPUT")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fallback.path().join("rust-export-v2.emtavern"));
+        let work_directory = std::env::var_os("EMBER_ARCHIVE_INTEROP_WORK")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| fallback.path().join("work"));
+        fs::create_dir_all(&work_directory).unwrap();
+
+        let importer = CampaignStore::open(work_directory.join("rust-import.sqlite")).unwrap();
+        let imported = importer
+            .import_campaign_archive(typescript_archive, CampaignArchiveImportMode::Create)
+            .unwrap();
+        assert_eq!(imported.id, "campaign-export");
+        let connection = importer.connect().unwrap();
+        let fact: String = connection
+            .query_row(
+                "SELECT statement FROM world_facts WHERE id = 'fact-export'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(fact, "The beacon is lit.");
+        let scene_revision: i64 = connection
+            .query_row(
+                "SELECT revision FROM scene_frames WHERE adventure_id = 'adventure-export'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(scene_revision, 4);
+        drop(connection);
+        importer
+            .export_campaign_archive_at(
+                "campaign-export",
+                rust_archive,
+                "0.1.0",
+                "2026-08-02T00:59:25.584Z",
+            )
+            .unwrap();
+    }
+
+    #[test]
     fn exports_deletes_imports_and_continues_a_native_campaign() {
         let directory = tempfile::tempdir().expect("temp directory");
         let database_path = directory.path().join("ember-tavern.sqlite");
@@ -1349,6 +1858,14 @@ mod tests {
                 [FIRST_TIME],
             )
             .expect("seed private setting");
+        connection
+            .execute(
+                "INSERT INTO app_settings (key, value_json, updated_at)
+                 VALUES ('randomness_profile_v1',
+                   '{\"profile\":\"HIGH\",\"customTemperature\":null}', ?1)",
+                [FIRST_TIME],
+            )
+            .expect("seed randomness setting");
         drop(connection);
 
         fs::write(&archive_path, b"replace only after complete export").expect("seed old export");
@@ -1358,6 +1875,7 @@ mod tests {
         let archive = fs::read(&archive_path).expect("read archive");
         assert!(!String::from_utf8_lossy(&archive).contains("credential_ref"));
         assert!(!String::from_utf8_lossy(&archive).contains("TOP_SECRET_NATIVE_EXPORT"));
+        assert!(!String::from_utf8_lossy(&archive).contains("randomness_profile_v1"));
         assert!(
             fs::read_dir(directory.path())
                 .expect("list export directory")
@@ -1445,6 +1963,46 @@ mod tests {
             })
             .count();
         assert_eq!(backup_count, 1);
+    }
+
+    #[test]
+    fn overwrite_import_aborts_when_another_store_writes_after_backup() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("overwrite-concurrency.sqlite");
+        let archive_path = directory.path().join("campaign.emtavern");
+        let first = CampaignStore::open(&database_path).unwrap();
+        first
+            .create_at("campaign-transfer".to_owned(), FIRST_TIME.to_owned())
+            .unwrap();
+        first
+            .export_campaign_archive("campaign-transfer", &archive_path, "0.1.0")
+            .unwrap();
+        let second = CampaignStore::open(&database_path).unwrap();
+        let concurrent_time = "2026-08-01T14:04:05.006Z";
+
+        let result = first.import_campaign_archive_with_backup_hook(
+            &archive_path,
+            CampaignArchiveImportMode::Overwrite,
+            || {
+                second
+                    .touch_at("campaign-transfer", concurrent_time.to_owned())
+                    .unwrap();
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(CampaignStoreError::ConcurrentModification)
+        ));
+        let connection = first.connect().unwrap();
+        let preserved: String = connection
+            .query_row(
+                "SELECT updated_at FROM campaigns WHERE id = 'campaign-transfer'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(preserved, concurrent_time);
     }
 
     #[test]
@@ -1543,5 +2101,112 @@ mod tests {
             fs::read(&archive_path).expect("read preserved destination"),
             b"original destination"
         );
+    }
+
+    #[test]
+    fn archive_resource_limits_reject_bombs_and_pathological_json() {
+        assert!(add_expanded_bytes(MAX_UNCOMPRESSED_BYTES - 1, 1).is_ok());
+        assert!(add_expanded_bytes(MAX_UNCOMPRESSED_BYTES, 1).is_err());
+        assert!(validate_archive_entry_resources("manifest.json", 1024, 64 * 1024 + 1).is_err());
+        assert!(validate_archive_entry_resources("campaign.json", 1024, 1024 * 101).is_err());
+        assert!(validate_record_count(MAX_EVENT_RECORDS, MAX_EVENT_RECORDS).is_ok());
+        assert!(validate_record_count(MAX_EVENT_RECORDS + 1, MAX_EVENT_RECORDS).is_err());
+
+        let deep = format!(
+            "{}0{}",
+            "[".repeat(MAX_JSON_DEPTH + 1),
+            "]".repeat(MAX_JSON_DEPTH + 1)
+        );
+        assert!(validate_json_text_resources(deep.as_bytes()).is_err());
+        assert!(
+            validate_json_value_resources(&Value::Array(vec![
+                Value::Null;
+                MAX_JSON_ARRAY_LENGTH + 1
+            ]))
+            .is_err()
+        );
+        assert!(
+            validate_json_value_resources(&Value::String("x".repeat(MAX_JSON_STRING_BYTES + 1)))
+                .is_err()
+        );
+
+        let mut writer = ZipWriter::new(Cursor::new(Vec::new()));
+        let options = SimpleFileOptions::default().compression_method(CompressionMethod::Deflated);
+        for name in ENTRY_NAMES {
+            writer.start_file(name, options).unwrap();
+            if name == "campaign.json" {
+                writer.write_all(&vec![b'a'; 1024 * 1024]).unwrap();
+            } else {
+                writer.write_all(b"{}\n").unwrap();
+            }
+        }
+        let bomb = writer.finish().unwrap().into_inner();
+        assert!(bomb.len() < 32 * 1024);
+        assert!(matches!(
+            parse_archive(&bomb),
+            Err(CampaignStoreError::ArchiveInvalid)
+        ));
+    }
+
+    #[test]
+    fn secret_scanner_rejects_nested_values_plain_text_and_debug_material() {
+        for secret in [
+            "provider returned sk-or-v1-1234567890abcdef",
+            "Provider echoed Authorization: Bearer abcdefghijklmnop",
+            "eyJabcdefghijk.abcdefghijkl.abcdefghijkl",
+            "TOP_SECRET_API_KEY_SHOULD_NOT_EXPORT",
+        ] {
+            assert!(assert_no_secret_text(secret).is_err());
+        }
+        assert!(
+            assert_no_secret_keys(&json!({
+                "message": {"detail": "sk-ant-api03-abcdefghijklmnop"}
+            }))
+            .is_err()
+        );
+        assert!(assert_no_secret_text("The innkeeper keeps a secret behind the hearth.").is_ok());
+
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store = CampaignStore::open(directory.path().join("secret-scan.sqlite"))
+            .expect("open database");
+        store
+            .create_at("campaign-secret-scan".to_owned(), FIRST_TIME.to_owned())
+            .expect("create campaign");
+        let connection = store.connect().expect("connect");
+        connection
+            .execute(
+                "INSERT INTO generation_records (
+                   id, campaign_id, request_id, task, model_profile_id, prompt_version,
+                   request_json, raw_response_text, validated_output_json,
+                   validation_error_json, started_at, completed_at
+                 ) VALUES (
+                   'generation-value-secret', 'campaign-secret-scan', 'request-value-secret',
+                   'GENERATE_WORLD', NULL, 1,
+                   '{\"message\":\"sk-or-v1-1234567890abcdef\"}', NULL, NULL, NULL, ?1, NULL
+                 )",
+                [FIRST_TIME],
+            )
+            .expect("seed nested secret value");
+        drop(connection);
+        assert!(matches!(
+            store.capture_archive("campaign-secret-scan", FIRST_TIME, "0.2.0"),
+            Err(CampaignStoreError::ArchiveInvalid)
+        ));
+
+        let connection = store.connect().expect("reconnect");
+        connection
+            .execute(
+                "UPDATE generation_records
+                 SET request_json = '{}',
+                     raw_response_text = 'Authorization: Bearer abcdefghijklmnop'
+                 WHERE id = 'generation-value-secret'",
+                [],
+            )
+            .expect("seed plain response secret");
+        drop(connection);
+        assert!(matches!(
+            store.capture_archive("campaign-secret-scan", FIRST_TIME, "0.2.0"),
+            Err(CampaignStoreError::ArchiveInvalid)
+        ));
     }
 }

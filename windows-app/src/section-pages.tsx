@@ -1,14 +1,16 @@
 import { schemaVersion } from '@ember-tavern/contracts';
 
+import { playerText } from './localization/index.js';
+
 const sharedSchema = schemaVersion(1);
 
 export function TavernPage() {
   return (
     <SectionPage
-      eyebrow="Home fire"
+      eyebrow={playerText.coreUi.homeFire}
       title="酒馆"
       description="这里将成为旅途之间的落脚点。存档入口会在下一项任务接入。"
-      note={`共享协议 Schema v${sharedSchema}`}
+      note={`共享协议模式版本 ${sharedSchema}`}
     />
   );
 }
@@ -16,7 +18,7 @@ export function TavernPage() {
 export function QuestsPage() {
   return (
     <SectionPage
-      eyebrow="Quest ledger"
+      eyebrow={playerText.coreUi.questLedger}
       title="任务"
       description="已知委托与当前目标将在后续页面任务中从本地存档读取。"
     />
@@ -26,7 +28,7 @@ export function QuestsPage() {
 export function AdventurePage() {
   return (
     <SectionPage
-      eyebrow="On the road"
+      eyebrow={playerText.coreUi.onRoad}
       title="冒险"
       description="剧情、行动与本地骰点将在专属纵向切片中呈现。"
     />
@@ -36,7 +38,7 @@ export function AdventurePage() {
 export function CharacterPage() {
   return (
     <SectionPage
-      eyebrow="Character folio"
+      eyebrow={playerText.coreUi.characterFolio}
       title="角色"
       description="角色属性、背景和装备会从SQLite中的当前存档恢复。"
     />

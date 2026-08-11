@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import type { ClassArchetype, PlayerAttributesInput } from '@ember-tavern/contracts';
@@ -10,10 +10,17 @@ import {
   type WindowsCharacterCreationService,
 } from './character-creation-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import {
+  INITIAL_CHARACTER_AI_STATE,
+  reduceCharacterAIState,
+  type CharacterAIEvent,
+  type CharacterAIPhase,
+} from './character-ai-state-machine.js';
+import { playerText } from './localization/index.js';
 
 type CharacterCreationActions = Pick<
   WindowsCharacterCreationService,
-  'load' | 'generateTraits' | 'complete'
+  'load' | 'generateTraits' | 'complete' | 'confirm'
 >;
 
 interface CharacterCreationPageProps {
@@ -50,7 +57,9 @@ export function CharacterCreationPage({
   const [snapshot, setSnapshot] = useState<CharacterCreationSnapshot | null>(null);
   const [draft, setDraft] = useState<CharacterDraft | null>(null);
   const [selectedTraitIds, setSelectedTraitIds] = useState<readonly string[]>([]);
-  const [busy, setBusy] = useState(false);
+  const [aiState, setAIState] = useState(INITIAL_CHARACTER_AI_STATE);
+  const aiStateRef = useRef(INITIAL_CHARACTER_AI_STATE);
+  const operationSequence = useRef(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
   const [retryAction, setRetryAction] = useState<(() => Promise<void>) | null>(null);
@@ -67,6 +76,15 @@ export function CharacterCreationPage({
         if (loaded.character !== null) {
           setSelectedTraitIds(loaded.character.traits.map(({ id }) => id));
         }
+        transition({
+          type: 'RESTORED',
+          phase:
+            loaded.character !== null
+              ? 'committed'
+              : loaded.candidate !== null
+                ? 'preview'
+                : 'idle',
+        });
       })
       .catch(() => {
         if (active) setLoadError('无法读取这个存档的车卡进度。');
@@ -84,21 +102,48 @@ export function CharacterCreationPage({
     [draft],
   );
 
+  const busy = ['generating', 'validating', 'confirming'].includes(aiState.phase);
+
+  function transition(event: CharacterAIEvent): boolean {
+    const previous = aiStateRef.current;
+    const next = reduceCharacterAIState(previous, event);
+    aiStateRef.current = next;
+    setAIState(next);
+    return next !== previous;
+  }
+
+  function updateDraft(next: CharacterDraft) {
+    transition({ type: 'DRAFT_CHANGED' });
+    setDraft(next);
+  }
+
   async function generateTraits() {
     if (draft === null) return;
-    setBusy(true);
+    const operationId = ++operationSequence.current;
+    const revision = aiStateRef.current.revision;
+    if (!transition({ type: 'GENERATION_STARTED', operationId })) return;
     setAiError(null);
     setRetryAction(null);
     try {
-      const generated = await service.generateTraits(draft);
+      const generated = await service.generateTraits(draft, {
+        onValidationStarted: () => {
+          transition({ type: 'VALIDATION_STARTED', operationId, revision });
+        },
+      });
+      if (!transition({ type: 'PREVIEW_READY', operationId, revision })) return;
       setSnapshot(generated);
       setDraft(generated.draft ?? draft);
       setSelectedTraitIds([]);
     } catch (error) {
+      transition({
+        type: 'GENERATION_FAILED',
+        operationId,
+        revision,
+        failure:
+          aiStateRef.current.phase === 'validating' ? 'validation_failed' : 'generation_failed',
+      });
       setAiError(error);
       setRetryAction(() => generateTraits);
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -111,16 +156,47 @@ export function CharacterCreationPage({
       return;
     }
     const selected = snapshot.traitCandidates.filter(({ id }) => selectedTraitIds.includes(id));
-    setBusy(true);
+    const operationId = ++operationSequence.current;
+    const revision = aiStateRef.current.revision;
+    if (!transition({ type: 'GENERATION_STARTED', operationId })) return;
     setAiError(null);
     setRetryAction(null);
     try {
-      setSnapshot(await service.complete(draft, snapshot.traitGenerationRecordId, selected));
+      const completed = await service.complete(draft, snapshot.traitGenerationRecordId, selected, {
+        onValidationStarted: () => {
+          transition({ type: 'VALIDATION_STARTED', operationId, revision });
+        },
+      });
+      if (!transition({ type: 'PREVIEW_READY', operationId, revision })) return;
+      setSnapshot(completed);
     } catch (error) {
+      transition({
+        type: 'GENERATION_FAILED',
+        operationId,
+        revision,
+        failure:
+          aiStateRef.current.phase === 'validating' ? 'validation_failed' : 'generation_failed',
+      });
       setAiError(error);
       setRetryAction(() => completeCharacter);
-    } finally {
-      setBusy(false);
+    }
+  }
+
+  async function confirmCharacter() {
+    if (campaignId === null || snapshot?.candidate?.kind !== 'COMPLETE_CHARACTER') return;
+    const operationId = ++operationSequence.current;
+    const revision = aiStateRef.current.revision;
+    if (!transition({ type: 'CONFIRM_STARTED', operationId })) return;
+    setAiError(null);
+    setRetryAction(null);
+    try {
+      const committed = await service.confirm(campaignId, snapshot.candidate.id);
+      if (!transition({ type: 'CONFIRM_SUCCEEDED', operationId, revision })) return;
+      setSnapshot(committed);
+    } catch (error) {
+      transition({ type: 'CONFIRM_FAILED', operationId, revision });
+      setAiError(error);
+      setRetryAction(() => confirmCharacter);
     }
   }
 
@@ -131,7 +207,7 @@ export function CharacterCreationPage({
     return loadError === null ? (
       <main className="character-studio character-studio--message" aria-busy="true">
         <span className="loading-glyph" aria-hidden="true" />
-        <p className="eyebrow">Reading the character sheet</p>
+        <p className="eyebrow">{playerText.coreUi.readingCharacterSheet}</p>
         <h1>正在铺开车卡…</h1>
       </main>
     ) : (
@@ -143,17 +219,42 @@ export function CharacterCreationPage({
     return (
       <main className="character-studio">
         <CharacterTopline step="03 · 背景与装备" />
-        <section className="character-intro">
-          <p className="eyebrow">Character ready</p>
-          <h1>{character.name}</h1>
-          <p>
-            {character.classDisplayName} · {character.concept}
-          </p>
-        </section>
-        <div className="character-review">
-          <section>
-            <p className="eyebrow">Background</p>
-            <h2>人物背景</h2>
+        <CharacterAIStatus phase={aiState.phase} />
+        <div className="character-review character-sheet" aria-label="完整角色卡">
+          <section className="character-sheet__summary" data-character-section="summary">
+            <p className="eyebrow">{playerText.coreUi.characterReady}</p>
+            <h1>{character.name}</h1>
+            <p>
+              {character.classDisplayName} · {character.concept}
+            </p>
+          </section>
+          <section data-character-section="basics">
+            <p className="eyebrow">基础</p>
+            <h2>基础信息</h2>
+            <Description label="姓名" value={character.name} />
+            <Description label="性别" value={character.gender ?? '未填写'} />
+            <Description
+              label="年龄"
+              value={character.age === null ? '未填写' : String(character.age)}
+            />
+            <Description label="职业" value={character.classDisplayName} />
+            <Description label="角色概念" value={character.concept} />
+          </section>
+          <section data-character-section="attributes">
+            <p className="eyebrow">能力</p>
+            <h2>属性</h2>
+            <dl className="character-sheet__attributes">
+              {Object.entries(ATTRIBUTE_LABELS).map(([attribute, label]) => (
+                <div key={attribute}>
+                  <dt>{label}</dt>
+                  <dd>{character.attributes[attribute as keyof PlayerAttributesInput]}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+          <section data-character-section="background">
+            <p className="eyebrow">{playerText.coreUi.background}</p>
+            <h2>背景</h2>
             <Description label="出生地" value={character.background.birthplace} />
             <Description label="成长经历" value={character.background.formativeExperience} />
             <Description label="冒险动机" value={character.background.adventureMotivation} />
@@ -161,9 +262,38 @@ export function CharacterCreationPage({
             <Description label="重要人物" value={character.background.importantPerson} />
             <Description label="来到酒馆" value={character.background.tavernArrivalReason} />
           </section>
-          <section>
-            <p className="eyebrow">Starting kit</p>
-            <h2>初始装备</h2>
+          <section data-character-section="personality">
+            <p className="eyebrow">选择与边界</p>
+            <h2>个性与偏好</h2>
+            <Description label="个人目标" value={character.personalGoal} />
+            <Description
+              label="故事偏好"
+              value={
+                character.storyPreferences.length === 0
+                  ? '未填写'
+                  : character.storyPreferences.join('、')
+              }
+            />
+            <Description
+              label="内容边界"
+              value={contentBoundaryLabel(character.contentBoundaries)}
+            />
+          </section>
+          <section data-character-section="traits">
+            <p className="eyebrow">特征</p>
+            <h2>特质</h2>
+            <ul className="character-sheet__traits">
+              {character.traits.map((trait) => (
+                <li key={trait.id}>
+                  <strong>{trait.name}</strong>
+                  <p>{trait.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section data-character-section="equipment">
+            <p className="eyebrow">{playerText.coreUi.startingKit}</p>
+            <h2>装备</h2>
             <ul className="equipment-list">
               {character.initialEquipment.map((item) => (
                 <li key={item.id}>
@@ -174,26 +304,112 @@ export function CharacterCreationPage({
               ))}
             </ul>
           </section>
+          <section className="character-sheet__ai-controls" data-character-section="ai-controls">
+            <div>
+              <p className="eyebrow">本地确认边界</p>
+              <h2>AI 控制</h2>
+              <p>角色已经确认并写入本地存档；AI 不会自动覆盖已提交的角色事实。</p>
+            </div>
+            <button
+              className="primary-action character-next"
+              type="button"
+              onClick={() => navigate(`/tavern?campaignId=${encodeURIComponent(campaignId)}`)}
+            >
+              进入酒馆生成流程
+            </button>
+          </section>
         </div>
-        <button
-          className="primary-action character-next"
-          type="button"
-          onClick={() => navigate(`/tavern?campaignId=${encodeURIComponent(campaignId)}`)}
-        >
-          进入酒馆生成流程
-        </button>
       </main>
     );
   }
   if (snapshot.campaignState !== 'CREATING_CHARACTER') {
     return <CharacterMessage title="这个存档不在创建角色阶段。" />;
   }
+  if (snapshot.candidate?.kind === 'COMPLETE_CHARACTER') {
+    const candidate = snapshot.candidate;
+    const background = candidate.background;
+    if (background === null) return <CharacterMessage title="角色候选数据不完整。" />;
+    return (
+      <main className="character-studio">
+        <CharacterTopline step="03 · 确认完整角色" />
+        <CharacterAIStatus phase={aiState.phase} />
+        <section className="character-intro">
+          <p className="eyebrow">结构化角色候选</p>
+          <h1>{candidate.draft.name} 已准备好供你确认。</h1>
+          <p>以下内容只是本地候选预览；确认前不会写入角色、装备或推进存档阶段。</p>
+        </section>
+        {aiError === null ? null : (
+          <AIErrorNotice
+            error={aiError}
+            onRetry={retryAction === null ? undefined : () => void retryAction()}
+          />
+        )}
+        <div className="character-review character-sheet" aria-label="未确认角色候选">
+          <section className="character-sheet__summary" data-character-section="summary">
+            <p className="eyebrow">未确认候选</p>
+            <h2>{candidate.draft.name}</h2>
+            <p>
+              {candidate.draft.classDisplayName} · {candidate.draft.concept}
+            </p>
+          </section>
+          <section data-character-section="background">
+            <h2>背景</h2>
+            <Description label="出生地" value={background.birthplace} />
+            <Description label="成长经历" value={background.formativeExperience} />
+            <Description label="冒险动机" value={background.adventureMotivation} />
+            <Description label="秘密" value={background.secret} />
+            <Description label="重要人物" value={background.importantPerson} />
+            <Description label="来到酒馆" value={background.tavernArrivalReason} />
+          </section>
+          <section data-character-section="traits">
+            <h2>已选特质</h2>
+            <ul className="character-sheet__traits">
+              {candidate.selectedTraits.map((trait) => (
+                <li key={trait.id}>
+                  <strong>{trait.name}</strong>
+                  <p>{trait.description}</p>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section data-character-section="equipment">
+            <h2>初始装备</h2>
+            <ul className="equipment-list">
+              {candidate.initialEquipment.map((item) => (
+                <li key={item.id}>
+                  <strong>{item.name}</strong>
+                  <p>{item.description}</p>
+                  <span>{effectLabel(item.effect)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="character-sheet__ai-controls" data-character-section="ai-controls">
+            <div>
+              <p className="eyebrow">原子确认边界</p>
+              <h2>写入本地存档</h2>
+              <p>确认会在一个事务中写入角色、装备和生成审计；失败不会留下半成品。</p>
+            </div>
+            <button
+              className="primary-action character-next"
+              type="button"
+              disabled={busy}
+              onClick={() => void confirmCharacter()}
+            >
+              {aiState.phase === 'confirming' ? '正在原子确认…' : '确认角色并写入存档'}
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
   if (snapshot.traitCandidates.length > 0) {
     return (
       <main className="character-studio">
         <CharacterTopline step="02 · 选择特质" />
+        <CharacterAIStatus phase={aiState.phase} />
         <section className="character-intro">
-          <p className="eyebrow">Choose two traits</p>
+          <p className="eyebrow">{playerText.coreUi.chooseTwoTraits}</p>
           <h1>决定角色如何面对世界。</h1>
           <p>从经过验证的六个候选特质中选择两个。重新打开应用后，本地进度仍会保留。</p>
         </section>
@@ -215,13 +431,14 @@ export function CharacterCreationPage({
                   type="checkbox"
                   checked={selected}
                   disabled={!selected && selectedTraitIds.length === 2}
-                  onChange={(event) =>
+                  onChange={(event) => {
+                    transition({ type: 'PREVIEW_EDITED' });
                     setSelectedTraitIds(
                       event.target.checked
                         ? [...selectedTraitIds, trait.id]
                         : selectedTraitIds.filter((id) => id !== trait.id),
-                    )
-                  }
+                    );
+                  }}
                 />
                 <span>{trait.name}</span>
                 <p>{trait.description}</p>
@@ -235,7 +452,9 @@ export function CharacterCreationPage({
           disabled={busy || selectedTraitIds.length !== 2}
           onClick={() => void completeCharacter()}
         >
-          {busy ? '正在生成背景…' : '确认特质并生成背景'}
+          {['generating', 'validating'].includes(aiState.phase)
+            ? '正在生成完整候选…'
+            : '确认特质并生成背景候选'}
         </button>
       </main>
     );
@@ -244,8 +463,9 @@ export function CharacterCreationPage({
   return (
     <main className="character-studio">
       <CharacterTopline step="01 · 基础车卡" />
+      <CharacterAIStatus phase={aiState.phase} />
       <section className="character-intro">
-        <p className="eyebrow">Build your traveler</p>
+        <p className="eyebrow">{playerText.coreUi.buildTraveler}</p>
         <h1>谁会推开酒馆的门？</h1>
         <p>基础事实由你决定；Fake Provider 只负责生成候选特质与背景文本。</p>
       </section>
@@ -269,14 +489,16 @@ export function CharacterCreationPage({
             <input
               required
               value={draft.name}
-              onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
             />
           </label>
           <label>
             <span>性别（可选）</span>
             <input
               value={draft.gender ?? ''}
-              onChange={(event) => setDraft({ ...draft, gender: emptyToNull(event.target.value) })}
+              onChange={(event) =>
+                updateDraft({ ...draft, gender: emptyToNull(event.target.value) })
+              }
             />
           </label>
           <label>
@@ -286,7 +508,7 @@ export function CharacterCreationPage({
               type="number"
               value={draft.age ?? ''}
               onChange={(event) =>
-                setDraft({
+                updateDraft({
                   ...draft,
                   age: event.target.value === '' ? null : Number(event.target.value),
                 })
@@ -299,7 +521,7 @@ export function CharacterCreationPage({
               required
               rows={3}
               value={draft.concept}
-              onChange={(event) => setDraft({ ...draft, concept: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, concept: event.target.value })}
             />
           </label>
           <label>
@@ -308,7 +530,7 @@ export function CharacterCreationPage({
               value={draft.classArchetype}
               onChange={(event) => {
                 const classArchetype = event.target.value as ClassArchetype;
-                setDraft({
+                updateDraft({
                   ...draft,
                   classArchetype,
                   classDisplayName: CLASS_NAMES[classArchetype],
@@ -327,7 +549,7 @@ export function CharacterCreationPage({
             <input
               required
               value={draft.classDisplayName}
-              onChange={(event) => setDraft({ ...draft, classDisplayName: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, classDisplayName: event.target.value })}
             />
           </label>
           <label className="character-form__wide">
@@ -336,7 +558,7 @@ export function CharacterCreationPage({
               required
               rows={2}
               value={draft.personalGoal}
-              onChange={(event) => setDraft({ ...draft, personalGoal: event.target.value })}
+              onChange={(event) => updateDraft({ ...draft, personalGoal: event.target.value })}
             />
           </label>
           <label className="character-form__wide">
@@ -345,7 +567,7 @@ export function CharacterCreationPage({
               rows={2}
               value={draft.storyPreferences.join('\n')}
               onChange={(event) =>
-                setDraft({ ...draft, storyPreferences: lines(event.target.value) })
+                updateDraft({ ...draft, storyPreferences: lines(event.target.value) })
               }
             />
           </label>
@@ -372,7 +594,7 @@ export function CharacterCreationPage({
                     type="number"
                     value={draft.attributes[name]}
                     onChange={(event) =>
-                      setDraft({
+                      updateDraft({
                         ...draft,
                         attributes: { ...draft.attributes, [name]: Number(event.target.value) },
                       })
@@ -390,14 +612,17 @@ export function CharacterCreationPage({
             label="允许恐怖元素"
             checked={draft.contentBoundaries.allowHorror}
             onChange={(allowHorror) =>
-              setDraft({ ...draft, contentBoundaries: { ...draft.contentBoundaries, allowHorror } })
+              updateDraft({
+                ...draft,
+                contentBoundaries: { ...draft.contentBoundaries, allowHorror },
+              })
             }
           />
           <Boundary
             label="允许永久死亡"
             checked={draft.contentBoundaries.allowPermanentDeath}
             onChange={(allowPermanentDeath) =>
-              setDraft({
+              updateDraft({
                 ...draft,
                 contentBoundaries: { ...draft.contentBoundaries, allowPermanentDeath },
               })
@@ -407,7 +632,7 @@ export function CharacterCreationPage({
             label="允许恋爱剧情"
             checked={draft.contentBoundaries.allowRomance}
             onChange={(allowRomance) =>
-              setDraft({
+              updateDraft({
                 ...draft,
                 contentBoundaries: { ...draft.contentBoundaries, allowRomance },
               })
@@ -417,7 +642,7 @@ export function CharacterCreationPage({
             label="允许背叛剧情"
             checked={draft.contentBoundaries.allowBetrayal}
             onChange={(allowBetrayal) =>
-              setDraft({
+              updateDraft({
                 ...draft,
                 contentBoundaries: { ...draft.contentBoundaries, allowBetrayal },
               })
@@ -429,7 +654,7 @@ export function CharacterCreationPage({
               rows={2}
               value={draft.contentBoundaries.excludedContent.join('\n')}
               onChange={(event) =>
-                setDraft({
+                updateDraft({
                   ...draft,
                   contentBoundaries: {
                     ...draft.contentBoundaries,
@@ -446,7 +671,11 @@ export function CharacterCreationPage({
           type="submit"
           disabled={busy || attributeTotal !== 10}
         >
-          {busy ? '正在生成特质…' : '生成六个候选特质'}
+          {aiState.phase === 'validating'
+            ? '正在验证特质…'
+            : aiState.phase === 'generating'
+              ? '正在生成特质…'
+              : '生成六个候选特质'}
         </button>
       </form>
     </main>
@@ -462,10 +691,37 @@ function CharacterTopline({ step }: { readonly step: string }) {
   );
 }
 
+function CharacterAIStatus({ phase }: { readonly phase: CharacterAIPhase }) {
+  return (
+    <p className="character-ai-status" data-testid="character-ai-phase" aria-live="polite">
+      AI 状态：{characterAIPhaseLabel(phase)}
+    </p>
+  );
+}
+
+function characterAIPhaseLabel(phase: CharacterAIPhase): string {
+  switch (phase) {
+    case 'idle':
+      return '待命';
+    case 'generating':
+      return '生成中';
+    case 'validating':
+      return '验证中';
+    case 'preview':
+      return '预览';
+    case 'editing':
+      return '编辑中';
+    case 'confirming':
+      return '确认中';
+    case 'committed':
+      return '已提交';
+  }
+}
+
 function CharacterMessage({ title }: { readonly title: string }) {
   return (
     <main className="character-studio character-studio--message" role="alert">
-      <p className="eyebrow">Character stage unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.characterStageUnavailable}</p>
       <h1>{title}</h1>
       <Link className="text-link" to="/saves">
         返回存档首页
@@ -516,6 +772,20 @@ function effectLabel(
   return effect.kind === 'NONE'
     ? '叙事装备'
     : `${ATTRIBUTE_LABELS[effect.attribute]}检定 ${effect.modifier > 0 ? '+' : ''}${effect.modifier}`;
+}
+
+function contentBoundaryLabel(boundaries: CharacterDraft['contentBoundaries']): string {
+  const allowed = [
+    boundaries.allowHorror ? '恐怖元素' : null,
+    boundaries.allowPermanentDeath ? '永久死亡' : null,
+    boundaries.allowRomance ? '恋爱剧情' : null,
+    boundaries.allowBetrayal ? '背叛剧情' : null,
+  ].filter((value): value is string => value !== null);
+  const exclusions =
+    boundaries.excludedContent.length === 0
+      ? '无额外排除内容'
+      : `排除：${boundaries.excludedContent.join('、')}`;
+  return `${allowed.length === 0 ? '未允许特殊内容' : `允许：${allowed.join('、')}`}；${exclusions}`;
 }
 
 function newDraft(campaignId: string): CharacterDraft {

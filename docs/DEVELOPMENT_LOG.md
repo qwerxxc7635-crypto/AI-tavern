@@ -2295,6 +2295,7 @@
 
 - M10-T06 Windows范围验收通过，完整证据见`docs/WINDOWS_ACCEPTANCE_0.1.md`。Windows 0.1内部候选已完成；未签名仍是外部发布限制，不影响内部候选结论。
 - M9与M10-T04继续`DEFERRED`；未自动开始iOS工作。
+
 ## 2026-08-02 — Windows v0.1 第一轮独立发布审查
 
 ### 独立发现与修复
@@ -2313,3 +2314,1201 @@
 
 - 真实 Edge/Playwright 复核 860×600、1180×760、1366×768 与 1920×1080，并检查设置、导入导出和恢复中心；未发现横向溢出或新增阻断性 UI 问题。
 - 完整门禁结果、正式产物哈希、签名状态、剩余风险与移交包位置在最终审查报告中记录。
+
+## 2026-08-08 — v0.2 M0 仓库与双平台基线
+
+### 完成
+
+- 自动确认仓库、`main`、起始 HEAD `2010448f3be953bb2ebb2c1dcf7ef23a8697e022` 与 `origin/main` 对齐。
+- 保护既有 `.gitignore` 修改；在 `.local/recovery/20260808_122928/` 保存 HEAD、status、tracked/staged diff、untracked 和元数据，不执行 destructive git。
+- 记录 macOS/Xcode、Node/pnpm、Rust、当前 Windows-only CI、Windows Tauri 入口和缺失 macOS adapters，形成 `docs/V0_2_BASELINE.md`。
+
+### 边界
+
+- 本项完成 `V02-M0-T01`。Architecture Gate 前没有修改生产代码；`V02-M0-T02/T03` 在 Gate 后实施。
+
+## 2026-08-08 — v0.2 M0.5 竞品研究与 Gap Analysis
+
+### 完成
+
+- 自行把 RePoG、TavernAI、SillyTavern clone 到 `.local/research/third_party` 并固定 branch/SHA/license/source availability。
+- 逐项分析因果 GM、玩家作者权、知识边界、冷热记忆、Prompt Manager、connection profile、world info、persona、context 预算、本地化和扩展边界。
+- 明确 TavernAI 固定仓库为 `SOURCE_NOT_PUBLIC_IN_THIS_REPO`，SillyTavern 只做 clean-room 行为研究，不复制 AGPL 源码。
+- 生成 baseline、三份分析、横向矩阵、Gap、Borrow Plan 与 Rejected Ideas；将 MUST/SHOULD/LATER/REJECT 映射到 `docs/TASKS_V0.2.md`。
+
+### 结论
+
+- `V02-COMP-T01`～`V02-COMP-T07` 完成。默认拒绝插件市场、完整 MultiChat/World Voices、AI Companion、浏览器服务替换桌面边界和非 SQLite 真实数据源。
+
+## 2026-08-08 — v0.2 M0.6 Architecture Gate
+
+### 完成
+
+- 定义单一 AI pipeline、ContextBlock、三层 provider 配置、Candidate Pattern、最小 Event Ledger、四层知识模型、SceneFrame 和六个平台 ports。
+- Architecture Gate 逐项证明 UI 无 provider 直连、domain 无平台依赖、AI 不直接写状态、context 统一、hard logic 本地、config frozen、knowledge/truth 分离且范围未膨胀。
+- Gate 结论为 `PASS FOR IMPLEMENTATION`；实现违反不变量时自动失效。
+
+### 下一项
+
+- 严格执行 `V02-M0-T02`，随后 `V02-M0-T03`；完成后进入 `V02-M1-T01`。不启动 iOS，不访问真实付费 API 或正式用户数据。
+
+## 2026-08-08 — v0.2 M0 跨平台路径与共享脚本完成
+
+### 实现
+
+- 新增 `ember-platform-services` crate，以 `PlatformPaths` port 暴露 data/cache/log/temp，Windows 与 macOS adapters 只接受平台 composition root 解析出的绝对路径。
+- Tauri 启动不再直接拼接 `app_data_dir`，而是经当前平台 adapter 获取 SQLite data dir；测试可注入临时根目录。
+- 用既有 `app-icon.svg` 补齐桌面 PNG/ICNS，未纳入生成器产生的 iOS/Android 资产。
+- 新增跨平台 Node build/shared gate/release metadata 入口；保留 Windows E2E 为明确专项脚本。
+
+### 验证
+
+- PlatformPaths tests：3/3；Node release metadata tests：2/2。
+- macOS `cargo check -p ember-tavern-windows` 通过；既有 `secure-secrets` 非 Windows dead-code warning 归入下一项 `V02-M1-T02`，不在 M0 隐藏。
+- `pnpm build:desktop` 通过，Vite 转换 179 modules；metadata 命令输出当前版本、提交、darwin/arm64。
+
+### 结论
+
+- `V02-M0-T02` 与 `V02-M0-T03` 完成。下一项严格为 `V02-M1-T01` SSRF IPv4/IPv6；Windows 和 macOS 的最终实机/CI 证据仍由 M9 重新验收。
+
+## 2026-08-08 — V02-M1-T01 关闭 SSRF IPv4/IPv6 绕过
+
+### 实现
+
+- 删除自维护的 IPv4/IPv6 “公网”网段判断，改用 `antissrf` 的 `ExternalOnlyLatest` 地址策略；依赖关闭默认 reqwest integration，不替换现有受限 HTTP transport。
+- 对 IPv4-mapped、IPv4-compatible、NAT64、6to4 与 Teredo 解析内嵌 IPv4，并在外层策略之外复用同一 IPv4 安全判断。
+- 保留全 DNS answer 校验、混合结果拒绝、解析地址固定、禁重定向和 URL host 驱动 Host/SNI 的既有边界。
+
+### 验证
+
+- `cargo test -p ember-secure-http`：11/11 通过。
+- `cargo clippy -p ember-secure-http --all-targets -- -D warnings` 通过；全 workspace tests 继续执行到 `ember-secure-secrets`，仅因 macOS adapter 尚未实现而在既有 round-trip 测试返回 `Unavailable`，该失败正是下一项 SR2-002，不属于本次网络边界回归。
+- 新矩阵覆盖 IPv4 private/CGNAT/link-local/documentation/benchmark/multicast/reserved，以及审查列出的 `64:ff9b:1::`、`100::`、`2001::`、`2001:2::`、`2001:10::`、6to4 和旧 compatible 形式。
+- 未访问真实 Provider；所有网络测试仅使用回环临时服务。
+
+### 结论
+
+- SR2-001 / `V02-M1-T01` 关闭。下一项严格为 `V02-M1-T02` SecureVault。
+
+## 2026-08-08 — V02-M1-T02 完成 SecureVault 生命周期
+
+### 实现
+
+- `SecretStore` 实现共享 `SecureVault` port；Windows 继续使用 Credential Manager，macOS 新增原生 Keychain adapter 与 health check。
+- 模型设置协议新增 `KEEP`、`REPLACE`、`CLEAR`：空密钥保存保持旧引用，显式替换/清空才改变引用。
+- 新增本地 migration 2 `credential_cleanup_queue`。新秘密先登记为可回滚暂存项，成功设置事务原子认领；旧引用在替换/清空事务中入队。
+- 删除成功才完成队列项，失败增加 attempts 并保留；启动及模型设置命令自动重试。临时探测或保存回滚的删除失败同样持久化。
+- Campaign archive schema 继续为1，与设备级 SQLite migration 2解耦；现有 TypeScript/Rust v1 fixture 保持互操作。
+
+### 验证
+
+- `cargo test -p ember-secure-secrets`：3/3，通过 macOS Keychain 真实运行时秘密 round-trip、健康检查和幂等删除，测试秘密已清理。
+- `cargo test -p ember-native-bridge -p ember-tavern-windows`：38/38，通过替换、保持、清空、事务回滚、删除失败、重启恢复和成功重试。
+- macOS 上的 Provider 系统凭据集成测试通过：仅向本机回环测试服务发送 Keychain 中的随机运行时值，并完成清理。
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
+- `pnpm test`：340/340，通过 migration 2、archive schema 1互操作、UI不暴露秘密及空输入 `KEEP` 回归。
+- `pnpm check:shared` 与 `pnpm build:desktop` 通过；Vite 转换 179 modules。
+- 未访问真实 Provider、付费 API 或正式用户数据；系统库测试只使用随机运行时值。
+
+### 结论
+
+- SR2-002 / `V02-M1-T02` 关闭。下一项严格为 `V02-M1-T03` `.emtavern` resource limits。
+
+## 2026-08-08 — V02-M1-T03 关闭存档资源耗尽风险
+
+### 实现
+
+- `.emtavern` 压缩包/展开总量收敛到32/64 MiB，五个固定条目各自限制64 KiB、16 MiB或32 MiB，压缩比最多100:1。
+- JSON文本在通用解析器前做非递归深度扫描，解析后以迭代遍历限制深度64、数组100,000项和字符串1,048,576字符/字节。
+- 事件、生成记录、单个Campaign事实表和档案总记录数分别限制为100,000、20,000、20,000和200,000；导出与导入共享相同政策。
+- TypeScript ZIP读取器只保留中央目录描述并按需用`maxOutputLength`展开；Rust先扫描全部元数据，再逐条目读取、校验SHA-256并解析，不再同时保存全部展开字节。
+
+### 验证
+
+- TypeScript资源测试与跨实现存档测试：12/12；包含实际中央目录压缩比炸弹拒绝。
+- Rust native archive tests：7/7；包含真实DEFLATE高压缩比炸弹、极深JSON、超长数组/字符串、记录数、单条目和展开总量。
+- `pnpm check:shared`：59 files / 344 tests 全部通过。
+- `cargo test --workspace` 全部通过；native bridge 37/37，且 TypeScript/Rust v1 fixtures 双向互操作保持通过。
+- `cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
+
+### 结论
+
+- SR2-003 / `V02-M1-T03` 关闭。下一项严格为 `V02-M1-T04` Secret scanning。
+
+## 2026-08-08 — V02-M1-T04 完成全字符串秘密扫描
+
+### 实现
+
+- 新增共享 TypeScript 存档秘密扫描器，Rust native实现同一高置信模式；扫描敏感字段名及所有嵌套字符串值。
+- 覆盖普通文本、请求JSON、原始响应、验证错误、四个数据文件和最终ZIP字节；识别Authorization、常见Provider Key/JWT、credential引用和显式测试密钥。
+- 命中时导出/导入整体拒绝，不修改游戏状态、不发布目标文件，也不把命中原文写入错误消息。
+- 诊断文本新增显式redaction函数，以`[REDACTED]`替换已知模式；隐私文档说明高置信扫描并非任意秘密识别的数学保证。
+
+### 验证
+
+- TypeScript scanner/export tests：14/14；覆盖嵌套值、纯文本Header、请求、响应、错误、普通叙事字段、JWT、测试密钥、redaction和无害叙事。
+- Rust native archive tests：8/8；真实SQLite导出对嵌套请求值与纯文本Provider回显均拒绝。
+- `pnpm check:shared`：60 files / 349 tests 全部通过。
+- `cargo test --workspace` 全部通过，native bridge 38/38；`cargo clippy --workspace --all-targets --all-features -- -D warnings` 通过。
+
+### 结论
+
+- SR2-004 / `V02-M1-T04` 关闭。下一项严格为 `V02-M1-T05` Provider consistency。
+
+## 2026-08-08 — V02-M1-T05 关闭 Provider 配置漂移
+
+### 实现
+
+- DeepSeek、Qwen和OpenRouter探测只接受固定规范化端点，设置页地址只读；Ollama和自定义服务把实际探测地址规范化后回传并保存。
+- Tauri新增内存探测回执注册表：随机UUID回执最长15分钟、最多64项，精确绑定预设、端点指纹、模型、显示名、能力来源、能力值与探测指纹；保存前必须逐值匹配。
+- 能力来源新增`PROVIDER_RESPONSE`、`PRESET_METADATA`、`UNKNOWN`。只有DeepSeek/Qwen正式预设模型使用预设能力，OpenRouter有响应元数据时标为Provider响应，其余保持未知和保守能力。
+- SQLite migration 3新增`endpoint_fingerprint`、`capability_source`与`probe_fingerprint`；同一Provider更新时先禁用全部旧模型，默认/备用引用在同一事务先清空再按当前选择写入。
+- Campaign archive schema仍为1；Provider配置、回执和设备能力继续不进入`.emtavern`。
+
+### 验证
+
+- 60个Vitest文件、349项测试通过；Node migration/startup覆盖migration 3字段与约束。
+- Native model settings 11/11通过，覆盖端点切换、旧模型禁用、默认/备用清空、端点/能力指纹篡改拒绝。
+- Tauri单元测试覆盖固定预设端点替换拒绝，以及回执与端点、模型、能力逐值绑定。
+- 未访问真实Provider、付费API或正式用户数据；Provider探测测试只验证本地结构和既有回环合同。
+
+### 结论
+
+- SR2-005 / `V02-M1-T05` 关闭。下一项严格为 `V02-M1-T06` Destructive transaction lock。
+
+## 2026-08-08 — V02-M1-T06 关闭破坏性备份并发窗口
+
+### 实现
+
+- `ember-platform-services`新增`AppInstanceLock` port和基于`fs2`的跨平台文件锁adapter，支持阻塞操作锁与非阻塞实例锁。
+- Tauri在打开SQLite前取得全生命周期实例锁；第二应用实例不能进入运行期。`CampaignStore`的启动备份、恢复、永久删除和导入使用数据库相邻的操作锁。
+- 永久删除与覆盖导入在同一连接记录`PRAGMA data_version`，备份后取得`BEGIN IMMEDIATE`并重新检查版本与目标；期间任一独立连接提交都会返回`CONCURRENT_MODIFICATION`，正式数据不变。
+- 创建导入和恢复同样把协调锁保持到事务提交/回滚；备份失败继续阻断删除或覆盖。
+
+### 验证
+
+- 两个独立`CampaignStore`测试在永久删除和覆盖导入完成备份后提交新时间戳；两项破坏性操作均取消，最新Campaign保留。
+- 两个独立文件锁adapter测试确认第二个非阻塞持有者在首个guard释放前返回`AlreadyLocked`，释放后可以取得。
+- 既有永久删除、覆盖导入、备份失败、恢复、导入回滚与Windows纵向E2E继续纳入完整workspace门禁。
+- 未访问正式用户数据；所有并发和备份测试使用自动清理的临时SQLite、锁文件与归档。
+
+### 结论
+
+- SR2-006 / `V02-M1-T06` 关闭。下一项严格为 `V02-M1-T07` TS/Rust bidirectional archive CI。
+
+## 2026-08-08 — V02-M1-T07 建立当前双实现存档门禁
+
+### 实现
+
+- 新增`pnpm archive:interop`跨平台命令：当前TypeScript exporter → 当前Rust importer，再执行当前Rust exporter → 当前TypeScript importer。
+- TypeScript门禁使用固定Campaign、事件、GenerationRecord和世界事实；Rust门禁使用固定Campaign与世界事实，两侧均检查导入后的SQLite事实且不携带设备Provider状态。
+- `archive-fixtures.json`记录两份v1夹具的路径、producer、source test、固定创建时间与SHA-256；生成结果对五个固定ZIP条目的名称和完整字节做regenerate-and-diff。
+- Windows/Unix由ZIP库写入的`made by`头允许不同，但提交夹具原始SHA-256仍由来源清单锁定；逻辑内容差异不能被忽略。
+- Windows CI新增独立互操作步骤，不再只依赖同语言测试或历史夹具读取。
+
+### 验证
+
+- `pnpm archive:interop`通过：TypeScript定向13/13、Rust当前交叉门禁1/1、Rust输出回交TypeScript定向13/13。
+- 两份重新生成归档的五个条目与提交夹具逐字节一致；提交文件SHA-256与来源清单一致。
+- 命令只使用临时SQLite与临时归档目录，结束后自动清理；未访问真实Provider、凭据或正式用户数据。
+
+### 结论
+
+- SR2-007 / `V02-M1-T07` 关闭。下一项严格为 `V02-M1-T08` CI / evidence。
+
+## 2026-08-08 — V02-M1-T08 建立双平台CI与结构化证据
+
+### 实现
+
+- GitHub Actions quality job扩展为Windows/macOS矩阵，两端运行完整共享检查与当前TS/Rust归档交叉门禁。
+- Windows release job通过证据包装器运行纵向SQLite E2E和Tauri NSIS构建；macOS build job同样构建Tauri `.app`。
+- 新增UTF-8命令证据包装器，记录命令、起止时间、退出码、signal、stdout和stderr；新增release证据收集器，记录bundle内全部常规文件的相对路径、大小与SHA-256并拒绝symlink/空目录。
+- 两个平台的bundle和JSON证据均上传为CI artifact，失败时仍上传已产生的证据。
+
+### 验证
+
+- 新增4项Node测试：2项验证UTF-8命令/产物证据，2项锁定双平台矩阵、归档门禁、Windows纵向测试、NSIS、macOS app、哈希和artifact上传配置。
+- 本机包装器测试真实捕获中文stdout与stderr并验证退出码/时间；临时bundle的长度与SHA-256逐值匹配。
+- macOS本机实际`tauri build --bundles app`通过，release可执行文件与`Ember Tavern.app`生成成功；结构化命令证据退出码为0，bundle证据记录3个常规文件及SHA-256。
+- 托管Windows NSIS和macOS app job只在远端CI运行；当前提交不把尚未出现的远端run结果写成已通过，M9仍需双环境最终验收。
+
+### 结论
+
+- SR2-008、SR2-009 / `V02-M1-T08` 关闭。SR2-010保留至最终连续流程截图；下一项严格为 `V02-M2-T01` AI Task Orchestrator。
+
+## 2026-08-08 — V02-M2-T01 统一 AI Task Orchestrator
+
+### 实现
+
+- 新增品牌化`AiOperationId`以及统一`AITaskRequest`/`AITaskResult`，在一次执行中绑定task、request、operation、Campaign/Actor、Provider配置、模型和attempt。
+- route显式区分`PRIMARY`、`RETRY`、`FALLBACK`与`REPAIR`；恢复流程分别标记fallback/retry，结构修复标记repair，禁止adapter内部隐式切换。
+- Provider调用前验证request/route身份，返回后验证request/model和token usage；错误归一为configuration、credential、capability、network-policy、timeout、provider、schema、domain-policy、stale-revision和cancelled十类。
+- 世界、角色、酒馆、任务、NPC对话、冒险开始/回合/结算共八类应用生成路径全部经过统一执行入口，UI继续只调用Application service。
+
+### 验证
+
+- 新增7项Orchestrator测试，覆盖四类route、attempt规则、调用前拒绝漂移、usage一致性、timeout和稳定错误分类。
+- 完整`pnpm test`通过：61个Vitest文件、358项测试，Node持久化与脚本测试同时通过；`pnpm typecheck`、`pnpm lint`和`git diff --check`通过。
+- 未访问真实Provider、付费API或正式用户数据；测试只使用Fake Provider和固定规范化响应。
+
+### 结论
+
+- `V02-M2-T01`完成。下一项严格为`V02-M2-T02` Context Assembly Pipeline。
+
+## 2026-08-08 — V02-M2-T02 完成 Context Assembly Pipeline
+
+### 实现
+
+- 新增完整ContextBlock schema：12种类型、stable/semi-stable/dynamic、priority、块预算、privacy class、source/revision、version及规范化JSON SHA-256。
+- 装配器按阶段、任务type顺序、priority和ID确定性排序；支持0～1 relevance、required块、块预算与总预算，可选块按not-relevant/block-budget/total-budget记录排除原因且不截断JSON。
+- ContextManifest只保存来源、版本、hash、隐私级别、估算token和纳入原因，不复制块内容；required块无法装入时fail closed。
+- 所有普通应用生成和回合Orchestrator都在Provider前创建任务块；AITaskOrchestrator重新计算hash并核对included manifest，context或provenance漂移时不调用Provider。
+
+### 验证
+
+- 新增5项装配测试，覆盖规范化hash、provenance隐私、三阶段确定顺序、相关性/双层预算、整块排除、required失败与UTF-8估算。
+- Orchestrator测试新增context篡改拒绝；完整`pnpm test`通过62个Vitest文件、363项测试，并通过Node持久化/脚本测试。
+- `pnpm lint`、`pnpm typecheck`与`git diff --check`通过；未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M2-T02`完成。下一项严格为`V02-M2-T03` ResolvedModelConfig。
+
+## 2026-08-08 — V02-M2-T03 冻结 ResolvedModelConfig
+
+### 实现
+
+- 新增ConnectionProfile到ResolvedModelConfig的单向解析，冻结规范化endpoint、Provider options、credential reference、模型档案/名称、能力、生成参数、prompt profile和cache profile。
+- 所有语义字段以Unicode NFC规范化JSON计算SHA-256；ContextBlock同时改用共享规范化器，使组合/分解Unicode得到同一hash并拒绝等价键冲突。
+- AITaskOrchestrator复算fingerprint并绑定route/request，Provider只接收冻结投影；可编辑配置对象在调用前变化不会影响实际endpoint、credential reference或options。
+- 回合GenerationRecord记录resolved fingerprint而不记录完整配置；结构修复要求与原fingerprint一致，temperature或任一配置漂移均在第二次Provider调用前失败。
+
+### 验证
+
+- 新增3项ResolvedModelConfig测试，覆盖深冻结、端点规范化、确定性fingerprint、参数差异、投影、禁用配置及含authority秘密/query的端点拒绝。
+- Orchestrator新增冻结投影测试；repair回归新增generation参数漂移拒绝并确认Provider仍只调用一次。
+- 完整`pnpm test`通过63个Vitest文件、367项测试及16项Node测试；`pnpm typecheck`通过。未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M2-T03`完成。下一项严格为`V02-M2-T04` AI Candidate Infrastructure。
+
+## 2026-08-08 — V02-M2-T04 建立 AI Candidate Infrastructure
+
+### 实现
+
+- SQLite migration 4新增`ai_candidates`，绑定Campaign、operation、GenerationRecord、payload、双重验证证据、无秘密provenance、expected revision、状态和修订链；TypeScript/Rust启动迁移同步升级。
+- 新增Candidate repository与Application use cases：propose、preview、edit/regenerate修订、reject及confirm；payload和provenance执行高置信credential扫描。
+- Candidate不可原地编辑；修订在同一事务创建新PROPOSED项并把旧项标为SUPERSEDED，保留双向链和独立operation。
+- confirm在`BEGIN IMMEDIATE`中核对Campaign/状态/revision，领域commit与ACCEPTED转换共同提交；失败共同回滚，重复确认不会重复领域写入。
+
+### 验证
+
+- 新增4项Candidate纵向测试，覆盖生成/验证/预览、编辑修订、无领域副作用、stale revision、原子确认、幂等重复确认、领域失败回滚、拒绝和credential拒绝。
+- 完整Vitest通过64个文件、371项测试；Node migration 4新库与重复应用通过，旧库升级断言更新并定向通过。
+- Rust native启动路径纳入migration 4，格式门禁及newer-schema拒绝测试通过；未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M2-T04`完成。下一项严格为`V02-M2-T05` Event Ledger。
+
+## 2026-08-08 — V02-M2-T05 建立最小 Event Ledger
+
+### 实现
+
+- SQLite migration 5新增独立`event_ledger`，覆盖character、quest、turn、dice、scene、knowledge、snapshot和recovery八类注册事件/聚合。
+- 每项绑定全局event ID、operation ID、aggregate ID/type、连续revision、版本化payload、source和数据库生成时间；唯一约束阻止operation元组重放与revision重复。
+- 数据库触发器要求同一aggregate从revision 1严格连续；Repository校验注册表、正整数、JSON和高置信credential，并提供Campaign/aggregate确定性查询。
+- Candidate确认纵向测试在同一事务写领域投影、QUEST ledger和ACCEPTED状态；领域失败时三者共同回滚，证明Ledger不脱离状态事务。
+
+### 验证
+
+- 新增3项Ledger测试，逐项覆盖八类首批事件、数据库时间、连续revision、operation幂等、aggregate顺序和秘密拒绝。
+- Candidate 4项纵向测试继续通过并新增Ledger原子提交/回滚断言；migration 5新库、重复应用与旧库升级纳入门禁。
+- Rust native 43/43通过，包含Windows纵向切片、存档和newer-schema拒绝；`pnpm lint`、`pnpm typecheck`及格式检查通过。未访问正式用户数据或外部API。
+
+### 结论
+
+- `V02-M2-T05`完成，M2 Core AI Architecture实现任务结束。下一项严格为`V02-M3-T01` “我的”入口。
+
+## 2026-08-08 — V02-M3-T01 新增“我的”入口
+
+### 实现
+
+- 存档首页主操作区新增“我的”，无需先选择Campaign即可进入设备级设置。
+- 共享侧栏把原“设置”导航升级为“我的”并使用独立`/my`路由；旧`/settings`继续保留，避免恢复提示和既有深链失效。
+- 新页面明确设备模型/偏好与SQLite游戏事实的边界，并提供模型设置和存档首页两个可用去向，不提前实现T02的信息架构内容。
+
+### 验证
+
+- 路由测试遍历全部六个共享导航并确认“我的”标题与选中状态。
+- 存档首页新增无Campaign入口测试；相关2个测试文件共16项通过，`pnpm typecheck`通过。
+- 未接入真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M3-T01`完成。下一项严格为`V02-M3-T02` 我的页面信息架构。
+
+## 2026-08-08 — V02-M3-T02 建立“我的”信息架构
+
+### 实现
+
+- “我的”页面固定七个设备级分区：API、默认与备用、生成参数、DeepSeek缓存、上下文、隐私、版本与更新记录。
+- 左侧语义导航直接定位页面section，桌面保持sticky目录，小窗口降为单列；每项说明与本地优先、配置冻结和隐私边界一致。
+- API分区继续链接现有模型设置；其余分区只建立信息层级，不伪造尚未由T03～M4接线的实时值或控件。
+
+### 验证
+
+- 新增1项页面结构测试，逐一校验七个导航链接、section标题、锚点和模型设置深链。
+- “我的”页面及共享路由2个测试文件共4项通过；`pnpm typecheck`通过。
+- 未访问真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M3-T02`完成。下一项严格为`V02-M3-T03` Connection Profiles。
+
+## 2026-08-08 — V02-M3-T03 建立 Connection Profiles
+
+### 实现
+
+- 建立前端单一`CONNECTION_PROFILES`闭集，逐项定义DeepSeek、Qwen、OpenRouter、Ollama与OpenAI-Compatible的显示名、默认端点、默认模型、端点模式和凭据模式。
+- DeepSeek、Qwen及OpenRouter保持固定官方兼容端点且不可在界面编辑；Ollama与OpenAI-Compatible允许配置端点，Ollama明确不要求系统凭据。
+- Profile切换统一重置端点、模型、探测模型及receipt，避免旧Profile探测证据被新选择复用；原生层既有固定端点和安全URL校验继续作为权威门禁。
+- 已保存模型同时显示用户配置名、Connection Profile类型与实际Base URL；SQLite中已有`preset_key`继续作为持久Profile身份，不增加重复状态。
+
+### 验证
+
+- 新增五类Profile选项测试，覆盖三个固定端点只读、Ollama默认本机地址/禁用Key、OpenAI-Compatible空白可配置端点/可选Key。
+- 模型设置页面2项测试通过；`pnpm typecheck`和`pnpm lint`通过。
+- 未实现下一项T04的完整binding状态机，未连接真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M3-T03`完成。下一项严格为`V02-M3-T04` API Binding State Machine。
+
+## 2026-08-08 — V02-M3-T04 建立 API Binding 显式状态机
+
+### 实现
+
+- 新增纯API Binding reducer，显式覆盖`editing`、`testing`、`choosing_model`、`saving`、`saved`和`failed`六态，页面不再以单一`busy`布尔值推断连接流程。
+- 每次端点、Profile、配置名或API Key变化都会递增revision、清空探测证据并废止当前operation；测试/保存返回必须同时匹配operation ID与revision，迟到结果不能恢复旧receipt。
+- 连接测试加入30秒默认逻辑超时与可见取消操作；取消后仍由原异步操作的`finally`清理临时credential，底层迟到结果不进入页面状态。
+- 保存期间锁定配置表单；保存失败进入`failed`但保留同revision已验证证据，允许用户显式重试，不自动更换Profile或模型。
+- 记录`DEC-066`，明确前端状态机与原生probe receipt安全门禁的职责边界。
+
+### 验证
+
+- 状态机5项测试覆盖完整成功路径、timeout、cancel与迟到结果、config changed、key replaced及save failed重试。
+- 页面3项测试新增六态可见转换和取消后忽略迟到Provider结果；相关8项测试、`pnpm typecheck`、`pnpm lint`及diff检查通过。
+- 未实现T05的凭据clear/remove/health界面，未调用真实Provider、付费API或正式用户数据。
+
+### 结论
+
+- `V02-M3-T04`完成。下一项严格为`V02-M3-T05` Credential UI。
+
+## 2026-08-08 — V02-M3-T05 完成 Credential UI
+
+### 实现
+
+- API Key输入根据当前匹配档案明确显示新建或替换语义；留空保留已有reference，输入新Key经连接测试后使用既有原子REPLACE流程，保存完成立即清空且永不回显。
+- 新增“清空未保存的 Key”，只清除React草稿并使旧探测证据失效；已保存档案提供带确认的“删除已保存凭据”，配置和模型继续保留。
+- 已保存档案显示三类保守健康信息：Ollama无需Key、远端档案已保存reference但需连接测试确认当前可用性、或未保存；最近探测时间仅取已持久化capability checkedAt，不宣称实时有效。
+- 全局显示credential cleanup queue健康；有待处理项时明确旧引用已停用并可调用设置读取路径重试安全库清理，仍失败则保留数量供后续启动重试。
+- 复用M1已验收的系统安全凭据、opaque reference、事务后清理队列和持久重试，没有把秘密、reference值或真实Key加入页面、SQLite游戏事实或日志。
+
+### 验证
+
+- 页面4项测试覆盖新Key保存、留空KEEP、Key替换REPLACE、草稿clear、带确认remove、cleanup pending/重试恢复、健康文案及DOM不含草稿Key。
+- 定向测试、`pnpm typecheck`、`pnpm lint`及diff检查通过。
+- 未调用真实Provider、付费API或正式用户数据；未提前实现M4 DeepSeek缓存功能。
+
+### 结论
+
+- `V02-M3-T05`完成，M3 Settings & Profile UX实现任务结束。下一项严格为`V02-M4-T01` DeepSeek Profile。
+
+## 2026-08-08 — V02-M4-T01 固定 DeepSeek Flash Profile 身份
+
+### 实现
+
+- Provider preset继续只向API发送模型ID `deepseek-v4-flash`，并把对应玩家可见名称固定为`DeepSeek-V4-Flash-0731`；二者以独立常量表达，避免展示名进入请求model字段。
+- Tauri模型探测通过DeepSeek preset元数据返回规范UI名，新保存档案持久化该名称；原生档案测试同步锁定准确字符串。
+- 前端Profile默认值引用API ID常量，probe解析和已有档案解析对该精确preset/model组合规范化UI名，因此旧本地记录无需数据库迁移也不会继续展示旧名称。
+- DeepSeek V4 Pro及其他Provider显示名不受影响；本项未加入缓存序列化或Prompt内容。
+
+### 验证
+
+- Rust DeepSeek契约测试同时断言API ID和UI名并完成本地mock模型列表/生成；TypeScript契约测试证明旧显示名读入后API ID不变、UI名被规范化。
+- 模型设置相关7项测试、`pnpm typecheck`和`pnpm lint`通过；未访问真实DeepSeek或付费API。
+
+### 结论
+
+- `V02-M4-T01`完成。下一项严格为`V02-M4-T02` Stable Prompt Profile。
+
+## 2026-08-08 — V02-M4-T02 建立 Stable Prompt Profile
+
+### 实现
+
+- 新增`deepseek-v4-flash-prefix` version 1，固定System Contract、Game Rules、Output Schema、Prompt Profile、Stable World Truths五段及其不可插队顺序。
+- Prompt Profile显式冻结task、逻辑角色、任务指令、schema名、任务prompt版本和stable profile版本；完整输出schema进入稳定消息前缀，不再只存在于Provider response format参数。
+- Stable World Truths进入前递归复制冻结，并拒绝timestamp、request ID、UUID、transient error、cache metrics及UI debug字段/值；当前调用默认空事实段，等待T04按ContextBlock知识边界接线。
+- 现有`formatTaskPrompt`统一携带profile并在动态Task Input JSON之前渲染；不支持system message的模型仍按原能力折入单一USER消息。
+- 记录`DEC-067`并同步目标架构当前实现边界，明确T03才负责最终确定性字节序列化。
+
+### 验证
+
+- Prompt目录9项测试通过，新增断言五段准确顺序、profile/task双版本、实际输出schema、前缀位置，以及request ID与UUID拒绝。
+- `pnpm typecheck`和`pnpm lint`通过；未发送真实请求或使用正式用户数据。
+
+### 结论
+
+- `V02-M4-T02`完成。下一项严格为`V02-M4-T03` Deterministic Serialization。
+
+## 2026-08-08 — V02-M4-T03 统一确定性序列化
+
+### 实现
+
+- 导出并复用`ai-core`单一canonical JSON实现，Stable Prompt Profile不再调用普通`JSON.stringify`，与ContextBlock hash、token估算及ResolvedModelConfig fingerprint采用相同字节语义。
+- object key执行NFC/LF规范化后按码点排序且无额外空白；Unicode等价重复key拒绝，避免规范化后静默覆盖。
+- array严格保留调用方语义顺序；string与enum执行NFC和CRLF/CR到LF归一化；finite number使用JSON规范形式并把负零稳定为零，NaN/Infinity拒绝。
+- Prompt段固定为section enum、单LF、canonical JSON，段间双LF且末尾无换行；记录`DEC-068`并同步目标架构当前实现。
+
+### 验证
+
+- 新增2项canonical JSON测试，逐项覆盖乱序key、array、零、enum、Unicode组合、CRLF、UTF-8字节相等、非有限数及等价key拒绝。
+- Prompt目录新增精确字节片段测试；canonical/context/prompt共17项测试、`pnpm typecheck`及`pnpm lint`通过。
+- 未改变`.emtavern`格式、未重写已有审计hash、未访问外部API或正式用户数据。
+
+### 结论
+
+- `V02-M4-T03`完成。下一项严格为`V02-M4-T04` Context Cache Layout。
+
+## 2026-08-08 — V02-M4-T04 建立 Context Cache Layout
+
+### 实现
+
+- ContextBlock注册表增加summary、state和action语义类型；新增五段Cache Layout：Long-term Summary、Relevant Lore/Knowledge、Recent History、Current Scene/State、Player Action。
+- summary/memory/lore/knowledge强制semi-stable，history/scene/state/dice/action/user_input强制dynamic；错误stability或尚未映射的复合类型直接拒绝，防止行动进入可复用前缀。
+- Layout只投影type、source revision、version、content hash和content，不把block/source ID等随机标识送进Prompt；半稳定与动态段分别按稳定语义顺序整理。
+- Provider-neutral formatter可选接收Stable World Truths与Cache Layout，按段渲染后再追加canonical `TASK_INPUT`；既有调用不传layout时保持行为兼容。
+- 记录`DEC-069`并同步目标架构；现有复合`task` ContextBlock未被虚假拆分，真实云生成启用前必须由知识边界后的细粒度块接线。
+
+### 验证
+
+- 新增2项Layout测试，覆盖五段/两层准确顺序、summary/lore/knowledge/history/state/action映射、投影不含source ID、错误层级和未知类型拒绝。
+- Prompt集成测试证明semi-stable、dynamic与`TASK_INPUT`顺序及Stable World Truths位置；相关13项测试、`pnpm typecheck`、`pnpm lint`和diff检查通过。
+- 未访问外部API、未承诺缓存命中率、未记录完整Prompt指标。
+
+### 结论
+
+- `V02-M4-T04`完成。下一项严格为`V02-M4-T05` Cache Metrics。
+
+## 2026-08-08 — V02-M4-T05 建立 Cache Metrics
+
+### 实现
+
+- OpenAI-compatible Provider usage新增可选`prompt_cache_hit_tokens`和`prompt_cache_miss_tokens`解析；字段缺失保持unknown，不从总token猜测命中。
+- 新增cacheable prefix SHA-256，只覆盖Stable Prompt Profile及summary/lore/knowledge两个semi-stable段，不含dynamic history/scene/action或Task Input。
+- 新增设备级Cache Metrics Repository，记录task type、hit/miss、计算ratio、prefix hash和记录时间，使用`BEGIN IMMEDIATE`更新现有`app_settings.deepseek_cache_metrics_v1`并仅保留最近200项。
+- 指标读取严格拒绝未知字段、非法task、负数/非安全整数、伪造ratio、非法hash和时间；数据模型明确排除完整Prompt、messages、context、request ID及credential，不进入Campaign可移植格式。
+- 记录`DEC-070`并同步目标架构/数据模型；不承诺固定命中率，不在Fake Provider路径生成虚假指标。
+
+### 验证
+
+- Rust Provider 15/15契约测试通过；DeepSeek本地mock响应断言1000 hit与400 miss被准确解析，未访问真实API。
+- 新增2项持久指标测试，覆盖ratio、精确字段白名单、SQLite持久读取、无Prompt内容、非法输入及注入`fullPrompt`拒绝。
+- Prompt测试断言prefix hash为64位小写SHA-256；相关13项TypeScript测试、`pnpm typecheck`和`pnpm lint`通过。
+
+### 结论
+
+- `V02-M4-T05`完成。下一项严格为`V02-M4-T06` Cache Regression。
+
+## 2026-08-08 — V02-M4-T06 固定 Cache Regression 门禁
+
+### 实现
+
+- 导出可缓存prefix的规范文本函数，与生产prefix hash共用同一路径，允许测试直接比较UTF-8字节而非只比较摘要。
+- Provider Context段不再序列化`contentHash`：该hash包含block/source身份，虽未直接发送UUID仍会随随机ID变化；Prompt只发送type、source revision、version和content，内部Layout/manifest继续保留hash供校验。
+- 保持dynamic Context完整渲染，但cacheable prefix只选两个semi-stable段；当前action变化因此只改变tail。
+- Profile hash覆盖任务Prompt版本/schema名；Prompt Profile升级会自然改变prefix bytes与SHA-256，无需人为清缓存。
+
+### 验证
+
+- 新增3项专用回归：相同稳定语义在不同object key顺序及随机block/source ID下产生逐字节相同prefix；只改action时prefix/hash不变但完整Context tail变化；Prompt版本1升2时hash必变。
+- cache regression、prompt和layout共16项测试、`pnpm typecheck`、`pnpm lint`及diff检查通过。
+- 未访问真实Provider、未声明固定缓存命中率、未把完整Prompt写入指标。
+
+### 结论
+
+- `V02-M4-T06`完成，M4 DeepSeek Cache实现任务结束。下一项严格为`V02-M5-T01` Single Version Source。
+
+## 2026-08-08 — V02-M5-T01 建立 0.2.0 单一版本源
+
+### 实现
+
+- 根`package.json.version`升级为产品权威版本`0.2.0`；Windows、全部共享npm workspace及iOS占位manifest同步对齐，未开展iOS功能。
+- 根Cargo workspace新增`workspace.package.version = 0.2.0`，五个共享crate和Tauri crate全部改为`version.workspace = true`；Cargo.lock由Cargo重新解析为0.2.0。
+- Tauri bundle配置升级到0.2.0；存档导出原有`CARGO_PKG_VERSION`路径自然使用同一Rust workspace版本。
+- “我的 → 版本与更新记录”通过`@tauri-apps/api/app.getVersion()`读取打包metadata并显示，不在玩家UI源码另写版本常量。
+- 记录`DEC-071`；历史v0.1验收文档、安装包路径及存档兼容测试值保持历史事实，不做机械替换。
+
+### 验证
+
+- My页面与Tauri配置3项测试通过，release metadata 2项Node测试通过并在当前darwin/arm64输出version 0.2.0。
+- Cargo workspace全套81项测试通过，输出确认六个内部crate均编译为0.2.0；TypeScript完整71个文件/398项测试、16项Node测试、`pnpm typecheck`和`pnpm lint`通过。
+- 未发布、签名或上传产物，未访问真实API或正式用户数据。
+
+### 结论
+
+- `V02-M5-T01`完成。下一项严格为`V02-M5-T02` Changelog Automation。
+
+## 2026-08-08 — V02-M5-T02 自动化 Changelog 与发布信息
+
+### 实现
+
+- 新建根`CHANGELOG.md`，以current-release标记维护`0.2.0 Unreleased`区段；保留历史`0.1.0`但不虚构未知发布日期。
+- 新增`release-info.json`及前端生成模块，包含schema、版本、development/unreleased状态、Changelog定位和当前更新摘要；“我的 → 版本与更新记录”显示Tauri运行时版本及生成的发布状态/摘要。
+- 新增`release:sync`，从根版本权威源同步全部npm manifests、Tauri、Cargo workspace/成员、Cargo.lock及Changelog标题，再确定性生成两份release-info消费者格式。
+- 新增严格只读`release:check`，检测全部版本镜像、Cargo继承、lockfile、Changelog、JSON和前端生成模块漂移；CI在Windows/macOS共享门禁执行该检查。
+- release metadata产物增加channel/status；记录`DEC-072`。为恢复仓库级Prettier门禁，仅机械格式化此前已提交但未符合现行规则的v0.2文件，不改变逻辑。
+
+### 验证
+
+- `pnpm release:sync`后`pnpm release:check`通过，并验证再次检查不写文件；Node发布脚本4项测试覆盖确定性生成及8类镜像漂移。
+- My页面与Tauri配置3项定向测试、`pnpm typecheck`、`pnpm lint`、全仓`pnpm format:check`及`git diff --check`通过。
+- 当前发布状态仍为unreleased；未构建、签名、上传或发布产物，未访问真实API、正式用户数据或开展iOS功能。
+
+### 结论
+
+- `V02-M5-T02`完成。下一项严格为`V02-M5-T03` zh-CN Resource Layer。
+
+## 2026-08-08 — V02-M5-T03 建立 zh-CN 玩家资源层
+
+### 实现
+
+- 新增`windows-app/src/localization/zh-CN.ts`，以只读分区集中通用、导航、标题栏、加载、路由/页面错误和存档文件对话框文案；动态存档标题使用资源格式化函数，不在页面拼接句式。
+- 新增唯一活动locale与`playerText`类型安全入口，不提供英文fallback、缺键回显或自动locale侦测；应用启动显式设置HTML根`lang=zh-CN`。
+- 应用壳层、全局Suspense/404/ErrorBoundary和Tauri导入导出对话框改用资源入口，清除其中`Current room`、`Local session`、`Preparing room`等玩家可见英文。
+- 记录`DEC-073`；页面级游戏流程迁移明确留给紧随其后的T04，不启动iOS或新增多语言切换范围。
+
+### 验证
+
+- 新增2项资源层测试，验证唯一locale、静态资源非空、动态格式化和document语言标记。
+- localization、路由、存档对话框及存档首页共4个文件/20项定向测试通过；`pnpm typecheck`、`pnpm lint`与`git diff --check`通过。
+- 未访问网络、Provider或正式用户数据，未增加英文资源或静默fallback。
+
+### 结论
+
+- `V02-M5-T03`完成。下一项严格为`V02-M5-T04` Core UI Localization。
+
+## 2026-08-08 — V02-M5-T04 完成核心 UI 中文覆盖
+
+### 实现
+
+- 存档、世界构筑、车卡、酒馆、NPC对话、任务告示、冒险/D20、档案、恢复、模型设置与“我的”全部核心流程清除英文页面眉题并接入zh-CN资源。
+- API Binding的editing/testing/choosing_model/saving/saved/failed转为中文展示；连接配置表单不再显示`Connection Profile`，发布channel/status也不再直接显示`development / unreleased`，未知值使用中文保守状态。
+- 更新日志标题、当前版本“未发布”状态及连接配置/API绑定摘要改为中文；release sync/check同步适配中文标题，机器协议中的`unreleased`保持不变。
+- 修正模型隐私说明仍引用0.1候选及`Campaign`的过期文本；明确保留Provider/模型名、model ID、API字段、URL、代码标识与玩家/AI专名。
+- 发布同步JSON改用仓库Prettier配置确定性写入，修复`release:sync`后Tauri配置立刻产生格式漂移的问题；记录`DEC-074`。
+
+### 验证
+
+- 13个核心页面/资源测试文件共35项定向测试通过，覆盖导航、存档、世界、车卡、酒馆、NPC、任务、冒险、档案、恢复、模型与更新记录。
+- 中文Changelog同步后`release:sync`、只读`release:check`、发布脚本4项测试及仓库级`format:check`通过；同步本身不再制造格式差异。
+- `pnpm typecheck`、`pnpm lint`与`git diff --check`通过；未访问真实Provider、正式用户数据或iOS代码。
+
+### 结论
+
+- `V02-M5-T04`完成。下一项严格为`V02-M5-T05` English Regression Gate。
+
+## 2026-08-08 — V02-M5-T05 建立玩家可见英文回归门禁
+
+### 实现
+
+- 新增TypeScript AST检查器，扫描生产TSX的渲染正文、玩家属性、confirm和状态/错误消息，并检查zh-CN资源、Changelog与release-info highlights。
+- 明确跳过className、key、路由、内部枚举、测试夹具与服务诊断；仅放行Provider/模型名、model ID、API字段、URL、代码标识、玩家/AI专名及`.emtavern`格式名。
+- 首次扫描修复`Notice board`、`Posted by`、`temperature`、`Inspector`、`ReleaseMetadata`、`Schema`等真实遗漏；误报修正通过AST父节点边界完成，没有扩大普通英文允许范围。
+- 新增`pnpm i18n:check`并接入Windows/macOS共享CI；更新日志同步记录英文回归门禁，记录`DEC-075`。
+
+### 验证
+
+- 新增3项Node测试，证明渲染正文/accessibility label/状态消息会失败，允许技术专名可通过，资源与Changelog可检出且机器case不误报。
+- 当前仓库`pnpm i18n:check`通过；My/任务/路由5项定向UI测试、`pnpm typecheck`、`pnpm lint`和`git diff --check`通过。
+- 未扫描或修改模型生成的玩家内容、正式用户数据或iOS代码，未访问网络。
+
+### 结论
+
+- `V02-M5-T05`完成，M5版本/Changelog/zh-CN任务结束。下一项严格为`V02-M6-T01` Scroll / Layout。
+
+## 2026-08-08 — V02-M6-T01 修复车卡滚动与缩放布局
+
+### 实现
+
+- `.character-studio`改为独立`100dvh`滚动容器，固定滚动条槽、封闭横向溢出并包含overscroll，避免根页面`overflow:hidden`导致低高度字段不可达。
+- 车卡表单双栏明确最小28rem/18rem；900px以下表单、特质和确认视图切换单栏，按钮移除最小宽度并铺满可用区域。
+- 主操作使用safe-area感知sticky底部位置；640px以下压缩页面顶部、topline、intro与标题，保留全部字段和操作。
+- 新增布局合同测试，对860×600、1180×760、1366×768、1920×1080在100%/125%/150%共12组组合验证单/双栏宽度与低高度分支，并锁定滚动/断点/sticky规则；记录`DEC-076`。
+
+### 验证
+
+- 布局合同2项与现有车卡交互3项测试通过；`pnpm typecheck`、`pnpm lint`、英文回归门禁和`git diff --check`通过。
+- `design-review`技能因用户未提交`.gitignore`且当前main无目标URL，按技能硬规则未启动截图流程；没有提交/暂存该用户文件，也没有伪造截图证据。
+- Windows前端生产构建及全量73个文件/402项Vitest、21项Node测试通过；真实Windows/macOS视口截图证据保留到M9双环境验收。
+
+### 结论
+
+- `V02-M6-T01`完成。下一项严格为`V02-M6-T02` Character Structure。
+
+## 2026-08-08 — V02-M6-T02 建立车卡八分区
+
+### 实现
+
+- 已确认角色卡固定为summary、basics、attributes、background、personality、traits、equipment、AI controls八个语义区，并以稳定`data-character-section`顺序标识。
+- 基础区显示姓名、性别、年龄、职业与概念；属性区显示四项数值；背景、特质和装备继续读取已提交视图。
+- 领域模型没有独立personality字段，个性区仅投影个人目标、故事偏好和内容边界；未新增schema、migration或伪造字段。
+- AI控制区只说明本地确认边界并保留进入酒馆操作，不加入生成/校验/预览/编辑/确认状态；新增响应式八区样式并记录`DEC-077`。
+- 更新Changelog并通过release sync把车卡布局/八分区摘要送入“我的 → 版本与更新记录”。
+
+### 验证
+
+- 车卡交互测试新增八区精确顺序及七个内容标题断言；与布局合同共5项测试通过。
+- 发布同步/检查、Windows前端生产构建、全量73个文件/402项Vitest与21项Node测试、`pnpm typecheck`、`pnpm lint`、玩家可见英文门禁及格式检查通过。
+- 未修改SQLite、存档格式、AI请求、Provider或正式用户数据，未开始iOS。
+
+### 结论
+
+- `V02-M6-T02`完成。下一项严格为`V02-M6-T03` AI Character State Machine。
+
+## 2026-08-08 — V02-M6-T03 建立 AI 车卡显式状态机
+
+### 实现
+
+- 新增纯reducer覆盖idle、generating、validating、preview、editing、confirming、committed，并记录revision、active operation与生成/验证/确认失败种类。
+- 草稿和特质选择变化递增revision并失效当前操作；生成、验证、预览和确认结果必须同时匹配operation ID与revision，迟到结果不再更新当前UI。
+- Character service增加只读validation observer，在Provider身份核对后、结构验证前通知UI进入validating；不暴露raw response或绕过既有schema验证。
+- 页面移除独立busy state，busy由三个活动阶段派生；恢复本地进度映射idle/preview/committed，玩家看到中文live status和阶段化按钮文案。
+- 记录`DEC-078`并更新Changelog；明确T03只保证UI结果时序，旧命令的SQLite提交时机必须由T04 Candidate任务修复。
+
+### 验证
+
+- 新增3项状态机测试，覆盖完整阶段链、编辑使迟到验证失效、失败回到可重试编辑态；service/page/layout共11项定向测试通过。
+- 页面测试验证编辑、预览、再次编辑和已提交中文状态；`pnpm typecheck`、`pnpm lint`、英文回归门禁和`git diff --check`通过。
+- Windows前端生产构建、全量74个文件/405项Vitest、21项Node测试、发布同步/检查和格式检查通过。
+- 未改变SQLite schema、存档格式、Provider配置或正式用户数据，未提前实现Candidate原子确认。
+
+### 结论
+
+- `V02-M6-T03`完成。下一项严格为`V02-M6-T04` AI Character Candidate。
+
+## 2026-08-08 — V02-M6-T04 建立可恢复的 AI 角色候选与原子确认
+
+### 实现
+
+- 原生角色流程复用migration 4的`ai_candidates`：特质生成建立PROPOSED候选，重新生成以SUPERSEDED修订链替代旧候选；完整背景生成建立包含草稿、六个候选、两个选择、背景、程序拥有装备效果及两次生成审计的完整候选。
+- `character_completion_commit`不再写`player_characters`、`items`、`pending_ai_requests`、`generation_records`或推进Campaign，只返回可跨重启恢复的完整候选；页面增加明确的候选预览与“确认角色并写入存档”操作。
+- 新增`character_candidate_confirm`固定语义命令，在`BEGIN IMMEDIATE`内复核Candidate状态/版本/Campaign、结构与领域规则、AI响应一致性和输入/上下文绑定，再原子写角色、装备、两次生成审计、ACCEPTED状态及下一Campaign阶段。
+- 确认失败整笔回滚，重复确认同一ACCEPTED候选幂等返回；Candidate不包含凭据。`.emtavern`格式未携带PROPOSED Candidate，因此导出在存在未确认候选时明确报错，避免静默丢进度。
+- 记录`DEC-079`并更新Changelog/release摘要；未新增schema、真实Provider/付费调用、正式用户数据或iOS代码。
+
+### 验证
+
+- Rust边界测试证明完整候选生成后角色、物品、已提交生成记录均为0，未确认归档导出被阻止；确认后恰有两条生成记录、候选为ACCEPTED，重复确认不重复写入，关闭重开后角色继续存在。
+- Native bridge 43项全量测试（含Windows纵向E2E）通过；Tauri Windows crate `cargo check`通过。
+- 车卡service/page/state/layout 11项定向Vitest通过，覆盖候选预览提示、独立确认及committed状态；`pnpm typecheck`通过。
+
+### 结论
+
+- `V02-M6-T04`完成，M6车卡AI任务结束。下一项严格为`V02-M7-T01` SceneFrame。
+
+## 2026-08-09 — V02-M7-T01 建立 Adventure SceneFrame
+
+### 实现
+
+- 新增migration 6的`scene_frames`独立投影，保存scene/location/participants/pressure/affordances/pending consequences/return point/revision，不污染不可变`adventures.plan_json`。
+- 初始冒险计划、叙事回合和D20结算均在现有原子事务中更新SceneFrame，并追加相同revision的`SCENE_COMMITTED` Event Ledger；失败回滚后不会留下半个场景。
+- Adventure snapshot和AI回合ContextBlock读取持久Frame，严格验证嵌套结构、revision、最新本地ledger以及可移植game event恢复锚点；旧库无Frame时只派生兼容视图。
+- GENERATE_ADVENTURE_TURN升级为prompt v2/schema v3，输入必须包含SceneFrame；Windows service验证Frame与当前场景摘要一致。
+- `.emtavern` Campaign archive schema升级至2并携带`scene_frames`，TypeScript/Rust读取方继续接受schema 1；导入在正式写入前验证Frame结构、归属和event恢复点，Event Ledger保持设备级不迁移。
+- 记录`DEC-080`并更新Changelog/release摘要；未实现T02行动模式、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Rust Adventure测试覆盖初始Frame、每次回合/D20 revision、待决后果清除、重启恢复、ledger一致性和`.emtavern`跨库回环。
+- TypeScript契约、上下文、prompt、service/page、存档和migration定向测试通过；旧数据库升级保留原始备份，schema 1 Rust夹具保持可导入。
+- 全量门禁结果记录于本任务提交前的最终验证。
+
+### 结论
+
+- `V02-M7-T01`完成。下一项严格为`V02-M7-T02` Action Modes。
+
+## 2026-08-09 — V02-M7-T02 建立冒险行动模式
+
+### 实现
+
+- 冒险输入区新增“行动 / 对话 / 观察”三种互斥意图及对应中文提示和提交文案，不隐藏现有建议或文本输入。
+- Windows service与Tauri命令传递ACTION/DIALOGUE/OBSERVE；原生层在打开事务前拒绝未知模式，并把合法模式与玩家文本共同写入`player_action_json`。
+- 原生/TypeScript恢复视图保留mode；旧回合没有mode时按ACTION兼容，新的Repository回环不会丢失显式mode。
+- `GENERATE_ADVENTURE_TURN`升级到schema v4/prompt v3，Context Builder和原生上下文都传递`playerActionMode`，明确三种意图的叙事语义。
+- 记录`DEC-081`并同步Changelog/release摘要；未实现下一任务的建议数量/知识来源约束。
+
+### 验证
+
+- 页面测试覆盖三种单选模式、动态提示、对话提交及模式到service的传递；service八回合测试轮换三种模式。
+- Rust测试证明三种模式进入持久上下文，非法模式不创建回合；持久层回环覆盖OBSERVE mode。
+- 全量门禁结果记录于本任务提交前的最终验证。
+
+### 结论
+
+- `V02-M7-T02`完成。下一项严格为`V02-M7-T03` Action Suggestions。
+
+## 2026-08-09 — V02-M7-T03 建立受知识边界约束的行动建议
+
+### 实现
+
+- `GENERATE_ADVENTURE_TURN`升级到schema v5/prompt v4；活动场景严格要求3至5条不重复建议，ENDING严格要求0条，结构错误不能进入游戏事务。
+- TypeScript Context Builder从当前Campaign SQLite读取Quest相关/LOCKED_RULE事实，并只为相关NPC装配known、suspected与false-belief statements；excluded secret facts在发送给模型前过滤。
+- Application Use Case与原生Windows路径都传递knownFacts和npcKnowledge；原生提交层独立复核建议数量与去空白、大小写不敏感唯一性，避免绕过共享schema。
+- Fake Provider与测试夹具改为合法的3条活动建议；记录`DEC-082`并同步Changelog/release摘要。
+- 未改变T04自由输入合同，未接入真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 定向Vitest 6个文件、67项测试通过，覆盖上下文知识筛选、NPC秘密隔离、schema数量/去重/ENDING边界、prompt版本及两条回合编排路径。
+- 完整74个Vitest文件/407项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及82项测试通过，包含Windows纵向E2E；原生层覆盖少于3条、空白/大小写重复及ENDING空建议边界。
+- 桌面前端生产构建通过；未读取或改写正式用户存档。
+
+### 结论
+
+- `V02-M7-T03`完成。下一项严格为`V02-M7-T04` Free Input。
+
+## 2026-08-09 — V02-M7-T04 固化始终可选的自由输入
+
+### 实现
+
+- 冒险行动区把文本框明确标记为“自由输入”，并提示玩家可忽略建议，直接描述想做、想说或想观察的内容。
+- 3至5条建议只负责填入同一个可编辑文本框，不成为提交前置条件；建议与输入在非行动状态或提交进行中同步禁用，避免绕过状态机或重复提交。
+- 提交成功后清空草稿；失败时保留原文并重新开放输入，玩家可编辑后再次提交。后端继续把任意合法文本与所选模式作为`FREEFORM`写入SQLite。
+- 记录`DEC-083`并同步Changelog/release摘要；未提前实现T05状态机改造、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Adventure页面3项定向测试通过，覆盖建议选择、完全不使用建议的任意观察文本、失败后草稿保留，以及D20后重新进入可行动场景。
+- 完整74个Vitest文件/409项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及82项测试通过，包含Windows纵向E2E；桌面前端生产构建通过。
+
+### 结论
+
+- `V02-M7-T04`完成。下一项严格为`V02-M7-T05` Adventure Turn State Machine。
+
+## 2026-08-09 — V02-M7-T05 建立显式冒险回合状态机
+
+### 实现
+
+- 新增纯Adventure Turn reducer，完整覆盖draft、submitted、generating、validating、resolving、committed和narrating，并用operation ID与draft revision拒绝乱序或迟到事件。
+- Windows Adventure Service新增只读阶段观察边界：行动持久化、Provider生成、输出验证、原子提交开始和SQLite提交完成按真实顺序通知页面；恢复`WAITING_FOR_PLAYER`时复用同一条链路且不重复submit。
+- 页面不再只用单一busy推断AI回合：各阶段提供中文live status，只有提交/生成/验证/提交事务进行时禁用行动；成功进入narrating后可继续编辑下一回合。
+- submitted、generating、validating、resolving失败分别保留明确原因和原输入；编辑会废弃旧重试闭包。首次载入或待处理回合恢复失败时提供安全重载和恢复中心入口。
+- 记录`DEC-084`并同步Changelog/release摘要；未改变D20硬逻辑、动画、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 状态机、service与page共18项定向测试通过，覆盖完整七阶段顺序、四类失败、乱序/迟到拒绝、观察器隔离、待处理回合重启恢复、任意自由输入失败保留及载入重试。
+- 完整75个Vitest文件/420项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及82项测试通过，包含Windows纵向E2E；桌面前端生产构建通过。
+
+### 结论
+
+- `V02-M7-T05`完成。下一项严格为`V02-M7-T06` D20 Hard Logic。
+
+## 2026-08-09 — V02-M7-T06 固化 D20 硬逻辑
+
+### 实现
+
+- 共享DiceResult新增canonical raw、modifier、total、DC、result，程序按属性+装备+状态计算modifier，以安全整数加法计算total，再用total>=DC产生结果；旧d20/difficulty/success字段作为兼容别名保留。
+- 原生Windows路径抽出独立D20硬逻辑，在SQLite事务前验证raw 1至20、属性1至5、DC闭集和溢出；随机字节使用rejection sampling消除直接mod 20偏差。
+- 原生回合、TypeScript Repository、Game Event、Windows snapshot和Adventure Archive读取均复核别名一致性、修正分解、总计算式及结果，矛盾数据不能进入叙事或玩家界面。
+- 冒险页和档案页明确展示raw + modifier = total / DC / result；`RESOLVE_DICE_RESULT`升级为schema/prompt v2，输入只携带已固定的五个硬结果字段并拒绝模型改写。
+- 记录`DEC-085`并同步Changelog/release摘要；未实现T07动画、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- D20领域、持久化、schema、application、prompt、Windows解析/页面/档案共12个文件107项定向测试通过；覆盖阈值、边界、溢出、旧字段兼容和多种矛盾字段拒绝。
+- 原生Adventure 3项定向测试通过，覆盖成功/失败硬结果、非法raw/属性/DC/溢出及完整八回合恢复链路。
+- 完整77个Vitest文件/436项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及83项测试通过，包含Windows纵向E2E；桌面前端生产构建通过。
+
+### 结论
+
+- `V02-M7-T06`完成。下一项严格为`V02-M7-T07` D20 Animation。
+
+## 2026-08-09 — V02-M7-T07 建立不重骰的 D20 动画
+
+### 实现
+
+- Windows Adventure Service把检定拆分为`rollCheck`与`completeCheck`：前者只生成并持久化硬结果，后者只读取该结果生成叙事；兼容入口仍按相同顺序执行。
+- 新增D20动画组件，明确显示已锁定的raw、modifier、total、DC和result，并支持动画结束、fallback与“跳过动画”三种一次性完成路径。
+- `prefers-reduced-motion`下立即揭示结果；组件中断卸载会取消fallback，刷新后从SQLite `RESOLVING` snapshot恢复同一结果，再继续叙事。
+- Campaign级single-flight合并重复点击；已处于`RESOLVING`时直接复用持久结果，载入不再隐式跳过动画，也没有任何UI重骰入口。
+- 记录`DEC-086`并同步Changelog/release摘要；未实现M8知识模型、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 动画、页面与Service共16项定向测试通过，覆盖skip、repeat animation event、reduce motion、unmount interruption、refresh restore、并发/顺序重复点击及叙事阶段边界。
+- 完整78个Vitest文件/442项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及83项测试通过，包含Windows纵向E2E；桌面前端199 modules生产构建通过。因用户级TUNA Git索引不可达，Rust门禁以临时Cargo Home复用本机rsproxy缓存离线执行，未修改全局配置或依赖锁。
+
+### 结论
+
+- `V02-M7-T07`完成。下一项严格为`V02-M8-T01` WorldTruth / Claim / Knowledge / Memory。
+
+## 2026-08-09 — V02-M8-T01 建立四层知识领域模型
+
+### 实现
+
+- 新增独立WorldTruth、Claim、Knowledge与Memory判别合同及各自强类型ID，避免继续用WorldFact或NPC记忆数组表达所有语义。
+- WorldTruth固定本地授权与public/game-private/secret可见性；Claim保存结构化陈述、Truth/Event/Actor来源、confidence和revision。
+- Knowledge固定Actor、Truth/Claim目标、known/suspected/believed状态、可见性与最小来源；Memory只能引用Knowledge/Event证据，不含任何Truth authority。
+- 构造器拒绝空白标识、非法枚举/置信度/revision、非有限或循环JSON、重复Memory来源和无来源Memory。
+- 记录`DEC-087`并同步Changelog/release摘要；T01没有把仅有合同的新对象写入SQLite，避免在T03完整provenance落地前制造第二套不完整真相源。
+
+### 验证
+
+- Knowledge合同4项定向测试与既有Foundation/World/Tavern共31项测试通过，覆盖四层区分、Actor范围、来源、Memory单向边界及非法输入。
+- 完整79个Vitest文件/446项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及83项测试通过，包含Windows纵向E2E；桌面前端200 modules生产构建通过。Rust继续以临时Cargo Home复用本机rsproxy缓存离线执行，未修改全局配置或依赖锁。
+
+### 结论
+
+- `V02-M8-T01`完成。下一项严格为`V02-M8-T02` NPC Knowledge Boundary。
+
+## 2026-08-09 — V02-M8-T02 固化 NPC 知识边界
+
+### 实现
+
+- `NPC_REPLY` schema v2改为结构化Knowledge数组，显式区分TRUTH/CLAIM及KNOWN/SUSPECTED/BELIEVED，不再传递三个无类型字符串列表。
+- TypeScript Context Builder只按当前NPC知识ID投影同Campaign事实，并过滤excluded secret、其他Actor消息和记忆；缺失事实、重复状态和错误认知越权均失败关闭。
+- 原生Windows生成上下文实现同一查询与分类规则，限制最多100条，验证FALSE_BELIEF归属和memory.npcId；未授权但同Campaign存在的事实不会进入snapshot。
+- 原生提交继续在事务内重建预期上下文并逐值比较，WebView不能注入“已知事实”；Prompt v2明确Claim不得冒充WorldTruth。
+- 记录`DEC-088`并同步Changelog/release摘要；未修改Adventure GM知识上下文，未提前实现T03 provenance。
+
+### 验证
+
+- Context Builder、NPC Application、schema、prompt与Windows service共57项定向测试通过；原生NPC 3项测试覆盖未授权事实排除、跨Actor false belief拒绝及篡改零写入。
+- 完整79个Vitest文件/447项测试与21项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及84项测试通过，包含Windows纵向E2E；桌面前端200 modules生产构建通过。Rust继续以临时Cargo Home复用本机rsproxy缓存离线执行，未修改全局配置或依赖锁。
+
+### 结论
+
+- `V02-M8-T02`完成。下一项严格为`V02-M8-T03` Knowledge Provenance。
+
+## 2026-08-09 — V02-M8-T03 持久化 Knowledge Provenance
+
+### 实现
+
+- schema 7在既有`npc_knowledge`权威行新增`provenance_json`，为每个活动知识事实记录state、source、eventId、learnedAt与confidence；没有新建第二套Truth或Knowledge数据源。
+- 共享合同拒绝缺失/重复provenance、跨状态重复、excluded secret重叠、非法时间/置信度与无事件的观察/交流/推理来源；通用Knowledge合同同步补齐四个来源字段。
+- TypeScript Repository原子保存来源并验证事件属于同一NPC Campaign；原生NPC对话与Adventure上下文读取执行同等状态、Actor、时间、置信度和事件校验。
+- schema 6数据库按原数组顺序确定性回填IMPORT来源，过滤excluded secret；旧`.emtavern` schema 1/2缺列时在隔离导入阶段补齐后再执行严格领域重载。
+- 存档JSON列清单、TypeScript/Rust导出导入及双向fixture已同步，记录`DEC-089`；未提前实现T04传闻来源化、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 完整79个Vitest文件/448项测试与22项Node测试通过；迁移定向测试覆盖schema 6已知/怀疑/相信及excluded secret回填，Repository与合同覆盖来源往返和非法来源拒绝。
+- Rust workspace格式、全target/feature Clippy及84项测试通过，包含原生NPC/Adventure边界、初始化持久化和Windows纵向E2E。
+- `pnpm archive:interop`完成当前TypeScript/Rust归档双向生成、交叉导入与fixture逐条目比对；桌面前端200 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T03`完成。下一项严格为`V02-M8-T04` Rumor / Claim。
+
+## 2026-08-09 — V02-M8-T04 轻量来源化酒馆传闻
+
+### 实现
+
+- RUMOR兼容投影新增独立claimId、来源NPC、WITNESS/HEARSAY/PERSONAL_BELIEF/FACTION_MESSAGE、confidence和claimRevision，并可通过`createClaimFromRumor`重建不含隐藏真实性的Claim。
+- `GENERATE_NPCS` schema/prompt升级v3，分别生成传播方式、Claim置信度与隐藏veracity；来源名必须解析为当前Roster NPC，程序验证后与NPC Knowledge在同一事务提交。
+- TypeScript WorldRepository和原生NPC Context验证Claim字段及来源NPC Campaign边界；Knowledge provenance继承对应Claim confidence，传闻继续只以CLAIM进入NPC Prompt。
+- schema 8与旧存档导入兼容层把历史传闻保守回填为HEARSAY/0.5，并从既有detail或NPC Knowledge恢复来源；没有新增Claims表或第二套真相源。
+- Windows Tavern view只携带claimId、来源NPC和传播方式，界面显示中文来源标签且不序列化隐藏veracity/confidence；记录`DEC-090`，未实现World Voices、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Knowledge/World/Rumor合同、AI schema/prompt、Context、Application、Repository与Windows页面定向测试通过，覆盖Claim重建、来源往返、置信度继承、v3版本及隐藏veracity不出现在玩家投影。
+- schema 6→8迁移测试同时覆盖Knowledge provenance、excluded secret和旧RUMOR来源回填；原生46项bridge测试通过，包含非法confidence零写入与Windows纵向E2E。
+- 完整79个Vitest文件/449项测试与22项Node测试通过；Rust workspace格式、全target/feature Clippy及84项测试通过。
+- `pnpm archive:interop`完成当前TypeScript/Rust归档双向生成、交叉导入与fixture逐条目比对；release metadata、zh-CN玩家文案门禁及桌面前端200 modules生产构建通过。
+- 桌面双实现仍使用Fake Provider，未触达真实付费API、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M8-T04`完成。下一项严格为`V02-M8-T05` Randomness Profiles。
+
+## 2026-08-09 — V02-M8-T05 建立 Randomness Profiles
+
+### 实现
+
+- 新增CONSERVATIVE/BALANCED/HIGH/CUSTOM四档设备级随机性合同，分别解析为0.2、0.7、1.1或0至2的有限自定义temperature；缺省为BALANCED。
+- 原生CampaignStore以`app_settings.randomness_profile_v1`持久化非秘密设置，闭集、预设映射和自定义形状验证失败时不覆盖最后有效值；重开数据库后保持设置。
+- My页面“生成参数”提供稳健、平衡、高随机与自定义选择、当前实际温度及显式保存状态；非法自定义值不能提交。
+- 世界、车卡、酒馆、NPC对话、任务、冒险与结算七条Windows AI路径在请求前读取实际temperature并冻结进请求快照；测试默认源保持离线确定性。
+- 记录`DEC-091`并同步数据模型、目标架构和Changelog；随机性不进入存档、不影响本地D20，未实现T06重复抑制、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Randomness Service、My页面与World Service共6项定向测试通过，覆盖四档解析、自定义边界、矛盾快照拒绝、UI保存和请求temperature冻结。
+- 原生Randomness 2项测试通过，覆盖默认值、四档保存、重开恢复和非法更新零覆盖。
+- 完整80个Vitest文件/452项测试与22项Node测试通过；Rust workspace格式、全target/feature Clippy及86项测试通过，包含Windows纵向E2E。
+- `pnpm archive:interop`验证设备级随机性设置不进入TypeScript/Rust归档并完成双向交叉导入；release metadata、zh-CN玩家文案门禁及桌面前端201 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T05`完成。下一项严格为`V02-M8-T06` Repetition Reduction。
+
+## 2026-08-09 — V02-M8-T06 降低生成内容重复
+
+### 实现
+
+- 新增TypeScript与Rust一致的确定性重复检测器：规范化长句至少12个字母或数字才参与比较，任务结构签名由风险、奖励、回合区间和排序属性组成，NPC原型签名由identity与personality组成。
+- `GENERATE_NPCS`、`NPC_REPLY`与`GENERATE_QUEST`分别升级schema/prompt为v4、v3与v2；提示词携带已有NPC原型或最近任务结构，并明确禁止重复长句。
+- 酒馆初始化同时检查现有店主和同批NPC原型；任务生成与最近20项任务比较结构；NPC对话与最近同Actor的NPC消息比较生成句段。
+- TypeScript Schema、Application/Windows Service与原生SQLite事务前均执行验证，命中后以明确错误失败关闭；原生测试确认NPC、传闻、任务、消息、关系与生成审计均无部分写入。
+- Fake Provider根据历史上下文产生可重复测试且彼此不同的离线任务和NPC回复；记录`DEC-092`并同步Changelog与架构文档，未实现T07 Context Budget、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- 定向schema、prompt、detector、Windows Service、Application与原生测试通过，覆盖规范化长句、历史NPC回复、任务结构和NPC原型三类命中及零写入路径。
+- 完整81个Vitest文件/456项测试与22项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及87项测试通过，包含Windows纵向E2E在模型切换和存档导入后的连续不同回复。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对；桌面前端202 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T06`完成。下一项严格为`V02-M8-T07` Context Budget。
+
+## 2026-08-09 — V02-M8-T07 固化 Prompt Context Budget
+
+### 实现
+
+- 复用15类任务现有12,000/16,000/22,000字符预算，新增公共`assertTaskContextBudget`；七条Windows AI生成Service均在Prompt格式化和Provider调用前执行失败关闭。
+- 历史型Schema固定窗口上限：NPC消息12、长期记忆9、冒险回合8、世界事件10、结算回合摘要9，并限制相关事实、规则、记忆提取和一致性输入。
+- `compressContextHistory`改为真正有损的旧史摘要：超过四项时只保留最早两项和最晚两项样本，标注被压缩条目总数，再附加任务预算允许的最新窗口。
+- Windows Adventure Settlement从发送全部回合改为与Application一致的8条最近回合加1条旧史抽样摘要；原生NPC、冒险上下文本来已分别限制12条消息、8条记忆、8个回合、30项事实并继续保持。
+- 记录`DEC-093`并同步Changelog与Context/Memory架构文档；未实现T08 Inspector、精确tokenizer、向量检索、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Context Builder、Schema、Application与Windows Settlement定向测试覆盖80条历史压缩、抽样缺失中间条目、最近窗口保留、四类历史数组超限拒绝及12,000字符总预算拒绝。
+- 完整81个Vitest文件/458项测试与22项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及87项测试通过，包含Windows纵向E2E；T07未修改SQLite schema或原生存档格式。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对；桌面前端202 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T07`完成。下一项严格为`V02-M8-T08` Context Inspector。
+
+## 2026-08-09 — V02-M8-T08 提供隐私遮罩 Context Inspector
+
+### 实现
+
+- ContextManifest条目新增stability，并在AITaskOrchestrator调用Provider前与实际ContextBlock一并复核，防止检查视图与发送块漂移。
+- 新增会话级Context Inspector Service；七条Windows AI生成路径在实际请求格式化前记录最近Manifest，不写SQLite或存档。
+- Inspector投影包含block、估算token、source、revision、stability、INCLUDED/OMITTED原因、12位hash前缀与HIT/MISS/NOT_APPLICABLE缓存观察。
+- secret来源统一遮罩，快照完全不携带block content、完整system prompt、未公开世界真相或凭据；相同上下文二次观察只在当前会话标记HIT。
+- “我的/上下文”新增可横向滚动的只读表格、总预算和刷新按钮；空会话显示明确空状态。记录`DEC-094`并同步Changelog与Context/Memory文档，未实现诊断导出、真实Provider/付费API、正式用户数据或iOS。
+
+### 验证
+
+- Inspector Service、Context Assembly/Orchestrator与My页面定向测试通过，覆盖实际请求记录、同内容会话HIT、included/omitted、secret来源遮罩、hash前缀和UI八列展示。
+- 完整82个Vitest文件/461项测试与22项Node测试通过；Prettier、ESLint、TypeScript、release metadata和zh-CN玩家文案门禁通过。
+- Rust workspace格式、全target/feature Clippy及87项测试通过，包含Windows纵向E2E；Inspector未修改SQLite schema或存档格式。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对；桌面前端203 modules生产构建通过。
+
+### 结论
+
+- `V02-M8-T08`完成。下一项严格为`V02-M9-T01` Shared Gate。
+
+## 2026-08-09 — V02-M9-T01 完成 Shared Gate
+
+### 实现
+
+- `pnpm check:shared`统一纳入release metadata、zh-CN玩家语言与跨语言存档互操作，并保留既有Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、全target/feature Clippy和Rust workspace测试。
+- CI workflow自测新增本地Shared Gate类别锁定，防止release、语言、archive或Rust门禁从本地入口静默漂移。
+- 新增`docs/audit/V0_2_SHARED_GATE.md`，记录当前环境、命令、时间、测试统计、门禁映射、边界与原始证据SHA-256；原始UTF-8输出保存在Git忽略的`.local/evidence`。
+- 记录`DEC-095`；Shared Gate不冒充Windows或macOS平台专属验收，未接入真实Provider、付费API、正式用户数据或iOS。
+
+### 验证
+
+- 首次结构化运行在23项Node测试阶段失败：新增自测用单行字符串匹配多行Clippy调用；失败证据原样保留，修正测试断言并单独验证3项CI workflow测试后重新执行全门禁。
+- 通过记录退出码为0：Prettier、release metadata、zh-CN门禁、ESLint、TypeScript、82个Vitest文件/461项测试及23项Node测试全部通过。
+- rustfmt、全workspace/target/feature Clippy及87项Rust测试通过；SQLite迁移/备份/事务、Provider合同、Context、Orchestrator和Security类别均有对应测试覆盖。
+- `pnpm archive:interop`完成TypeScript/Rust归档双向生成、交叉导入与fixture比对。
+
+### 结论
+
+- `V02-M9-T01`完成。下一项严格为`V02-M9-T02` Windows Gate。
+
+## 2026-08-11 — V02-M9-T02 完成 Windows Gate
+
+### 实现
+
+- CI新增受限Windows发布门禁：真实Credential Manager合同、WebView2 Runtime/进程、v0.2.0 NSIS、当前用户静默安装、启动存活、静默卸载和应用数据保留。
+- 发布命令统一写入UTF-8结构化证据，收集安装器大小与SHA-256并上传artifact；生命周期脚本拒绝既有安装、既有应用数据和非临时Windows CI环境。
+- 修复实机暴露的跨平台行尾、Windows测试超时、文件锁错误码、Node 24 pnpm子进程及PowerShell空结果严格模式问题；没有降低或跳过任何门禁。
+- 新增`docs/audit/V0_2_WINDOWS_GATE.md`并记录`DEC-096`；未接入真实Provider、付费API、正式用户数据或iOS。
+
+### 验证
+
+- 权威PR CI run `31446196404`在HEAD `43aea70`全绿：Windows/macOS共享质量、Windows发布和macOS构建任务全部成功。
+- Windows纵向切片与NSIS构建退出码0；安装器`Ember Tavern_0.2.0_x64-setup.exe`为5,223,248 bytes，SHA-256为`6137ed6c0fb5be27e8e8e490883ada354e74e3b6e6d3cafb42da88e876a95a7d`。
+- Credential Manager往返/删除退出码0且无秘密遗留；发现WebView2 Runtime并观测两个新进程；应用版本0.2.0且存活11秒。
+- 静默卸载退出码0，HKCU卸载注册与安装目录移除，应用数据哨兵保留；生命周期JSON的`success=true`。
+
+### 结论
+
+- `V02-M9-T02`完成。下一项严格为`V02-M9-T03` macOS Gate。
+
+## 2026-08-11 — V02-M9-T03 完成 macOS Gate
+
+### 实现
+
+- macOS build job新增受限生命周期门禁：验证Keychain、`.app`元数据、系统WebKit链接与新进程、启动存活、实际SQLite落点及PlatformPaths adapter合同。
+- 门禁拒绝非临时macOS CI和任何既有应用路径；只有全部确认不存在后才授权清理本次创建的Application Support、Caches、Logs或WebKit精确目录。
+- `.app`构建、生命周期、文件清单分别写入UTF-8结构化JSON并上传artifact；新增CI自测锁定所有必需证据入口。
+- 新增`docs/audit/V0_2_MACOS_GATE.md`并记录`DEC-097`；未接入真实Provider、付费API、正式用户数据或iOS。
+
+### 验证
+
+- 权威PR CI run `31461140570`在HEAD `3a6e656`的macOS共享质量及build/lifecycle任务成功。
+- Keychain往返/读取/删除退出码0且无秘密遗留；`.app`为arm64、bundle ID `com.embertavern.windows`、版本0.2.0。
+- 可执行文件链接系统`WebKit.framework`，启动产生2个新WebKit进程并存活19秒；stdout/stderr均为0 bytes。
+- SQLite实际创建于`~/Library/Application Support/com.embertavern.windows/ember-tavern.sqlite`，data/cache/log/temp均为绝对路径，macOS PlatformPaths adapter合同通过。
+- 生命周期清理仅删除本次创建且预先授权的data/cache/WebKit目录；本机非CI拒绝测试确认清理未获授权且删除列表为空。
+
+### 结论
+
+- `V02-M9-T03`完成。下一项严格为`V02-M9-T04` UI 4-resolution Gate。
+
+## 2026-08-11 — V02-M9-T04 完成四分辨率 UI Gate
+
+### 实现与修复
+
+- 使用headed Google Chrome覆盖存档、世界、车卡、酒馆、NPC、任务、冒险、角色卡、档案、我的、设置和恢复12个核心页面，以及860x600、1180x760、1366x768、1920x1080四个指定视口。
+- 每次导航等待页面专用最终就绪选择器，再执行截图前后控制台检查、document/main横向溢出与可见后代裁切测量；48组最终结果均无控制台错误、横向溢出或裁切。
+- 修复模型设置标题栏“未知路径”，补充路由标题回归测试；修复纸张主题缺失局部色板导致的低对比度，并以对比度合同锁定正文与弱化文字阈值。
+- 核心对话/任务/冒险断点改为计入248px侧栏，“我的”页在最小宽度改为单栏；新增侧栏感知与最小宽度布局回归测试。
+- 新增`docs/audit/V0_2_UI_4_RESOLUTION_GATE.md`、48张最终截图、4张修复前截图及52项SHA-256清单，并记录`DEC-098`。
+- 视觉数据只来自临时QA工作树中的确定性本地Tauri IPC fixture；fixture未提交，未访问真实Provider、付费API、API Key、正式用户数据或iOS。
+
+### 验证
+
+- 48/48页面与视口组合逐张视觉复核通过；修复后控制台错误0、document/main横向溢出0、裁切后代0。
+- `pnpm lint`通过；86个Vitest文件/465项测试与27项Node测试全部通过。
+- `pnpm --dir windows-app build`完成TypeScript检查与203 modules生产构建；根包未定义`build`脚本，因此未把不存在的`pnpm build`入口作为门禁。
+- 4项QA缺陷全部verified，0项deferred、best-effort或reverted；QA健康分94提升至100。
+
+### 结论
+
+- `V02-M9-T04`完成。下一项严格为`V02-M9-T05` Vertical Flow。
+
+## 2026-08-11 — V02-M9-T05 完成 Vertical Flow
+
+### 实现与修复
+
+- 扩展`windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save`：首次启动先断言无Campaign/设备模型；在同一真实SQLite存档完成世界、车卡、酒馆、NPC、任务、8回合冒险、本地D20与结算。
+- 流程在已持久化NPC请求后模拟中断，重开得到`RECOVERY_REQUIRED`与一个pending；恢复原子回到最近完整`TAVERN`、取消pending并继续对话，再完成导出、删除、导入、重开与继续。
+- 使用唯一bundle ID `com.embertavern.flowqa`的打包macOS `.app`和隔离Application Support数据完成真实WKWebView验证，覆盖原生导出/导入对话框；没有读取或修改正式应用数据。
+- 实机发现`ISSUE-005`：WKWebView未呈现`window.confirm`，首次点击会直接删除隔离QA存档。归档经真实导入路径恢复后，将删除改为应用内警告、取消和最终确认两个阶段，并新增回归测试；修复后取消操作保留Campaign且收起确认。
+- 新增`docs/audit/V0_2_VERTICAL_FLOW_GATE.md`、18张原生UI PNG和SHA-256清单，记录`DEC-099`并关闭SR2-010。
+
+### 验证
+
+- `pnpm test:windows-e2e`通过；单一测试覆盖真实SQLite、恢复、导出/删除/导入和继续。
+- 删除确认定向Vitest 13/13通过；`pnpm lint`与`pnpm --dir windows-app build`通过，生产构建为203 modules。
+- 18张截图逐张视觉复核及SHA-256复算通过；原生应用确认取消后Campaign仍存在，最终危险确认未再次执行。
+- 全过程仅使用临时/隔离数据和Fake Provider，未使用真实Provider、付费API、API Key、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M9-T05`完成，M9全部关闭。下一项严格为`V02-M10-T01` Windows v0.2 Build。
+
+## 2026-08-11 — V02-M10-T01 完成 Windows v0.2 Build
+
+### 构建与落盘
+
+- 权威PR CI run `31503183202`在精确HEAD `20ae2f536c1f70f16878bbfb8699bda6df339775`通过Windows/macOS共享质量门禁和两端平台发布job。
+- Windows x64 runner先通过单一SQLite纵向E2E，再执行`pnpm --dir windows-app tauri build --bundles nsis`；构建命令退出码0。
+- 当前用户NSIS `Ember Tavern_0.2.0_x64-setup.exe`已下载到Git忽略的`release/v0.2/`，结构化CI证据保存在其`evidence/`子目录。
+- 安装器为5,220,387 bytes，SHA-256为`1674ffa788316c196ed11147090d281ec68e2ee4b4865a7319c4efe53dde10ca`；CI文件清单、生命周期JSON和下载后复算三方一致。
+
+### 验证与边界
+
+- Credential Manager测试凭据往返/删除通过且无秘密遗留；检测到WebView2 Runtime并观察到新WebView2进程。
+- 0.2.0当前用户静默安装、安装后启动存活11秒和静默卸载全部退出0；卸载注册与安装目录移除，应用数据哨兵保留。
+- 当前产物为未签名内部发布候选，不冒充已签名公开发行版；未使用真实Provider、付费API、API Key、正式用户数据或iOS。
+- 新增`docs/audit/V0_2_WINDOWS_BUILD.md`固定来源HEAD、run、大小、哈希和生命周期结论。
+
+### 结论
+
+- `V02-M10-T01`完成。下一项严格为`V02-M10-T02` Artifact Hash / Manifest。
+
+## 2026-08-11 — V02-M10-T02 完成 Artifact Hash / Manifest
+
+### 输出
+
+- 在Git忽略的`release/v0.2/`生成权威清单要求的五个精确基名文件：`SHA256SUMS`、`ARTIFACT_MANIFEST`、`BUILD_INFO`、`RELEASE_NOTES`和`KNOWN_LIMITATIONS`。
+- `SHA256SUMS`只覆盖不可变安装器，避免自引用；复算结果为`1674ffa788316c196ed11147090d281ec68e2ee4b4865a7319c4efe53dde10ca`。
+- JSON manifest记录安装器名称、版本、平台、架构、字节数、SHA-256、source HEAD、CI run和未签名状态；BUILD_INFO记录runner、工具链、构建命令/时间/退出码及Windows生命周期结论。
+- 发布说明汇总v0.2纵向能力、数据/凭据边界和双平台门禁；已知限制明确未签名、WebView2联网、Fake Provider、无自动更新/云同步/iOS及卸载保留数据。
+- 新增`docs/audit/V0_2_ARTIFACT_MANIFEST.md`固定五份文件本身的SHA-256、格式和验证结果。
+
+### 验证与边界
+
+- `shasum -a 256 -c SHA256SUMS`通过；安装器大小/哈希与CI文件清单、生命周期JSON、ARTIFACT_MANIFEST和本机复算一致。
+- `jq`验证两个JSON结构、精确source HEAD/run、build exit 0、应用数据保留和unsigned边界。
+- release根目录恰好包含安装器与五个要求文件；秘密样式扫描未发现API Key、bearer token或秘密值。
+- 本任务未签名、未发布或上传本地release目录，未使用真实Provider、付费API、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M10-T02`完成。下一项严格为`V02-M10-T03` macOS Dev Build Record。
+
+## 2026-08-11 — V02-M10-T03 完成 macOS Dev Build Record
+
+### 构建记录
+
+- 下载权威PR CI run `31503183202`的`ember-tavern-macos-build-evidence`到Git忽略的`.local/m10-t03/run-31503183202/`，来源为最终产品代码HEAD `20ae2f536c1f70f16878bbfb8699bda6df339775`。
+- runner为GitHub托管`macos-latest`、darwin arm64；`pnpm --dir windows-app tauri build --bundles app`退出0，生成`Ember Tavern.app` 0.2.0，bundle ID `com.embertavern.windows`。
+- 主可执行文件为21,614,912 bytes，SHA-256 `d7c5e45776f70fca26a003f36a56bae4651590c644f75ffdd7ec40bf09210dc5`；Info.plist和icon哈希也完成CI/下载后本机双重核对。
+
+### 验证与边界
+
+- Keychain往返/删除退出0且无秘密遗留；可执行文件使用系统WebKit，启动后观测两个新WebKit进程并存活17秒，stdout/stderr均为0 bytes。
+- PlatformPaths返回绝对data/cache/log/temp根，真实SQLite创建于macOS Application Support路径；adapter合同通过，临时runner路径仅在精确授权后清理。
+- 下载后的lifecycle JSON通过`jq`合同复核，Mach-O确认为thin arm64；`codesign`只显示ad-hoc linker signature，无TeamIdentifier、Developer ID、公证或分发签名。
+- 新增`docs/audit/V0_2_MACOS_DEV_BUILD.md`；该记录不作为正式macOS发布，未使用真实Provider、付费API、API Key、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M10-T03`完成。下一项严格为`V02-M10-T04` Review Package。
+
+## 2026-08-11 — V02-M10-T04 完成 ChatGPT Review Package
+
+### 组包
+
+- 生成`review_v0.2_to_chatgpt_20260811_2319.zip`，包根`00_REVIEW_GUIDE.md`说明审查顺序、证据边界、来源HEAD和分发限制。
+- `competitor-research/`包含三个指定仓库拆解、基线、矩阵、Gap Analysis、借鉴计划和拒绝项；`architecture/`包含Architecture Gate、目标架构、AI pipeline、Context/Memory和状态/事件文档。
+- `final-tasks/`包含完成态权威任务；`audit-fixes/`包含第一轮、v0.1第二轮、共享/平台/UI/纵向/发布审计；`screenshots/`包含52张四分辨率/修复证据和18张原生纵向流程证据。
+- `tests/`包含94个跟踪测试文件清单、当前本地/CI结果摘要及结构化Windows/macOS平台JSON；`git/`只包含HEAD、状态、日志、refs/remotes和摘要文本。
+- `source/`使用最终提交HEAD的`git archive`生成源码ZIP；`installer/`包含Windows x64 NSIS和M10-T02五个文件；`risks/`包含已知限制、延期范围和发布边界。
+
+### 安全与验证
+
+- 排除`.git`对象、`.local`、third-party工作树、`node_modules`、target/cache、数据库/备份、`.env`、系统凭据、正式用户数据和真实API Key；预存用户`.gitignore`修改未暂存、未进入源码归档。
+- 组包前复核安装器、UI/纵向截图SHA清单和JSON证据；生成覆盖所有包内文件的SHA-256清单（清单自身除外）。
+- ZIP创建后解压到新的临时目录，逐项执行SHA-256复算并核对11类必需目录、源码HEAD、安装器和截图数量。
+- 首次完成态推送后，Windows CI在80回合SQLite结算集成测试上耗时33.6秒并触发30秒全局超时；macOS及此前权威Windows run均通过，失败不是业务断言。为该单一重型集成用例增加Windows专属60秒余量、macOS保持5秒，未删除操作、断言或测试类别；修复后重新生成源码归档、全文件清单和外层ZIP。
+- 新增`docs/audit/V0_2_REVIEW_PACKAGE.md`；包仅供下一轮ChatGPT审查，不构成Windows公开发行或macOS分发授权。
+
+### 结论
+
+- `V02-M10-T04`完成；v0.2 M0–M10权威任务全部完成。iOS及其余默认延期范围不自动启动。

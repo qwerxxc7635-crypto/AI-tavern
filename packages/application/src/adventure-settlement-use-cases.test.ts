@@ -116,7 +116,7 @@ describe('AdventureSettlementUseCases', () => {
       const summaryRequest = JSON.stringify(
         new GenerationRecordRepository(sqlite).get(summaryGenerationKey)?.request,
       );
-      expect(summaryRequest).toContain('Earlier history:');
+      expect(summaryRequest).toContain('Earlier history (72 entries; sampled):');
       expect(summaryRequest).toContain('history-marker-80');
       expect(summaryRequest).not.toContain('history-marker-40');
       expect(new CampaignRepository(sqlite).get(campaignKey)?.state).toBe('ADVENTURE');

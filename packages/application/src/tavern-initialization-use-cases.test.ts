@@ -99,6 +99,13 @@ describe('TavernInitializationUseCases', () => {
       ]);
       expect(initialized.rumors).toHaveLength(3);
       expect(initialized.rumors.every(({ kind }) => kind === 'RUMOR')).toBe(true);
+      expect(initialized.rumors[0]).toMatchObject({
+        claimId: 'claim-rumor-0',
+        sourceNpcId: npcId('npc-1'),
+        sourceBasis: 'WITNESS',
+        confidence: 0.9,
+        claimRevision: 1,
+      });
       expect(initialized.questPublisherNpcIds).toEqual([
         npcId('npc-0'),
         npcId('npc-1'),
@@ -109,6 +116,7 @@ describe('TavernInitializationUseCases', () => {
         'Waiting for the causeway to reopen.',
       );
       expect(npcs.getKnowledge(npcId('npc-1'))?.knownFactIds).toContain(worldFactId('rumor-0'));
+      expect(npcs.getKnowledge(npcId('npc-1'))?.provenance[0]?.confidence).toBe(0.9);
       expect(npcs.getRelationship(npcId('npc-2'))).toMatchObject({
         playerCharacterId: characterKey,
         trust: 0,

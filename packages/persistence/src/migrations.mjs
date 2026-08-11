@@ -7,6 +7,47 @@ const migrations = [
     name: 'initial',
     source: new URL('../../../database/migrations/0001_initial.sql', import.meta.url),
   },
+  {
+    version: 2,
+    name: 'credential_cleanup_queue',
+    source: new URL(
+      '../../../database/migrations/0002_credential_cleanup_queue.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 3,
+    name: 'provider_probe_consistency',
+    source: new URL(
+      '../../../database/migrations/0003_provider_probe_consistency.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 4,
+    name: 'ai_candidates',
+    source: new URL('../../../database/migrations/0004_ai_candidates.sql', import.meta.url),
+  },
+  {
+    version: 5,
+    name: 'event_ledger',
+    source: new URL('../../../database/migrations/0005_event_ledger.sql', import.meta.url),
+  },
+  {
+    version: 6,
+    name: 'scene_frames',
+    source: new URL('../../../database/migrations/0006_scene_frames.sql', import.meta.url),
+  },
+  {
+    version: 7,
+    name: 'knowledge_provenance',
+    source: new URL('../../../database/migrations/0007_knowledge_provenance.sql', import.meta.url),
+  },
+  {
+    version: 8,
+    name: 'rumor_claim_sources',
+    source: new URL('../../../database/migrations/0008_rumor_claim_sources.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

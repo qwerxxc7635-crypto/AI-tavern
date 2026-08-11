@@ -7,6 +7,7 @@ import {
   type QuestView,
   type WindowsQuestBoardService,
 } from './quest-board-service.js';
+import { playerText } from './localization/index.js';
 
 type QuestActions = Pick<WindowsQuestBoardService, 'load' | 'initialize' | 'accept'>;
 
@@ -85,7 +86,7 @@ export function QuestBoardPage({
   if (snapshot === null) {
     return error === null ? (
       <main className="quest-board-page" aria-busy="true">
-        <p className="eyebrow">Reading the notice board</p>
+        <p className="eyebrow">{playerText.coreUi.readingNoticeBoard}</p>
         <h1>正在整理任务告示…</h1>
       </main>
     ) : (
@@ -100,7 +101,7 @@ export function QuestBoardPage({
     <main className="quest-board-page">
       <header className="quest-board-header">
         <div>
-          <p className="eyebrow">{snapshot.source.tavernName} · Notice board</p>
+          <p className="eyebrow">{snapshot.source.tavernName} · 任务告示</p>
           <h1>任务告示</h1>
           <p>选择一份委托，先确认风险、目标和推荐能力。</p>
         </div>
@@ -131,7 +132,7 @@ export function QuestBoardPage({
           <article className="quest-detail" aria-live="polite">
             <div className="quest-detail__heading">
               <div>
-                <p className="eyebrow">Posted by {selected.publisherName}</p>
+                <p className="eyebrow">发布者：{selected.publisherName}</p>
                 <h2>{selected.content.title}</h2>
               </div>
               <span className={`risk-badge risk-badge--${selected.risk.toLowerCase()}`}>
@@ -214,7 +215,7 @@ function statusLabel(status: QuestView['status']): string {
 function QuestMessage({ title, detail }: { readonly title: string; readonly detail?: string }) {
   return (
     <main className="quest-board-page">
-      <p className="eyebrow">Quest board unavailable</p>
+      <p className="eyebrow">{playerText.coreUi.questBoardUnavailable}</p>
       <h1>{title}</h1>
       {detail === undefined ? null : <p>{detail}</p>}
       <Link className="text-link" to="/tavern">

@@ -1,15 +1,21 @@
 import {
+  assembleTaskContext,
+  contextBudgetForTask,
+  resolveModelConfig,
   routeModel,
   StandardAIError,
   standardizeAIError,
   validateAIOutput,
   type AIProvider,
   type AITask,
+  type ContextManifest,
   type ModelCapabilities,
   type NormalizedAIRequest,
   type ProviderConfig,
+  type ResolvedModelConfig,
 } from '@ember-tavern/ai-core';
 import {
+  type AiOperationId,
   type AiRequestError,
   type AiRequestId,
   type CampaignId,
@@ -31,6 +37,8 @@ import {
 } from '@ember-tavern/persistence';
 import { formatTaskPrompt, type FormattedTaskPrompt } from '@ember-tavern/prompts';
 
+import { AITaskOrchestrator, type AIRouteKind } from './ai-task-orchestrator.js';
+
 export interface AITurnGenerationOptions {
   readonly temperature: number;
   readonly maxOutputTokens: number;
@@ -41,6 +49,7 @@ export interface AITurnGenerationOptions {
 }
 
 export interface ExecuteAITurn {
+  readonly operationId: AiOperationId;
   readonly requestId: AiRequestId;
   readonly generationRecordId: GenerationRecordId;
   readonly campaignId: CampaignId;
@@ -51,6 +60,9 @@ export interface ExecuteAITurn {
   readonly modelName: string;
   readonly requireSelectedModelProfile?: boolean;
   readonly repairSourceRequestId?: AiRequestId;
+  readonly routeKind?: AIRouteKind;
+  readonly routeAttempt?: number;
+  readonly requiredResolvedFingerprint?: string;
   readonly input: JsonValue;
   readonly generationOptions: AITurnGenerationOptions;
   readonly buildContext: () => unknown | Promise<unknown>;
@@ -108,8 +120,18 @@ export class AITurnOrchestrator {
     }
 
     let context: JsonValue;
+    let contextAssembly: Awaited<ReturnType<typeof assembleTaskContext>>['assembly'];
     try {
       context = toJsonValue(await command.buildContext(), '$context');
+      const prepared = await assembleTaskContext(
+        command.task,
+        command.requestId,
+        1,
+        context,
+        contextBudgetForTask(command.task).maxCharacters,
+      );
+      context = prepared.content;
+      contextAssembly = prepared.assembly;
       this.requests.setContext(command.requestId, context, this.now());
     } catch (error) {
       this.failPending(command.requestId, {
@@ -124,6 +146,7 @@ export class AITurnOrchestrator {
 
     let request: NormalizedAIRequest;
     let selectedModelProfileId: ModelProfileId;
+    let resolvedModelConfig: ResolvedModelConfig;
     try {
       const enabledProfiles = this.modelProfiles.listEnabled(this.providerConfig.id);
       const profiles = command.requireSelectedModelProfile
@@ -183,6 +206,21 @@ export class AITurnOrchestrator {
         maxOutputTokens: command.generationOptions.maxOutputTokens,
         timeoutMs: command.generationOptions.timeoutMs,
       });
+      resolvedModelConfig = await resolveModelConfig({
+        connectionProfile: this.providerConfig,
+        modelProfileId: selectedModelProfileId,
+        capabilities: selectedProfile.capabilities,
+        request,
+      });
+      if (
+        command.requiredResolvedFingerprint !== undefined &&
+        command.requiredResolvedFingerprint !== resolvedModelConfig.fingerprint
+      ) {
+        throw new AIOrchestrationError(
+          'RESOLVED_MODEL_CONFIG_DRIFT',
+          'The frozen model configuration changed before execution',
+        );
+      }
     } catch (error) {
       this.failPending(command.requestId, {
         code: error instanceof AIOrchestrationError ? error.code : 'PROMPT_BUILD_FAILED',
@@ -202,20 +240,41 @@ export class AITurnOrchestrator {
       task: command.task,
       modelProfileId: selectedModelProfileId,
       promptVersion: request.promptVersion,
-      request: requestJson(request, context, command.repairSourceRequestId),
+      request: requestJson(
+        request,
+        context,
+        command.operationId,
+        command.routeKind ?? 'PRIMARY',
+        command.routeAttempt ?? 1,
+        contextAssembly.manifest,
+        resolvedModelConfig.fingerprint,
+        command.repairSourceRequestId,
+      ),
       startedAt: this.now(),
     });
     this.requests.startAttempt(command.requestId, this.now());
 
     let rawResponseText: string;
     try {
-      const response = await this.provider.generate(request, this.providerConfig);
-      if (response.requestId !== command.requestId || response.modelName !== request.modelName) {
-        throw new AIOrchestrationError(
-          'PROVIDER_RESPONSE_MISMATCH',
-          'Provider response does not match the normalized request',
-        );
-      }
+      const response = (
+        await new AITaskOrchestrator(this.provider, this.providerConfig).execute({
+          operationId: command.operationId,
+          requestId: command.requestId,
+          taskType: command.task,
+          campaignId: command.campaignId,
+          actorId: null,
+          contextAssembly,
+          resolvedModelConfig,
+          route: {
+            kind: command.routeKind ?? 'PRIMARY',
+            attempt: command.routeAttempt ?? 1,
+            providerId: this.providerConfig.id,
+            modelProfileId: selectedModelProfileId,
+            modelName: request.modelName,
+          },
+          providerRequest: request,
+        })
+      ).response;
       rawResponseText = response.content;
       this.requests.markReceived(command.requestId, this.now());
       this.requests.markValidating(command.requestId, this.now());
@@ -318,10 +377,20 @@ export class AITurnOrchestrator {
 function requestJson(
   request: NormalizedAIRequest,
   context: JsonValue,
+  operationId: AiOperationId,
+  routeKind: AIRouteKind,
+  routeAttempt: number,
+  contextManifest: ContextManifest,
+  resolvedModelFingerprint: string,
   repairSourceRequestId: AiRequestId | undefined,
 ): JsonValue {
   return Object.freeze({
     requestId: request.requestId,
+    operationId,
+    routeKind,
+    routeAttempt,
+    contextManifest: toJsonValue(contextManifest, '$contextManifest'),
+    resolvedModelFingerprint,
     task: request.task,
     promptVersion: request.promptVersion,
     modelName: request.modelName,

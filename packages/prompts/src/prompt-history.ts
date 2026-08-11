@@ -43,4 +43,49 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Build settlement world events from filtered clocks, factions, and recent events.',
   }),
+  Object.freeze({
+    task: 'GENERATE_ADVENTURE_TURN',
+    version: promptVersion(2),
+    change: 'Ground every turn in the persisted SceneFrame recovery and authority boundaries.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_ADVENTURE_TURN',
+    version: promptVersion(3),
+    change: 'Interpret explicit action, dialogue, and observation intent modes.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_ADVENTURE_TURN',
+    version: promptVersion(4),
+    change: 'Require 3-5 grounded and distinct suggestions for active scenes.',
+  }),
+  Object.freeze({
+    task: 'RESOLVE_DICE_RESULT',
+    version: promptVersion(2),
+    change: 'Narrate only after raw, modifier, total, DC, and result are fixed locally.',
+  }),
+  Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(2),
+    change: 'Consume only actor-scoped Truth and Claim knowledge projections.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_NPCS',
+    version: promptVersion(3),
+    change: 'Source each tavern rumor as a lightweight NPC Claim with basis and confidence.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_NPCS',
+    version: promptVersion(4),
+    change: 'Avoid repeated phrases and duplicate NPC identity/personality archetypes.',
+  }),
+  Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(3),
+    change: 'Reject substantial phrase repetition inside a generated reply.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_QUEST',
+    version: promptVersion(2),
+    change: 'Avoid recent quest structures and substantial repeated phrases.',
+  }),
 ]);

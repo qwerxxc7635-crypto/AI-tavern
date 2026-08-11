@@ -1,8 +1,10 @@
 export { AI_TASKS, PROVIDER_PRESET_KEYS, PROVIDER_TYPES } from './protocol.js';
+export { canonicalJson, sha256CanonicalJson } from './canonical-json.js';
 export {
   buildAdventureTurnContext,
   buildNpcDialogueContext,
   buildWorldEventContext,
+  assertTaskContextBudget,
   compressContextHistory,
   contextBudgetForTask,
   ContextBuildError,
@@ -18,6 +20,40 @@ export type {
   WorldEventContext,
   WorldEventContextSource,
 } from './context-builder.js';
+export {
+  assembleContextBlocks,
+  assembleTaskContext,
+  CONTEXT_BLOCK_TYPES,
+  CONTEXT_PRIVACY_CLASSES,
+  CONTEXT_STABILITIES,
+  ContextAssemblyError,
+  createContextBlock,
+  estimateContextTokens,
+} from './context-assembly.js';
+export {
+  CONTEXT_CACHE_SECTION_KINDS,
+  ContextCacheLayoutError,
+  createContextCacheLayout,
+} from './context-cache-layout.js';
+export type {
+  ContextCacheBlockProjection,
+  ContextCacheLayout,
+  ContextCacheSection,
+  ContextCacheSectionKind,
+} from './context-cache-layout.js';
+export type {
+  ContextAssembly,
+  ContextAssemblyPolicy,
+  ContextBlock,
+  ContextBlockDraft,
+  ContextBlockType,
+  ContextCandidate,
+  ContextExclusionReason,
+  ContextManifest,
+  ContextManifestEntry,
+  ContextPrivacyClass,
+  ContextStability,
+} from './context-assembly.js';
 export { FakeAIProvider, FakeAIProviderError } from './fake-ai-provider.js';
 export { FAKE_TASK_OUTPUTS } from './fake-task-outputs.js';
 export { validateAIOutput } from './output-validator.js';
@@ -63,3 +99,16 @@ export {
   standardizeAIError,
 } from './standard-ai-error.js';
 export type { StandardAIErrorCode } from './standard-ai-error.js';
+export * from './repetition-detector.js';
+export {
+  providerConfigFromResolved,
+  resolveModelConfig,
+  ResolvedModelConfigError,
+  verifyResolvedModelConfig,
+} from './resolved-model-config.js';
+export type {
+  FrozenGenerationParameters,
+  FrozenPromptProfile,
+  ResolvedModelConfig,
+  ResolveModelConfigInput,
+} from './resolved-model-config.js';

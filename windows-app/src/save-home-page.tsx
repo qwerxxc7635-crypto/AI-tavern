@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
 
 import {
   tauriCampaignGateway,
@@ -7,6 +7,7 @@ import {
   type CampaignSummary,
 } from './campaign-gateway.js';
 import { tauriSaveTransferGateway, type SaveTransferGateway } from './save-transfer-gateway.js';
+import { playerText } from './localization/index.js';
 
 const STATE_LABELS: Readonly<Record<CampaignSummary['state'], string>> = {
   CREATING_WORLD: '构筑世界',
@@ -34,6 +35,7 @@ export function SaveHomePage({
   const [campaigns, setCampaigns] = useState<readonly CampaignSummary[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const busyIdRef = useRef<string | null>(null);
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [transferNotice, setTransferNotice] = useState<string | null>(null);
 
@@ -133,14 +135,11 @@ export function SaveHomePage({
   }
 
   async function deleteCampaign(campaign: CampaignSummary) {
-    const accepted = window.confirm(
-      '永久删除会移除该存档的全部本地数据。应用会先创建完整数据库备份，但请确认已经导出需要保留的 .emtavern 文件。确定继续吗？',
-    );
-    if (!accepted) return;
     markBusy(`delete:${campaign.id}`);
     try {
       await gateway.deleteCampaign(campaign.id);
       await reload();
+      setDeleteConfirmationId(null);
       setTransferNotice(`本地存档 ${campaign.id.slice(0, 8)} 已永久删除。`);
     } catch {
       setError('存档没有删除成功，本地数据保持原状。');
@@ -222,18 +221,23 @@ export function SaveHomePage({
           <span />
         </div>
         <div>
-          <p className="eyebrow">Local chronicles</p>
+          <p className="eyebrow">{playerText.coreUi.localChronicles}</p>
           <h1>选择一段旅程</h1>
           <p>每一页都保存在这台设备的 SQLite 存档中。</p>
         </div>
-        <button
-          className="primary-action"
-          type="button"
-          disabled={busyId !== null}
-          onClick={() => void createCampaign()}
-        >
-          {busyId === 'new' ? '正在落笔…' : '新建存档'}
-        </button>
+        <div className="save-home__header-actions">
+          <NavLink className="quiet-action" to="/my">
+            我的
+          </NavLink>
+          <button
+            className="primary-action"
+            type="button"
+            disabled={busyId !== null}
+            onClick={() => void createCampaign()}
+          >
+            {busyId === 'new' ? '正在落笔…' : '新建存档'}
+          </button>
+        </div>
       </header>
 
       {error === null ? null : (
@@ -250,7 +254,7 @@ export function SaveHomePage({
 
       <section className="save-transfer" aria-label="存档导入与导出">
         <div>
-          <p className="eyebrow">Portable archive</p>
+          <p className="eyebrow">{playerText.coreUi.portableArchive}</p>
           <h2>迁移你的旅程</h2>
           <p>选择或拖入一个 .emtavern 文件。设备模型与 API Key 不会随存档迁移。</p>
         </div>
@@ -273,7 +277,7 @@ export function SaveHomePage({
 
       {campaigns?.length === 0 ? (
         <section className="save-home__empty">
-          <p className="eyebrow">No chronicles yet</p>
+          <p className="eyebrow">{playerText.coreUi.noChroniclesYet}</p>
           <h2>炉边还没有你的故事。</h2>
           <p>新建存档后，世界构筑会从这里开始。归档内容仍保留在本地数据库中。</p>
         </section>
@@ -327,11 +331,38 @@ export function SaveHomePage({
                   className="danger-action"
                   type="button"
                   disabled={busyId !== null}
-                  onClick={() => void deleteCampaign(campaign)}
+                  aria-expanded={deleteConfirmationId === campaign.id}
+                  onClick={() => setDeleteConfirmationId(campaign.id)}
                 >
                   {busyId === `delete:${campaign.id}` ? '正在删除…' : '永久删除'}
                 </button>
               </div>
+              {deleteConfirmationId === campaign.id ? (
+                <div className="save-card__delete-confirmation" role="alert">
+                  <p>
+                    此操作会永久移除该存档的全部本地数据。应用会先创建完整数据库备份，但请先导出需要保留的
+                    .emtavern 文件。
+                  </p>
+                  <div>
+                    <button
+                      className="quiet-action"
+                      type="button"
+                      disabled={busyId !== null}
+                      onClick={() => setDeleteConfirmationId(null)}
+                    >
+                      取消删除
+                    </button>
+                    <button
+                      className="danger-action"
+                      type="button"
+                      disabled={busyId !== null}
+                      onClick={() => void deleteCampaign(campaign)}
+                    >
+                      {busyId === `delete:${campaign.id}` ? '正在删除…' : '确认永久删除'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </article>
           ))}
         </section>

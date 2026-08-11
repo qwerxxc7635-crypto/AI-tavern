@@ -56,18 +56,20 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_NPCS: define(
     'GENERATE_NPCS',
     'WORLD_DESIGNER',
-    'Create the requested number of non-owner tavern NPCs. Give each independent motives, secrets, speech, and a valid residency-specific visit reason. Also create exactly three rumors attributed to generated NPC names with an explicit hidden veracity proposal.',
-    2,
+    'Create the requested number of non-owner tavern NPCs. Give each a distinct identity and personality archetype unlike existingNpcArchetypes, with independent motives, secrets, speech, and a valid residency-specific visit reason. Do not repeat substantial phrases. Also create exactly three rumors attributed to generated NPC names. Classify each source as witness, hearsay, personal belief, or faction message and give the Claim confidence independently from its hidden veracity proposal.',
+    4,
   ),
   NPC_REPLY: define(
     'NPC_REPLY',
     'NPC_ACTOR',
-    'Reply only from this NPC perspective and limited knowledge. Do not reveal excluded secrets or facts belonging only to other NPCs.',
+    'Reply only from this NPC perspective without repeating substantial phrases inside the response. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
+    3,
   ),
   GENERATE_QUEST: define(
     'GENERATE_QUEST',
     'WORLD_DESIGNER',
-    'Create a short-session quest grounded in supplied facts and NPCs. Separate narrative content from program-controlled risk and reward proposals.',
+    'Create a short-session quest grounded in supplied facts and NPCs. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. Separate narrative content from program-controlled risk and reward proposals.',
+    2,
   ),
   GENERATE_ADVENTURE_PLAN: define(
     'GENERATE_ADVENTURE_PLAN',
@@ -77,12 +79,14 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_ADVENTURE_TURN: define(
     'GENERATE_ADVENTURE_TURN',
     'GAME_MASTER',
-    'Resolve only the submitted action into the next scene. Offer clear actions and propose, but never apply, state changes.',
+    'Resolve only the submitted intent from the supplied SceneFrame. ACTION changes the situation, DIALOGUE addresses a participant, and OBSERVE gathers perceivable information. For an active scene, return 3-5 distinct suggestions grounded jointly in the scene, quest, player character, knownFacts, and npcKnowledge; return none for ENDING. Preserve authority boundaries and propose, but never apply, state changes.',
+    4,
   ),
   RESOLVE_DICE_RESULT: define(
     'RESOLVE_DICE_RESULT',
     'GAME_MASTER',
-    'Narrate the supplied immutable local dice result. Never reroll, change the total, difficulty, or success value.',
+    'Narrate the supplied immutable local dice result only after hard logic has fixed raw, modifier, total, DC, and result. Never reroll or change any of those five values.',
+    2,
   ),
   GENERATE_WORLD_EVENT: define(
     'GENERATE_WORLD_EVENT',

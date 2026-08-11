@@ -2,8 +2,11 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  assertTaskContextBudget,
   GenerateQuestInputSchema,
   GenerateQuestOutputSchema,
+  hasRepeatedQuestStructure,
+  questStructureSignature,
   validateAIOutput,
   type AIProvider,
   type NormalizedAIRequest,
@@ -17,6 +20,12 @@ import {
   isoTimestamp,
 } from '@ember-tavern/contracts';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
+import { recordContextInspection } from './context-inspector-service.js';
+import {
+  balancedRandomnessTemperatureSource,
+  tauriRandomnessTemperatureSource,
+  type RandomnessTemperatureSource,
+} from './randomness-settings-service.js';
 
 export interface QuestNpcBrief {
   readonly id: string;
@@ -42,6 +51,7 @@ export interface QuestGenerationSource {
   };
   readonly availableNpcs: readonly QuestNpcBrief[];
   readonly recentQuestTitles: readonly string[];
+  readonly recentQuestStructures: readonly string[];
 }
 
 export interface QuestView {
@@ -134,6 +144,7 @@ export class WindowsQuestBoardService {
     private readonly gateway: QuestBoardGateway = tauriQuestBoardGateway,
     private readonly provider: AIProvider = new FakeAIProvider(),
     private readonly createIdentity: () => RequestIdentity = defaultIdentity,
+    private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
   ) {}
 
   public load(id: string): Promise<QuestBoardSnapshot> {
@@ -178,6 +189,7 @@ export class WindowsQuestBoardService {
         availableNpcs: snapshot.source.availableNpcs,
         playerConcept: snapshot.source.playerConcept,
         recentQuestTitles: snapshot.source.recentQuestTitles,
+        recentQuestStructures: snapshot.source.recentQuestStructures,
       });
       snapshot = await this.gateway.commit({
         campaignId: id,
@@ -196,7 +208,10 @@ export class WindowsQuestBoardService {
     const identity = this.createIdentity();
     const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
     if (model === undefined) throw new QuestBoardServiceError('MODEL_NOT_FOUND');
+    assertTaskContextBudget('GENERATE_QUEST', input);
+    await recordContextInspection('GENERATE_QUEST', input);
     const prompt = formatTaskPrompt('GENERATE_QUEST', input, model.capabilities);
+    const temperature = await this.randomness.resolveTemperature();
     const request: NormalizedAIRequest = {
       requestId: aiRequestId(identity.requestId),
       task: 'GENERATE_QUEST',
@@ -204,7 +219,7 @@ export class WindowsQuestBoardService {
       modelName: model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: 0,
+      temperature,
       maxOutputTokens: 4_000,
       timeoutMs: 5_000,
     };
@@ -215,6 +230,10 @@ export class WindowsQuestBoardService {
     const validated = validateAIOutput('GENERATE_QUEST', response.content);
     if (!validated.ok) throw new QuestBoardServiceError(validated.error.code);
     const output = GenerateQuestOutputSchema.parse(validated.validatedOutput);
+    const sourceInput = GenerateQuestInputSchema.parse(input);
+    if (hasRepeatedQuestStructure(output, sourceInput.recentQuestStructures)) {
+      throw new QuestBoardServiceError('REPETITION_DETECTED');
+    }
     return {
       ...identity,
       promptVersion: request.promptVersion,
@@ -231,7 +250,12 @@ export class WindowsQuestBoardService {
   }
 }
 
-export const windowsQuestBoardService = new WindowsQuestBoardService();
+export const windowsQuestBoardService = new WindowsQuestBoardService(
+  tauriQuestBoardGateway,
+  new FakeAIProvider(),
+  defaultIdentity,
+  tauriRandomnessTemperatureSource,
+);
 
 export class QuestBoardServiceError extends Error {
   public constructor(public readonly code: string) {
@@ -252,15 +276,27 @@ function defaultIdentity(): RequestIdentity {
 function parseSnapshot(value: unknown, expectedCampaignId: string): QuestBoardSnapshot {
   const record = requireRecord(value);
   const source = parseSource(record['source']);
+  const quests = Object.freeze(requireArray(record['quests']).map(parseQuest));
   const storedCampaignId = campaignId(requireText(record['campaignId']));
   if (storedCampaignId !== expectedCampaignId) {
     throw new TypeError('Quest board belongs to another campaign');
+  }
+  const expectedStructures = quests.slice(-20).map((quest) =>
+    questStructureSignature({
+      risk: quest.risk,
+      rewardTier: quest.rewardTier,
+      expectedTurns: { min: quest.expectedTurnsMin, max: quest.expectedTurnsMax },
+      recommendedAttributes: quest.recommendedAttributes,
+    }),
+  );
+  if (JSON.stringify(source.recentQuestStructures) !== JSON.stringify(expectedStructures)) {
+    throw new TypeError('Quest repetition history is inconsistent');
   }
   return Object.freeze({
     campaignId: storedCampaignId,
     campaignState: requireText(record['campaignState']),
     source,
-    quests: Object.freeze(requireArray(record['quests']).map(parseQuest)),
+    quests,
   });
 }
 
@@ -282,6 +318,9 @@ function parseSource(value: unknown): QuestGenerationSource {
     }),
     availableNpcs: Object.freeze(requireArray(record['availableNpcs']).map(parseNpc)),
     recentQuestTitles: Object.freeze(requireArray(record['recentQuestTitles']).map(requireText)),
+    recentQuestStructures: Object.freeze(
+      requireArray(record['recentQuestStructures']).map(requireText),
+    ),
   });
 }
 

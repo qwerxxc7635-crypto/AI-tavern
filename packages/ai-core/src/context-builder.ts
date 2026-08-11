@@ -1,5 +1,7 @@
+import { createClaimFromRumor } from '@ember-tavern/contracts';
 import type {
   Adventure,
+  AdventureActionMode,
   AdventureTurn,
   Clue,
   GameEvent,
@@ -10,6 +12,7 @@ import type {
   NpcRelationship,
   PlayerCharacter,
   Quest,
+  SceneFrame,
   WorldBible,
   WorldFact,
 } from '@ember-tavern/contracts';
@@ -90,9 +93,26 @@ export function contextBudgetForTask(task: AITask): ContextBudget {
   return TASK_CONTEXT_BUDGETS[task];
 }
 
+export function assertTaskContextBudget(task: AITask, input: unknown): void {
+  const budget = contextBudgetForTask(task);
+  let characters: number;
+  try {
+    const serialized = JSON.stringify(input);
+    if (serialized === undefined) throw new TypeError('Context is not JSON serializable');
+    characters = serialized.length;
+  } catch (error) {
+    throw new ContextBuildError('AI task context must be JSON serializable', { cause: error });
+  }
+  if (characters > budget.maxCharacters) {
+    throw new ContextBuildError(
+      `AI task context exceeds the ${budget.maxCharacters} character budget`,
+    );
+  }
+}
+
 export class ContextBuildError extends Error {
-  public constructor(message: string) {
-    super(message);
+  public constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'ContextBuildError';
   }
 }
@@ -117,8 +137,12 @@ export interface AdventureContextSource {
   readonly turns: readonly AdventureTurn[];
   readonly clues: readonly Clue[];
   readonly relatedNpcs: readonly NpcProfile[];
+  readonly worldFacts: readonly WorldFact[];
+  readonly npcKnowledge: readonly NpcKnowledge[];
   readonly playerAction: string;
+  readonly playerActionMode?: AdventureActionMode;
   readonly longTermSummary: string | null;
+  readonly sceneFrame?: SceneFrame;
 }
 
 export interface WorldEventContextSource {
@@ -149,13 +173,44 @@ export function buildNpcDialogueContext(
   const facts = new Map(
     source.facts
       .filter((fact) => fact.campaignId === source.world.campaignId && !excluded.has(fact.id))
-      .map((fact) => [fact.id, fact.statement]),
+      .map((fact) => [fact.id, fact]),
   );
-  const statements = (ids: readonly WorldFact['id'][]) =>
+  const usedKnowledgeIds = new Set<WorldFact['id']>();
+  const knowledgeEntries = (
+    ids: readonly WorldFact['id'][],
+    state: 'KNOWN' | 'SUSPECTED' | 'BELIEVED',
+  ) =>
     ids.flatMap((id) => {
-      const statement = facts.get(id);
-      return statement === undefined ? [] : [statement];
+      if (excluded.has(id)) return [];
+      if (usedKnowledgeIds.has(id)) {
+        throw new ContextBuildError('NPC knowledge cannot place one fact in multiple states');
+      }
+      const fact = facts.get(id);
+      if (fact === undefined) {
+        throw new ContextBuildError('NPC knowledge references an unavailable campaign fact');
+      }
+      if (state === 'BELIEVED') {
+        if (fact.kind !== 'FALSE_BELIEF' || !fact.believedByNpcIds.includes(source.npc.id)) {
+          throw new ContextBuildError('NPC false belief is not assigned to this actor');
+        }
+      } else if (fact.kind === 'FALSE_BELIEF') {
+        throw new ContextBuildError('NPC false belief cannot be promoted to truth or suspicion');
+      }
+      if (fact.kind === 'RUMOR') createClaimFromRumor(fact);
+      usedKnowledgeIds.add(id);
+      return [
+        {
+          targetKind: state === 'KNOWN' && fact.kind !== 'RUMOR' ? 'TRUTH' : 'CLAIM',
+          state,
+          statement: fact.statement,
+        } as const,
+      ];
     });
+  const actorKnowledge = [
+    ...knowledgeEntries(source.knowledge.knownFactIds, 'KNOWN'),
+    ...knowledgeEntries(source.knowledge.suspectedFactIds, 'SUSPECTED'),
+    ...knowledgeEntries(source.knowledge.falseBeliefFactIds, 'BELIEVED'),
+  ];
   let recentMessages = takeNewest(
     source.messages
       .filter(
@@ -196,9 +251,7 @@ export function buildNpcDialogueContext(
       awe: source.relationship.awe,
       obligation: source.relationship.obligation,
     },
-    knownFacts: statements(source.knowledge.knownFactIds),
-    suspectedFacts: statements(source.knowledge.suspectedFactIds),
-    falseBeliefs: statements(source.knowledge.falseBeliefFactIds),
+    knowledge: actorKnowledge,
     recentMessages,
     longTermMemories,
     playerMessage: source.playerMessage,
@@ -244,6 +297,38 @@ export function buildAdventureTurnContext(
       goal: npc.goal,
       currentMood: npc.currentMood,
     }));
+  const sceneFrame = source.sceneFrame ?? deriveSceneFrame(source);
+  const relatedNpcIds = new Set(relatedNpcs.map(({ id }) => id));
+  const factById = new Map(
+    source.worldFacts.filter((fact) => fact.campaignId === campaign).map((fact) => [fact.id, fact]),
+  );
+  let knownFacts = source.worldFacts
+    .filter(
+      (fact) =>
+        fact.campaignId === campaign &&
+        fact.kind !== 'FALSE_BELIEF' &&
+        (fact.kind === 'LOCKED_RULE' || source.quest.relatedFactIds.includes(fact.id)),
+    )
+    .slice(0, 30)
+    .map(({ id, kind, statement }) => ({ id, kind, statement }));
+  let npcKnowledge = source.npcKnowledge
+    .filter(({ npcId }) => relatedNpcIds.has(npcId))
+    .slice(0, 12)
+    .map((knowledge) => {
+      const excluded = new Set(knowledge.excludedSecretFactIds);
+      const statementsFor = (ids: NpcKnowledge['knownFactIds']) =>
+        ids.flatMap((id) => {
+          if (excluded.has(id)) return [];
+          const fact = factById.get(id);
+          return fact === undefined ? [] : [fact.statement];
+        });
+      return {
+        npcId: knowledge.npcId,
+        knownFacts: statementsFor(knowledge.knownFactIds),
+        suspectedFacts: statementsFor(knowledge.suspectedFactIds),
+        falseBeliefs: statementsFor(knowledge.falseBeliefFactIds),
+      };
+    });
   const turnHistory = source.turns
     .filter((turn) => turn.adventureId === source.adventure.id)
     .sort((left, right) => left.turnNumber - right.turnNumber)
@@ -302,22 +387,81 @@ export function buildAdventureTurnContext(
     },
     currentTurnNumber: source.adventure.currentTurnNumber,
     currentScene: source.currentScene,
+    sceneFrame,
     longTermSummary,
     recentTurns,
     discoveredClues,
     relatedNpcs,
+    knownFacts,
+    npcKnowledge,
+    playerActionMode: source.playerActionMode ?? 'ACTION',
     playerAction: source.playerAction,
   });
 
   while (serializedLength(build()) > budget.maxCharacters) {
     if (recentTurns.length > 0) recentTurns = recentTurns.slice(1);
-    else if (relatedNpcs.length > 0) relatedNpcs = relatedNpcs.slice(0, -1);
+    else if (relatedNpcs.length > 0) {
+      const removedNpcId = relatedNpcs.at(-1)?.id;
+      relatedNpcs = relatedNpcs.slice(0, -1);
+      npcKnowledge = npcKnowledge.filter(({ npcId }) => npcId !== removedNpcId);
+    } else if (npcKnowledge.length > 0) npcKnowledge = npcKnowledge.slice(0, -1);
+    else if (knownFacts.length > 0) knownFacts = knownFacts.slice(0, -1);
     else if (discoveredClues.length > 0) discoveredClues = discoveredClues.slice(1);
     else if (longTermSummary !== null) {
       longTermSummary = shrinkSummary(longTermSummary);
     } else throw new ContextBuildError('Adventure context core fields exceed the character budget');
   }
   return GenerateAdventureTurnInputSchema.parse(build());
+}
+
+function deriveSceneFrame(source: AdventureContextSource): SceneFrame {
+  const latest = source.turns
+    .filter(({ adventureId }) => adventureId === source.adventure.id)
+    .sort((left, right) => left.turnNumber - right.turnNumber)
+    .at(-1);
+  const location =
+    source.adventure.plan.coreScenes[
+      Math.min(
+        Math.max(source.adventure.currentTurnNumber - 1, 0),
+        source.adventure.plan.coreScenes.length - 1,
+      )
+    ] ?? source.currentScene;
+  return Object.freeze({
+    sceneId: `${source.adventure.id}:scene:${source.adventure.currentTurnNumber}`,
+    location,
+    participants: Object.freeze([
+      source.playerCharacter.id,
+      ...new Set(latest?.speakerNpcIds ?? []),
+    ]),
+    pressure: Object.freeze([]),
+    affordances: Object.freeze(
+      (latest?.suggestedActions ?? []).map(({ optionId, text }) =>
+        Object.freeze({ id: optionId, label: text, preconditions: Object.freeze([]) }),
+      ),
+    ),
+    pendingConsequences: Object.freeze(
+      latest?.checkRequest === null || latest?.checkRequest === undefined
+        ? []
+        : [
+            Object.freeze({
+              id: latest.checkRequest.id,
+              trigger: 'CHECK_REQUIRED',
+              payload: {
+                id: latest.checkRequest.id,
+                turnId: latest.checkRequest.turnId,
+                attribute: latest.checkRequest.attribute,
+                difficulty: latest.checkRequest.difficulty,
+                reason: latest.checkRequest.reason,
+              },
+            }),
+          ],
+    ),
+    returnPoint: Object.freeze({
+      eventId: latest?.id ?? source.adventure.id,
+      summary: source.currentScene,
+    }),
+    revision: Math.max(source.adventure.currentTurnNumber + 1, 1),
+  });
 }
 
 export function buildWorldEventContext(
@@ -390,8 +534,9 @@ export function compressContextHistory(
   const canonical = values.filter((value) => value.trim().length > 0);
   const recent = takeNewest(canonical, recentLimit);
   const older = canonical.slice(0, Math.max(0, canonical.length - recent.length));
-  const prefix = 'Earlier history: ';
-  const summary = boundedSummary(older, Math.max(1, summaryMaxCharacters - prefix.length));
+  const sampledOlder = older.length <= 4 ? older : [...older.slice(0, 2), ...older.slice(-2)];
+  const prefix = `Earlier history (${older.length} entries${older.length > 4 ? '; sampled' : ''}): `;
+  const summary = boundedSummary(sampledOlder, Math.max(1, summaryMaxCharacters - prefix.length));
   return Object.freeze([...(summary === null ? [] : [`${prefix}${summary}`]), ...recent]);
 }
 

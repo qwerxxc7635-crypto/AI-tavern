@@ -59,6 +59,16 @@ describe('NPC knowledge isolation', () => {
       suspectedFactIds: [],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [worldFactId('fact-secret-1')],
+      provenance: [
+        {
+          factId: worldFactId('fact-public'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: isoTimestamp('2026-07-30T10:00:00.000Z'),
+          confidence: 1,
+        },
+      ],
     });
     const second = createNpcKnowledge({
       npcId: npcId('npc-2'),
@@ -66,6 +76,32 @@ describe('NPC knowledge isolation', () => {
       suspectedFactIds: [worldFactId('fact-suspected')],
       falseBeliefFactIds: [worldFactId('fact-false')],
       excludedSecretFactIds: [worldFactId('fact-secret-2')],
+      provenance: [
+        {
+          factId: worldFactId('fact-public'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: isoTimestamp('2026-07-30T10:00:00.000Z'),
+          confidence: 1,
+        },
+        {
+          factId: worldFactId('fact-suspected'),
+          state: 'SUSPECTED',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: isoTimestamp('2026-07-30T10:00:00.000Z'),
+          confidence: 0.5,
+        },
+        {
+          factId: worldFactId('fact-false'),
+          state: 'BELIEVED',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: isoTimestamp('2026-07-30T10:00:00.000Z'),
+          confidence: 1,
+        },
+      ],
     });
 
     sharedSource.push(worldFactId('fact-added-later'));
@@ -76,6 +112,49 @@ describe('NPC knowledge isolation', () => {
     expect(second.suspectedFactIds).toEqual([worldFactId('fact-suspected')]);
     expect(first.excludedSecretFactIds).not.toEqual(second.excludedSecretFactIds);
     expect(Object.isFrozen(first.knownFactIds)).toBe(true);
+  });
+
+  it('rejects missing, contradictory, or eventless active provenance', () => {
+    const factId = worldFactId('fact-known');
+    const base = {
+      npcId: npcId('npc-validated'),
+      knownFactIds: [factId],
+      suspectedFactIds: [],
+      falseBeliefFactIds: [],
+      excludedSecretFactIds: [],
+    } as const;
+    expect(() => createNpcKnowledge({ ...base, provenance: [] })).toThrow('exactly one provenance');
+    expect(() =>
+      createNpcKnowledge({
+        ...base,
+        excludedSecretFactIds: [factId],
+        provenance: [
+          {
+            factId,
+            state: 'KNOWN',
+            source: 'IMPORT',
+            eventId: null,
+            learnedAt: isoTimestamp('2026-08-09T00:00:00.000Z'),
+            confidence: 1,
+          },
+        ],
+      }),
+    ).toThrow('Excluded secret');
+    expect(() =>
+      createNpcKnowledge({
+        ...base,
+        provenance: [
+          {
+            factId,
+            state: 'KNOWN',
+            source: 'OBSERVATION',
+            eventId: null,
+            learnedAt: isoTimestamp('2026-08-09T00:00:00.000Z'),
+            confidence: 2,
+          },
+        ],
+      }),
+    ).toThrow('confidence');
   });
 });
 

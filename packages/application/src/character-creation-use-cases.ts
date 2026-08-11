@@ -42,6 +42,7 @@ import {
 import { formatTaskPrompt } from '@ember-tavern/prompts';
 
 import { AIOrchestrationError, type AITurnGenerationOptions } from './ai-turn-orchestrator.js';
+import { executePrimaryAITask } from './ai-task-orchestrator.js';
 
 export interface CharacterIdentityFactory {
   trait(name: string, index: number): CharacterTraitId;
@@ -309,7 +310,15 @@ export class CharacterCreationUseCases {
     this.requests.startAttempt(command.requestId, this.now());
     let raw: string;
     try {
-      const response = await this.provider.generate(request, this.providerConfig);
+      const response = await executePrimaryAITask(
+        this.provider,
+        this.providerConfig,
+        command.campaignId,
+        request,
+        inputJson,
+        command.modelProfileId,
+        model.capabilities,
+      );
       if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
         throw new AIOrchestrationError('INVALID_OUTPUT', 'Provider response identity mismatch');
       }

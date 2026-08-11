@@ -4,7 +4,9 @@ use serde_json::{Value, json};
 use uuid::Uuid;
 
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    repetition::{find_repeated_phrase, find_repeated_phrase_against},
+    validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -140,6 +142,27 @@ impl CampaignStore {
             return Err(CampaignStoreError::InvalidData);
         }
 
+        let prior_conversation_id =
+            conversation_id(&transaction, &command.campaign_id, &command.npc_id)?;
+        let prior_npc_messages = match &prior_conversation_id {
+            None => Vec::new(),
+            Some(id) => load_messages(&transaction, id)?
+                .into_iter()
+                .filter(|message| message.role == "NPC")
+                .map(|message| message.content)
+                .collect::<Vec<_>>(),
+        };
+        if find_repeated_phrase_against(
+            std::iter::once(output.reply.as_str())
+                .chain(output.suggested_topics.iter().map(String::as_str))
+                .chain(output.memory_candidate.iter().map(String::as_str)),
+            prior_npc_messages.iter().map(String::as_str),
+        )
+        .is_some()
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+
         let relationship = load_relationship(&transaction, &command.npc_id)?;
         let next_relationship = DialogueRelationshipView {
             trust: next_score(relationship.trust, output.relationship_proposal.trust)?,
@@ -154,8 +177,7 @@ impl CampaignStore {
             )?,
         };
         let at = current_timestamp()?;
-        let conversation_id = conversation_id(&transaction, &command.campaign_id, &command.npc_id)?
-            .unwrap_or_else(|| Uuid::new_v4().to_string());
+        let conversation_id = prior_conversation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
         transaction.execute(
             "INSERT OR IGNORE INTO conversations (
                id, campaign_id, kind, npc_id, adventure_id, created_at, updated_at
@@ -281,26 +303,74 @@ fn load_generation_context(
         return Err(CampaignStoreError::InvalidState);
     }
     let relationship = load_relationship(connection, npc_id)?;
-    let (known, suspected, false_beliefs, excluded): (String, String, String, String) = connection
+    let (known, suspected, false_beliefs, excluded, provenance): (
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) = connection
         .query_row(
             "SELECT known_fact_ids_json, suspected_fact_ids_json,
-                    false_belief_fact_ids_json, excluded_secret_fact_ids_json
+                    false_belief_fact_ids_json, excluded_secret_fact_ids_json, provenance_json
              FROM npc_knowledge WHERE npc_id = ?1",
             [npc_id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
         )
         .optional()?
         .ok_or(CampaignStoreError::InvalidData)?;
     let excluded = id_list(&excluded)?;
-    let known_facts = fact_statements(connection, campaign_id, &id_list(&known)?, &excluded)?;
-    let suspected_facts =
-        fact_statements(connection, campaign_id, &id_list(&suspected)?, &excluded)?;
-    let false_beliefs = fact_statements(
+    let known = id_list(&known)?;
+    let suspected = id_list(&suspected)?;
+    let false_beliefs = id_list(&false_beliefs)?;
+    validate_knowledge_provenance(
         connection,
         campaign_id,
-        &id_list(&false_beliefs)?,
-        &excluded,
+        npc_id,
+        KnowledgeFactSets {
+            known: &known,
+            suspected: &suspected,
+            false_beliefs: &false_beliefs,
+            excluded: &excluded,
+        },
+        &provenance,
     )?;
+    let mut used = std::collections::HashSet::new();
+    let mut knowledge = knowledge_entries(
+        connection,
+        campaign_id,
+        npc_id,
+        &known,
+        &excluded,
+        "KNOWN",
+        &mut used,
+    )?;
+    knowledge.extend(knowledge_entries(
+        connection,
+        campaign_id,
+        npc_id,
+        &suspected,
+        &excluded,
+        "SUSPECTED",
+        &mut used,
+    )?);
+    knowledge.extend(knowledge_entries(
+        connection,
+        campaign_id,
+        npc_id,
+        &false_beliefs,
+        &excluded,
+        "BELIEVED",
+        &mut used,
+    )?);
     let recent_messages = match conversation_id(connection, campaign_id, npc_id)? {
         Some(id) => load_messages(connection, &id)?
             .into_iter()
@@ -315,17 +385,24 @@ fn load_generation_context(
     };
     let memories_value: Value =
         serde_json::from_str(&npc.memories_json).map_err(|_| CampaignStoreError::InvalidData)?;
-    let long_term_memories = memories_value
+    let memories = memories_value
         .as_array()
-        .ok_or(CampaignStoreError::InvalidData)?
-        .iter()
-        .filter_map(|memory| {
-            memory
-                .as_object()
-                .and_then(|record| record.get("summary"))
-                .and_then(Value::as_str)
-                .map(str::to_owned)
-        })
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let mut validated_memories = Vec::with_capacity(memories.len());
+    for memory in memories {
+        let record = memory.as_object().ok_or(CampaignStoreError::InvalidData)?;
+        if record.get("npcId").and_then(Value::as_str) != Some(npc_id) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        let summary = record
+            .get("summary")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::InvalidData)?;
+        validate_text(summary, 4_000)?;
+        validated_memories.push(summary.to_owned());
+    }
+    let long_term_memories = validated_memories
+        .into_iter()
         .rev()
         .take(8)
         .collect::<Vec<_>>()
@@ -348,12 +425,102 @@ fn load_generation_context(
             "currentStatus": npc.current_status,
         },
         "relationship": relationship,
-        "knownFacts": known_facts,
-        "suspectedFacts": suspected_facts,
-        "falseBeliefs": false_beliefs,
+        "knowledge": knowledge,
         "recentMessages": recent_messages,
         "longTermMemories": long_term_memories,
     }))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct StoredKnowledgeProvenance {
+    fact_id: String,
+    state: String,
+    source: String,
+    event_id: Option<String>,
+    learned_at: String,
+    confidence: f64,
+}
+
+pub(crate) struct KnowledgeFactSets<'a> {
+    pub(crate) known: &'a [String],
+    pub(crate) suspected: &'a [String],
+    pub(crate) false_beliefs: &'a [String],
+    pub(crate) excluded: &'a [String],
+}
+
+pub(crate) fn validate_knowledge_provenance(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+    facts: KnowledgeFactSets<'_>,
+    raw: &str,
+) -> Result<(), CampaignStoreError> {
+    let mut expected = std::collections::HashMap::new();
+    for (ids, state) in [
+        (facts.known, "KNOWN"),
+        (facts.suspected, "SUSPECTED"),
+        (facts.false_beliefs, "BELIEVED"),
+    ] {
+        for fact_id in ids {
+            if expected.insert(fact_id.as_str(), state).is_some()
+                || facts.excluded.contains(fact_id)
+            {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    let entries: Vec<StoredKnowledgeProvenance> =
+        serde_json::from_str(raw).map_err(|_| CampaignStoreError::InvalidData)?;
+    if entries.len() != expected.len() {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut seen = std::collections::HashSet::new();
+    for entry in entries {
+        if !seen.insert(entry.fact_id.clone())
+            || expected.get(entry.fact_id.as_str()).copied() != Some(entry.state.as_str())
+            || !entry.confidence.is_finite()
+            || !(0.0..=1.0).contains(&entry.confidence)
+            || time::OffsetDateTime::parse(
+                &entry.learned_at,
+                &time::format_description::well_known::Rfc3339,
+            )
+            .is_err()
+            || !matches!(
+                entry.source.as_str(),
+                "LOCAL_RULE" | "OBSERVATION" | "COMMUNICATION" | "INFERENCE" | "IMPORT"
+            )
+            || (!matches!(entry.source.as_str(), "LOCAL_RULE" | "IMPORT")
+                && entry.event_id.is_none())
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        if let Some(event_id) = entry.event_id {
+            let exists = connection
+                .query_row(
+                    "SELECT 1 FROM game_events WHERE id = ?1 AND campaign_id = ?2",
+                    params![event_id, campaign_id],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            if !exists {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    let npc_exists = connection
+        .query_row(
+            "SELECT 1 FROM npcs WHERE id = ?1 AND campaign_id = ?2",
+            params![npc_id, campaign_id],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !npc_exists {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(())
 }
 
 fn load_npc(
@@ -474,29 +641,108 @@ fn load_suggested_topics(
     }
 }
 
-fn fact_statements(
+fn knowledge_entries(
     connection: &Connection,
     campaign_id: &str,
+    npc_id: &str,
     ids: &[String],
     excluded: &[String],
-) -> Result<Vec<String>, CampaignStoreError> {
-    let mut statements = Vec::new();
+    state: &str,
+    used: &mut std::collections::HashSet<String>,
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut entries = Vec::new();
     for id in ids {
         if excluded.contains(id) {
             continue;
         }
-        if let Some(statement) = connection
+        if !used.insert(id.clone()) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        if used.len() > 100 {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        let fact = connection
             .query_row(
-                "SELECT statement FROM world_facts WHERE id = ?1 AND campaign_id = ?2",
+                "SELECT kind, statement, detail_json FROM world_facts
+                 WHERE id = ?1 AND campaign_id = ?2",
                 params![id, campaign_id],
-                |row| row.get(0),
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                    ))
+                },
             )
             .optional()?
-        {
-            statements.push(statement);
+            .ok_or(CampaignStoreError::InvalidData)?;
+        let (kind, statement, detail_json) = fact;
+        if state == "BELIEVED" {
+            let detail: Value =
+                serde_json::from_str(&detail_json).map_err(|_| CampaignStoreError::InvalidData)?;
+            let belongs_to_actor = detail
+                .get("believedByNpcIds")
+                .and_then(Value::as_array)
+                .is_some_and(|ids| ids.iter().any(|value| value.as_str() == Some(npc_id)));
+            if kind != "FALSE_BELIEF" || !belongs_to_actor {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        } else if kind == "FALSE_BELIEF" {
+            return Err(CampaignStoreError::InvalidData);
         }
+        if kind == "RUMOR" {
+            let detail: Value =
+                serde_json::from_str(&detail_json).map_err(|_| CampaignStoreError::InvalidData)?;
+            let claim_id = detail
+                .get("claimId")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::InvalidData)?;
+            validate_id(claim_id)?;
+            let source_npc_id = detail
+                .get("sourceNpcId")
+                .and_then(Value::as_str)
+                .ok_or(CampaignStoreError::InvalidData)?;
+            let source_exists = connection
+                .query_row(
+                    "SELECT 1 FROM npcs WHERE id = ?1 AND campaign_id = ?2",
+                    params![source_npc_id, campaign_id],
+                    |_| Ok(()),
+                )
+                .optional()?
+                .is_some();
+            let valid_basis = detail
+                .get("sourceBasis")
+                .and_then(Value::as_str)
+                .is_some_and(|basis| {
+                    matches!(
+                        basis,
+                        "WITNESS" | "HEARSAY" | "PERSONAL_BELIEF" | "FACTION_MESSAGE"
+                    )
+                });
+            let valid_confidence = detail
+                .get("confidence")
+                .and_then(Value::as_f64)
+                .is_some_and(|value| value.is_finite() && (0.0..=1.0).contains(&value));
+            let valid_revision = detail
+                .get("claimRevision")
+                .and_then(Value::as_i64)
+                .is_some_and(|value| value >= 1);
+            if !source_exists || !valid_basis || !valid_confidence || !valid_revision {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+        let target_kind = if state == "KNOWN" && kind != "RUMOR" {
+            "TRUTH"
+        } else {
+            "CLAIM"
+        };
+        entries.push(json!({
+            "targetKind": target_kind,
+            "state": state,
+            "statement": statement,
+        }));
     }
-    Ok(statements)
+    Ok(entries)
 }
 
 fn id_list(value: &str) -> Result<Vec<String>, CampaignStoreError> {
@@ -535,6 +781,15 @@ fn validate_output(output: &NpcReplyOutput) -> Result<(), CampaignStoreError> {
     }
     if let Some(memory) = &output.memory_candidate {
         validate_text(memory, 4_000)?;
+    }
+    if find_repeated_phrase(
+        std::iter::once(output.reply.as_str())
+            .chain(output.suggested_topics.iter().map(String::as_str))
+            .chain(output.memory_candidate.iter().map(String::as_str)),
+    )
+    .is_some()
+    {
+        return Err(CampaignStoreError::InvalidData);
     }
     for proposal in [
         output.relationship_proposal.trust,
@@ -699,18 +954,87 @@ mod tests {
         let snapshot = store
             .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
             .expect("snapshot");
+        assert_eq!(
+            snapshot.generation_context["knowledge"],
+            json!([{
+                "targetKind": "TRUTH",
+                "state": "KNOWN",
+                "statement": "The cellar door is warm."
+            }])
+        );
+        assert!(
+            !snapshot
+                .generation_context
+                .to_string()
+                .contains("royal seal")
+        );
         let mut invalid = command(&snapshot, 1, "Hello.");
-        invalid.generation.input["knownFacts"] = json!(["A fabricated fact."]);
+        invalid.generation.input["knowledge"] = json!([{
+            "targetKind": "TRUTH",
+            "state": "KNOWN",
+            "statement": "A fabricated fact."
+        }]);
 
         assert!(matches!(
             store.commit_npc_dialogue(invalid),
             Err(CampaignStoreError::InvalidData)
         ));
+        let mut repeated = command(&snapshot, 1, "Hello.");
+        repeated.generation.validated_output["reply"] =
+            json!("The abandoned lighthouse door must remain sealed until dawn.");
+        repeated.generation.validated_output["memoryCandidate"] =
+            json!("The abandoned lighthouse door must remain sealed until dawn.");
+        repeated.generation.raw_response_text = repeated.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_dialogue(repeated),
+            Err(CampaignStoreError::InvalidData)
+        ));
+        let first = store
+            .commit_npc_dialogue(command(&snapshot, 1, "Show me the cellar."))
+            .expect("first distinct reply");
+        let mut repeated_history = command(&first, 2, "What should I avoid?");
+        repeated_history.generation.validated_output["reply"] =
+            json!("Stay close and touch nothing warm.");
+        repeated_history.generation.raw_response_text =
+            repeated_history.generation.validated_output.to_string();
+        assert!(matches!(
+            store.commit_npc_dialogue(repeated_history),
+            Err(CampaignStoreError::InvalidData)
+        ));
         let after = store
             .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
             .expect("unchanged snapshot");
-        assert!(after.messages.is_empty());
-        assert_eq!(after.relationship.trust, 0);
+        assert_eq!(after.messages.len(), 2);
+        assert_eq!(after.relationship.trust, 1);
+    }
+
+    #[test]
+    fn rejects_knowledge_that_promotes_another_actor_false_belief() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_dialogue(&store);
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                "INSERT INTO world_facts (
+                   id, campaign_id, kind, statement, faction_ids_json, detail_json, created_at
+                 ) VALUES (
+                   'fact-other-belief', 'campaign-dialogue', 'FALSE_BELIEF',
+                   'The harbor is empty.', '[]', '{\"believedByNpcIds\":[\"npc-other\"]}',
+                   '2026-07-31T05:00:00.000Z'
+                 );
+                 UPDATE npc_knowledge
+                 SET false_belief_fact_ids_json = '[\"fact-other-belief\"]'
+                 WHERE npc_id = 'npc-owner';",
+            )
+            .expect("seed invalid actor knowledge");
+        drop(connection);
+
+        assert!(matches!(
+            store.npc_dialogue_snapshot("campaign-dialogue", "npc-owner"),
+            Err(CampaignStoreError::InvalidData)
+        ));
     }
 
     fn seed_dialogue(store: &CampaignStore) {
@@ -773,12 +1097,18 @@ mod tests {
                  ) VALUES (
                    'fact-known', 'campaign-dialogue', 'DEVELOPING_FACT',
                    'The cellar door is warm.', '[]', '{}', '2026-07-31T05:00:00.000Z'
+                 ), (
+                   'fact-hidden', 'campaign-dialogue', 'DEVELOPING_FACT',
+                   'A royal seal is hidden beneath the floor.', '[]', '{}',
+                   '2026-07-31T05:00:00.000Z'
                  );
                  INSERT INTO npc_knowledge (
                    npc_id, known_fact_ids_json, suspected_fact_ids_json,
-                   false_belief_fact_ids_json, excluded_secret_fact_ids_json, updated_at
+                   false_belief_fact_ids_json, excluded_secret_fact_ids_json,
+                   provenance_json, updated_at
                  ) VALUES (
                    'npc-owner', '[\"fact-known\"]', '[]', '[]', '[]',
+                   '[{\"factId\":\"fact-known\",\"state\":\"KNOWN\",\"source\":\"IMPORT\",\"eventId\":null,\"learnedAt\":\"2026-07-31T05:00:00.000Z\",\"confidence\":1}]',
                    '2026-07-31T05:00:00.000Z'
                  );
                  INSERT INTO npc_relationships (
@@ -796,8 +1126,13 @@ mod tests {
         index: usize,
         player_message: &str,
     ) -> NpcDialogueCommit {
+        let reply = if index == 1 {
+            "Stay close and touch nothing warm."
+        } else {
+            "The cellar stones are cooling, so we can proceed."
+        };
         let output = json!({
-            "reply": "Stay close and touch nothing warm.",
+            "reply": reply,
             "mood": "Wary",
             "suggestedTopics": ["The old tunnel"],
             "memoryCandidate": null,
@@ -816,7 +1151,7 @@ mod tests {
                 request_id: format!("dialogue-request-{index}"),
                 generation_record_id: format!("dialogue-generation-{index}"),
                 idempotency_key: format!("dialogue-key-{index}"),
-                prompt_version: 1,
+                prompt_version: 3,
                 input,
                 context: json!({ "npcId": "npc-owner" }),
                 request: json!({ "task": "NPC_REPLY" }),

@@ -1,5 +1,6 @@
 import type { AITask, ProviderConfig } from '@ember-tavern/ai-core';
 import {
+  aiOperationId,
   type AiRequestId,
   type GenerationRecordId,
   type IdempotencyKey,
@@ -95,6 +96,7 @@ export class StructuredOutputRepairUseCases {
     }
 
     return await this.originalModelOrchestrator.execute({
+      operationId: aiOperationId(command.idempotencyKey),
       requestId: command.requestId,
       generationRecordId: command.generationRecordId,
       campaignId: source.campaignId,
@@ -105,6 +107,8 @@ export class StructuredOutputRepairUseCases {
       modelName: profile.modelName,
       requireSelectedModelProfile: true,
       repairSourceRequestId: source.id,
+      routeKind: 'REPAIR',
+      requiredResolvedFingerprint: resolvedFingerprint(sourceGeneration.request),
       input: source.input,
       generationOptions: command.generationOptions,
       buildContext: () => source.context,
@@ -119,4 +123,21 @@ export class StructuredOutputRepairUseCases {
       validateDomainAndBuildCommit: command.validateDomainAndBuildCommit,
     });
   }
+}
+
+function resolvedFingerprint(request: JsonValue): string {
+  if (request === null || typeof request !== 'object' || Array.isArray(request)) {
+    throw new AIOrchestrationError(
+      'ORIGINAL_MODEL_CONFIG_MISSING',
+      'The original frozen model configuration is unavailable',
+    );
+  }
+  const value = (request as Readonly<Record<string, JsonValue>>)['resolvedModelFingerprint'];
+  if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value)) {
+    throw new AIOrchestrationError(
+      'ORIGINAL_MODEL_CONFIG_MISSING',
+      'The original frozen model configuration is unavailable',
+    );
+  }
+  return value;
 }

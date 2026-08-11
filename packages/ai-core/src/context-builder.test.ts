@@ -3,6 +3,7 @@ import {
   adventureId,
   campaignId,
   characterTraitId,
+  claimId,
   clueId,
   conversationId,
   factionId,
@@ -37,6 +38,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AI_TASKS,
+  assertTaskContextBudget,
   buildAdventureTurnContext,
   buildNpcDialogueContext,
   buildWorldEventContext,
@@ -135,15 +137,54 @@ const relationship: NpcRelationship = {
 };
 const knowledge: NpcKnowledge = {
   npcId: targetNpcId,
-  knownFactIds: [targetFactId, excludedFactId],
+  knownFactIds: [targetFactId],
   suspectedFactIds: [suspectedFactId],
   falseBeliefFactIds: [falseFactId],
   excludedSecretFactIds: [excludedFactId],
+  provenance: [
+    {
+      factId: targetFactId,
+      state: 'KNOWN',
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt: now,
+      confidence: 1,
+    },
+    {
+      factId: suspectedFactId,
+      state: 'SUSPECTED',
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt: now,
+      confidence: 0.5,
+    },
+    {
+      factId: falseFactId,
+      state: 'BELIEVED',
+      source: 'IMPORT',
+      eventId: null,
+      learnedAt: now,
+      confidence: 1,
+    },
+  ],
 };
 const facts: readonly WorldFact[] = [
   fact(targetFactId, 'The cellar door is warm.'),
-  fact(suspectedFactId, 'The keeper may use the tunnel.'),
-  fact(falseFactId, 'The tunnel ends beneath the market.'),
+  {
+    ...fact(suspectedFactId, 'The keeper may use the tunnel.'),
+    kind: 'RUMOR',
+    claimId: claimId('claim-suspected'),
+    sourceNpcId: targetNpcId,
+    sourceBasis: 'PERSONAL_BELIEF',
+    confidence: 0.4,
+    claimRevision: 1,
+    veracity: 'UNKNOWN',
+  },
+  {
+    ...fact(falseFactId, 'The tunnel ends beneath the market.'),
+    kind: 'FALSE_BELIEF',
+    believedByNpcIds: [targetNpcId],
+  },
   fact(excludedFactId, 'The sealed ledger names Ilyra.'),
   fact(unrelatedFactId, 'Tomas sabotaged the old ferry.'),
 ];
@@ -185,9 +226,11 @@ describe('AI context builders', () => {
     );
 
     expect(NpcReplyInputSchema.safeParse(context).success).toBe(true);
-    expect(context.knownFacts).toEqual(['The cellar door is warm.']);
-    expect(context.suspectedFacts).toEqual(['The keeper may use the tunnel.']);
-    expect(context.falseBeliefs).toEqual(['The tunnel ends beneath the market.']);
+    expect(context.knowledge).toEqual([
+      { targetKind: 'TRUTH', state: 'KNOWN', statement: 'The cellar door is warm.' },
+      { targetKind: 'CLAIM', state: 'SUSPECTED', statement: 'The keeper may use the tunnel.' },
+      { targetKind: 'CLAIM', state: 'BELIEVED', statement: 'The tunnel ends beneath the market.' },
+    ]);
     expect(context.recentMessages).toEqual([
       { role: 'PLAYER', content: 'What is below the cellar?' },
       { role: 'NPC', content: 'An old passage.' },
@@ -196,6 +239,49 @@ describe('AI context builders', () => {
     expect(JSON.stringify(context)).toContain(targetNpc.secret);
     expect(JSON.stringify(context)).not.toContain(unrelatedNpc.secret);
     expect(JSON.stringify(context)).not.toContain('sealed ledger');
+  });
+
+  it('fails closed when knowledge promotes another actor false belief or duplicates a fact', () => {
+    expect(() =>
+      buildNpcDialogueContext({
+        world,
+        npc: targetNpc,
+        knowledge: {
+          ...knowledge,
+          knownFactIds: [falseFactId],
+          falseBeliefFactIds: [],
+        },
+        relationship,
+        facts: [
+          {
+            ...fact(falseFactId, 'Tomas believes the harbor is empty.'),
+            kind: 'FALSE_BELIEF',
+            believedByNpcIds: [unrelatedNpcId],
+          },
+        ],
+        messages: [],
+        memories: [],
+        playerMessage: 'What do you know?',
+      }),
+    ).toThrow('false belief');
+
+    expect(() =>
+      buildNpcDialogueContext({
+        world,
+        npc: targetNpc,
+        knowledge: {
+          ...knowledge,
+          knownFactIds: [targetFactId],
+          suspectedFactIds: [targetFactId],
+          falseBeliefFactIds: [],
+        },
+        relationship,
+        facts,
+        messages: [],
+        memories: [],
+        playerMessage: 'What do you know?',
+      }),
+    ).toThrow('multiple states');
   });
 
   it('combines long-term memory with recent dialogue and trims oldest optional context first', () => {
@@ -278,6 +364,9 @@ describe('AI context builders', () => {
           },
         ],
         relatedNpcs: [targetNpc, unrelatedNpc],
+        worldFacts: facts,
+        npcKnowledge: [knowledge],
+        playerActionMode: 'OBSERVE',
         playerAction: 'Climb above the flood.',
         longTermSummary: 'The party followed the warm trail from the cellar.',
       },
@@ -290,6 +379,23 @@ describe('AI context builders', () => {
     expect(context.recentTurns.join(' ')).not.toContain('Unrelated secret');
     expect(context.discoveredClues).toEqual(['Scorched Lens: Burned from within.']);
     expect(context.relatedNpcs.map(({ id }) => id)).toEqual([targetNpcId]);
+    expect(context.playerActionMode).toBe('OBSERVE');
+    expect(context.knownFacts).toEqual([
+      { id: targetFactId, kind: 'DEVELOPING_FACT', statement: 'The cellar door is warm.' },
+    ]);
+    expect(context.npcKnowledge).toEqual([
+      {
+        npcId: targetNpcId,
+        knownFacts: ['The cellar door is warm.'],
+        suspectedFacts: ['The keeper may use the tunnel.'],
+        falseBeliefs: ['The tunnel ends beneath the market.'],
+      },
+    ]);
+    expect(context.sceneFrame).toMatchObject({
+      participants: [createPlayer().id],
+      revision: adventure.currentTurnNumber + 1,
+      returnPoint: { summary: 'The lighthouse stair is flooded.' },
+    });
     expect(JSON.stringify(context)).not.toContain(targetNpc.secret);
     expect(context.longTermSummary).toContain('warm trail');
   });
@@ -376,6 +482,15 @@ describe('AI context builders', () => {
     );
   });
 
+  it('rejects an oversized task context before prompt formatting', () => {
+    expect(() =>
+      assertTaskContextBudget('GENERATE_WORLD', {
+        history: 'x'.repeat(contextBudgetForTask('GENERATE_WORLD').maxCharacters + 1),
+      }),
+    ).toThrow('exceeds the 12000 character budget');
+    expect(() => assertTaskContextBudget('GENERATE_WORLD', { concept: 'bounded' })).not.toThrow();
+  });
+
   it('compresses older NPC and adventure history while preserving bounded recent context', () => {
     const dialogueBudget = contextBudgetForTask('NPC_REPLY');
     const dialogue = buildNpcDialogueContext(
@@ -403,7 +518,7 @@ describe('AI context builders', () => {
     expect(dialogue.recentMessages).toHaveLength(dialogueBudget.recentMessageLimit);
     expect(dialogue.recentMessages[0]?.content).toContain('dialogue-marker-68');
     expect(dialogue.longTermMemories).toHaveLength(dialogueBudget.longTermMemoryLimit + 1);
-    expect(dialogue.longTermMemories[0]).toMatch(/^Earlier history:/);
+    expect(dialogue.longTermMemories[0]).toMatch(/^Earlier history \(32 entries; sampled\):/);
     expect(dialogue.longTermMemories.at(-1)).toContain('memory-marker-39');
     expect(JSON.stringify(dialogue).length).toBeLessThanOrEqual(dialogueBudget.maxCharacters);
 
@@ -427,6 +542,8 @@ describe('AI context builders', () => {
         ),
         clues: [],
         relatedNpcs: [targetNpc],
+        worldFacts: facts,
+        npcKnowledge: [knowledge],
         playerAction: 'Continue.',
         longTermSummary: 'A previous adventure restored the harbor road.',
       },
@@ -448,7 +565,7 @@ describe('AI context builders', () => {
       180,
     );
     expect(compressed).toHaveLength(4);
-    expect(compressed[0]).toMatch(/^Earlier history: 1\. entry-0-/);
+    expect(compressed[0]).toMatch(/^Earlier history \(17 entries; sampled\): 1\. entry-0-/);
     expect(compressed[0]?.length).toBeLessThanOrEqual(180);
     expect(compressed.slice(1)).toEqual([
       `entry-17-${'x'.repeat(40)}`,

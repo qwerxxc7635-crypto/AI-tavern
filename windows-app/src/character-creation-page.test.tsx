@@ -8,6 +8,7 @@ import { CharacterCreationPage } from './character-creation-page.js';
 import type {
   CharacterCreationSnapshot,
   CharacterDraft,
+  CharacterGenerationObserver,
   CharacterTraitView,
 } from './character-creation-service.js';
 
@@ -21,6 +22,7 @@ describe('character creation page', () => {
     fireEvent.change(await screen.findByLabelText('姓名'), {
       target: { value: '林鸦' },
     });
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：编辑中');
     fireEvent.change(screen.getByLabelText('角色概念'), {
       target: { value: '追查失踪商队的荒野向导' },
     });
@@ -30,6 +32,7 @@ describe('character creation page', () => {
     fireEvent.click(screen.getByRole('button', { name: '生成六个候选特质' }));
 
     expect(await screen.findByText('敏锐观察')).toBeTruthy();
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：预览');
     expect(service.generatedDraft).toMatchObject({
       name: '林鸦',
       attributes: { physique: 3, agility: 3, knowledge: 2, charisma: 2 },
@@ -37,12 +40,36 @@ describe('character creation page', () => {
 
     fireEvent.click(screen.getByRole('checkbox', { name: /敏锐观察/ }));
     fireEvent.click(screen.getByRole('checkbox', { name: /守信/ }));
-    fireEvent.click(screen.getByRole('button', { name: '确认特质并生成背景' }));
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：编辑中');
+    fireEvent.click(screen.getByRole('button', { name: '确认特质并生成背景候选' }));
 
-    expect(await screen.findByRole('heading', { name: '人物背景' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: '背景' })).toBeTruthy();
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：预览');
+    expect(screen.getByText(/确认前不会写入角色/)).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '确认角色并写入存档' }));
+
+    expect(await screen.findByRole('heading', { name: '基础信息' })).toBeTruthy();
+    expect(screen.getByTestId('character-ai-phase').textContent).toBe('AI 状态：已提交');
     expect(screen.getByText('灰湾')).toBeTruthy();
     expect(screen.getByText('体魄检定 +1')).toBeTruthy();
     expect(service.selectedTraits).toHaveLength(2);
+    expect(
+      [...document.querySelectorAll<HTMLElement>('[data-character-section]')].map(
+        ({ dataset }) => dataset['characterSection'],
+      ),
+    ).toEqual([
+      'summary',
+      'basics',
+      'attributes',
+      'background',
+      'personality',
+      'traits',
+      'equipment',
+      'ai-controls',
+    ]);
+    for (const heading of ['基础信息', '属性', '背景', '个性与偏好', '特质', '装备', 'AI 控制']) {
+      expect(screen.getByRole('heading', { name: heading })).toBeTruthy();
+    }
 
     fireEvent.click(screen.getByRole('button', { name: '进入酒馆生成流程' }));
     expect(await screen.findByText('等待酒馆生成 campaign-character')).toBeTruthy();
@@ -55,6 +82,7 @@ describe('character creation page', () => {
       draft,
       traitGenerationRecordId: 'generation-traits',
       traitCandidates: traitCandidates(),
+      candidate: traitCandidate(draft),
     });
     renderCharacterPage(service);
 
@@ -105,13 +133,18 @@ class FakeCharacterService {
     return this.snapshot;
   }
 
-  public async generateTraits(draft: CharacterDraft): Promise<CharacterCreationSnapshot> {
+  public async generateTraits(
+    draft: CharacterDraft,
+    observer?: CharacterGenerationObserver,
+  ): Promise<CharacterCreationSnapshot> {
     this.generatedDraft = draft;
+    observer?.onValidationStarted();
     this.snapshot = {
       campaignState: 'CREATING_CHARACTER',
       draft,
       traitGenerationRecordId: 'generation-traits',
       traitCandidates: traitCandidates(),
+      candidate: traitCandidate(draft),
       character: null,
     };
     return this.snapshot;
@@ -121,39 +154,73 @@ class FakeCharacterService {
     draft: CharacterDraft,
     traitGenerationRecordId: string,
     selectedTraits: readonly CharacterTraitView[],
+    observer?: CharacterGenerationObserver,
   ): Promise<CharacterCreationSnapshot> {
     expect(traitGenerationRecordId).toBe('generation-traits');
     this.selectedTraits = selectedTraits;
+    observer?.onValidationStarted();
+    const equipment = [
+      {
+        id: 'item-compass',
+        name: '旧黄铜罗盘',
+        description: '指针偶尔会偏向旧路。',
+        effect: { kind: 'CHECK_MODIFIER' as const, attribute: 'physique' as const, modifier: 1 },
+      },
+      {
+        id: 'item-cloak',
+        name: '防雨斗篷',
+        description: '一件结实的旅行斗篷。',
+        effect: { kind: 'NONE' as const },
+      },
+    ];
+    const background = {
+      birthplace: '灰湾',
+      formativeExperience: '曾为远行商队领路。',
+      adventureMotivation: '找回失踪的亲人。',
+      secret: '保留着一张残缺地图。',
+      importantPerson: '老向导赫姆。',
+      tavernArrivalReason: '追踪地图上的炉火印记。',
+    };
+    this.snapshot = {
+      campaignState: 'CREATING_CHARACTER',
+      draft,
+      traitGenerationRecordId,
+      traitCandidates: traitCandidates(),
+      candidate: {
+        id: 'candidate-complete',
+        kind: 'COMPLETE_CHARACTER',
+        draft,
+        traitGenerationRecordId,
+        traitCandidates: traitCandidates(),
+        selectedTraits,
+        background,
+        initialEquipment: equipment,
+      },
+      character: null,
+    };
+    return this.snapshot;
+  }
+
+  public async confirm(): Promise<CharacterCreationSnapshot> {
+    const candidate = this.snapshot.candidate;
+    if (
+      candidate === null ||
+      candidate.kind !== 'COMPLETE_CHARACTER' ||
+      candidate.background === null
+    ) {
+      throw new Error('missing candidate');
+    }
     this.snapshot = {
       campaignState: 'GENERATING_TAVERN',
-      draft: null,
-      traitGenerationRecordId,
-      traitCandidates: selectedTraits,
+      draft: candidate.draft,
+      traitGenerationRecordId: null,
+      traitCandidates: [],
+      candidate: null,
       character: {
-        ...draft,
-        traits: selectedTraits,
-        background: {
-          birthplace: '灰湾',
-          formativeExperience: '曾为远行商队领路。',
-          adventureMotivation: '找回失踪的亲人。',
-          secret: '保留着一张残缺地图。',
-          importantPerson: '老向导赫姆。',
-          tavernArrivalReason: '追踪地图上的炉火印记。',
-        },
-        initialEquipment: [
-          {
-            id: 'item-compass',
-            name: '旧黄铜罗盘',
-            description: '指针偶尔会偏向旧路。',
-            effect: { kind: 'CHECK_MODIFIER', attribute: 'physique', modifier: 1 },
-          },
-          {
-            id: 'item-cloak',
-            name: '防雨斗篷',
-            description: '一件结实的旅行斗篷。',
-            effect: { kind: 'NONE' },
-          },
-        ],
+        ...candidate.draft,
+        traits: candidate.selectedTraits,
+        background: candidate.background,
+        initialEquipment: candidate.initialEquipment,
         createdAt: '2026-07-31T12:00:00.000Z',
         updatedAt: '2026-07-31T12:00:00.000Z',
       },
@@ -168,7 +235,21 @@ function emptySnapshot(): CharacterCreationSnapshot {
     draft: null,
     traitGenerationRecordId: null,
     traitCandidates: [],
+    candidate: null,
     character: null,
+  };
+}
+
+function traitCandidate(draft: CharacterDraft) {
+  return {
+    id: 'candidate-traits',
+    kind: 'CHARACTER_TRAITS' as const,
+    draft,
+    traitGenerationRecordId: 'generation-traits',
+    traitCandidates: traitCandidates(),
+    selectedTraits: [],
+    background: null,
+    initialEquipment: [],
   };
 }
 

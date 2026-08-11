@@ -1,5 +1,6 @@
 import type { AITask, ProviderConfig } from '@ember-tavern/ai-core';
 import {
+  aiOperationId,
   schemaVersion,
   type AiRequestId,
   type GameEventId,
@@ -138,6 +139,7 @@ export class AIRequestRecoveryUseCases {
     }
 
     return this.targetOrchestrator.execute({
+      operationId: aiOperationId(command.idempotencyKey),
       requestId: command.requestId,
       generationRecordId: command.generationRecordId,
       campaignId: source.campaignId,
@@ -147,6 +149,8 @@ export class AIRequestRecoveryUseCases {
       modelProfileId: targetProfile.id,
       modelName: targetProfile.modelName,
       requireSelectedModelProfile: true,
+      routeKind: switched ? 'FALLBACK' : 'RETRY',
+      routeAttempt: switched ? 1 : 2,
       input: source.input,
       generationOptions: command.generationOptions,
       buildContext: () => source.context,

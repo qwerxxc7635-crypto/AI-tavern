@@ -286,7 +286,11 @@ function adventureTurn(): AdventureTurn {
         text: 'Secure a rope and cross.',
       },
     ],
-    playerAction: { kind: 'FREEFORM', text: 'Test the nearest support first.' },
+    playerAction: {
+      kind: 'FREEFORM',
+      mode: 'OBSERVE',
+      text: 'Test the nearest support first.',
+    },
     checkRequest: {
       id: checkId,
       turnId: turnKey,
@@ -296,6 +300,10 @@ function adventureTurn(): AdventureTurn {
     },
     diceResult: {
       checkRequestId: checkId,
+      raw: 12,
+      modifier: 2,
+      dc: 14,
+      result: 'SUCCESS',
       d20: 12,
       attributeModifier: 2,
       equipmentModifier: 0,

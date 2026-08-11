@@ -94,6 +94,35 @@ impl SecretStore {
         let secret = Zeroizing::new(platform::get(reference)?);
         Ok(use_secret(secret.as_slice()))
     }
+
+    pub fn health_check(&self) -> Result<(), SecretStoreError> {
+        platform::health_check()
+    }
+}
+
+pub trait SecureVault {
+    fn save(&self, secret: String) -> Result<CredentialRef, SecretStoreError>;
+    fn exists(&self, reference: &CredentialRef) -> Result<bool, SecretStoreError>;
+    fn delete(&self, reference: &CredentialRef) -> Result<(), SecretStoreError>;
+    fn health_check(&self) -> Result<(), SecretStoreError>;
+}
+
+impl SecureVault for SecretStore {
+    fn save(&self, secret: String) -> Result<CredentialRef, SecretStoreError> {
+        SecretStore::save(self, secret)
+    }
+
+    fn exists(&self, reference: &CredentialRef) -> Result<bool, SecretStoreError> {
+        SecretStore::exists(self, reference)
+    }
+
+    fn delete(&self, reference: &CredentialRef) -> Result<(), SecretStoreError> {
+        SecretStore::delete(self, reference)
+    }
+
+    fn health_check(&self) -> Result<(), SecretStoreError> {
+        SecretStore::health_check(self)
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -116,6 +145,10 @@ mod platform {
 
     pub fn delete(reference: &CredentialRef) -> Result<(), SecretStoreError> {
         entry(reference)?.delete_credential().map_err(map_error)
+    }
+
+    pub fn health_check() -> Result<(), SecretStoreError> {
+        initialize()
     }
 
     fn entry(reference: &CredentialRef) -> Result<Entry, SecretStoreError> {
@@ -144,7 +177,57 @@ mod platform {
     }
 }
 
-#[cfg(not(target_os = "windows"))]
+#[cfg(target_os = "macos")]
+mod platform {
+    use std::sync::OnceLock;
+
+    use keyring_core::{Entry, Error as KeyringError};
+
+    use super::{CredentialRef, SERVICE_NAME, SecretStoreError};
+
+    static INITIALIZED: OnceLock<Result<(), SecretStoreError>> = OnceLock::new();
+
+    pub fn set(reference: &CredentialRef, secret: &[u8]) -> Result<(), SecretStoreError> {
+        entry(reference)?.set_secret(secret).map_err(map_error)
+    }
+
+    pub fn get(reference: &CredentialRef) -> Result<Vec<u8>, SecretStoreError> {
+        entry(reference)?.get_secret().map_err(map_error)
+    }
+
+    pub fn delete(reference: &CredentialRef) -> Result<(), SecretStoreError> {
+        entry(reference)?.delete_credential().map_err(map_error)
+    }
+
+    pub fn health_check() -> Result<(), SecretStoreError> {
+        initialize()
+    }
+
+    fn entry(reference: &CredentialRef) -> Result<Entry, SecretStoreError> {
+        initialize()?;
+        Entry::new(SERVICE_NAME, reference.expose_reference()).map_err(map_error)
+    }
+
+    fn initialize() -> Result<(), SecretStoreError> {
+        *INITIALIZED.get_or_init(|| {
+            let store = apple_native_keyring_store::keychain::Store::new().map_err(map_error)?;
+            keyring_core::set_default_store(store);
+            Ok(())
+        })
+    }
+
+    fn map_error(error: KeyringError) -> SecretStoreError {
+        match error {
+            KeyringError::NoEntry => SecretStoreError::NotFound,
+            KeyringError::NoDefaultStore
+            | KeyringError::NoStorageAccess(_)
+            | KeyringError::PlatformFailure(_) => SecretStoreError::Unavailable,
+            _ => SecretStoreError::OperationFailed,
+        }
+    }
+}
+
+#[cfg(not(any(target_os = "windows", target_os = "macos")))]
 mod platform {
     use super::{CredentialRef, SecretStoreError};
 
@@ -157,6 +240,10 @@ mod platform {
     }
 
     pub fn delete(_: &CredentialRef) -> Result<(), SecretStoreError> {
+        Err(SecretStoreError::Unavailable)
+    }
+
+    pub fn health_check() -> Result<(), SecretStoreError> {
         Err(SecretStoreError::Unavailable)
     }
 }
@@ -222,6 +309,7 @@ mod tests {
     #[test]
     fn operating_system_store_round_trip_and_idempotent_delete() {
         let store = SecretStore;
+        store.health_check().unwrap();
         let runtime_secret = format!("runtime-{}", Uuid::new_v4());
         let expected = Zeroizing::new(runtime_secret.as_bytes().to_vec());
         let reference = store.save(runtime_secret).unwrap();

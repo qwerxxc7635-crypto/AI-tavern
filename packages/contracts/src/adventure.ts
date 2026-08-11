@@ -15,6 +15,7 @@ import type {
   WorldFactId,
 } from './foundation.js';
 import type { QuestRisk } from './quest.js';
+import type { JsonValue } from './pending-ai-request.js';
 
 export interface AdventurePlan {
   readonly adventureId: AdventureId;
@@ -26,6 +27,32 @@ export interface AdventurePlan {
   readonly majorObstacles: readonly string[];
   readonly possibleEndings: readonly string[];
   readonly failureCost: string;
+}
+
+export interface SceneFrame {
+  readonly sceneId: string;
+  readonly location: string;
+  readonly participants: readonly string[];
+  readonly pressure: readonly {
+    readonly id: string;
+    readonly kind: string;
+    readonly level: number;
+  }[];
+  readonly affordances: readonly {
+    readonly id: string;
+    readonly label: string;
+    readonly preconditions: readonly string[];
+  }[];
+  readonly pendingConsequences: readonly {
+    readonly id: string;
+    readonly trigger: string;
+    readonly payload: JsonValue;
+  }[];
+  readonly returnPoint: {
+    readonly eventId: string;
+    readonly summary: string;
+  };
+  readonly revision: number;
 }
 
 export const ADVENTURE_STATES = [
@@ -77,11 +104,28 @@ export interface Adventure {
   readonly updatedAt: IsoTimestamp;
 }
 
+export const ADVENTURE_ACTION_MODES = ['ACTION', 'DIALOGUE', 'OBSERVE'] as const;
+export type AdventureActionMode = (typeof ADVENTURE_ACTION_MODES)[number];
+
 export type PlayerAction =
-  | { readonly kind: 'SUGGESTED'; readonly optionId: ActionOptionId; readonly text: string }
-  | { readonly kind: 'FREEFORM'; readonly text: string }
-  | { readonly kind: 'USE_ITEM'; readonly itemId: ItemId; readonly intent: string }
-  | { readonly kind: 'EXIT_ADVENTURE'; readonly reason: string };
+  | {
+      readonly kind: 'SUGGESTED';
+      readonly optionId: ActionOptionId;
+      readonly text: string;
+      readonly mode?: AdventureActionMode;
+    }
+  | { readonly kind: 'FREEFORM'; readonly text: string; readonly mode?: AdventureActionMode }
+  | {
+      readonly kind: 'USE_ITEM';
+      readonly itemId: ItemId;
+      readonly intent: string;
+      readonly mode?: AdventureActionMode;
+    }
+  | {
+      readonly kind: 'EXIT_ADVENTURE';
+      readonly reason: string;
+      readonly mode?: AdventureActionMode;
+    };
 
 export type CheckDifficulty = 8 | 11 | 14 | 17;
 
@@ -95,11 +139,15 @@ export interface CheckRequest {
 
 export interface DiceResult {
   readonly checkRequestId: CheckRequestId;
+  readonly raw: number;
+  readonly modifier: number;
+  readonly total: number;
+  readonly dc: CheckDifficulty;
+  readonly result: 'SUCCESS' | 'FAILURE';
   readonly d20: number;
   readonly attributeModifier: number;
   readonly equipmentModifier: number;
   readonly statusModifier: number;
-  readonly total: number;
   readonly difficulty: CheckDifficulty;
   readonly success: boolean;
 }

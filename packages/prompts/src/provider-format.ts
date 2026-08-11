@@ -1,7 +1,9 @@
 import {
   AI_TASK_SCHEMAS,
+  canonicalJson,
   selectStructuredFormat,
   type AITask,
+  type ContextCacheLayout,
   type ModelCapabilities,
   type NormalizedMessage,
   type NormalizedResponseFormat,
@@ -9,13 +11,19 @@ import {
 import type { JsonValue, PromptVersion } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
-import { BASE_SYSTEM_PROMPT } from './base-rules.js';
+import {
+  createStablePromptProfile,
+  renderStablePromptProfile,
+  type StablePromptProfile,
+} from './stable-prompt-profile.js';
 import { taskPrompt } from './task-prompts.js';
+import { renderContextCacheLayout } from './context-cache-renderer.js';
 
 export interface FormattedTaskPrompt {
   readonly promptVersion: PromptVersion;
   readonly messages: readonly NormalizedMessage[];
   readonly responseFormat: NormalizedResponseFormat;
+  readonly stableProfile: StablePromptProfile;
 }
 
 export interface StructuralRepairError {
@@ -27,20 +35,33 @@ export interface StructuralRepairError {
   }[];
 }
 
+export interface PromptFormatContext {
+  readonly stableWorldTruths?: JsonValue;
+  readonly cacheLayout?: ContextCacheLayout;
+}
+
 export function formatTaskPrompt(
   task: AITask,
   input: unknown,
   capabilities: ModelCapabilities,
+  context: PromptFormatContext = Object.freeze({}),
 ): FormattedTaskPrompt {
   const schemas = AI_TASK_SCHEMAS[task];
   const validatedInput = schemas.input.parse(input);
   const definition = taskPrompt(task);
-  const system = [
-    BASE_SYSTEM_PROMPT,
-    `Logical role: ${definition.role}.`,
-    `Task instruction: ${definition.instruction}`,
-  ].join('\n\n');
-  const user = `Task input JSON:\n${JSON.stringify(validatedInput)}`;
+  const outputSchema = jsonRecord(z.toJSONSchema(schemas.output));
+  const stableProfile = createStablePromptProfile(
+    definition,
+    outputSchema,
+    context.stableWorldTruths,
+  );
+  const system = renderStablePromptProfile(stableProfile);
+  const user = [
+    context.cacheLayout === undefined ? null : renderContextCacheLayout(context.cacheLayout),
+    `[TASK_INPUT]\nTask input JSON:\n${canonicalJson(validatedInput as JsonValue)}`,
+  ]
+    .filter((part): part is string => part !== null)
+    .join('\n\n');
   const messages: readonly NormalizedMessage[] = capabilities.systemMessages
     ? [
         { role: 'SYSTEM', content: system },
@@ -52,6 +73,7 @@ export function formatTaskPrompt(
     promptVersion: definition.version,
     messages: Object.freeze(messages),
     responseFormat: responseFormat(definition.outputSchemaName, schemas.output, capabilities),
+    stableProfile,
   });
 }
 

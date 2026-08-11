@@ -169,6 +169,24 @@ describe('Tavern and NPC repositories', () => {
       suspectedFactIds: [],
       falseBeliefFactIds: [worldFactId('fact-owner-false')],
       excludedSecretFactIds: [worldFactId('fact-owner-secret')],
+      provenance: [
+        {
+          factId: worldFactId('fact-owner-known'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: now,
+          confidence: 1,
+        },
+        {
+          factId: worldFactId('fact-owner-false'),
+          state: 'BELIEVED',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: now,
+          confidence: 1,
+        },
+      ],
     });
     const residentKnowledge = createNpcKnowledge({
       npcId: residentKey,
@@ -176,6 +194,24 @@ describe('Tavern and NPC repositories', () => {
       suspectedFactIds: [worldFactId('fact-resident-suspected')],
       falseBeliefFactIds: [],
       excludedSecretFactIds: [],
+      provenance: [
+        {
+          factId: worldFactId('fact-resident-known'),
+          state: 'KNOWN',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: now,
+          confidence: 1,
+        },
+        {
+          factId: worldFactId('fact-resident-suspected'),
+          state: 'SUSPECTED',
+          source: 'IMPORT',
+          eventId: null,
+          learnedAt: now,
+          confidence: 0.5,
+        },
+      ],
     });
     npcs.saveKnowledge(ownerKnowledge, now);
     npcs.saveKnowledge(residentKnowledge, now);
@@ -254,6 +290,27 @@ describe('Tavern and NPC repositories', () => {
          ) VALUES (?, ?, '[]', '[]', '[]', ?)`,
       )
       .run(ownerKey, '[1]', now);
+    expect(() => npcs.getKnowledge(ownerKey)).toThrow(PersistenceDataError);
+    database
+      .prepare(
+        `UPDATE npc_knowledge
+         SET known_fact_ids_json = ?, provenance_json = ?
+         WHERE npc_id = ?`,
+      )
+      .run(
+        JSON.stringify([worldFactId('fact-known')]),
+        JSON.stringify([
+          {
+            factId: worldFactId('fact-known'),
+            state: 'SUSPECTED',
+            source: 'IMPORT',
+            eventId: null,
+            learnedAt: now,
+            confidence: 1,
+          },
+        ]),
+        ownerKey,
+      );
     expect(() => npcs.getKnowledge(ownerKey)).toThrow(PersistenceDataError);
   });
 });
