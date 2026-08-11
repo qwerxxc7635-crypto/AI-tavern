@@ -1965,11 +1965,28 @@ textarea:disabled {
   }
 }
 
+.dialogue-room,
+.quest-board-page,
+.adventure-page {
+  --ink: #2b2925;
+  --ink-muted: #5d5851;
+  --muted: #69635b;
+  --paper: #f2ebda;
+  --paper-deep: #e6ddcd;
+  --line: rgb(59 48 37 / 18%);
+  --line-strong: rgb(59 48 37 / 34%);
+  --ember: #934326;
+  --ember-bright: #74301b;
+  --moss: #526441;
+  --brass: #765824;
+}
+
 .dialogue-room {
   min-height: 100%;
   padding: clamp(1.5rem, 4vw, 3.5rem);
   color: var(--ink);
-  background: radial-gradient(circle at 18% 0%, rgb(180 77 38 / 12%), transparent 34rem);
+  background:
+    radial-gradient(circle at 18% 0%, rgb(180 77 38 / 12%), transparent 34rem), var(--paper);
 }
 
 .dialogue-profile {
