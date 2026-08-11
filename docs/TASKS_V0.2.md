@@ -62,7 +62,8 @@
 - `V02-M8-T08`：DONE；“我的/上下文”显示最近实际请求的block、token、来源、revision、stability、纳入/省略、hash前缀与会话缓存状态，且不显示内容或secret来源。
 - `V02-M9-T01`：DONE；本地共享门禁统一覆盖发布元数据、玩家语言、Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、Clippy、Rust workspace与跨语言存档互操作，并保留结构化UTF-8证据。
 - `V02-M9-T02`：DONE；Windows x64托管实机完成Credential Manager、WebView2、v0.2.0 NSIS、当前用户静默安装、启动存活、静默卸载与应用数据保留验收，结构化artifact与安装器SHA-256已归档。
-- 下一执行项严格进入 `V02-M9-T03` macOS Gate。
+- `V02-M9-T03`：DONE；macOS arm64托管实机完成Keychain、系统WebKit/WKWebView、v0.2.0 `.app`、19秒启动存活与PlatformPaths实际数据库落点验收，并安全清理临时应用路径。
+- 下一执行项严格进入 `V02-M9-T04` UI 4-resolution Gate。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1065,6 +1066,8 @@ GitHub托管Windows x64权威流水线已通过上述全部门禁：Credential M
 - .app
 - launch
 - PlatformPaths
+
+GitHub托管macOS arm64权威流水线已通过上述全部门禁：Keychain真实往返后无秘密遗留，`.app`版本0.2.0并链接系统WebKit，启动产生新WebKit进程且存活19秒，SQLite实际创建于macOS Application Support路径。原始artifact、路径、安全清理与哈希见`docs/audit/V0_2_MACOS_GATE.md`。
 
 ---
 

@@ -1994,3 +1994,19 @@ Windows Gate只在`CI=true`且`RUNNER_OS=Windows`的全新托管机运行。门�
 ### 影响与边界
 
 托管机验收不会覆盖开发者或正式用户安装，也不把卸载删除应用数据当作成功。Windows Gate不替代M9-T03的Keychain、WKWebView、`.app`启动和PlatformPaths；不启用真实Provider、付费API、正式用户数据或iOS。下一任务严格进入macOS Gate。
+
+## DEC-097：macOS Gate以应用实际启动证明PlatformPaths与WKWebView
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T03`、平台专属证据不得由共享合同测试冒充及正式数据保护红线
+
+### 决定与理由
+
+macOS Gate只在`CI=true`、`RUNNER_OS=macOS`的全新托管机运行。门禁先拒绝已存在的应用data/cache/log/WebKit路径，再验证`.app`的bundle ID、v0.2.0版本、可执行文件和系统`WebKit.framework`链接，执行Keychain真实往返/删除，启动包内可执行文件，并同时要求SQLite出现在Tauri解析的macOS Application Support路径、新WebKit进程出现以及应用持续存活。
+
+PlatformPaths不只依赖注入临时根目录的单元合同：实际启动必须创建`Application Support/com.embertavern.windows/ember-tavern.sqlite`，同时记录cache、log、temp绝对根及macOS adapter合同退出成功。清理使用独立授权位，只有全部目标在运行前确认不存在时才允许删除本次运行创建的精确路径；非CI拒绝路径不得清理。
+
+### 影响与边界
+
+该门禁证明当前macOS桌面包使用Keychain、系统WebKit与平台路径，但不执行签名、公证或分发，也不启动iOS。它不访问真实Provider、付费API、正式用户数据或API Key。下一任务严格进入M9-T04四分辨率UI Gate。

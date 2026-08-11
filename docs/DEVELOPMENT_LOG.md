@@ -3366,3 +3366,24 @@
 ### 结论
 
 - `V02-M9-T02`完成。下一项严格为`V02-M9-T03` macOS Gate。
+
+## 2026-08-11 — V02-M9-T03 完成 macOS Gate
+
+### 实现
+
+- macOS build job新增受限生命周期门禁：验证Keychain、`.app`元数据、系统WebKit链接与新进程、启动存活、实际SQLite落点及PlatformPaths adapter合同。
+- 门禁拒绝非临时macOS CI和任何既有应用路径；只有全部确认不存在后才授权清理本次创建的Application Support、Caches、Logs或WebKit精确目录。
+- `.app`构建、生命周期、文件清单分别写入UTF-8结构化JSON并上传artifact；新增CI自测锁定所有必需证据入口。
+- 新增`docs/audit/V0_2_MACOS_GATE.md`并记录`DEC-097`；未接入真实Provider、付费API、正式用户数据或iOS。
+
+### 验证
+
+- 权威PR CI run `31461140570`在HEAD `3a6e656`的macOS共享质量及build/lifecycle任务成功。
+- Keychain往返/读取/删除退出码0且无秘密遗留；`.app`为arm64、bundle ID `com.embertavern.windows`、版本0.2.0。
+- 可执行文件链接系统`WebKit.framework`，启动产生2个新WebKit进程并存活19秒；stdout/stderr均为0 bytes。
+- SQLite实际创建于`~/Library/Application Support/com.embertavern.windows/ember-tavern.sqlite`，data/cache/log/temp均为绝对路径，macOS PlatformPaths adapter合同通过。
+- 生命周期清理仅删除本次创建且预先授权的data/cache/WebKit目录；本机非CI拒绝测试确认清理未获授权且删除列表为空。
+
+### 结论
+
+- `V02-M9-T03`完成。下一项严格为`V02-M9-T04` UI 4-resolution Gate。
