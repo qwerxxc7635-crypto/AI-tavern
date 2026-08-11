@@ -3506,6 +3506,7 @@
 - 排除`.git`对象、`.local`、third-party工作树、`node_modules`、target/cache、数据库/备份、`.env`、系统凭据、正式用户数据和真实API Key；预存用户`.gitignore`修改未暂存、未进入源码归档。
 - 组包前复核安装器、UI/纵向截图SHA清单和JSON证据；生成覆盖所有包内文件的SHA-256清单（清单自身除外）。
 - ZIP创建后解压到新的临时目录，逐项执行SHA-256复算并核对11类必需目录、源码HEAD、安装器和截图数量。
+- 首次完成态推送后，Windows CI在80回合SQLite结算集成测试上耗时33.6秒并触发30秒全局超时；macOS及此前权威Windows run均通过，失败不是业务断言。为该单一重型集成用例增加Windows专属60秒余量、macOS保持5秒，未删除操作、断言或测试类别；修复后重新生成源码归档、全文件清单和外层ZIP。
 - 新增`docs/audit/V0_2_REVIEW_PACKAGE.md`；包仅供下一轮ChatGPT审查，不构成Windows公开发行或macOS分发授权。
 
 ### 结论

@@ -37,6 +37,7 @@ The pre-existing uncommitted `.gitignore` addition for `.gstack/` is preserved o
 - Screenshot manifests are verified before packaging.
 - JSON evidence and metadata are parsed before packaging.
 - The final package content manifest is verified after ZIP creation by extracting into a new temporary directory and recalculating every listed SHA-256.
+- A final Windows-only CI flake was traced to the 80-turn SQLite settlement integration case taking 33.6 seconds under full-suite contention versus the 30-second global timeout. The test retains all operations and assertions and receives a 60-second Windows-only integration allowance; macOS keeps the 5-second limit. The final package is regenerated from the corrected committed HEAD.
 - The package describes an unsigned Windows internal release candidate and a non-distributable macOS development build; it is not a public release authorization.
 
 The default-deferred scope remains iOS, plugin marketplace, full MultiChat, full World Voices, AI Companion, online multiplayer, full VTT map engine, official macOS release and store distribution.
