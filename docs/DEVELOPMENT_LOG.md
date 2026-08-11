@@ -3430,3 +3430,23 @@
 ### 结论
 
 - `V02-M9-T05`完成，M9全部关闭。下一项严格为`V02-M10-T01` Windows v0.2 Build。
+
+## 2026-08-11 — V02-M10-T01 完成 Windows v0.2 Build
+
+### 构建与落盘
+
+- 权威PR CI run `31503183202`在精确HEAD `20ae2f536c1f70f16878bbfb8699bda6df339775`通过Windows/macOS共享质量门禁和两端平台发布job。
+- Windows x64 runner先通过单一SQLite纵向E2E，再执行`pnpm --dir windows-app tauri build --bundles nsis`；构建命令退出码0。
+- 当前用户NSIS `Ember Tavern_0.2.0_x64-setup.exe`已下载到Git忽略的`release/v0.2/`，结构化CI证据保存在其`evidence/`子目录。
+- 安装器为5,220,387 bytes，SHA-256为`1674ffa788316c196ed11147090d281ec68e2ee4b4865a7319c4efe53dde10ca`；CI文件清单、生命周期JSON和下载后复算三方一致。
+
+### 验证与边界
+
+- Credential Manager测试凭据往返/删除通过且无秘密遗留；检测到WebView2 Runtime并观察到新WebView2进程。
+- 0.2.0当前用户静默安装、安装后启动存活11秒和静默卸载全部退出0；卸载注册与安装目录移除，应用数据哨兵保留。
+- 当前产物为未签名内部发布候选，不冒充已签名公开发行版；未使用真实Provider、付费API、API Key、正式用户数据或iOS。
+- 新增`docs/audit/V0_2_WINDOWS_BUILD.md`固定来源HEAD、run、大小、哈希和生命周期结论。
+
+### 结论
+
+- `V02-M10-T01`完成。下一项严格为`V02-M10-T02` Artifact Hash / Manifest。
