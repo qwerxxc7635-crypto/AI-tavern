@@ -55,18 +55,21 @@ describe('save home page', () => {
 
   it('permanently deletes an exported campaign only after explicit confirmation', async () => {
     const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
-    const confirm = vi
-      .spyOn(window, 'confirm')
-      .mockReturnValueOnce(false)
-      .mockReturnValueOnce(true);
     renderSaveHome(gateway);
 
+    // Regression: ISSUE-005 — WKWebView did not present window.confirm before permanent deletion
+    // Found by /qa on 2026-08-11
+    // Report: docs/audit/V0_2_VERTICAL_FLOW_GATE.md
     fireEvent.click(await screen.findByRole('button', { name: '永久删除' }));
     expect(gateway.deleteCalls).toEqual([]);
+    expect(screen.getByRole('alert').textContent).toContain('永久移除');
+    fireEvent.click(screen.getByRole('button', { name: '取消删除' }));
+    expect(screen.queryByRole('alert')).toBeNull();
+
     fireEvent.click(screen.getByRole('button', { name: '永久删除' }));
+    fireEvent.click(screen.getByRole('button', { name: '确认永久删除' }));
     expect((await screen.findByRole('status')).textContent).toContain('已永久删除');
     expect(gateway.deleteCalls).toEqual([EXISTING_CAMPAIGN.id]);
-    expect(confirm).toHaveBeenCalledWith(expect.stringContaining('完整数据库备份'));
   });
 
   it('continues a verified campaign and carries its identifier into the shell route', async () => {
