@@ -68,7 +68,8 @@
 - `V02-M10-T01`：DONE；权威Windows x64 runner基于HEAD `20ae2f5`生成0.2.0当前用户NSIS，纵向E2E、Credential Manager、WebView2、静默安装/启动/卸载和数据保留全绿，安装器已落盘`release/v0.2/`并三方复核大小与SHA-256。
 - `V02-M10-T02`：DONE；`release/v0.2/`已生成五个精确基名的SHA256SUMS、ARTIFACT_MANIFEST、BUILD_INFO、RELEASE_NOTES和KNOWN_LIMITATIONS，绑定源HEAD/CI/未签名边界并通过哈希、JSON及秘密样式扫描。
 - `V02-M10-T03`：DONE；macOS arm64开发`.app`已记录runner/本地证据路径、三项bundle文件哈希、构建环境与Keychain/WKWebView/PlatformPaths/17秒启动结果，并明确仅有ad-hoc签名、非正式发布。
-- 下一执行项严格进入 `V02-M10-T04` Review Package。
+- `V02-M10-T04`：DONE；已生成`review_v0.2_to_chatgpt_20260811_2319.zip`，覆盖竞品研究、架构、最终任务、安全修复、测试、70张截图、Git文本数据、精确HEAD源码归档、Windows安装器、全文件哈希和风险边界，并完成解包复算。
+- v0.2 M0–M10权威任务全部完成；保持默认延期项，不自动进入iOS或扩展范围。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1164,6 +1165,8 @@ GitHub托管macOS arm64权威流水线已通过上述全部门禁：Keychain真�
 - installer
 - hashes
 - risks
+
+已生成`review_v0.2_to_chatgpt_20260811_2319.zip`。包根Review Guide映射全部11类必需内容；源码使用精确最终HEAD的`git archive`，Git数据仅导出文本，Windows安装器保留M10-T02哈希，70张截图连同原SHA清单纳入。包排除third-party工作树、`.git`对象、依赖、target/cache、数据库、正式用户数据、环境文件和真实Key；最终内容清单在新临时目录解包后逐项复算通过。完整记录见`docs/audit/V0_2_REVIEW_PACKAGE.md`。
 
 ---
 

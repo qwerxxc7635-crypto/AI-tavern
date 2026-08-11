@@ -3490,3 +3490,24 @@
 ### 结论
 
 - `V02-M10-T03`完成。下一项严格为`V02-M10-T04` Review Package。
+
+## 2026-08-11 — V02-M10-T04 完成 ChatGPT Review Package
+
+### 组包
+
+- 生成`review_v0.2_to_chatgpt_20260811_2319.zip`，包根`00_REVIEW_GUIDE.md`说明审查顺序、证据边界、来源HEAD和分发限制。
+- `competitor-research/`包含三个指定仓库拆解、基线、矩阵、Gap Analysis、借鉴计划和拒绝项；`architecture/`包含Architecture Gate、目标架构、AI pipeline、Context/Memory和状态/事件文档。
+- `final-tasks/`包含完成态权威任务；`audit-fixes/`包含第一轮、v0.1第二轮、共享/平台/UI/纵向/发布审计；`screenshots/`包含52张四分辨率/修复证据和18张原生纵向流程证据。
+- `tests/`包含94个跟踪测试文件清单、当前本地/CI结果摘要及结构化Windows/macOS平台JSON；`git/`只包含HEAD、状态、日志、refs/remotes和摘要文本。
+- `source/`使用最终提交HEAD的`git archive`生成源码ZIP；`installer/`包含Windows x64 NSIS和M10-T02五个文件；`risks/`包含已知限制、延期范围和发布边界。
+
+### 安全与验证
+
+- 排除`.git`对象、`.local`、third-party工作树、`node_modules`、target/cache、数据库/备份、`.env`、系统凭据、正式用户数据和真实API Key；预存用户`.gitignore`修改未暂存、未进入源码归档。
+- 组包前复核安装器、UI/纵向截图SHA清单和JSON证据；生成覆盖所有包内文件的SHA-256清单（清单自身除外）。
+- ZIP创建后解压到新的临时目录，逐项执行SHA-256复算并核对11类必需目录、源码HEAD、安装器和截图数量。
+- 新增`docs/audit/V0_2_REVIEW_PACKAGE.md`；包仅供下一轮ChatGPT审查，不构成Windows公开发行或macOS分发授权。
+
+### 结论
+
+- `V02-M10-T04`完成；v0.2 M0–M10权威任务全部完成。iOS及其余默认延期范围不自动启动。
