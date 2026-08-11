@@ -71,6 +71,8 @@ test('requires an ephemeral Windows install lifecycle gate with system integrati
     '$webViewInstallations = @(Get-WebView2Installations)',
     '$registrations = @(Get-ProductRegistrations)',
     '@(Get-ProductRegistrations).Count -eq 0',
+    "Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue |",
+    'ForEach-Object { $_.Id }',
   ]) {
     assert.ok(
       windowsReleaseGate.includes(required),

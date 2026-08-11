@@ -125,7 +125,10 @@ try {
   if ($webViewInstallations.Count -eq 0) {
     throw 'Microsoft Edge WebView2 Runtime executable was not found.'
   }
-  $webViewBefore = @((Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue).Id)
+  $webViewBefore = @(
+    Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue |
+      ForEach-Object { $_.Id }
+  )
 
   $installProcess = Start-Process -FilePath $installer -ArgumentList '/S' -Wait -PassThru
   if ($installProcess.ExitCode -ne 0) {
