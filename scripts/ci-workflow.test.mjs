@@ -67,6 +67,10 @@ test('requires an ephemeral Windows install lifecycle gate with system integrati
     'applicationDataPreserved',
     'Refusing to replace a pre-existing Ember Tavern installation',
     'Refusing to touch a pre-existing Ember Tavern application data directory',
+    'if (@(Get-ProductRegistrations).Count -ne 0)',
+    '$webViewInstallations = @(Get-WebView2Installations)',
+    '$registrations = @(Get-ProductRegistrations)',
+    '@(Get-ProductRegistrations).Count -eq 0',
   ]) {
     assert.ok(
       windowsReleaseGate.includes(required),

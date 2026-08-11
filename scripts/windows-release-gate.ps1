@@ -89,7 +89,7 @@ try {
   if (-not [Runtime.InteropServices.RuntimeInformation]::IsOSPlatform([Runtime.InteropServices.OSPlatform]::Windows)) {
     throw 'Windows release gate requires the Windows operating system.'
   }
-  if ((Get-ProductRegistrations).Count -ne 0) {
+  if (@(Get-ProductRegistrations).Count -ne 0) {
     throw 'Refusing to replace a pre-existing Ember Tavern installation.'
   }
 
@@ -121,7 +121,7 @@ try {
     secretPersistedAfterTest = $false
   }
 
-  $webViewInstallations = Get-WebView2Installations
+  $webViewInstallations = @(Get-WebView2Installations)
   if ($webViewInstallations.Count -eq 0) {
     throw 'Microsoft Edge WebView2 Runtime executable was not found.'
   }
@@ -131,7 +131,7 @@ try {
   if ($installProcess.ExitCode -ne 0) {
     throw "NSIS installation failed with exit code $($installProcess.ExitCode)."
   }
-  $registrations = Get-ProductRegistrations
+  $registrations = @(Get-ProductRegistrations)
   if ($registrations.Count -ne 1) {
     throw "Expected one current-user uninstall registration, found $($registrations.Count)."
   }
@@ -208,7 +208,7 @@ try {
     throw "NSIS uninstallation failed with exit code $($uninstallProcess.ExitCode)."
   }
   $uninstalled = Wait-Until -TimeoutSeconds 30 -Condition {
-    (Get-ProductRegistrations).Count -eq 0 -and -not (Test-Path -LiteralPath $installDirectory)
+    @(Get-ProductRegistrations).Count -eq 0 -and -not (Test-Path -LiteralPath $installDirectory)
   }
   if (-not $uninstalled) {
     throw 'Installation files or current-user uninstall registration remained after uninstall.'
