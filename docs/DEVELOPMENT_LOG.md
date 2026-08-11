@@ -3450,3 +3450,24 @@
 ### 结论
 
 - `V02-M10-T01`完成。下一项严格为`V02-M10-T02` Artifact Hash / Manifest。
+
+## 2026-08-11 — V02-M10-T02 完成 Artifact Hash / Manifest
+
+### 输出
+
+- 在Git忽略的`release/v0.2/`生成权威清单要求的五个精确基名文件：`SHA256SUMS`、`ARTIFACT_MANIFEST`、`BUILD_INFO`、`RELEASE_NOTES`和`KNOWN_LIMITATIONS`。
+- `SHA256SUMS`只覆盖不可变安装器，避免自引用；复算结果为`1674ffa788316c196ed11147090d281ec68e2ee4b4865a7319c4efe53dde10ca`。
+- JSON manifest记录安装器名称、版本、平台、架构、字节数、SHA-256、source HEAD、CI run和未签名状态；BUILD_INFO记录runner、工具链、构建命令/时间/退出码及Windows生命周期结论。
+- 发布说明汇总v0.2纵向能力、数据/凭据边界和双平台门禁；已知限制明确未签名、WebView2联网、Fake Provider、无自动更新/云同步/iOS及卸载保留数据。
+- 新增`docs/audit/V0_2_ARTIFACT_MANIFEST.md`固定五份文件本身的SHA-256、格式和验证结果。
+
+### 验证与边界
+
+- `shasum -a 256 -c SHA256SUMS`通过；安装器大小/哈希与CI文件清单、生命周期JSON、ARTIFACT_MANIFEST和本机复算一致。
+- `jq`验证两个JSON结构、精确source HEAD/run、build exit 0、应用数据保留和unsigned边界。
+- release根目录恰好包含安装器与五个要求文件；秘密样式扫描未发现API Key、bearer token或秘密值。
+- 本任务未签名、未发布或上传本地release目录，未使用真实Provider、付费API、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M10-T02`完成。下一项严格为`V02-M10-T03` macOS Dev Build Record。

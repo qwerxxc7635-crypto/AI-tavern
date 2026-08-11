@@ -66,7 +66,8 @@
 - `V02-M9-T04`：DONE；12个核心页面在860x600、1180x760、1366x768、1920x1080完成48组最终截图、控制台/溢出/裁切检查和逐张视觉复核，4项缺陷全部修复并保留前后证据。
 - `V02-M9-T05`：DONE；单一SQLite存档完成首次启动至导出/删除/导入/继续的完整纵向链，覆盖中断请求恢复，并以隔离原生`.app`、18张截图和SHA-256清单关闭SR2-010；实机发现的WKWebView删除确认缺陷已修复并回归锁定。
 - `V02-M10-T01`：DONE；权威Windows x64 runner基于HEAD `20ae2f5`生成0.2.0当前用户NSIS，纵向E2E、Credential Manager、WebView2、静默安装/启动/卸载和数据保留全绿，安装器已落盘`release/v0.2/`并三方复核大小与SHA-256。
-- 下一执行项严格进入 `V02-M10-T02` Artifact Hash / Manifest。
+- `V02-M10-T02`：DONE；`release/v0.2/`已生成五个精确基名的SHA256SUMS、ARTIFACT_MANIFEST、BUILD_INFO、RELEASE_NOTES和KNOWN_LIMITATIONS，绑定源HEAD/CI/未签名边界并通过哈希、JSON及秘密样式扫描。
+- 下一执行项严格进入 `V02-M10-T03` macOS Dev Build Record。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1123,6 +1124,8 @@ GitHub托管macOS arm64权威流水线已通过上述全部门禁：Keychain真�
 - BUILD_INFO
 - RELEASE_NOTES
 - KNOWN_LIMITATIONS
+
+已在`release/v0.2/`生成五个要求文件。`SHA256SUMS`复算安装器为`1674ffa788316c196ed11147090d281ec68e2ee4b4865a7319c4efe53dde10ca`；JSON manifest/build info绑定源HEAD、CI run/job、Windows x64、NSIS、构建命令、生命周期和未签名状态；发布说明与限制明确Fake Provider、数据保留、WebView2、无自动更新/iOS及外发签名边界。完整记录见`docs/audit/V0_2_ARTIFACT_MANIFEST.md`。
 
 ---
 
