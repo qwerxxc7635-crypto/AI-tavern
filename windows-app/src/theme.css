@@ -2333,7 +2333,7 @@ textarea:disabled {
   border-bottom: 0;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 1050px) {
   .my-hub__layout {
     grid-template-columns: 1fr;
   }
