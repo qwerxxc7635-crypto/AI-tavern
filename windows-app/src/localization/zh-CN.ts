@@ -14,6 +14,7 @@ export const zhCN = Object.freeze({
     archives: '档案',
     my: '我的',
     npcDialogue: 'NPC 对话',
+    modelSettings: '模型设置',
   }),
   titlebar: Object.freeze({
     eyebrow: '当前位置',

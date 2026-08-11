@@ -114,7 +114,11 @@ export function AppShell() {
   const location = useLocation();
   const current =
     WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname) ??
-    (location.pathname === '/npc' ? { label: playerText.navigation.npcDialogue } : undefined);
+    (location.pathname === '/npc'
+      ? { label: playerText.navigation.npcDialogue }
+      : location.pathname === '/settings'
+        ? { label: playerText.navigation.modelSettings }
+        : undefined);
   const campaignId = new URLSearchParams(location.search).get('campaignId');
 
   return (
