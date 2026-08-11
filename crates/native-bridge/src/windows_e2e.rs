@@ -10,6 +10,14 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
     let database_path = directory.path().join("ember-tavern.sqlite");
     let archive_path = directory.path().join("windows-release.emtavern");
     let store = CampaignStore::open(&database_path).expect("open release database");
+    assert!(store.list().expect("first-launch campaign list").is_empty());
+    assert!(
+        store
+            .model_settings()
+            .expect("first-launch model settings")
+            .profiles
+            .is_empty()
+    );
     store
         .create_at(
             CAMPAIGN_ID.to_owned(),
@@ -434,25 +442,78 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         4
     );
     reopened
+        .connect()
+        .expect("connect for interrupted request")
+        .execute_batch(
+            "UPDATE campaigns
+               SET state = 'RECOVERY_REQUIRED', resume_state = 'TAVERN'
+               WHERE id = 'campaign-windows-e2e';
+             INSERT INTO pending_ai_requests (
+               id, campaign_id, turn_id, idempotency_key, task, status, model_profile_id,
+               input_json, context_json, attempt_count, last_error_json, created_at, updated_at
+             ) VALUES (
+               'e2e-interrupted-request', 'campaign-windows-e2e', NULL,
+               'e2e:interrupted-request', 'NPC_REPLY', 'SENDING', NULL,
+               '{}', '{}', 1, NULL,
+               '2026-08-01T14:30:00.000Z', '2026-08-01T14:30:00.000Z'
+             );",
+        )
+        .expect("persist interrupted request before crash");
+    drop(reopened);
+
+    let recovered = CampaignStore::open(&database_path).expect("restart after interrupted request");
+    let recovery = recovered
+        .campaign_recovery(CAMPAIGN_ID)
+        .expect("inspect interrupted request");
+    assert_eq!(recovery.resume_state, "TAVERN");
+    assert_eq!(recovery.unfinished_request_count, 1);
+    assert_eq!(
+        recovered
+            .restore_campaign_after_failure(CAMPAIGN_ID)
+            .expect("restore last committed state")
+            .state,
+        "TAVERN"
+    );
+    assert_eq!(
+        recovered
+            .connect()
+            .expect("verify cancelled request")
+            .query_row(
+                "SELECT status FROM pending_ai_requests WHERE id = 'e2e-interrupted-request'",
+                [],
+                |row| row.get::<_, String>(0),
+            )
+            .expect("interrupted request status"),
+        "CANCELLED"
+    );
+    assert_eq!(
+        recovered
+            .continue_campaign(CAMPAIGN_ID)
+            .expect("continue after recovery")
+            .state,
+        "TAVERN"
+    );
+
+    recovered
         .export_campaign_archive(CAMPAIGN_ID, &archive_path, "0.1.0")
         .expect("export save archive");
     assert_eq!(
-        reopened
+        recovered
             .inspect_campaign_archive(&archive_path)
             .expect("inspect exported archive")
             .campaign_id,
         CAMPAIGN_ID
     );
-    reopened
+    recovered
         .connect()
         .expect("connect for local delete")
         .execute("DELETE FROM campaigns WHERE id = ?1", [CAMPAIGN_ID])
         .expect("delete local campaign");
-    assert!(reopened.list().expect("empty campaign list").is_empty());
-    reopened
+    assert!(recovered.list().expect("empty campaign list").is_empty());
+    recovered
         .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
         .expect("reimport campaign");
-    drop(reopened);
+    drop(recovered);
 
     let imported = CampaignStore::open(&database_path).expect("restart imported campaign");
     assert_eq!(
