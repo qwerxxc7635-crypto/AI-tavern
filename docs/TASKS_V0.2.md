@@ -64,7 +64,8 @@
 - `V02-M9-T02`：DONE；Windows x64托管实机完成Credential Manager、WebView2、v0.2.0 NSIS、当前用户静默安装、启动存活、静默卸载与应用数据保留验收，结构化artifact与安装器SHA-256已归档。
 - `V02-M9-T03`：DONE；macOS arm64托管实机完成Keychain、系统WebKit/WKWebView、v0.2.0 `.app`、19秒启动存活与PlatformPaths实际数据库落点验收，并安全清理临时应用路径。
 - `V02-M9-T04`：DONE；12个核心页面在860x600、1180x760、1366x768、1920x1080完成48组最终截图、控制台/溢出/裁切检查和逐张视觉复核，4项缺陷全部修复并保留前后证据。
-- 下一执行项严格进入 `V02-M9-T05` Vertical Flow。
+- `V02-M9-T05`：DONE；单一SQLite存档完成首次启动至导出/删除/导入/继续的完整纵向链，覆盖中断请求恢复，并以隔离原生`.app`、18张截图和SHA-256清单关闭SR2-010；实机发现的WKWebView删除确认缺陷已修复并回归锁定。
+- 下一执行项严格进入 `V02-M10-T01` Windows v0.2 Build。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1097,6 +1098,8 @@ GitHub托管macOS arm64权威流水线已通过上述全部门禁：Keychain真�
 → Delete
 → Import
 → Continue
+
+已完成单一持久SQLite Campaign的可执行纵向测试和隔离bundle ID原生`.app`验证。流程覆盖首次空状态、我的/API、世界确认、车卡、酒馆、NPC、任务、冒险、本地D20、结算、崩溃/恢复、导出、删除、导入与继续；恢复会取消未完成请求并原子回到最近完整阶段。WKWebView实测发现`window.confirm`未展示即删除的问题，已改为应用内二次确认并验证取消后存档保留。审计、18张PNG及SHA-256见`docs/audit/V0_2_VERTICAL_FLOW_GATE.md`。
 
 ---
 

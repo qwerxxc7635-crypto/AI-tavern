@@ -3409,3 +3409,24 @@
 ### 结论
 
 - `V02-M9-T04`完成。下一项严格为`V02-M9-T05` Vertical Flow。
+
+## 2026-08-11 — V02-M9-T05 完成 Vertical Flow
+
+### 实现与修复
+
+- 扩展`windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save`：首次启动先断言无Campaign/设备模型；在同一真实SQLite存档完成世界、车卡、酒馆、NPC、任务、8回合冒险、本地D20与结算。
+- 流程在已持久化NPC请求后模拟中断，重开得到`RECOVERY_REQUIRED`与一个pending；恢复原子回到最近完整`TAVERN`、取消pending并继续对话，再完成导出、删除、导入、重开与继续。
+- 使用唯一bundle ID `com.embertavern.flowqa`的打包macOS `.app`和隔离Application Support数据完成真实WKWebView验证，覆盖原生导出/导入对话框；没有读取或修改正式应用数据。
+- 实机发现`ISSUE-005`：WKWebView未呈现`window.confirm`，首次点击会直接删除隔离QA存档。归档经真实导入路径恢复后，将删除改为应用内警告、取消和最终确认两个阶段，并新增回归测试；修复后取消操作保留Campaign且收起确认。
+- 新增`docs/audit/V0_2_VERTICAL_FLOW_GATE.md`、18张原生UI PNG和SHA-256清单，记录`DEC-099`并关闭SR2-010。
+
+### 验证
+
+- `pnpm test:windows-e2e`通过；单一测试覆盖真实SQLite、恢复、导出/删除/导入和继续。
+- 删除确认定向Vitest 13/13通过；`pnpm lint`与`pnpm --dir windows-app build`通过，生产构建为203 modules。
+- 18张截图逐张视觉复核及SHA-256复算通过；原生应用确认取消后Campaign仍存在，最终危险确认未再次执行。
+- 全过程仅使用临时/隔离数据和Fake Provider，未使用真实Provider、付费API、API Key、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M9-T05`完成，M9全部关闭。下一项严格为`V02-M10-T01` Windows v0.2 Build。

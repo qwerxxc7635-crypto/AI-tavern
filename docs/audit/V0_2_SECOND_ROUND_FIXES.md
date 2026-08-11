@@ -70,6 +70,9 @@
 - `collect-release-evidence.mjs`递归拒绝symlink并记录平台、架构、相对产物路径、字节数和SHA-256；空bundle直接失败。
 - CI在失败时仍上传已生成的命令证据；包装器测试覆盖中文UTF-8 stdout、stderr、时间与退出码，产物测试覆盖确定路径、长度和哈希。
 
-## 待关闭
+## SR2-010 — CLOSED
 
-- SR2-010：完整实机截图证据在最终Windows/macOS验收和下一轮审查包阶段关闭，不能用当前CI配置提前标记。
+- M9 Windows与macOS原生平台Gate分别证明WebView2/NSIS/Credential Manager和WKWebView/`.app`/Keychain/PlatformPaths。
+- M9-T04完成12个核心页面、4种分辨率、48组最终截图及逐张视觉复核；M9-T05进一步在隔离原生`.app`上完成首次启动至导出、删除、导入、继续的连续流程。
+- 纵向流程同时由单一真实SQLite Campaign的可执行E2E覆盖中断请求、重开、恢复、取消pending、导出/删除/导入和继续，避免仅凭截图关闭数据问题。
+- 完整证据、18张原生UI PNG、SHA-256和实测缺陷修复见`docs/audit/V0_2_VERTICAL_FLOW_GATE.md`；测试未访问真实Provider、付费API、API Key或正式用户数据。

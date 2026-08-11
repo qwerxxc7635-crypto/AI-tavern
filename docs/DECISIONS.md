@@ -2026,3 +2026,19 @@ UI Gate固定覆盖存档、世界、车卡、酒馆、NPC、任务、冒险、�
 ### 影响与边界
 
 该Gate证明指定页面在四种分辨率下的可读性、布局和基础路由表现，不证明原生打包、系统凭据、WebView生命周期、SQLite路径或安装卸载；这些继续由M9-T02 Windows Gate与M9-T03 macOS Gate独立证明。UI修复必须保留回归合同，下一任务严格进入M9-T05连续纵向流程。
+
+## DEC-099：Vertical Flow以单一SQLite可执行链和隔离原生应用双重取证
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T05`、SR2-010、SQLite唯一事实源及正式数据保护红线
+
+### 决定与理由
+
+纵向门禁必须同时满足两类不可互相替代的证据：Rust E2E在单一真实SQLite Campaign上执行完整状态链，证明原子提交、中断恢复、pending取消、导出/删除/导入和继续；唯一bundle ID `com.embertavern.flowqa`的打包`.app`通过WKWebView和原生命令呈现对应页面、系统文件对话框及恢复入口。可复现截图阶段数据库由同一E2E领域操作生成，不允许静态页面或截图冒充状态转换。
+
+不可逆删除必须使用应用内显式二次确认，不能依赖`window.confirm`等宿主WebView可能不呈现的浏览器原语。实测发现WKWebView未展示确认即删除隔离QA存档后，应用改为先展开永久删除说明，再提供取消和最终确认两个独立控件；取消必须保留Campaign并收起警告。
+
+### 影响与边界
+
+证据bundle、Application Support目录和`.emtavern`归档只属于隔离QA标识；不访问或修改正式用户数据。流程只使用确定性Fake Provider，不配置真实API Key，不调用真实Provider或付费API，也不启动iOS。该Gate关闭SR2-010并将严格下一任务推进到M10-T01 Windows v0.2 Build。
