@@ -3471,3 +3471,22 @@
 ### 结论
 
 - `V02-M10-T02`完成。下一项严格为`V02-M10-T03` macOS Dev Build Record。
+
+## 2026-08-11 — V02-M10-T03 完成 macOS Dev Build Record
+
+### 构建记录
+
+- 下载权威PR CI run `31503183202`的`ember-tavern-macos-build-evidence`到Git忽略的`.local/m10-t03/run-31503183202/`，来源为最终产品代码HEAD `20ae2f536c1f70f16878bbfb8699bda6df339775`。
+- runner为GitHub托管`macos-latest`、darwin arm64；`pnpm --dir windows-app tauri build --bundles app`退出0，生成`Ember Tavern.app` 0.2.0，bundle ID `com.embertavern.windows`。
+- 主可执行文件为21,614,912 bytes，SHA-256 `d7c5e45776f70fca26a003f36a56bae4651590c644f75ffdd7ec40bf09210dc5`；Info.plist和icon哈希也完成CI/下载后本机双重核对。
+
+### 验证与边界
+
+- Keychain往返/删除退出0且无秘密遗留；可执行文件使用系统WebKit，启动后观测两个新WebKit进程并存活17秒，stdout/stderr均为0 bytes。
+- PlatformPaths返回绝对data/cache/log/temp根，真实SQLite创建于macOS Application Support路径；adapter合同通过，临时runner路径仅在精确授权后清理。
+- 下载后的lifecycle JSON通过`jq`合同复核，Mach-O确认为thin arm64；`codesign`只显示ad-hoc linker signature，无TeamIdentifier、Developer ID、公证或分发签名。
+- 新增`docs/audit/V0_2_MACOS_DEV_BUILD.md`；该记录不作为正式macOS发布，未使用真实Provider、付费API、API Key、正式用户数据或iOS。
+
+### 结论
+
+- `V02-M10-T03`完成。下一项严格为`V02-M10-T04` Review Package。

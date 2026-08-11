@@ -67,7 +67,8 @@
 - `V02-M9-T05`：DONE；单一SQLite存档完成首次启动至导出/删除/导入/继续的完整纵向链，覆盖中断请求恢复，并以隔离原生`.app`、18张截图和SHA-256清单关闭SR2-010；实机发现的WKWebView删除确认缺陷已修复并回归锁定。
 - `V02-M10-T01`：DONE；权威Windows x64 runner基于HEAD `20ae2f5`生成0.2.0当前用户NSIS，纵向E2E、Credential Manager、WebView2、静默安装/启动/卸载和数据保留全绿，安装器已落盘`release/v0.2/`并三方复核大小与SHA-256。
 - `V02-M10-T02`：DONE；`release/v0.2/`已生成五个精确基名的SHA256SUMS、ARTIFACT_MANIFEST、BUILD_INFO、RELEASE_NOTES和KNOWN_LIMITATIONS，绑定源HEAD/CI/未签名边界并通过哈希、JSON及秘密样式扫描。
-- 下一执行项严格进入 `V02-M10-T03` macOS Dev Build Record。
+- `V02-M10-T03`：DONE；macOS arm64开发`.app`已记录runner/本地证据路径、三项bundle文件哈希、构建环境与Keychain/WKWebView/PlatformPaths/17秒启动结果，并明确仅有ad-hoc签名、非正式发布。
+- 下一执行项严格进入 `V02-M10-T04` Review Package。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1139,6 +1140,8 @@ GitHub托管macOS arm64权威流水线已通过上述全部门禁：Keychain真�
 - test result
 
 不作为正式发布。
+
+已记录权威run `31503183202`在macOS arm64生成的`Ember Tavern.app`：主可执行文件21,614,912 bytes，SHA-256为`d7c5e45776f70fca26a003f36a56bae4651590c644f75ffdd7ec40bf09210dc5`。Keychain、系统WebKit/WKWebView、PlatformPaths真实SQLite落点和17秒启动均通过；下载后本机复算三项bundle文件哈希一致。包仅有ad-hoc linker signature，无Developer ID、公证或分发授权。完整记录见`docs/audit/V0_2_MACOS_DEV_BUILD.md`。
 
 ---
 
