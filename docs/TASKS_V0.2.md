@@ -7,7 +7,7 @@
 > iOS：DEFERRED  
 > 版本：0.2.0
 
-## 当前执行状态（2026-08-09）
+## 当前执行状态（2026-08-11）
 
 - `V02-M0-T01`～`V02-M0-T03`：DONE；起始证据、PlatformPaths 与跨平台脚本验证见 `docs/V0_2_BASELINE.md`。
 - `V02-COMP-T01`～`V02-COMP-T07`：DONE；三仓库固定 SHA、源码可用性、矩阵、Gap、Borrow/Reject 均已记录在 `docs/research/`。
@@ -63,7 +63,8 @@
 - `V02-M9-T01`：DONE；本地共享门禁统一覆盖发布元数据、玩家语言、Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、Clippy、Rust workspace与跨语言存档互操作，并保留结构化UTF-8证据。
 - `V02-M9-T02`：DONE；Windows x64托管实机完成Credential Manager、WebView2、v0.2.0 NSIS、当前用户静默安装、启动存活、静默卸载与应用数据保留验收，结构化artifact与安装器SHA-256已归档。
 - `V02-M9-T03`：DONE；macOS arm64托管实机完成Keychain、系统WebKit/WKWebView、v0.2.0 `.app`、19秒启动存活与PlatformPaths实际数据库落点验收，并安全清理临时应用路径。
-- 下一执行项严格进入 `V02-M9-T04` UI 4-resolution Gate。
+- `V02-M9-T04`：DONE；12个核心页面在860x600、1180x760、1366x768、1920x1080完成48组最终截图、控制台/溢出/裁切检查和逐张视觉复核，4项缺陷全部修复并保留前后证据。
+- 下一执行项严格进入 `V02-M9-T05` Vertical Flow。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1074,6 +1075,8 @@ GitHub托管macOS arm64权威流水线已通过上述全部门禁：Keychain真�
 ## V02-M9-T04 [P0] UI 4-resolution Gate
 
 全部核心页面截图。
+
+已完成存档、世界、车卡、酒馆、NPC、任务、冒险、角色卡、档案、我的、设置、恢复12个核心页面在860x600、1180x760、1366x768、1920x1080的48组最终截图。每次加载均等待页面专用就绪选择器，并检查控制台、document/main横向溢出与裁切后代；最终结果全部为0。修复了模型设置标题、纸张主题对比度、侧栏感知断点和“我的”页最小宽度布局4项问题，审计、修复前后证据及52张PNG哈希见`docs/audit/V0_2_UI_4_RESOLUTION_GATE.md`。
 
 ---
 
