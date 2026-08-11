@@ -132,6 +132,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Build macOS app with evidence
         run: node scripts/run-with-evidence.mjs --output artifacts/evidence/macos-app-build.json -- pnpm --dir windows-app tauri build --bundles app
+      - name: Keychain, WKWebView, app launch and PlatformPaths evidence
+        run: node scripts/run-with-evidence.mjs --output artifacts/evidence/macos-lifecycle-gate-command.json -- node scripts/macos-release-gate.mjs --app 'target/release/bundle/macos/Ember Tavern.app' --output artifacts/evidence/macos-lifecycle.json
       - name: Hash macOS app bundle
         run: node scripts/collect-release-evidence.mjs --root target/release/bundle/macos --output artifacts/evidence/macos-release-files.json
       - name: Upload macOS build evidence

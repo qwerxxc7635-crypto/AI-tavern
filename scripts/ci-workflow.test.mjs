@@ -8,6 +8,7 @@ const windowsReleaseGate = readFileSync(
   new URL('./windows-release-gate.ps1', import.meta.url),
   'utf8',
 );
+const macosReleaseGate = readFileSync(new URL('./macos-release-gate.mjs', import.meta.url), 'utf8');
 
 test('runs shared quality gates on Windows and macOS', () => {
   assert.match(workflow, /os: \[windows-latest, macos-latest\]/u);
@@ -78,5 +79,28 @@ test('requires an ephemeral Windows install lifecycle gate with system integrati
       windowsReleaseGate.includes(required),
       `Windows release gate is missing: ${required}`,
     );
+  }
+});
+
+test('requires an ephemeral macOS app lifecycle gate with system integrations', () => {
+  for (const required of [
+    'macos-release-gate.mjs',
+    'macos-lifecycle-gate-command.json',
+    'macos-lifecycle.json',
+  ]) {
+    assert.ok(workflow.includes(required), `CI is missing macOS evidence: ${required}`);
+  }
+
+  for (const required of [
+    "process.env.RUNNER_OS !== 'macOS'",
+    'operating_system_store_round_trip_and_idempotent_delete',
+    '/System/Library/Frameworks/WebKit.framework/',
+    "join(userHome, 'Library', 'Application Support', identifier)",
+    'macos_adapter_obeys_platform_paths_contract',
+    'databaseObserved: true',
+    'Refusing to touch pre-existing application path',
+    'if (cleanupAuthorized)',
+  ]) {
+    assert.ok(macosReleaseGate.includes(required), `macOS release gate is missing: ${required}`);
   }
 });
