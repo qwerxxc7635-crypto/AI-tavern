@@ -584,6 +584,30 @@ button:focus-visible {
   gap: 0.65rem;
 }
 
+.save-card__delete-confirmation {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  border: 1px solid rgb(193 120 83 / 48%);
+  color: #f1c5ae;
+  background: rgb(117 72 52 / 22%);
+}
+
+.save-card__delete-confirmation p {
+  max-width: 48rem;
+  margin: 0;
+  line-height: 1.55;
+}
+
+.save-card__delete-confirmation > div {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.65rem;
+}
+
 .save-home__empty,
 .save-home__loading {
   min-height: 22rem;
@@ -1902,6 +1926,15 @@ textarea:disabled {
 
   .save-card__actions {
     grid-column: 2;
+  }
+
+  .save-card__delete-confirmation {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .save-card__delete-confirmation > div {
+    flex-wrap: wrap;
   }
 
   .save-transfer {

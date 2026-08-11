@@ -35,6 +35,7 @@ export function SaveHomePage({
   const [campaigns, setCampaigns] = useState<readonly CampaignSummary[] | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const busyIdRef = useRef<string | null>(null);
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [transferNotice, setTransferNotice] = useState<string | null>(null);
 
@@ -134,14 +135,11 @@ export function SaveHomePage({
   }
 
   async function deleteCampaign(campaign: CampaignSummary) {
-    const accepted = window.confirm(
-      '永久删除会移除该存档的全部本地数据。应用会先创建完整数据库备份，但请确认已经导出需要保留的 .emtavern 文件。确定继续吗？',
-    );
-    if (!accepted) return;
     markBusy(`delete:${campaign.id}`);
     try {
       await gateway.deleteCampaign(campaign.id);
       await reload();
+      setDeleteConfirmationId(null);
       setTransferNotice(`本地存档 ${campaign.id.slice(0, 8)} 已永久删除。`);
     } catch {
       setError('存档没有删除成功，本地数据保持原状。');
@@ -333,11 +331,38 @@ export function SaveHomePage({
                   className="danger-action"
                   type="button"
                   disabled={busyId !== null}
-                  onClick={() => void deleteCampaign(campaign)}
+                  aria-expanded={deleteConfirmationId === campaign.id}
+                  onClick={() => setDeleteConfirmationId(campaign.id)}
                 >
                   {busyId === `delete:${campaign.id}` ? '正在删除…' : '永久删除'}
                 </button>
               </div>
+              {deleteConfirmationId === campaign.id ? (
+                <div className="save-card__delete-confirmation" role="alert">
+                  <p>
+                    此操作会永久移除该存档的全部本地数据。应用会先创建完整数据库备份，但请先导出需要保留的
+                    .emtavern 文件。
+                  </p>
+                  <div>
+                    <button
+                      className="quiet-action"
+                      type="button"
+                      disabled={busyId !== null}
+                      onClick={() => setDeleteConfirmationId(null)}
+                    >
+                      取消删除
+                    </button>
+                    <button
+                      className="danger-action"
+                      type="button"
+                      disabled={busyId !== null}
+                      onClick={() => void deleteCampaign(campaign)}
+                    >
+                      {busyId === `delete:${campaign.id}` ? '正在删除…' : '确认永久删除'}
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </article>
           ))}
         </section>
