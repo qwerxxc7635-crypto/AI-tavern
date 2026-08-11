@@ -61,7 +61,8 @@
 - `V02-M8-T07`：DONE；所有Windows Provider调用前执行任务级字符预算，历史型Schema固定数量上限，长历史只保留最新窗口与带总数的有损抽样摘要。
 - `V02-M8-T08`：DONE；“我的/上下文”显示最近实际请求的block、token、来源、revision、stability、纳入/省略、hash前缀与会话缓存状态，且不显示内容或secret来源。
 - `V02-M9-T01`：DONE；本地共享门禁统一覆盖发布元数据、玩家语言、Prettier、ESLint、TypeScript、Vitest/Node、rustfmt、Clippy、Rust workspace与跨语言存档互操作，并保留结构化UTF-8证据。
-- 下一执行项严格进入 `V02-M9-T02` Windows Gate。
+- `V02-M9-T02`：DONE；Windows x64托管实机完成Credential Manager、WebView2、v0.2.0 NSIS、当前用户静默安装、启动存活、静默卸载与应用数据保留验收，结构化artifact与安装器SHA-256已归档。
+- 下一执行项严格进入 `V02-M9-T03` macOS Gate。
 
 研究分类已经映射进本清单：MUST 对应 M0～M10 的现有任务，SHOULD 对应 `V02-M4-T05/T06`、`V02-M8-T08` 等增强验收；完整分支、MultiChat、World Voices、插件市场、AI Companion、iOS 与完整 Event Sourcing 不得插入当前序列。
 
@@ -1052,6 +1053,8 @@ NPC Prompt 只接收允许知道的信息。
 - install
 - launch
 - uninstall
+
+GitHub托管Windows x64权威流水线已通过上述全部门禁：Credential Manager往返后无秘密遗留，应用启动产生新WebView2进程，v0.2.0 NSIS静默安装/启动/卸载成功，卸载注册与安装目录移除且应用数据保留。原始artifact、命令退出码、环境、哈希与失败修复链见`docs/audit/V0_2_WINDOWS_GATE.md`。
 
 ---
 

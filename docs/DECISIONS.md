@@ -1978,3 +1978,19 @@ Inspector不写SQLite、不新增schema、不进入`.emtavern`，应用重启后
 ### 影响与边界
 
 Shared Gate证明共享代码与合同在当前开发环境通过，但不代替平台实机验收。Rust平台合同、Windows纵向测试或macOS本地开发测试均不得冒充Credential Manager、WebView2、NSIS安装生命周期、Keychain、WKWebView或`.app`启动证据；这些仍按M9-T02、T03独立收集。该决定不启用真实Provider、付费API、正式用户数据或iOS。
+
+## DEC-096：Windows Gate使用临时托管机执行真实安装生命周期
+
+- 日期：2026-08-11
+- 状态：已采纳
+- 依据：`V02-M9-T02`、平台实机证据不得由共享测试冒充及正式数据保护红线
+
+### 决定与理由
+
+Windows Gate只在`CI=true`且`RUNNER_OS=Windows`的全新托管机运行。门禁先拒绝既有Ember Tavern安装与应用数据，再验证Windows Credential Manager真实往返和删除、WebView2 Runtime可执行文件、v0.2.0 NSIS静默安装、HKCU卸载注册、安装后应用版本、应用存活和新WebView2进程，最后静默卸载并确认注册与安装目录移除、应用数据哨兵保留。
+
+纵向切片、NSIS构建、生命周期和发布文件清单分别写入结构化JSON，安装器SHA-256必须在生命周期、文件清单与下载后复算中一致。失败证据不覆盖：CRLF、Windows超时、锁错误码、pnpm子进程及PowerShell空集合严格模式问题均保留独立CI记录，修复后重新从完整双平台门禁开始验收。
+
+### 影响与边界
+
+托管机验收不会覆盖开发者或正式用户安装，也不把卸载删除应用数据当作成功。Windows Gate不替代M9-T03的Keychain、WKWebView、`.app`启动和PlatformPaths；不启用真实Provider、付费API、正式用户数据或iOS。下一任务严格进入macOS Gate。

@@ -3346,3 +3346,23 @@
 ### 结论
 
 - `V02-M9-T01`完成。下一项严格为`V02-M9-T02` Windows Gate。
+
+## 2026-08-11 — V02-M9-T02 完成 Windows Gate
+
+### 实现
+
+- CI新增受限Windows发布门禁：真实Credential Manager合同、WebView2 Runtime/进程、v0.2.0 NSIS、当前用户静默安装、启动存活、静默卸载和应用数据保留。
+- 发布命令统一写入UTF-8结构化证据，收集安装器大小与SHA-256并上传artifact；生命周期脚本拒绝既有安装、既有应用数据和非临时Windows CI环境。
+- 修复实机暴露的跨平台行尾、Windows测试超时、文件锁错误码、Node 24 pnpm子进程及PowerShell空结果严格模式问题；没有降低或跳过任何门禁。
+- 新增`docs/audit/V0_2_WINDOWS_GATE.md`并记录`DEC-096`；未接入真实Provider、付费API、正式用户数据或iOS。
+
+### 验证
+
+- 权威PR CI run `31446196404`在HEAD `43aea70`全绿：Windows/macOS共享质量、Windows发布和macOS构建任务全部成功。
+- Windows纵向切片与NSIS构建退出码0；安装器`Ember Tavern_0.2.0_x64-setup.exe`为5,223,248 bytes，SHA-256为`6137ed6c0fb5be27e8e8e490883ada354e74e3b6e6d3cafb42da88e876a95a7d`。
+- Credential Manager往返/删除退出码0且无秘密遗留；发现WebView2 Runtime并观测两个新进程；应用版本0.2.0且存活11秒。
+- 静默卸载退出码0，HKCU卸载注册与安装目录移除，应用数据哨兵保留；生命周期JSON的`success=true`。
+
+### 结论
+
+- `V02-M9-T02`完成。下一项严格为`V02-M9-T03` macOS Gate。
