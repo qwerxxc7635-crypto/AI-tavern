@@ -4,8 +4,8 @@ import type { JsonValue, PromptVersion } from '@ember-tavern/contracts';
 import { BASE_RULES } from './base-rules.js';
 import type { TaskPromptDefinition } from './task-prompts.js';
 
-export const STABLE_PROMPT_PROFILE_ID = 'deepseek-v4-flash-prefix';
-export const STABLE_PROMPT_PROFILE_VERSION = 1;
+export const STABLE_PROMPT_PROFILE_ID = 'deepseek-v4-flash-prefix-v2';
+export const STABLE_PROMPT_PROFILE_VERSION = 2;
 
 export const STABLE_PROMPT_SECTION_KINDS = [
   'SYSTEM_CONTRACT',

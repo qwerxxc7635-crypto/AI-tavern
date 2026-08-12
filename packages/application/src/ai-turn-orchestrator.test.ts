@@ -147,7 +147,7 @@ describe('AITurnOrchestrator', () => {
         validationError: null,
       });
       expect(new AdventureRepository(sqlite).getTurn(turnKey)).toMatchObject({
-        sceneText: 'Warm light leaks through the old cellar lock as the storm shakes the shutters.',
+        sceneText: expect.stringMatching(/Study the lock.*旧通道/),
         resolvedAt: at,
       });
       expect(new WorldRepository(sqlite).getFact(worldFactId('fact-orchestrated'))).toMatchObject({
@@ -306,7 +306,7 @@ describe('AITurnOrchestrator', () => {
         request: { context: source?.context },
       });
       expect(new AdventureRepository(sqlite).getTurn(turnKey)).toMatchObject({
-        sceneText: 'Warm light leaks through the old cellar lock as the storm shakes the shutters.',
+        sceneText: expect.stringMatching(/Study the lock.*旧通道/),
         resolvedAt: at,
       });
       expect(new WorldRepository(sqlite).getFact(worldFactId('fact-orchestrated'))).not.toBeNull();

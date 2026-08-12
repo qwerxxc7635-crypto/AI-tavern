@@ -6,6 +6,7 @@ import {
   type CampaignGateway,
   type CampaignSummary,
 } from './campaign-gateway.js';
+import { confirmPlayerAction } from './confirmation-service.js';
 import { tauriSaveTransferGateway, type SaveTransferGateway } from './save-transfer-gateway.js';
 import { playerText } from './localization/index.js';
 
@@ -121,7 +122,7 @@ export function SaveHomePage({
   }
 
   async function archiveCampaign(campaign: CampaignSummary) {
-    const accepted = window.confirm('归档后，该存档会从当前列表中移除。确定继续吗？');
+    const accepted = await confirmPlayerAction('归档后，该存档会从当前列表中移除。确定继续吗？');
     if (!accepted) return;
     markBusy(campaign.id);
     try {
@@ -177,7 +178,7 @@ export function SaveHomePage({
       const inspection = await transferGateway.inspect(path);
       let mode: 'CREATE' | 'OVERWRITE' = 'CREATE';
       if (inspection.campaignExists) {
-        const accepted = window.confirm(
+        const accepted = await confirmPlayerAction(
           `本地已存在存档 ${inspection.campaignId.slice(0, 8)}。覆盖前会创建完整数据库备份，确定继续吗？`,
         );
         if (!accepted) return;

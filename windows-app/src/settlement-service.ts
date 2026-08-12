@@ -1,27 +1,20 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
-  FakeAIProvider,
-  assertTaskContextBudget,
   compressContextHistory,
   contextBudgetForTask,
   GenerateWorldEventInputSchema,
   GenerateWorldEventOutputSchema,
   SummarizeAdventureInputSchema,
   SummarizeAdventureOutputSchema,
-  validateAIOutput,
   type AIProvider,
   type AITask,
-  type NormalizedAIRequest,
-  type ProviderConfig,
 } from '@ember-tavern/ai-core';
+import { campaignId, generationRecordId, idempotencyKey } from '@ember-tavern/contracts';
 import {
-  aiRequestId,
-  campaignId,
-  generationRecordId,
-  idempotencyKey,
-} from '@ember-tavern/contracts';
-import { formatTaskPrompt } from '@ember-tavern/prompts';
-import { recordContextInspection } from './context-inspector-service.js';
+  desktopAIEngine,
+  tauriDesktopAIOrchestrator,
+  type DesktopAIEngine,
+} from './desktop-ai-orchestrator.js';
 import type { AdventureSnapshot } from './adventure-service.js';
 import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
 import {
@@ -90,23 +83,16 @@ export const tauriSettlementGateway: SettlementGateway = {
     );
   },
 };
-const CONFIG: ProviderConfig = {
-  id: 'fake-windows',
-  providerType: 'LOCAL_OPENAI_COMPATIBLE',
-  presetKey: 'custom',
-  displayName: 'Fake',
-  baseUrl: null,
-  credentialRef: null,
-  options: {},
-  enabled: true,
-};
 export class WindowsSettlementService {
   private readonly active = new Map<string, Promise<AdventureArchive>>();
   public constructor(
     private readonly gateway: SettlementGateway = tauriSettlementGateway,
-    private readonly provider: AIProvider = new FakeAIProvider(),
+    provider?: AIProvider | DesktopAIEngine,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
-  ) {}
+  ) {
+    this.ai = desktopAIEngine(provider);
+  }
+  private readonly ai: DesktopAIEngine;
   public list(id: string) {
     campaignId(id);
     return this.gateway.list(id);
@@ -174,45 +160,29 @@ export class WindowsSettlementService {
     context: Readonly<{ adventureId: string }>,
   ): Promise<Audit<T>> {
     const suffix = crypto.randomUUID();
-    const model = (await this.provider.listModels()).find((m) => m.name === 'ember-fake-v1');
-    if (model === undefined) throw new Error('Fake model unavailable');
-    assertTaskContextBudget(task, input);
-    await recordContextInspection(task, input);
-    const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
-    const request: NormalizedAIRequest = {
-      requestId: aiRequestId(`${task.toLowerCase()}-${suffix}`),
-      task,
-      promptVersion: prompt.promptVersion,
-      modelName: model.name,
-      messages: prompt.messages,
-      responseFormat: prompt.responseFormat,
+    const generated = await this.ai.execute(task, input, {
+      requestId: `${task.toLowerCase()}-${suffix}`,
       temperature,
       maxOutputTokens: 8000,
       timeoutMs: 5000,
-    };
-    const response = await this.provider.generate(request, CONFIG);
-    if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
-      throw new Error('Settlement provider identity mismatch');
-    }
-    const checked = validateAIOutput(task, response.content);
-    if (!checked.ok) throw new Error('Settlement output invalid');
+    });
     return {
-      requestId: request.requestId,
+      requestId: generated.request.requestId,
       generationRecordId: generationRecordId(`settlement-generation-${suffix}`),
       idempotencyKey: idempotencyKey(`settlement:${task}:${suffix}`),
-      promptVersion: request.promptVersion,
+      promptVersion: generated.request.promptVersion,
       input,
       context,
-      request,
-      rawResponseText: response.content,
-      validatedOutput: parse(checked.validatedOutput),
+      request: generated.request,
+      rawResponseText: generated.response.content,
+      validatedOutput: parse(generated.validatedOutput),
     };
   }
 }
 export const windowsSettlementService = new WindowsSettlementService(
   tauriSettlementGateway,
-  new FakeAIProvider(),
+  tauriDesktopAIOrchestrator,
   tauriRandomnessTemperatureSource,
 );
 function parseArchive(value: unknown, id: string): AdventureArchive {

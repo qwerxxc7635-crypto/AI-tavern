@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod adventure_play;
+mod cache_metrics;
 mod character_creation;
 mod model_settings;
 mod npc_dialogue;
@@ -16,6 +17,7 @@ mod tavern_initialization;
 mod windows_e2e;
 mod world_creation;
 pub use adventure_play::*;
+pub use cache_metrics::*;
 pub use character_creation::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;

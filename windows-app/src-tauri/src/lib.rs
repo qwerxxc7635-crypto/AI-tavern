@@ -25,9 +25,10 @@ use ember_native_bridge::{
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
-    DEEPSEEK_BASE_URL, DeepSeekPreset, ModelCostStatus, OLLAMA_BASE_URL, OPENROUTER_BASE_URL,
+    DEEPSEEK_BASE_URL, DeepSeekPreset, FinishReason, MessageRole, ModelCostStatus,
+    NormalizedMessage, NormalizedRequest, OLLAMA_BASE_URL, OPENROUTER_BASE_URL,
     OpenAiCompatibleConfig, OpenAiCompatibleProvider, OpenRouterPreset, ProviderError,
-    QWEN_BASE_URL, QwenPreset,
+    QWEN_BASE_URL, QwenPreset, ResponseFormat, TokenUsage,
 };
 use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
 use serde::{Deserialize, Serialize};
@@ -226,6 +227,234 @@ fn probe_stale() -> CommandError {
     }
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum RuntimeMessageRole {
+    System,
+    User,
+    Assistant,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeMessage {
+    role: RuntimeMessageRole,
+    content: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+enum RuntimeResponseFormatKind {
+    Text,
+    JsonObject,
+    JsonSchema,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeResponseFormat {
+    kind: RuntimeResponseFormatKind,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct RuntimeGenerateRequest {
+    selected_profile_id: String,
+    request_id: String,
+    task: String,
+    prompt_version: u64,
+    model_name: String,
+    messages: Vec<RuntimeMessage>,
+    response_format: RuntimeResponseFormat,
+    temperature: f64,
+    max_output_tokens: u32,
+    timeout_ms: u64,
+    cache_prefix_hash: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeTokenUsage {
+    input_tokens: Option<u64>,
+    output_tokens: Option<u64>,
+    total_tokens: Option<u64>,
+    prompt_cache_hit_tokens: Option<u64>,
+    prompt_cache_miss_tokens: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeGenerateResponse {
+    request_id: String,
+    provider_request_id: Option<String>,
+    model_name: String,
+    content: String,
+    finish_reason: &'static str,
+    usage: RuntimeTokenUsage,
+    received_at: String,
+    selected_profile_id: String,
+    selected_provider_id: String,
+    selected_preset_key: String,
+    selected_provider_display_name: String,
+    cache_metric_recorded: Option<bool>,
+}
+
+#[tauri::command]
+async fn ai_generate(
+    request: RuntimeGenerateRequest,
+    store: State<'_, CampaignStore>,
+) -> Result<RuntimeGenerateResponse, CommandError> {
+    execute_ai_generate(request, store.inner()).await
+}
+
+async fn execute_ai_generate(
+    request: RuntimeGenerateRequest,
+    store: &CampaignStore,
+) -> Result<RuntimeGenerateResponse, CommandError> {
+    let runtime = store
+        .model_runtime_config(&request.selected_profile_id)
+        .map_err(|error| match error {
+            CampaignStoreError::NotFound => CommandError {
+                code: "MODEL_NOT_CONFIGURED",
+                message: "请先在模型设置中测试并保存默认模型。",
+            },
+            other => other.into(),
+        })?;
+    if request.model_name != runtime.model_name {
+        return Err(CommandError {
+            code: "MODEL_SELECTION_DRIFT",
+            message: "模型设置已发生变化，请按当前设置重新生成。",
+        });
+    }
+    if request.task.trim().is_empty()
+        || request.prompt_version == 0
+        || !is_sha256_hex(&request.cache_prefix_hash)
+    {
+        return Err(ProviderError::InvalidRequest.into());
+    }
+    let credential = runtime
+        .credential_ref
+        .as_deref()
+        .map(str::parse::<CredentialRef>)
+        .transpose()
+        .map_err(|_| ProviderError::InvalidConfig)?;
+    let config = runtime_provider_config(&runtime.preset_key, &runtime.base_url, credential)?;
+    let metric_task = request.task.clone();
+    let cache_prefix_hash = request.cache_prefix_hash.clone();
+    let normalized = NormalizedRequest {
+        request_id: request.request_id,
+        model_name: request.model_name,
+        messages: request
+            .messages
+            .into_iter()
+            .map(|message| NormalizedMessage {
+                role: match message.role {
+                    RuntimeMessageRole::System => MessageRole::System,
+                    RuntimeMessageRole::User => MessageRole::User,
+                    RuntimeMessageRole::Assistant => MessageRole::Assistant,
+                },
+                content: message.content,
+            })
+            .collect(),
+        response_format: match request.response_format.kind {
+            RuntimeResponseFormatKind::Text => ResponseFormat::Text,
+            RuntimeResponseFormatKind::JsonObject => ResponseFormat::JsonObject,
+            RuntimeResponseFormatKind::JsonSchema => ResponseFormat::JsonSchema,
+        },
+        temperature: request.temperature,
+        max_output_tokens: request.max_output_tokens,
+        timeout: Duration::from_millis(request.timeout_ms),
+    };
+    let response = OpenAiCompatibleProvider::new()?
+        .generate(&config, &normalized, CancellationToken::new())
+        .await?;
+    let cache_metric_recorded = record_cache_metric_best_effort(
+        store,
+        &runtime.preset_key,
+        &metric_task,
+        response.usage.prompt_cache_hit_tokens,
+        response.usage.prompt_cache_miss_tokens,
+        &cache_prefix_hash,
+        &response.received_at,
+    );
+    Ok(RuntimeGenerateResponse {
+        request_id: response.request_id,
+        provider_request_id: response.provider_request_id,
+        model_name: response.model_name,
+        content: response.content,
+        finish_reason: finish_reason_name(response.finish_reason),
+        usage: runtime_usage(response.usage),
+        received_at: response.received_at,
+        selected_profile_id: runtime.profile_id,
+        selected_provider_id: runtime.provider_id,
+        selected_preset_key: runtime.preset_key,
+        selected_provider_display_name: runtime.provider_display_name,
+        cache_metric_recorded,
+    })
+}
+
+fn record_cache_metric_best_effort(
+    store: &CampaignStore,
+    preset_key: &str,
+    task: &str,
+    hit: Option<u64>,
+    miss: Option<u64>,
+    prefix_hash: &str,
+    recorded_at: &str,
+) -> Option<bool> {
+    if preset_key != "deepseek" {
+        return None;
+    }
+    let (Some(hit), Some(miss)) = (hit, miss) else {
+        return None;
+    };
+    Some(
+        store
+            .record_deepseek_cache_metric(task, hit, miss, prefix_hash, recorded_at)
+            .is_ok(),
+    )
+}
+
+fn runtime_provider_config(
+    preset_key: &str,
+    base_url: &str,
+    credential: Option<CredentialRef>,
+) -> Result<OpenAiCompatibleConfig, ProviderError> {
+    match preset_key {
+        "deepseek" => DeepSeekPreset::config(credential.ok_or(ProviderError::InvalidConfig)?),
+        "qwen" => QwenPreset::config(credential.ok_or(ProviderError::InvalidConfig)?),
+        "openrouter" => OpenRouterPreset::config(credential.ok_or(ProviderError::InvalidConfig)?),
+        "ollama" => OpenAiCompatibleConfig::new(base_url, None),
+        "custom" => OpenAiCompatibleConfig::new(base_url, credential),
+        _ => Err(ProviderError::InvalidConfig),
+    }
+}
+
+fn is_sha256_hex(value: &str) -> bool {
+    value.len() == 64 && value.bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+fn finish_reason_name(reason: FinishReason) -> &'static str {
+    match reason {
+        FinishReason::Stop => "STOP",
+        FinishReason::Length => "LENGTH",
+        FinishReason::ContentFilter => "CONTENT_FILTER",
+        FinishReason::ToolCall => "TOOL_CALL",
+        FinishReason::Error => "ERROR",
+        FinishReason::Unknown => "UNKNOWN",
+    }
+}
+
+fn runtime_usage(usage: TokenUsage) -> RuntimeTokenUsage {
+    RuntimeTokenUsage {
+        input_tokens: usage.input_tokens,
+        output_tokens: usage.output_tokens,
+        total_tokens: usage.total_tokens,
+        prompt_cache_hit_tokens: usage.prompt_cache_hit_tokens,
+        prompt_cache_miss_tokens: usage.prompt_cache_miss_tokens,
+    }
+}
+
 #[tauri::command]
 fn model_settings_get(
     store: State<'_, CampaignStore>,
@@ -354,7 +583,7 @@ async fn provider_probe(
             let capabilities = ModelCapabilitiesRegistration {
                 text: true,
                 streaming: false,
-                system_messages: false,
+                system_messages: true,
                 json_mode: preset
                     .map(|value| value.json_mode)
                     .or(model.supports_json_mode)
@@ -378,9 +607,11 @@ async fn provider_probe(
                 capability_source,
                 &capabilities,
             )?;
+            let display_name =
+                preset_display_name(&preset_key, &model.name).unwrap_or(model.display_name);
             Ok(ProviderProbeModel {
                 name: model.name,
-                display_name: model.display_name,
+                display_name,
                 capabilities,
                 capability_source,
                 probe_fingerprint,
@@ -400,6 +631,15 @@ async fn provider_probe(
         endpoint_fingerprint,
         models,
     })
+}
+
+fn preset_display_name(preset_key: &str, model_name: &str) -> Option<String> {
+    match preset_key {
+        "deepseek" => DeepSeekPreset::model(model_name),
+        "qwen" => QwenPreset::model(model_name),
+        _ => None,
+    }
+    .map(|model| model.display_name.to_owned())
 }
 
 fn normalize_probe_url(preset_key: &str, supplied: Option<&str>) -> Result<String, ProviderError> {
@@ -537,7 +777,50 @@ fn world_generation_commit(
     command: WorldGenerationCommit,
     store: State<'_, CampaignStore>,
 ) -> Result<WorldCreationSnapshot, CommandError> {
-    store.commit_world_generation(command).map_err(Into::into)
+    let task_name = match command.task {
+        ember_native_bridge::WorldGenerationTask::GenerateWorld => "GENERATE_WORLD",
+        ember_native_bridge::WorldGenerationTask::RefineWorld => "REFINE_WORLD",
+    };
+    let expected_world = serde_json::to_value(&command.world).map_err(|_| CommandError {
+        code: "WORLD_COMMIT_OUTPUT_MISMATCH",
+        message: "世界候选无法转换为可提交的数据。",
+    })?;
+    let output_world = if task_name == "GENERATE_WORLD" {
+        Some(&command.validated_output)
+    } else {
+        command
+            .validated_output
+            .as_object()
+            .and_then(|output| output.get("world"))
+    };
+    if output_world != Some(&expected_world) {
+        return Err(CommandError {
+            code: "WORLD_COMMIT_OUTPUT_MISMATCH",
+            message: "世界候选与已验证模型输出不一致。",
+        });
+    }
+    if command
+        .request
+        .as_object()
+        .and_then(|request| request.get("task"))
+        .and_then(serde_json::Value::as_str)
+        != Some(task_name)
+        || !command.input.is_object()
+    {
+        return Err(CommandError {
+            code: "WORLD_COMMIT_ENVELOPE_INVALID",
+            message: "世界生成请求与提交任务不一致。",
+        });
+    }
+    store
+        .commit_world_generation(command)
+        .map_err(|error| match error {
+            CampaignStoreError::InvalidData => CommandError {
+                code: "WORLD_BUSINESS_RULE_INVALID",
+                message: "世界候选没有通过本地业务规则。",
+            },
+            other => other.into(),
+        })
 }
 
 #[tauri::command]
@@ -856,6 +1139,7 @@ pub fn run() {
             model_settings_get,
             model_settings_save,
             model_settings_forget_credential,
+            ai_generate,
             randomness_settings_get,
             randomness_settings_save,
             provider_probe
@@ -868,9 +1152,37 @@ pub fn run() {
 mod tests {
     use super::*;
     use ember_secure_secrets::SecretStoreError;
+    use std::io::{Read, Write};
+    use std::net::TcpListener;
+
+    #[test]
+    fn cache_telemetry_failure_is_observable_but_does_not_replace_generation() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("telemetry.sqlite")).unwrap();
+        assert_eq!(
+            record_cache_metric_best_effort(
+                &store,
+                "deepseek",
+                "UNKNOWN_TASK",
+                Some(1),
+                Some(1),
+                &"a".repeat(64),
+                "2026-08-12T00:00:00Z",
+            ),
+            Some(false)
+        );
+    }
 
     struct DeleteVault {
         fail: bool,
+    }
+
+    struct RealCredentialCleanup(CredentialRef);
+
+    impl Drop for RealCredentialCleanup {
+        fn drop(&mut self) {
+            let _ = SecretStore.delete(&self.0);
+        }
     }
 
     impl SecureVault for DeleteVault {
@@ -926,6 +1238,298 @@ mod tests {
             DEEPSEEK_BASE_URL
         );
         assert!(normalize_probe_url("deepseek", Some("https://attacker.invalid/v1/")).is_err());
+    }
+
+    #[test]
+    fn preset_probe_uses_the_same_canonical_display_name_as_the_settings_ui() {
+        assert_eq!(
+            preset_display_name("deepseek", "deepseek-v4-flash").as_deref(),
+            Some("DeepSeek-V4-Flash-0731")
+        );
+        assert_eq!(
+            preset_display_name("qwen", "qwen3.7-plus").as_deref(),
+            Some("Qwen 3.7 Plus")
+        );
+        assert_eq!(preset_display_name("custom", "custom-model"), None);
+    }
+
+    #[tokio::test]
+    async fn native_generation_uses_saved_default_model_and_rejects_model_drift() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1/", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let (mut socket, _) = listener.accept().unwrap();
+            let mut request = Vec::new();
+            let mut buffer = [0_u8; 4096];
+            let header_end = loop {
+                let read = socket.read(&mut buffer).unwrap();
+                assert_ne!(read, 0);
+                request.extend_from_slice(&buffer[..read]);
+                if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                    break position + 4;
+                }
+            };
+            let content_length = String::from_utf8_lossy(&request[..header_end])
+                .lines()
+                .find_map(|line| {
+                    line.strip_prefix("content-length: ")
+                        .or_else(|| line.strip_prefix("Content-Length: "))
+                })
+                .and_then(|value| value.trim().parse::<usize>().ok())
+                .unwrap();
+            while request.len() - header_end < content_length {
+                let read = socket.read(&mut buffer).unwrap();
+                assert_ne!(read, 0);
+                request.extend_from_slice(&buffer[..read]);
+            }
+            let request_text = String::from_utf8_lossy(&request[header_end..]);
+            assert!(request_text.contains("runtime-model"));
+            let body = serde_json::json!({
+                "id": "native-runtime-request",
+                "model": "runtime-model",
+                "choices": [{
+                    "message": { "content": "{\"status\":\"ok\"}" },
+                    "finish_reason": "stop"
+                }],
+                "usage": { "prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14 }
+            })
+            .to_string();
+            let response = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                body.len()
+            );
+            socket.write_all(response.as_bytes()).unwrap();
+        });
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("native-runtime.sqlite")).unwrap();
+        let capabilities = ModelCapabilitiesRegistration {
+            text: true,
+            streaming: false,
+            system_messages: true,
+            json_mode: true,
+            json_schema: false,
+            tool_calling: false,
+            reasoning: false,
+            context_window_tokens: Some(8192),
+            cost_status: "UNKNOWN".to_owned(),
+            checked_at: "2026-08-12T00:00:00Z".to_owned(),
+        };
+        let endpoint = model_endpoint_fingerprint("custom", &base_url);
+        let probe = model_probe_fingerprint(
+            &endpoint,
+            "runtime-model",
+            CapabilitySource::Unknown,
+            &capabilities,
+        )
+        .unwrap();
+        let saved = store
+            .save_model_settings(ModelSettingsUpdate {
+                preset_key: "custom".to_owned(),
+                provider_display_name: "Runtime provider".to_owned(),
+                base_url: Some(base_url),
+                endpoint_fingerprint: endpoint,
+                credential_ref: None,
+                credential_action: CredentialAction::Keep,
+                model_name: "runtime-model".to_owned(),
+                model_display_name: "Runtime Model".to_owned(),
+                capabilities,
+                capability_source: CapabilitySource::Unknown,
+                probe_fingerprint: probe,
+                probe_receipt_id: Uuid::new_v4().to_string(),
+                use_as_default: true,
+                use_as_fallback: false,
+            })
+            .unwrap();
+        let profile_id = saved.default_model_profile_id.clone().unwrap();
+        let request = runtime_test_request(&profile_id, "runtime-model");
+        let response = execute_ai_generate(request, &store).await.unwrap();
+        assert_eq!(response.model_name, "runtime-model");
+        assert_eq!(response.selected_profile_id, profile_id);
+        assert_eq!(response.selected_preset_key, "custom");
+        server.join().unwrap();
+
+        let error = execute_ai_generate(runtime_test_request(&profile_id, "forged-model"), &store)
+            .await
+            .unwrap_err();
+        assert_eq!(error.code, "MODEL_SELECTION_DRIFT");
+    }
+
+    #[tokio::test]
+    #[ignore = "requires an explicitly authorized DeepSeek API key in an environment variable"]
+    async fn real_deepseek_runtime_verifies_selection_cache_and_reopen() {
+        let secret = std::env::var("EMBER_TAVERN_DEEPSEEK_API_KEY")
+            .expect("EMBER_TAVERN_DEEPSEEK_API_KEY is required for the ignored real-provider test");
+        let reference = SecretStore.save(secret).unwrap();
+        let cleanup = RealCredentialCleanup(reference.clone());
+        let provider = OpenAiCompatibleProvider::new().unwrap();
+        let config = DeepSeekPreset::config(reference.clone()).unwrap();
+        let models = provider
+            .list_models(&config, CancellationToken::new())
+            .await
+            .unwrap();
+        assert!(models.iter().any(|model| model.name == "deepseek-v4-flash"));
+
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("real-deepseek.sqlite");
+        let store = CampaignStore::open(&database_path).unwrap();
+        let capabilities = ModelCapabilitiesRegistration {
+            text: true,
+            streaming: false,
+            system_messages: true,
+            json_mode: true,
+            json_schema: false,
+            tool_calling: false,
+            reasoning: true,
+            context_window_tokens: Some(1_048_576),
+            cost_status: "PAID".to_owned(),
+            checked_at: OffsetDateTime::now_utc().format(&Rfc3339).unwrap(),
+        };
+        let endpoint = model_endpoint_fingerprint("deepseek", DEEPSEEK_BASE_URL);
+        let probe = model_probe_fingerprint(
+            &endpoint,
+            "deepseek-v4-flash",
+            CapabilitySource::PresetMetadata,
+            &capabilities,
+        )
+        .unwrap();
+        let saved = store
+            .save_model_settings(ModelSettingsUpdate {
+                preset_key: "deepseek".to_owned(),
+                provider_display_name: "DeepSeek real verification".to_owned(),
+                base_url: Some(DEEPSEEK_BASE_URL.to_owned()),
+                endpoint_fingerprint: endpoint,
+                credential_ref: Some(reference.to_string()),
+                credential_action: CredentialAction::Replace,
+                model_name: "deepseek-v4-flash".to_owned(),
+                model_display_name: "DeepSeek-V4-Flash-0731".to_owned(),
+                capabilities,
+                capability_source: CapabilitySource::PresetMetadata,
+                probe_fingerprint: probe,
+                probe_receipt_id: Uuid::new_v4().to_string(),
+                use_as_default: true,
+                use_as_fallback: false,
+            })
+            .unwrap();
+        let profile_id = saved.default_model_profile_id.unwrap();
+        let stable_system = [
+            "你是 Ember Tavern 的 NPC 演员。只输出一个 JSON 对象，不得使用 Markdown。",
+            "保持角色一致，不改写本地游戏状态，不泄露隐藏事实，不索取或复述任何凭据。",
+            "JSON 必须且只能包含 reply、mood、suggestedTopics、memoryCandidate、relationshipProposal。",
+            "reply、mood、suggestedTopics 与 memoryCandidate 使用自然简体中文。relationshipProposal 使用空对象。",
+            "角色：岚灯酒馆的守门人苏槿，谨慎、诚实、熟悉潮汐与旧灯塔，但不知道密室内发生的事。",
+        ]
+        .join("\n");
+        let first = execute_ai_generate(
+            real_runtime_request(
+                &profile_id,
+                "我想先查看灯塔门上的潮痕。",
+                &stable_system,
+                "one",
+            ),
+            &store,
+        )
+        .await
+        .unwrap();
+        std::thread::sleep(Duration::from_secs(2));
+        let second = execute_ai_generate(
+            real_runtime_request(
+                &profile_id,
+                "我改为询问昨夜是谁守门。",
+                &stable_system,
+                "two",
+            ),
+            &store,
+        )
+        .await
+        .unwrap();
+        for response in [&first, &second] {
+            let output: serde_json::Value = serde_json::from_str(&response.content).unwrap();
+            assert!(
+                output["reply"]
+                    .as_str()
+                    .is_some_and(|value| !value.is_empty())
+            );
+            assert!(output["suggestedTopics"].as_array().is_some());
+            assert_eq!(response.model_name, "deepseek-v4-flash");
+            assert_eq!(response.selected_profile_id, profile_id);
+        }
+        assert_ne!(first.content, second.content);
+        let metrics = store.deepseek_cache_metrics().unwrap();
+        assert_eq!(metrics.len(), 2);
+        assert_eq!(metrics[0].prefix_hash, metrics[1].prefix_hash);
+        assert!(metrics[1].prompt_cache_hit_tokens > 0);
+        let safe_metrics = metrics
+            .iter()
+            .map(|metric| {
+                (
+                    metric.prompt_cache_hit_tokens,
+                    metric.prompt_cache_miss_tokens,
+                    metric.hit_ratio,
+                )
+            })
+            .collect::<Vec<_>>();
+        eprintln!("real DeepSeek cache metrics: {safe_metrics:?}");
+        drop(store);
+
+        let reopened = CampaignStore::open(database_path).unwrap();
+        let runtime = reopened.default_model_runtime_config().unwrap();
+        assert_eq!(runtime.model_name, "deepseek-v4-flash");
+        assert_eq!(reopened.deepseek_cache_metrics().unwrap().len(), 2);
+        drop(cleanup);
+        assert!(!SecretStore.exists(&reference).unwrap());
+    }
+
+    fn real_runtime_request(
+        profile_id: &str,
+        player_input: &str,
+        stable_system: &str,
+        suffix: &str,
+    ) -> RuntimeGenerateRequest {
+        RuntimeGenerateRequest {
+            selected_profile_id: profile_id.to_owned(),
+            request_id: format!("real-deepseek-{suffix}"),
+            task: "NPC_REPLY".to_owned(),
+            prompt_version: 3,
+            model_name: "deepseek-v4-flash".to_owned(),
+            messages: vec![
+                RuntimeMessage {
+                    role: RuntimeMessageRole::System,
+                    content: stable_system.to_owned(),
+                },
+                RuntimeMessage {
+                    role: RuntimeMessageRole::User,
+                    content: format!("玩家输入：{player_input}"),
+                },
+            ],
+            response_format: RuntimeResponseFormat {
+                kind: RuntimeResponseFormatKind::JsonObject,
+            },
+            temperature: 0.5,
+            max_output_tokens: 512,
+            timeout_ms: 60_000,
+            cache_prefix_hash: "c".repeat(64),
+        }
+    }
+
+    fn runtime_test_request(profile_id: &str, model_name: &str) -> RuntimeGenerateRequest {
+        RuntimeGenerateRequest {
+            selected_profile_id: profile_id.to_owned(),
+            request_id: "runtime-request".to_owned(),
+            task: "NPC_REPLY".to_owned(),
+            prompt_version: 1,
+            model_name: model_name.to_owned(),
+            messages: vec![RuntimeMessage {
+                role: RuntimeMessageRole::User,
+                content: "Return JSON.".to_owned(),
+            }],
+            response_format: RuntimeResponseFormat {
+                kind: RuntimeResponseFormatKind::JsonObject,
+            },
+            temperature: 0.5,
+            max_output_tokens: 256,
+            timeout_ms: 5_000,
+            cache_prefix_hash: "a".repeat(64),
+        }
     }
 
     #[test]

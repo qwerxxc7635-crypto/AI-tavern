@@ -1,17 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import {
-  FakeAIProvider,
-  assertTaskContextBudget,
   GenerateWorldInputSchema,
   GenerateWorldOutputSchema,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
-  validateAIOutput,
   type AIProvider,
   type AITask,
-  type NormalizedAIRequest,
-  type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
   WORLD_BIBLE_LOCKABLE_FIELDS,
@@ -22,8 +17,11 @@ import {
   isoTimestamp,
   type WorldBibleLockableField,
 } from '@ember-tavern/contracts';
-import { formatTaskPrompt } from '@ember-tavern/prompts';
-import { recordContextInspection } from './context-inspector-service.js';
+import {
+  desktopAIEngine,
+  tauriDesktopAIOrchestrator,
+  type DesktopAIEngine,
+} from './desktop-ai-orchestrator.js';
 import {
   balancedRandomnessTemperatureSource,
   tauriRandomnessTemperatureSource,
@@ -87,17 +85,6 @@ interface WorldRequestIdentity {
   readonly idempotencyKey: string;
 }
 
-const FAKE_PROVIDER_CONFIG: ProviderConfig = Object.freeze({
-  id: 'windows-offline-fake',
-  providerType: 'LOCAL_OPENAI_COMPATIBLE',
-  presetKey: 'custom',
-  displayName: 'Ember Fake',
-  baseUrl: null,
-  credentialRef: null,
-  options: {},
-  enabled: true,
-});
-
 export const tauriWorldCreationGateway: WorldCreationGateway = {
   async load(id) {
     return parseSnapshot(await invoke<unknown>('world_creation_get', { id }), id);
@@ -124,12 +111,16 @@ export const tauriWorldCreationGateway: WorldCreationGateway = {
 export class WindowsWorldCreationService {
   public constructor(
     private readonly gateway: WorldCreationGateway = tauriWorldCreationGateway,
-    private readonly provider: AIProvider = new FakeAIProvider(),
+    provider?: AIProvider | DesktopAIEngine,
     private readonly createIdentity: (
       task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     ) => WorldRequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
-  ) {}
+  ) {
+    this.ai = desktopAIEngine(provider);
+  }
+
+  private readonly ai: DesktopAIEngine;
 
   public load(campaignIdValue: string): Promise<WorldCreationSnapshot> {
     campaignId(campaignIdValue);
@@ -185,44 +176,28 @@ export class WindowsWorldCreationService {
     input: unknown,
   ): Promise<WorldCreationSnapshot> {
     const identity = this.createIdentity(task);
-    const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
-    if (model === undefined) throw new WorldCreationServiceError('MODEL_NOT_FOUND');
-    assertTaskContextBudget(task, input);
-    await recordContextInspection(task, input);
-    const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
-    const request: NormalizedAIRequest = {
-      requestId: aiRequestId(identity.requestId),
-      task,
-      promptVersion: prompt.promptVersion,
-      modelName: model.name,
-      messages: prompt.messages,
-      responseFormat: prompt.responseFormat,
+    const generated = await this.ai.execute(task, input, {
+      requestId: identity.requestId,
       temperature,
-      maxOutputTokens: 4_000,
+      maxOutputTokens: 8_000,
       timeoutMs: 5_000,
-    };
-    const response = await this.provider.generate(request, FAKE_PROVIDER_CONFIG);
-    if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
-      throw new WorldCreationServiceError('PROVIDER_IDENTITY_MISMATCH');
-    }
-    const validated = validateAIOutput(task, response.content);
-    if (!validated.ok) throw new WorldCreationServiceError(validated.error.code);
+    });
     const world =
       task === 'GENERATE_WORLD'
-        ? GenerateWorldOutputSchema.parse(validated.validatedOutput)
-        : RefineWorldOutputSchema.parse(validated.validatedOutput).world;
+        ? GenerateWorldOutputSchema.parse(generated.validatedOutput)
+        : RefineWorldOutputSchema.parse(generated.validatedOutput).world;
     return this.gateway.commit({
       campaignId: campaignIdValue,
       task,
       requestId: identity.requestId,
       generationRecordId: identity.generationRecordId,
       idempotencyKey: identity.idempotencyKey,
-      promptVersion: request.promptVersion,
+      promptVersion: generated.request.promptVersion,
       input,
-      request,
-      rawResponseText: response.content,
-      validatedOutput: validated.validatedOutput,
+      request: generated.request,
+      rawResponseText: generated.response.content,
+      validatedOutput: generated.validatedOutput,
       world,
     });
   }
@@ -230,7 +205,7 @@ export class WindowsWorldCreationService {
 
 export const windowsWorldCreationService = new WindowsWorldCreationService(
   tauriWorldCreationGateway,
-  new FakeAIProvider(),
+  tauriDesktopAIOrchestrator,
   defaultIdentity,
   tauriRandomnessTemperatureSource,
 );

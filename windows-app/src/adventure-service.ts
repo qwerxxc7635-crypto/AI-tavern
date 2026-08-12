@@ -1,8 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import {
-  FakeAIProvider,
-  assertTaskContextBudget,
   GenerateAdventurePlanInputSchema,
   GenerateAdventurePlanOutputSchema,
   GenerateAdventureTurnInputSchema,
@@ -10,11 +8,8 @@ import {
   ResolveDiceResultInputSchema,
   ResolveDiceResultOutputSchema,
   SceneFrameSchema,
-  validateAIOutput,
   type AIProvider,
   type AITask,
-  type NormalizedAIRequest,
-  type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
@@ -24,8 +19,11 @@ import {
   type AdventureActionMode,
   type SceneFrame,
 } from '@ember-tavern/contracts';
-import { formatTaskPrompt } from '@ember-tavern/prompts';
-import { recordContextInspection } from './context-inspector-service.js';
+import {
+  desktopAIEngine,
+  tauriDesktopAIOrchestrator,
+  type DesktopAIEngine,
+} from './desktop-ai-orchestrator.js';
 import { parseD20HardResult, type D20HardResultView } from './d20-hard-result.js';
 import {
   balancedRandomnessTemperatureSource,
@@ -154,17 +152,6 @@ interface RequestIdentity {
   readonly idempotencyKey: string;
 }
 
-const PROVIDER_CONFIG: ProviderConfig = Object.freeze({
-  id: 'windows-offline-fake',
-  providerType: 'LOCAL_OPENAI_COMPATIBLE',
-  presetKey: 'custom',
-  displayName: 'Ember Fake',
-  baseUrl: null,
-  credentialRef: null,
-  options: {},
-  enabled: true,
-});
-
 export const tauriAdventureGateway: AdventureGateway = {
   async load(id, questId) {
     return parseSnapshot(
@@ -223,10 +210,14 @@ export class WindowsAdventureService {
 
   public constructor(
     private readonly gateway: AdventureGateway = tauriAdventureGateway,
-    private readonly provider: AIProvider = new FakeAIProvider(),
+    provider?: AIProvider | DesktopAIEngine,
     private readonly createIdentity: (task: AITask) => RequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
-  ) {}
+  ) {
+    this.ai = desktopAIEngine(provider);
+  }
+
+  private readonly ai: DesktopAIEngine;
 
   public load(
     id: string,
@@ -358,38 +349,22 @@ export class WindowsAdventureService {
     onValidationStarted?: () => void,
   ): Promise<GenerationAudit> {
     const identity = this.createIdentity(task);
-    const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
-    if (model === undefined) throw new AdventureServiceError('MODEL_NOT_FOUND');
-    assertTaskContextBudget(task, input);
-    await recordContextInspection(task, input);
-    const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
-    const request: NormalizedAIRequest = {
-      requestId: aiRequestId(identity.requestId),
-      task,
-      promptVersion: prompt.promptVersion,
-      modelName: model.name,
-      messages: prompt.messages,
-      responseFormat: prompt.responseFormat,
+    const generated = await this.ai.execute(task, input, {
+      requestId: identity.requestId,
       temperature,
       maxOutputTokens: 8_000,
       timeoutMs: 5_000,
-    };
-    const response = await this.provider.generate(request, PROVIDER_CONFIG);
-    if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
-      throw new AdventureServiceError('PROVIDER_IDENTITY_MISMATCH');
-    }
+    });
     onValidationStarted?.();
-    const validation = validateAIOutput(task, response.content);
-    if (!validation.ok) throw new AdventureServiceError(validation.error.code);
     return {
       ...identity,
-      promptVersion: request.promptVersion,
+      promptVersion: generated.request.promptVersion,
       input,
       context,
-      request,
-      rawResponseText: response.content,
-      validatedOutput: parseOutput(validation.validatedOutput),
+      request: generated.request,
+      rawResponseText: generated.response.content,
+      validatedOutput: parseOutput(generated.validatedOutput),
     };
   }
 
@@ -412,7 +387,7 @@ export class WindowsAdventureService {
 
 export const windowsAdventureService = new WindowsAdventureService(
   tauriAdventureGateway,
-  new FakeAIProvider(),
+  tauriDesktopAIOrchestrator,
   defaultIdentity,
   tauriRandomnessTemperatureSource,
 );

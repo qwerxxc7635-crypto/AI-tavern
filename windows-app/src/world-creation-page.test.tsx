@@ -23,7 +23,7 @@ describe('world creation page', () => {
       target: { value: '漂浮在云海上的群岛。' },
     });
     fireEvent.change(screen.getByLabelText('世界类型'), { target: { value: '蒸汽朋克' } });
-    fireEvent.click(screen.getByRole('button', { name: '使用 Fake Provider 生成' }));
+    fireEvent.click(screen.getByRole('button', { name: '使用默认模型生成' }));
 
     expect(await screen.findByDisplayValue('Ember Coast')).toBeTruthy();
     expect(service.generateOptions).toMatchObject({

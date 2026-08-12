@@ -129,7 +129,7 @@ export function WorldCreationPage({
       <main className="world-studio">
         <header className="world-studio__topline">
           <Link to="/saves">← 存档首页</Link>
-          <p>Fake Provider · 本地离线预览</p>
+          <p>当前默认模型 · 生成结果预览</p>
         </header>
         <section className="world-hero">
           <div>
@@ -470,7 +470,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
         </fieldset>
 
         <button className="primary-action world-options__submit" type="submit" disabled={busy}>
-          {busy ? '正在生成世界…' : '使用 Fake Provider 生成'}
+          {busy ? '正在生成世界…' : '使用默认模型生成'}
         </button>
       </form>
     </main>

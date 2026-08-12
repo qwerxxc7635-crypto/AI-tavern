@@ -99,7 +99,9 @@ describe('Desktop release configuration', () => {
     expect(capability.identifier).toBe('default');
     expect(capability.windows).toEqual(['main']);
     expect(capability.permissions).toEqual([
+      'core:app:allow-version',
       'core:event:default',
+      'dialog:allow-message',
       'dialog:allow-open',
       'dialog:allow-save',
     ]);

@@ -6,6 +6,7 @@ import {
   reduceApiBindingState,
   withApiBindingTimeout,
 } from './api-binding-state-machine.js';
+import { confirmPlayerAction } from './confirmation-service.js';
 
 import {
   CONNECTION_PROFILES,
@@ -222,9 +223,14 @@ export function ModelSettingsPage({
           : '模型设置已保存；旧凭据已停止使用，系统凭据清理将在稍后自动重试。',
       );
       dispatchBinding({ type: 'SAVE_SUCCEEDED', operationId, revision });
-    } catch {
+    } catch (error) {
       if (activeOperation.current !== operationId) return;
-      setStatus('模型设置未保存，请检查输入后重试。');
+      const code = commandErrorCode(error);
+      setStatus(
+        code === null
+          ? '模型设置未保存，请检查输入后重试。'
+          : `模型设置未保存（${code}），请检查输入后重试。`,
+      );
       dispatchBinding({ type: 'SAVE_FAILED', operationId, revision });
     } finally {
       if (activeOperation.current === operationId) activeOperation.current = null;
@@ -232,7 +238,7 @@ export function ModelSettingsPage({
   }
 
   async function forgetCredential(profileId: string) {
-    const accepted = window.confirm(
+    const accepted = await confirmPlayerAction(
       '删除后，该Provider的已保存API Key会从系统安全凭据库移除；模型配置仍会保留。确定继续吗？',
     );
     if (!accepted) return;
@@ -286,7 +292,7 @@ export function ModelSettingsPage({
           Key（若填写）并读取模型列表；自定义地址就是本次连接的数据接收方。远程地址只允许HTTPS，本机回环服务可使用HTTP。
         </p>
         <p>
-          当前候选尚未启用云端游戏生成。未来启用云生成或跨服务商切换时，发送必要游戏上下文前必须另行确认。
+          保存为默认模型后，新游戏生成请求会立即使用该配置。勾选备用模型表示：仅当默认服务发生网络、限流、超时或服务不可用时，允许把同一任务的必要上下文发送给该备用服务商一次；认证、额度和输出校验错误不会自动切换。
         </p>
       </section>
       <section className="model-settings__panel" aria-label="模型配置">
@@ -479,4 +485,10 @@ export function ModelSettingsPage({
       </section>
     </main>
   );
+}
+
+function commandErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || Array.isArray(error)) return null;
+  const code = (error as Readonly<Record<string, unknown>>)['code'];
+  return typeof code === 'string' && /^[A-Z0-9_]{2,64}$/.test(code) ? code : null;
 }

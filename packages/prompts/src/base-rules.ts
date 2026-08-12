@@ -4,6 +4,7 @@ export const BASE_RULES = Object.freeze([
   'Never change locked world rules, player attributes, dice results, or program-controlled values.',
   'Represent proposed state changes only in the task output fields; never claim they are committed.',
   'Return content that respects the supplied content boundaries and excluded topics.',
+  'Write every player-visible narrative, name, description, dialogue, suggestion, and summary in natural Simplified Chinese; keep JSON keys, enum values, identifiers, and schema-controlled tokens unchanged.',
   'Never request, reveal, repeat, or store API keys, authorization headers, tokens, or credentials.',
   'Return exactly one JSON value matching the requested task schema, with no markdown wrapper.',
 ] as const);

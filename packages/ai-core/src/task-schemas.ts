@@ -64,6 +64,57 @@ const worldDraftShape = {
   tavernReason: text,
   storyHooks: stringList.min(1).max(12),
 };
+const worldDraft = z
+  .object(worldDraftShape)
+  .strict()
+  .superRefine((world, context) => {
+    const factionNames = new Set<string>();
+    world.factions.forEach((faction, index) => {
+      if (factionNames.has(faction.name)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['factions', index, 'name'],
+          message: 'Faction names must be unique',
+        });
+      }
+      factionNames.add(faction.name);
+    });
+    const locationNames = new Set<string>();
+    world.locations.forEach((location, index) => {
+      if (locationNames.has(location.name)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['locations', index, 'name'],
+          message: 'Location names must be unique',
+        });
+      }
+      locationNames.add(location.name);
+    });
+    world.locations.forEach((location, index) => {
+      if (location.parentName === location.name) {
+        context.addIssue({
+          code: 'custom',
+          path: ['locations', index, 'parentName'],
+          message: 'A location cannot be its own parent',
+        });
+      } else if (location.parentName !== null && !locationNames.has(location.parentName)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['locations', index, 'parentName'],
+          message: 'Location parentName must reference a generated location',
+        });
+      }
+      location.factionNames.forEach((name, factionIndex) => {
+        if (!factionNames.has(name)) {
+          context.addIssue({
+            code: 'custom',
+            path: ['locations', index, 'factionNames', factionIndex],
+            message: 'Location factionNames must reference a generated faction',
+          });
+        }
+      });
+    });
+  });
 const worldContext = z
   .object({
     name: shortText,
@@ -110,6 +161,12 @@ const turnRange = z
     max: z.number().int().min(1).max(20),
   })
   .strict();
+const v02QuestTurnRange = z
+  .object({
+    min: z.number().int().min(8).max(12),
+    max: z.number().int().min(8).max(12),
+  })
+  .strict();
 const playerContext = z
   .object({
     id: identifier,
@@ -141,7 +198,7 @@ const adventurePlanContext = z
   .object({
     objective: text,
     risk: questRisk,
-    expectedTurns: turnRange,
+    expectedTurns: v02QuestTurnRange,
     coreScenes: stringList.min(1).max(20),
     necessaryClues: stringList.max(20),
     majorObstacles: stringList.min(1).max(20),
@@ -161,11 +218,11 @@ const statePatchProposal = z
 export const GenerateWorldInputSchema = z
   .object({ concept: text, storyPreferences: stringList, contentBoundaries })
   .strict();
-export const GenerateWorldOutputSchema = z.object(worldDraftShape).strict();
+export const GenerateWorldOutputSchema = worldDraft;
 
 export const RefineWorldInputSchema = z
   .object({
-    world: z.object(worldDraftShape).strict(),
+    world: worldDraft,
     revisionInstructions: stringList.min(1),
     lockedFields: z.array(
       z.enum([
@@ -183,7 +240,7 @@ export const RefineWorldInputSchema = z
   })
   .strict();
 export const RefineWorldOutputSchema = z
-  .object({ world: z.object(worldDraftShape).strict(), changeSummary: stringList.min(1) })
+  .object({ world: worldDraft, changeSummary: stringList.min(1) })
   .strict();
 
 export const GenerateCharacterTraitsInputSchema = z
@@ -300,6 +357,54 @@ export const GenerateNpcsOutputSchema = z
   })
   .strict()
   .superRefine((output, context) => {
+    const names = new Set<string>();
+    output.npcs.forEach((npc, index) => {
+      if (names.has(npc.name)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['npcs', index, 'name'],
+          message: 'NPC names must be unique',
+        });
+      }
+      names.add(npc.name);
+      const visitor = npc.residency === 'TEMPORARY_VISITOR';
+      if (visitor !== (npc.visitReason !== null)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['npcs', index, 'visitReason'],
+          message: 'Only temporary visitors require a visitReason',
+        });
+      }
+    });
+    if (
+      output.npcs.length === 3 &&
+      output.npcs.filter((npc) => npc.residency === 'RESIDENT').length !== 2
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['npcs'],
+        message: 'Exactly two NPCs must be residents',
+      });
+    }
+    if (
+      output.npcs.length === 3 &&
+      output.npcs.filter((npc) => npc.residency === 'TEMPORARY_VISITOR').length !== 1
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['npcs'],
+        message: 'Exactly one NPC must be a temporary visitor',
+      });
+    }
+    output.rumors.forEach((rumor, index) => {
+      if (!names.has(rumor.sourceNpcName)) {
+        context.addIssue({
+          code: 'custom',
+          path: ['rumors', index, 'sourceNpcName'],
+          message: 'Rumor sourceNpcName must match a generated NPC name',
+        });
+      }
+    });
     const archetype = findRepeatedNpcArchetype(output.npcs);
     if (archetype !== null) {
       context.addIssue({
@@ -361,10 +466,10 @@ export const NpcReplyOutputSchema = z
     memoryCandidate: text.nullable(),
     relationshipProposal: z
       .object({
-        trust: z.number().int().min(-1).max(1).optional(),
-        closeness: z.number().int().min(-1).max(1).optional(),
-        awe: z.number().int().min(-1).max(1).optional(),
-        obligation: z.number().int().min(-1).max(1).optional(),
+        trust: z.number().int().min(-1).max(1).nullable().optional(),
+        closeness: z.number().int().min(-1).max(1).nullable().optional(),
+        awe: z.number().int().min(-1).max(1).nullable().optional(),
+        obligation: z.number().int().min(-1).max(1).nullable().optional(),
       })
       .strict(),
   })
@@ -396,7 +501,7 @@ export const GenerateQuestOutputSchema = z
     content: questContent,
     risk: questRisk,
     recommendedAttributes: z.array(attribute).min(1).max(4),
-    expectedTurns: turnRange,
+    expectedTurns: v02QuestTurnRange,
     rewardTier,
     relatedNpcIds: identifierList,
     relatedFactIds: identifierList,
@@ -522,6 +627,27 @@ export const GenerateAdventureTurnOutputSchema = z
   })
   .strict()
   .superRefine((output, context) => {
+    if ((output.checkRequest !== null) !== (output.adventureState === 'CHECK_REQUIRED')) {
+      context.addIssue({
+        code: 'custom',
+        path: ['checkRequest'],
+        message: 'checkRequest must exist exactly when adventureState is CHECK_REQUIRED',
+      });
+    }
+    output.statePatchProposals.forEach((proposal, index) => {
+      if (
+        proposal.kind !== 'FACT' ||
+        proposal.targetId !== null ||
+        typeof proposal.payload['statement'] !== 'string' ||
+        proposal.payload['statement'].trim().length === 0
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['statePatchProposals', index],
+          message: 'Adventure turns may only propose new FACT statements with a null targetId',
+        });
+      }
+    });
     const count = output.suggestedActions.length;
     if (output.adventureState === 'ENDING' ? count !== 0 : count < 3 || count > 5) {
       context.addIssue({
@@ -576,7 +702,24 @@ export const ResolveDiceResultOutputSchema = z
     consequence: text,
     statePatchProposals: z.array(statePatchProposal).max(10),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    output.statePatchProposals.forEach((proposal, index) => {
+      if (
+        proposal.kind !== 'FACT' ||
+        proposal.targetId !== null ||
+        typeof proposal.payload['statement'] !== 'string' ||
+        proposal.payload['statement'].trim().length === 0
+      ) {
+        context.addIssue({
+          code: 'custom',
+          path: ['statePatchProposals', index],
+          message:
+            'Dice resolution may only propose FACT patches with null targetId and a non-empty payload.statement',
+        });
+      }
+    });
+  });
 
 export const GenerateWorldEventInputSchema = z
   .object({

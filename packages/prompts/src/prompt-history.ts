@@ -64,6 +64,11 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     change: 'Narrate only after raw, modifier, total, DC, and result are fixed locally.',
   }),
   Object.freeze({
+    task: 'RESOLVE_DICE_RESULT',
+    version: promptVersion(3),
+    change: 'Restrict state proposals to native-commit-compatible FACT patches.',
+  }),
+  Object.freeze({
     task: 'NPC_REPLY',
     version: promptVersion(2),
     change: 'Consume only actor-scoped Truth and Claim knowledge projections.',

@@ -128,7 +128,86 @@ pub struct ModelSettingsSnapshot {
     pub pending_credential_cleanup_count: i64,
 }
 
+/// Internal-only model selection used by the native AI runtime. This type is
+/// deliberately not serializable so credential references cannot cross into
+/// the WebView, generation audit records, or save archives.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ModelRuntimeConfig {
+    pub profile_id: String,
+    pub provider_id: String,
+    pub preset_key: String,
+    pub provider_display_name: String,
+    pub base_url: String,
+    pub credential_ref: Option<String>,
+    pub model_name: String,
+    pub model_display_name: String,
+    pub capabilities: ModelCapabilitiesRegistration,
+}
+
 impl CampaignStore {
+    pub fn default_model_runtime_config(&self) -> Result<ModelRuntimeConfig, CampaignStoreError> {
+        let connection = self.connect()?;
+        let profile_id =
+            read_setting(&connection, DEFAULT_MODEL_KEY)?.ok_or(CampaignStoreError::NotFound)?;
+        drop(connection);
+        self.model_runtime_config(&profile_id)
+    }
+
+    pub fn model_runtime_config(
+        &self,
+        profile_id: &str,
+    ) -> Result<ModelRuntimeConfig, CampaignStoreError> {
+        let connection = self.connect()?;
+        let default = read_setting(&connection, DEFAULT_MODEL_KEY)?;
+        let fallback = read_setting(&connection, FALLBACK_MODEL_KEY)?;
+        if default.as_deref() != Some(profile_id) && fallback.as_deref() != Some(profile_id) {
+            return Err(CampaignStoreError::NotFound);
+        }
+        let config = connection
+            .query_row(
+                "SELECT m.id, p.id, p.preset_key, p.display_name, p.base_url,
+                        p.credential_ref, m.model_name, m.display_name,
+                        m.capabilities_json, m.capabilities_checked_at
+                 FROM model_profiles m
+                 JOIN provider_configs p ON p.id = m.provider_config_id
+                 WHERE m.id = ?1 AND m.enabled = 1 AND p.enabled = 1",
+                [profile_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                        row.get::<_, Option<String>>(5)?,
+                        row.get::<_, String>(6)?,
+                        row.get::<_, String>(7)?,
+                        row.get::<_, String>(8)?,
+                        row.get::<_, Option<String>>(9)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or(CampaignStoreError::NotFound)?;
+        let base_url = config.4.ok_or(CampaignStoreError::InvalidData)?;
+        let capabilities: ModelCapabilitiesRegistration =
+            serde_json::from_str(&config.8).map_err(|_| CampaignStoreError::InvalidData)?;
+        if config.9.as_deref() != Some(capabilities.checked_at.as_str()) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        Ok(ModelRuntimeConfig {
+            profile_id: config.0,
+            provider_id: config.1,
+            preset_key: config.2,
+            provider_display_name: config.3,
+            base_url,
+            credential_ref: config.5,
+            model_name: config.6,
+            model_display_name: config.7,
+            capabilities,
+        })
+    }
+
     pub fn model_settings(&self) -> Result<ModelSettingsSnapshot, CampaignStoreError> {
         let connection = self.connect()?;
         let mut statement = connection.prepare(
@@ -691,6 +770,34 @@ mod tests {
         assert_eq!(after.state, before.state);
         assert_eq!(after.created_at, before.created_at);
         assert_eq!(after.updated_at, before.updated_at);
+    }
+
+    #[test]
+    fn native_runtime_resolves_the_saved_default_with_internal_credential_reference() {
+        let directory = tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("runtime.sqlite")).unwrap();
+        let credential_ref = format!("credential:v1:{}", Uuid::new_v4());
+        let mut update = settings_update("deepseek", "DeepSeek runtime", "deepseek-v4-flash");
+        update.credential_ref = Some(credential_ref.clone());
+        update.credential_action = CredentialAction::Replace;
+        update.capabilities.json_mode = true;
+        update.use_as_default = true;
+        refresh_probe_metadata(&mut update);
+        let saved = store.save_model_settings(update).unwrap();
+
+        let runtime = store.default_model_runtime_config().unwrap();
+        assert_eq!(runtime.profile_id, saved.default_model_profile_id.unwrap());
+        assert_eq!(runtime.preset_key, "deepseek");
+        assert_eq!(runtime.model_name, "deepseek-v4-flash");
+        assert_eq!(runtime.credential_ref, Some(credential_ref));
+
+        let public = store.model_settings().unwrap();
+        assert!(public.profiles[0].has_credential);
+        assert!(
+            !serde_json::to_string(&public)
+                .unwrap()
+                .contains("credential:v1:")
+        );
     }
 
     #[test]

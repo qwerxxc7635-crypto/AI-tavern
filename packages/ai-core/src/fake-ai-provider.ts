@@ -139,6 +139,26 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
     const input = taskInput(request);
     const recentMessages = input?.['recentMessages'];
     if (Array.isArray(recentMessages) && recentMessages.length > 0) {
+      const priorNpcReplies = recentMessages.filter(
+        (message) => isRecord(message) && message['role'] === 'NPC',
+      ).length;
+      if (priorNpcReplies >= 2) {
+        const answerNumber = priorNpcReplies + 1;
+        const playerMessage =
+          typeof input?.['playerMessage'] === 'string'
+            ? input['playerMessage']
+            : `question ${answerNumber}`;
+        const inlinePlayerMessage = playerMessage.replace(/[.!?。！？；;\n]+/gu, ' ').trim();
+        const relationship = isRecord(input?.['relationship']) ? input['relationship'] : undefined;
+        const trust = relationship?.['trust'];
+        return {
+          reply: `Ilyra weighs "${inlinePlayerMessage}" and marks another safe step toward the sealed passage before the tide changes.`,
+          mood: 'Focused',
+          suggestedTopics: [`Tide mark ${answerNumber}`, `Passage sign ${answerNumber}`],
+          memoryCandidate: `The player asked about "${inlinePlayerMessage}" while investigating the sealed route beneath the tavern.`,
+          relationshipProposal: trust === 5 ? {} : { trust: 1 },
+        };
+      }
       return {
         reply: 'The lower stones have cooled, so the old tunnel can be approached carefully.',
         mood: 'Focused',
@@ -161,6 +181,21 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
   const minimumTurns = expectedTurns === undefined ? undefined : expectedTurns['min'];
   if (typeof currentTurnNumber !== 'number' || typeof minimumTurns !== 'number') return base;
   const nextTurnNumber = currentTurnNumber + 1;
+  const playerAction =
+    typeof input['playerAction'] === 'string' ? input['playerAction'].trim() : '谨慎前进';
+  const playerActionMode = input['playerActionMode'];
+  const actionSummary = playerAction.replace(/[.!?。！？；;\n]+/gu, ' ').slice(0, 80);
+  const semanticScene =
+    playerActionMode === 'DIALOGUE'
+      ? `你围绕“${actionSummary}”开口询问，对方的停顿暴露了通往灯塔下层的新线索。`
+      : playerActionMode === 'OBSERVE'
+        ? `你依照“${actionSummary}”仔细观察，盐渍、焦痕与潮线拼出了此前被忽略的路径。`
+        : `你付诸行动：“${actionSummary}”。旧通道随之发生变化，也迫使风暴中的阻碍提前显形。`;
+  const semanticSuggestions = [
+    { text: `追查“${actionSummary}”造成的直接变化。` },
+    { text: '核对新线索与潮汐记录是否一致。' },
+    { text: '先稳住当前位置，再寻找更安全的前路。' },
+  ];
   if (nextTurnNumber < minimumTurns) {
     const requiresCheck = [1, 3, 6].includes(nextTurnNumber);
     const clueByTurn: Readonly<Record<number, string>> = {
@@ -171,13 +206,16 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
     return requiresCheck
       ? {
           ...adventureBase,
+          sceneText: semanticScene,
+          suggestedActions: semanticSuggestions,
           discoveredClues:
             clueByTurn[nextTurnNumber] === undefined ? [] : [clueByTurn[nextTurnNumber]],
           statePatchProposals: nextTurnNumber === 1 ? adventureBase.statePatchProposals : [],
         }
       : {
           ...adventureBase,
-          sceneText: 'The trail opens onto a quiet landing where careful observation is enough.',
+          sceneText: semanticScene,
+          suggestedActions: semanticSuggestions,
           checkRequest: null,
           discoveredClues: [],
           statePatchProposals: [],
@@ -186,7 +224,7 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
   }
   return {
     ...adventureBase,
-    sceneText: 'The beacon catches and holds as the storm breaks beyond the harbor wall.',
+    sceneText: `${semanticScene} 最后，灯塔重新燃起，光束穿过港墙外渐退的风暴。`,
     suggestedActions: [],
     checkRequest: null,
     discoveredClues: [],

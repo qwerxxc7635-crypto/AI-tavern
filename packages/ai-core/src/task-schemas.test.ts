@@ -546,6 +546,23 @@ describe('versioned AI task schemas', () => {
     expect(schema.safeParse({ ...input, result: 'FAILURE' }).success).toBe(false);
   });
 
+  it('rejects dice-resolution patches that the native commit boundary cannot apply', () => {
+    const output = fixtures.RESOLVE_DICE_RESULT.output as Record<string, unknown>;
+    expect(
+      AI_TASK_SCHEMAS.RESOLVE_DICE_RESULT.output.safeParse({
+        ...output,
+        statePatchProposals: [
+          {
+            kind: 'CLOCK',
+            targetId: 'clock-region',
+            rationale: 'Advance the danger clock.',
+            payload: { amount: 1 },
+          },
+        ],
+      }).success,
+    ).toBe(false);
+  });
+
   it('rejects repeated NPC archetypes, quest phrases, and dialogue phrases', () => {
     const roster = fixtures.GENERATE_NPCS.output as {
       npcs: Array<Record<string, unknown>>;

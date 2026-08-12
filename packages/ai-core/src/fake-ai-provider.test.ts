@@ -146,4 +146,33 @@ describe('FakeAIProvider', () => {
       provider.generate(requestFor('CHECK_CONSISTENCY'), enabledConfig),
     ).resolves.toMatchObject({ receivedAt });
   });
+
+  it('makes freeform adventure intent change the resulting scene instead of only advancing turn', async () => {
+    const provider = new FakeAIProvider();
+    const baseInput = {
+      currentTurnNumber: 1,
+      adventurePlan: { expectedTurns: { min: 8, max: 12 } },
+      playerActionMode: 'ACTION',
+    };
+    const request = (playerAction: string): NormalizedAIRequest => ({
+      ...requestFor('GENERATE_ADVENTURE_TURN', playerAction),
+      messages: [
+        {
+          role: 'USER',
+          content: `Task input JSON:\n${JSON.stringify({ ...baseInput, playerAction })}`,
+        },
+      ],
+    });
+    const forceDoor = JSON.parse(
+      (await provider.generate(request('用肩膀撞开生锈的侧门'), enabledConfig)).content,
+    ) as Record<string, unknown>;
+    const inspectMarks = JSON.parse(
+      (await provider.generate(request('检查门框上的盐渍和焦痕'), enabledConfig)).content,
+    ) as Record<string, unknown>;
+
+    expect(forceDoor['sceneText']).toContain('撞开生锈的侧门');
+    expect(inspectMarks['sceneText']).toContain('检查门框上的盐渍和焦痕');
+    expect(forceDoor['sceneText']).not.toBe(inspectMarks['sceneText']);
+    expect(forceDoor['suggestedActions']).not.toEqual(inspectMarks['suggestedActions']);
+  });
 });

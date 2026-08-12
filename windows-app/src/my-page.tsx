@@ -82,7 +82,7 @@ export function MyPage({
 
           <section id="routing" className="my-hub__entry">
             <SectionCopy eyebrow={playerText.coreUi.modelRouting} title="默认与备用">
-              查看默认模型、任务覆盖和备用模型；跨Provider切换仍需显式披露与确认。
+              查看默认模型、任务覆盖和备用模型；跨Provider备用只按模型设置中的明确授权执行。
             </SectionCopy>
           </section>
 

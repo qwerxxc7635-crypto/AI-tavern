@@ -43,6 +43,52 @@ describe('AI output structure validation', () => {
     });
   });
 
+  it('rejects world references that the native business rules cannot commit', () => {
+    const invalid = {
+      ...FAKE_TASK_OUTPUTS.GENERATE_WORLD,
+      locations: [
+        {
+          ...FAKE_TASK_OUTPUTS.GENERATE_WORLD.locations[0],
+          parentName: '不存在的地点',
+          factionNames: ['不存在的阵营'],
+        },
+      ],
+    };
+    const result = validateAIOutput('GENERATE_WORLD', JSON.stringify(invalid));
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'SCHEMA_VALIDATION_FAILED',
+        issues: expect.arrayContaining([
+          expect.objectContaining({ path: ['locations', 0, 'parentName'] }),
+          expect.objectContaining({ path: ['locations', 0, 'factionNames', 0] }),
+        ]),
+      },
+    });
+  });
+
+  it('rejects NPC rosters that the native residency and rumor rules cannot commit', () => {
+    const output = FAKE_TASK_OUTPUTS.GENERATE_NPCS;
+    const invalid = {
+      ...output,
+      npcs: output.npcs.map((npc) => ({ ...npc, residency: 'RESIDENT', visitReason: null })),
+      rumors: output.rumors.map((rumor) => ({ ...rumor, sourceNpcName: '不存在的角色' })),
+    };
+    const result = validateAIOutput('GENERATE_NPCS', JSON.stringify(invalid));
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'SCHEMA_VALIDATION_FAILED',
+        issues: expect.arrayContaining([
+          expect.objectContaining({ path: ['npcs'] }),
+          expect.objectContaining({ path: ['rumors', 0, 'sourceNpcName'] }),
+        ]),
+      },
+    });
+  });
+
   it('rejects an invalid enum and reports its path', () => {
     const invalid = { ...FAKE_TASK_OUTPUTS.GENERATE_QUEST, risk: 'IMPOSSIBLE' };
     const result = validateAIOutput('GENERATE_QUEST', JSON.stringify(invalid));

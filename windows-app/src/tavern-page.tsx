@@ -9,6 +9,7 @@ import {
   type WindowsTavernService,
 } from './tavern-service.js';
 import { playerText } from './localization/index.js';
+import { AIErrorNotice } from './ai-error-notice.js';
 
 type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
 
@@ -27,7 +28,22 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
   const campaignId = search.get('campaignId');
   const [snapshot, setSnapshot] = useState<TavernSnapshot | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
+
+  const initialize = () => {
+    if (campaignId === null) return;
+    setError(null);
+    void service
+      .load(campaignId)
+      .then((loaded) =>
+        loaded.campaignState === 'GENERATING_TAVERN' ? service.initialize(campaignId) : loaded,
+      )
+      .then((loaded) => {
+        setSnapshot(loaded);
+        setSelectedNpcId(loaded.npcs[0]?.id ?? null);
+      })
+      .catch(setError);
+  };
 
   useEffect(() => {
     if (campaignId === null) return;
@@ -42,8 +58,8 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
         setSnapshot(loaded);
         setSelectedNpcId(loaded.npcs[0]?.id ?? null);
       })
-      .catch(() => {
-        if (active) setError('酒馆没有成功点亮，本地存档仍保持在上一个有效阶段。');
+      .catch((caught: unknown) => {
+        if (active) setError(caught);
       });
     return () => {
       active = false;
@@ -66,10 +82,14 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
         </div>
         <p className="eyebrow">{playerText.coreUi.lightingHearth}</p>
         <h1>正在点亮酒馆…</h1>
-        <p>Fake Provider 的内容会先验证，再由本地 SQLite 提交。</p>
+        <p>模型生成的内容会先经过验证，再由本地 SQLite 提交。</p>
       </main>
     ) : (
-      <TavernMessage title={error} />
+      <main className="tavern-room tavern-room--message">
+        <p className="eyebrow">酒馆生成尚未完成</p>
+        <h1>本地存档仍保持在上一个有效阶段。</h1>
+        <AIErrorNotice error={error} onRetry={initialize} />
+      </main>
     );
   }
   if (snapshot.campaignState !== 'TAVERN' || snapshot.tavern === null) {

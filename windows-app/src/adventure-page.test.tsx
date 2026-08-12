@@ -109,7 +109,10 @@ describe('adventure page', () => {
     expect(screen.getByRole('link', { name: '打开恢复中心' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '重新载入并继续' }));
 
-    expect(await screen.findByRole('textbox', { name: '自由输入' })).toBeTruthy();
+    const restoredInput = (await screen.findByRole('textbox', {
+      name: '自由输入',
+    })) as HTMLTextAreaElement;
+    expect(restoredInput.disabled).toBe(false);
     expect(service.loadCount).toBe(2);
   });
 
@@ -125,7 +128,10 @@ describe('adventure page', () => {
     expect(screen.getByText(/刷新或重放都不会重新投掷/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '跳过动画' }));
 
-    expect(await screen.findByRole('textbox', { name: '自由输入' })).toBeTruthy();
+    const resumedInput = (await screen.findByRole('textbox', {
+      name: '自由输入',
+    })) as HTMLTextAreaElement;
+    expect(resumedInput.disabled).toBe(false);
     expect(service.rolls).toBe(0);
     expect(service.completions).toBe(1);
   });
