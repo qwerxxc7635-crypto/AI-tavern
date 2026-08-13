@@ -106,6 +106,21 @@ export {
   applicationErrorFromStandardCode,
   classifyApplicationError,
 } from './application-error.js';
+export {
+  BASELINE_TASKS,
+  summarizePerformanceMetrics,
+  validatePerformanceBaselineReport,
+  validatePerformanceMetric,
+} from './performance-metric.js';
+export type {
+  BaselineProviderKind,
+  BaselineScenario,
+  BaselineStatus,
+  BaselineTask,
+  PerformanceMetric,
+  PerformanceBaselineReport,
+  PerformanceSummary,
+} from './performance-metric.js';
 export type {
   ApplicationErrorContract,
   ApplicationErrorKind,

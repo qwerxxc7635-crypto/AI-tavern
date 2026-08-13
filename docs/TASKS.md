@@ -83,7 +83,7 @@
 
 ## M1-T04 Performance Baseline
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M1-T03。
 - **Deliverable**：可重复基线工具与 `docs/V0.3_PERFORMANCE_BASELINE.md`。
 - **Acceptance**：记录 world/NPC/quest/action/D20 latency、queue wait、prompt/output tokens、cache、retry；Fake 与真实 Provider 证据明确区分。

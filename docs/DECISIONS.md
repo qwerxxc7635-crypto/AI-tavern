@@ -2162,3 +2162,26 @@ V0.2页面各自拼接路径与查询参数。侧栏会复制当前页面的完�
 - AI内部`configuration/credential/schema/domain_policy`等类别继续保留，`AITaskExecutionError`同时暴露稳定六类投影，不做破坏性重命名。
 - UI按合同显示可用动作并区分Toast/Error State；没有回调时不伪造可执行按钮。实际fallback仍要求已配置且已授权的备用模型。
 - 本决定不改变SQLite事务、pending请求幂等和硬结果规则；失败或取消不得留下部分事实，相关Repository/Application回归继续作为门禁。
+
+## DEC-106：性能证据使用内容无关的有界指标合同
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M1-T04`、`docs/V0.3_SPEC.md` 11.1
+
+### 背景
+
+V0.3需要在优化前建立world、NPC、quest、action和D20基线，但直接保存请求、Prompt、玩家输入或Provider响应会把游戏内容与秘密带入遥测。Fake Provider又不报告token和cache usage；若将未知值写成0，后续与真实Provider对比会得到错误结论。受控失败和重试也不能伪装成自然故障率。
+
+### 决定与理由
+
+性能证据只允许固定字段：任务、Fake/Real证据身份、Normal/Controlled场景、成功状态、总延迟、队列等待、四类可空usage计数、重试次数和格式受限的错误码。Prompt、messages、玩家全文、request ID、凭据、上下文和任意扩展字段均被schema拒绝。未知usage保持`null`并传播到汇总，不折算成0。
+
+Fake与Real报告必须显式区分；Fake报告必须标记真实Provider为`NOT_RUN`。汇总由原始样本重算，限定样本数、时间和计数上界，并拒绝证据身份或汇总不一致。受控失败/重试必须经过标准错误路径且在场景字段中显式声明。
+
+### 影响与边界
+
+- 基线工具要求调用者提供一个不存在的新输出路径，不覆盖旧证据，也不默认上传或写入应用数据库。
+- M1-T04只测现有Fake Provider，不读取正式Key、不调用真实模型；真实证据需要未来单独授权并生成独立报告。
+- Fake延迟只代表本机调度、协议和序列化开销，不是网络或模型SLA；M12-T03可沿用合同进行可比回归门禁。
+- 性能优化不能通过删除校验、失败记录、隐私边界或硬事实规则取得表面改善。

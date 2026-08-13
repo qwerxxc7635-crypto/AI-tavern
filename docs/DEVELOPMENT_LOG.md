@@ -3754,3 +3754,29 @@
 - 完整门禁同时覆盖pending请求重试幂等、事务回滚、无部分事实写入、D20硬结果和恢复用例；未删除或降低既有校验。
 - `pnpm --dir windows-app build`通过，Vite production构建208个模块。
 - 用户已有`.gitignore`修改保持未暂存；本任务不调用真实模型、不修改SQLite schema、不merge、不push。
+
+## 2026-08-13 — M1-T04 Performance Baseline
+
+### 指标合同与工具
+
+- 新增内容无关的性能指标schema，覆盖world、NPC、quest、action和D20的总延迟、队列等待、可空token/cache usage、重试与安全错误码，并限制字段、样本数、时间和计数上界。
+- 新增可重复CLI，要求显式指定新的JSON输出路径并拒绝覆盖；记录当前commit、运行环境、迭代次数及Fake/Real证据身份，不默认加入仓库或应用遥测。
+- Fake Provider没有usage数据时保持`null`，不伪造0；序列化证据扫描确认不包含Prompt、messages、玩家全文、request ID、凭据引用或秘密字段。
+- 新增`DEC-106`，固定内容无关指标、unknown传播、Fake/Real隔离与受控场景标记规则；未读取正式API Key或调用真实模型。
+
+### 基线证据
+
+- 正式Fake基线在macOS arm64、Node.js v26.7.0执行，每类10次、共50个样本；五类任务均产生P50/P95总延迟和队列等待汇总。
+- 首个quest样本通过标准`TIMEOUT`错误路径形成受控终态失败；首个action样本通过同类可重试错误后实际调用Fake Provider成功。报告分别记录一个失败与一次重试，不将其表述为自然故障率。
+- 独立使用每类3次再次运行，共15个样本，报告身份、五类汇总、受控失败和受控重试结构一致，证明工具可重复执行。
+- 新增`docs/V0.3_PERFORMANCE_BASELINE.md`，记录证据身份、方法、精确结果、复现命令、限制和M12比较规则。
+
+### 验证
+
+- 首次执行CLI时，runner位于Vitest默认排除的`scripts/`目录，命令明确失败且没有生成报告；将runner迁入`packages/ai-core/src`并保留CLI入口后重跑通过，未把空执行视为成功。
+- 定向runner执行通过：10次/任务为1项测试、50个样本；3次/任务重复运行为1项测试、15个样本。两份报告都由同一validator重算汇总并通过隐私扫描。
+- 指标单元测试覆盖schema、未知字段/隐私、失败一致性、上下界、nearest-rank汇总、unknown usage和报告身份/一致性。
+- 首次完整门禁在ESLint阶段发现测试中的非空断言及Node脚本直接使用`console`；改为显式输出路径校验和`process.stdout`后从头重跑，不跳过规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 90文件/528项通过，另有1项只在CLI环境运行的runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建209个模块。本任务没有以优化或删除校验改变基线结果。
+- 用户已有`.gitignore`修改保持未暂存；本任务不优化运行路径、不修改SQLite schema、不merge、不push。
