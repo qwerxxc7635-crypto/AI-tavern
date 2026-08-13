@@ -2,6 +2,21 @@
 
 本文件按任务记录实际变更、验证证据、限制和后续边界。每次完成任务后追加记录，不覆盖历史。
 
+## 2026-08-13 — 修复模型设置保存 `PROBE_STALE`
+
+### 根因与修复
+
+- Native Provider probe 使用 RFC3339 输出微秒时间戳，并基于该原始能力数据生成 probe fingerprint；前端 `Date.toISOString()` 将时间截断为三位毫秒，保存时 Native receipt 逐值校验因此稳定返回 `PROBE_STALE`。
+- 在 Native probe 生成能力数据和 fingerprint 前统一产生三位毫秒 UTC 时间戳，保持前端 canonical ISO 合同、receipt 安全门禁与后续统一 AI 编排三者一致。
+- 未放宽 receipt 对 Provider、端点、模型、能力内容与 fingerprint 的校验，也未改动 API Key 生命周期或联网边界。
+
+### 回归验证
+
+- 新增 Native 回归测试，以微秒输入锁定 probe 时间戳为 `2026-08-12T10:01:28.700Z`。
+- 保留前端微秒 RFC3339 防御性规范化测试，覆盖 Native/前端时间精度边界。
+- `pnpm check:shared` 全量通过：Prettier、release metadata、zh-CN、ESLint、TypeScript、87个Vitest文件/477项、Node 27项、Rust workspace 95项执行通过/0失败/1项真实API测试按设计忽略，以及TypeScript/Rust存档互操作全部通过。
+- 用户既有 `.gitignore` 修改保持未暂存，不纳入本次提交。
+
 ## 2026-07-30 — M0-T01 初始化 Git 仓库和基础规范
 
 ### 范围
