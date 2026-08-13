@@ -3660,3 +3660,25 @@
 - 文档包含16处官方/直接参考链接；秘密样式扫描通过，未发现Key或Bearer token样式内容。
 - 首次验证命令因shell正则内引号组合导致zsh在执行前报parse error；未产生写入。随后改用Node执行同等秘密与结构检查并完整通过。
 - Git状态复核只包含本任务四份文档以及用户原有`.gitignore`修改；后者不纳入暂存和提交。
+
+## 2026-08-13 — M0-T03 GitHub Reference Audit
+
+### 研究
+
+- 使用官方GitHub仓库、官方架构/产品文档和仓库License研究12个项目：SillyTavern、RisuAI、Tauri、Actual Budget、SQLite/rusqlite、TypeChat、LangGraph.js、XState、Evennia、ink、Bevy和Radix Primitives。
+- 覆盖AI Roleplay、Character/Lore/Prompt、Tauri桌面边界、offline-first SQLite、Structured Output、workflow/state machine、持久文字世界、Quest/narrative graph、数据驱动实体和Design System/a11y。
+- 对每个项目记录GitHub地址、License、模块、优点、缺点、Ember适用性、采用判断和拒绝原因；未只研究单一项目或以Star数量作为采用依据。
+
+### 输出与决定
+
+- 新增`docs/V0.3_REFERENCE_AUDIT.md`及子系统选择矩阵、License/复制策略和最终决定。
+- 新增`DEC-102`：V0.3不做框架大迁移；选择性吸收TypeChat、LangGraph/XState、Evennia/Bevy、ink、Actual/SQLite和Radix思想，任何实际依赖须在具体任务单独证明。
+- 明确LangGraph、Bevy、Evennia和ink不作为V0.3 runtime dependency；XState/Radix只在具体复杂度和测试收益证据成立时逐项评估。
+- 本任务只修改文档，未复制第三方源码/资产，未修改产品代码、依赖、数据库或Provider，未开始M1-T01。
+
+### 验证
+
+- Prettier定向写入与检查通过。首次暂存检查发现新审计文档末尾多一个空行，删除后重新暂存复核；未降低检查标准。
+- 参考审计结构检查通过：12个项目，每个项目均包含GitHub、License、研究模块、优点、缺点、适用性、采用判断和不采用原因八个字段。
+- 文档包含15处官方仓库/文档链接；秘密样式扫描通过。
+- Git状态复核只包含本任务四份文档和用户原有`.gitignore`修改；后者不纳入暂存和提交。

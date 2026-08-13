@@ -2078,3 +2078,19 @@ SillyTavern 的扩展生态展示了可扩展价值，也暴露了第三方代�
 ### 影响与边界
 
 Prompt Manager 必须区分 User Editable 与不可覆盖的 Core Rule Prompt；导入的角色、Lore、Memory 和外部资料必须经过隔离解析与授权，不能直接成为 WorldTruth。AI Inspector 提供可观察性但默认遮罩秘密且不能编辑正式事实。本决定不复制 SillyTavern 的 AGPL 源码、UI、CSS、品牌或素材。
+
+## DEC-102：V0.3 参考审计采用选择性模式而非框架迁移
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M0-T03`、`docs/V0.3_REFERENCE_AUDIT.md`
+
+### 决定与理由
+
+保留现有Tauri、React、共享TypeScript领域、Rust原生适配和SQLite事实库。TypeChat的schema-first validate/repair、LangGraph/XState的显式阶段与恢复、Evennia/Bevy的数据驱动实体、ink的可测试条件/后果、Actual Budget的local-first迁移和Radix的headless无障碍行为只作为可独立实现的设计参考。
+
+不在M0承诺引入LangGraph、XState、Bevy、Evennia、ink或Radix runtime dependency。具体任务只有在问题证据、bundle/维护成本、License、安全、跨平台和测试收益评估后才能新增依赖。尤其禁止建立第二套Agent checkpoint、ECS事实库或云同步模型。
+
+### 影响与边界
+
+V0.3按现有分层渐进增加Generator、Rules、Entity和UI能力。GPL/AGPL项目只作clean-room研究；permissive license项目也不默认复制代码或资产。任何实际依赖引入必须记录精确包、版本、License、替代方案和回滚路径。

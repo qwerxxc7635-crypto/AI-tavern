@@ -43,7 +43,7 @@
 
 ## M0-T03 GitHub Reference Audit
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M0-T02。
 - **Deliverable**：`docs/V0.3_REFERENCE_AUDIT.md`。
 - **Acceptance**：针对 AI Roleplay、RPG/TRPG、Tauri、offline SQLite、Prompt/Context、规则/状态机、Quest、Design System/插件选择多个成熟项目；记录 URL、License、模块、优缺点、适用性、采用判断和拒绝原因。
