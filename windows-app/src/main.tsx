@@ -7,6 +7,7 @@ import { AppRoutes } from './routes.js';
 import './design-tokens.css';
 import './theme.css';
 import './ui/primitives.css';
+import './ui/game-components.css';
 import './scroll-hardening.css';
 
 const root = document.querySelector('#root');

@@ -1,0 +1,226 @@
+.game-card {
+  color: var(--color-text-primary);
+}
+
+.game-character-card,
+.game-item-card {
+  display: grid;
+  padding: var(--card-padding);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  align-items: start;
+  gap: var(--et-space-4);
+  background: var(--card-background);
+}
+
+.game-character-card {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.game-item-card {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.game-card__sigil {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-pill);
+  place-items: center;
+  color: var(--color-accent);
+  font-family: var(--font-family-display);
+}
+
+.game-card h3,
+.game-card p {
+  margin: 0;
+}
+
+.game-card__meta,
+.game-card small {
+  color: var(--color-text-secondary);
+}
+
+.game-npc-card,
+.game-quest-card {
+  width: 100%;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.game-npc-card {
+  display: grid;
+  grid-template-columns: 2.75rem minmax(0, 1fr);
+  text-align: left;
+  gap: var(--et-space-3);
+}
+
+.game-card__copy {
+  display: grid;
+  gap: var(--et-space-1);
+}
+
+.game-npc-card.is-selected,
+.game-quest-card.is-selected,
+.game-trait-card.is-selected {
+  border-color: var(--color-accent);
+  box-shadow: inset 3px 0 0 var(--color-accent);
+}
+
+.patron-card.is-selected {
+  background: var(--color-surface-raised);
+}
+
+.quest-card.is-selected {
+  background: var(--color-canvas-deep);
+}
+
+.game-card__copy {
+  min-width: 0;
+}
+
+.game-trait-card {
+  position: relative;
+  display: grid;
+  cursor: pointer;
+}
+
+.game-trait-card input {
+  position: absolute;
+  top: var(--et-space-4);
+  right: var(--et-space-4);
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+}
+
+.game-dialogue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--et-space-4);
+}
+
+.game-dialogue__message {
+  max-width: 78%;
+  padding: var(--et-space-3) var(--et-space-4);
+  border-left: 2px solid var(--color-border-strong);
+  background: var(--color-canvas-deep);
+}
+
+.game-dialogue__message--player {
+  align-self: flex-end;
+  border-right: 2px solid var(--color-accent);
+  border-left: 0;
+  background: var(--color-accent-wash);
+}
+
+.game-dialogue__message--system {
+  align-self: center;
+  border: 1px dashed var(--color-border-strong);
+  text-align: center;
+  background: var(--color-transparent);
+}
+
+.game-dialogue__message small {
+  color: var(--color-text-secondary);
+}
+
+.game-dialogue__message p {
+  margin: var(--et-space-1) 0 0;
+  line-height: var(--line-height-body);
+}
+
+.game-action-composer,
+.game-ai-assist,
+.game-generation-panel,
+.game-status-panel {
+  display: grid;
+  gap: var(--et-space-4);
+}
+
+.game-action-composer__suggestions,
+.game-ai-assist > div,
+.game-generation-panel > div:last-child {
+  display: flex;
+  gap: var(--et-space-2);
+  flex-wrap: wrap;
+}
+
+.game-ai-assist,
+.game-generation-panel,
+.game-status-panel {
+  padding: var(--card-padding);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-background);
+}
+
+.game-generation-panel h2,
+.game-status-panel h2 {
+  margin: 0;
+}
+
+.game-generation-panel ol {
+  display: grid;
+  margin: 0;
+  padding-left: var(--et-space-6);
+  gap: var(--et-space-2);
+}
+
+.game-generation-panel li[data-state='COMPLETE'] {
+  color: var(--color-positive);
+}
+
+.game-generation-panel li[data-state='ERROR'] {
+  color: var(--color-danger);
+}
+
+.game-status-panel dl {
+  display: grid;
+  margin: 0;
+  gap: var(--et-space-2);
+}
+
+.game-status-panel dl > div {
+  display: flex;
+  padding-block: var(--et-space-2);
+  border-bottom: 1px solid var(--color-border-subtle);
+  justify-content: space-between;
+  gap: var(--et-space-4);
+}
+
+.game-status-panel dd {
+  margin: 0;
+  font-weight: var(--et-font-weight-bold);
+}
+
+.game-status-panel [data-tone='positive'] dd {
+  color: var(--color-positive);
+}
+
+.game-status-panel [data-tone='danger'] dd,
+.game-status-panel [data-tone='warning'] dd {
+  color: var(--color-danger);
+}
+
+@media (max-width: 760px) {
+  .game-character-card,
+  .game-item-card {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .game-character-card > :last-child,
+  .game-item-card > :last-child {
+    grid-column: 1 / -1;
+  }
+
+  .game-dialogue__message {
+    max-width: 92%;
+  }
+}
+
+@media (forced-colors: active) {
+  .game-card.is-selected {
+    border-color: Highlight;
+  }
+}

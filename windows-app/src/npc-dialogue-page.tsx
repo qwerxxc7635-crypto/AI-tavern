@@ -9,6 +9,7 @@ import {
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
 import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
+import { DialogueView } from './ui/game-components.js';
 
 type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
 
@@ -92,21 +93,17 @@ export function NpcDialoguePage({
 
       <div className="dialogue-layout">
         <section className="dialogue-panel" aria-label="对话历史">
-          <div className="dialogue-history" aria-live="polite">
-            {snapshot.messages.length === 0 ? (
-              <p className="dialogue-empty">炉火正旺。你可以先开口。</p>
-            ) : (
-              snapshot.messages.map((message) => (
-                <article
-                  className={`dialogue-bubble dialogue-bubble--${message.role.toLowerCase()}`}
-                  key={message.id}
-                >
-                  <small>{message.role === 'PLAYER' ? '你' : snapshot.npc.name}</small>
-                  <p>{message.content}</p>
-                </article>
-              ))
-            )}
-          </div>
+          <DialogueView
+            className="dialogue-history"
+            label="对话历史"
+            emptyText="炉火正旺。你可以先开口。"
+            messages={snapshot.messages.map((message) => ({
+              id: message.id,
+              content: message.content,
+              side: message.role,
+              speaker: message.role === 'PLAYER' ? '你' : snapshot.npc.name,
+            }))}
+          />
 
           {snapshot.suggestedTopics.length === 0 ? null : (
             <div className="dialogue-topics" aria-label="建议话题">

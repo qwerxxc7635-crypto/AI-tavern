@@ -114,7 +114,7 @@
 
 ## M2-T03 Game Components
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M2-T02。
 - **Deliverable**：九类共享 Game Components 及核心页面迁移。
 - **Acceptance**：同类卡片、对话、状态和生成交互不重复；组件仅接收明确 view model/actions。

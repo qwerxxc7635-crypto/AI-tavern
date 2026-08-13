@@ -2231,3 +2231,26 @@ Modal/Drawer采用原生`showModal`焦点陷阱、cancel语义和显式焦点归
 - Primitives不得导入Repository、SQLite、Provider、AI orchestrator或业务合同；Overlay只发出关闭意图，不能自行保存或回滚。
 - 页面按组件族渐进迁移；M2-T02只迁移通用错误边界作为接入证明，不机械替换所有既有控件。
 - 六类产品错误、fallback资格和玩家文案仍由M1-T03合同决定，Error/Toast primitive不推断业务含义。
+
+## DEC-109：Game Components只投影视图并以页面拥有业务状态
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T03`、`docs/V0.3_SPEC.md` 7.2
+
+### 背景
+
+任务、NPC、特质、物品、对话和生成状态在多个页面重复呈现。若共享组件直接读取Repository或调用Provider，会把SQLite事实所有权和AI验证边界带入展示层；若在M2-T03完整实现AIFieldAssist与ActionComposer，又会提前侵入M2-T04/T05的并发、锁定、恢复和统一提交验收。
+
+### 决定与理由
+
+十个明确命名的Game Components只接收只读view model与用户意图callback。页面/Application继续拥有读取、生成、验证、规则、事务和导航。卡片、Dialogue、Generation与Status可以统一视觉及空/错/加载态，同时保持业务依赖单向。
+
+ActionComposer和AIFieldAssist在本任务只建立presentation contract；M2-T04/M2-T05在同一组件上增加专属state machine与页面集成，不建立第二套组件。任务文档中的“九类”与原始目标十个名称不一致时，以明确名称和Spec为准，全部覆盖而不删除后续任务。
+
+### 影响与边界
+
+- Game Components不得导入SQLite、Tauri invoke、Provider、AI orchestrator、Repository或动态实体规则；callback不能返回未经页面验证就持久化的事实。
+- 页面迁移按重复度渐进进行；M2-T03先迁移QuestCard、NpcCard和DialogueView，保留现有服务与状态所有权。
+- 选择状态必须同时使用原生checked/`aria-pressed`与结构标记，不只改变颜色；empty/error/loading复用M2-T02 primitives。
+- 领域对象先在页面适配为最小view model，组件不以类型依赖反向绑定领域schema。

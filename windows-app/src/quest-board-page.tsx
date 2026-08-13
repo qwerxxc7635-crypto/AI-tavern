@@ -10,6 +10,7 @@ import {
 import { playerText } from './localization/index.js';
 import { APP_PATHS, buildRoute, campaignParentRoute } from './navigation.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { QuestCard } from './ui/game-components.js';
 
 type QuestActions = Pick<WindowsQuestBoardService, 'load' | 'initialize' | 'accept'>;
 
@@ -117,20 +118,20 @@ export function QuestBoardPage({
       <div className="quest-board-layout">
         <section className="quest-list" aria-label="任务列表">
           {snapshot.quests.map((quest) => (
-            <button
-              type="button"
+            <QuestCard
               key={quest.id}
-              className={quest.id === selectedId ? 'quest-card quest-card--selected' : 'quest-card'}
-              aria-pressed={quest.id === selectedId}
-              onClick={() => setSelectedId(quest.id)}
-            >
-              <small>
-                风险 {RISK_LABELS[quest.risk]} · {quest.publisherName}
-              </small>
-              <strong>{quest.content.title}</strong>
-              <span>{quest.content.summary}</span>
-              <em>{statusLabel(quest.status)}</em>
-            </button>
+              className="quest-card"
+              selected={quest.id === selectedId}
+              onSelect={() => setSelectedId(quest.id)}
+              quest={{
+                id: quest.id,
+                risk: RISK_LABELS[quest.risk],
+                publisher: quest.publisherName,
+                title: quest.content.title,
+                summary: quest.content.summary,
+                status: statusLabel(quest.status),
+              }}
+            />
           ))}
         </section>
 

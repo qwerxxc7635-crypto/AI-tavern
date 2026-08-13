@@ -3836,3 +3836,28 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 93文件/560项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建212个模块。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变业务逻辑、SQLite、Provider或游戏事实，不merge、不push。
+
+## 2026-08-13 — M2-T03 Game Components
+
+### 共享展示合同
+
+- 核对原始目标发现明确列出十类组件，而Task摘要写成“九类”；按Spec和名称完成CharacterCard、NpcCard、TraitCard、QuestCard、ItemCard、ActionComposer、DialogueView、AIFieldAssist、GenerationPanel和StatusPanel全部十类。
+- 每类只接收只读view model、ReactNode或用户意图callback，不导入Repository、SQLite、Tauri、Provider、AI orchestrator或动态实体规则。
+- 五类Card统一语义、选择/禁用和非颜色选中提示；Dialogue统一消息与loading/empty/error；Generation/Status统一进度和状态投影。
+- ActionComposer与AIFieldAssist只建立presentation shell，未提前实现M2-T04的字段生命周期或M2-T05的streaming、重复提交、恢复和跨场景状态机。
+- 新增`DEC-109`和`docs/V0.3_GAME_COMPONENTS.md`，记录view model边界、十类权威清单、迁移与后续任务所有权。
+
+### 核心页面迁移
+
+- 任务板列表迁移到QuestCard；selected quest、accept、风险详情和导航继续由页面拥有。
+- 酒馆人物列表迁移到NpcCard；NPC选择、详情和对话导航继续由页面拥有。
+- NPC消息历史迁移到DialogueView；草稿、建议、发送、AI错误和关系状态继续由页面拥有。
+- 旧布局class作为显式适配保留，未机械替换其他页面或改变服务调用；760px窄窗与forced-colors增加统一合同。
+
+### 验证
+
+- 定向Game Components与三份迁移页面测试通过：5文件/12项。
+- 组件测试覆盖十类渲染/交互和空错加载态；CSS静态测试覆盖raw颜色、token完整性、非颜色选择标记、760px窄窗与forced-colors。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 95文件/568项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建214个模块；共享Game Components形成独立lazy chunk，三份迁移页面bundle均保持按路由拆分。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、Provider、业务规则或持久化，不merge、不push。

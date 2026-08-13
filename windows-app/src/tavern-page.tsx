@@ -11,6 +11,7 @@ import {
 import { playerText } from './localization/index.js';
 import { APP_PATHS, buildRoute, campaignRoute } from './navigation.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { NpcCard } from './ui/game-components.js';
 
 type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
 
@@ -152,26 +153,19 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
           </div>
           <div className="patron-list">
             {snapshot.npcs.map((npc) => (
-              <button
-                className={
-                  npc.id === selectedNpcId ? 'patron-card patron-card--selected' : 'patron-card'
-                }
-                type="button"
+              <NpcCard
                 key={npc.id}
-                aria-pressed={npc.id === selectedNpcId}
-                onClick={() => setSelectedNpcId(npc.id)}
-              >
-                <span className="patron-card__sigil" aria-hidden="true">
-                  {npc.name.slice(0, 1)}
-                </span>
-                <span className="patron-card__copy">
-                  <small>
-                    {RESIDENCY_LABELS[npc.residency]} · {npc.currentMood}
-                  </small>
-                  <strong>{npc.name}</strong>
-                  <span>{npc.identity}</span>
-                </span>
-              </button>
+                className="patron-card"
+                selected={npc.id === selectedNpcId}
+                onSelect={() => setSelectedNpcId(npc.id)}
+                npc={{
+                  id: npc.id,
+                  name: npc.name,
+                  identity: npc.identity,
+                  mood: npc.currentMood,
+                  residency: RESIDENCY_LABELS[npc.residency],
+                }}
+              />
             ))}
           </div>
           {selectedNpc === null ? null : (
