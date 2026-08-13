@@ -3682,3 +3682,26 @@
 - 参考审计结构检查通过：12个项目，每个项目均包含GitHub、License、研究模块、优点、缺点、适用性、采用判断和不采用原因八个字段。
 - 文档包含15处官方仓库/文档链接；秘密样式扫描通过。
 - Git状态复核只包含本任务四份文档和用户原有`.gitignore`修改；后者不纳入暂存和提交。
+
+## 2026-08-13 — M1-T01 Credential Lifecycle
+
+### 根因与修复
+
+- 审计设置页、Tauri命令、SQLite Provider配置、操作系统安全存储和启动恢复链，确认正式秘密从未以明文写入React状态真源或SQLite。
+- 定位延迟清理竞态：旧数据库、备份恢复或中断流程可能留下一个后来又成为活动Provider引用的清理项；原启动重试未复核活动所有权，会删除仍在使用的安全存储秘密。
+- 在native bridge增加事务化活动引用检查。清理重试发现`provider_configs`仍引用目标时，只丢弃过期队列项；无活动引用时才执行原有安全存储删除。
+- 新增`DEC-103`，固定“SQLite活动引用优先于清理队列”的凭据所有权规则；未新增Provider、未读取正式用户Key，也未调用真实模型API。
+
+### 生命周期回归
+
+- 新增原生端到端测试，使用运行时生成并存入操作系统安全存储的临时秘密和本机mock OpenAI-compatible服务。
+- 同一已保存Provider依次执行世界生成、角色背景、NPC生成、NPC回复、任务生成、冒险计划、冒险回合、D20结果和冒险总结九类请求；mock服务逐次验证Bearer凭据存在。
+- 测试在流程中注入过期清理项，并在冒险前及完整流程后两次关闭和重开SQLite；每一步均验证默认模型引用、安全存储秘密和生成结果仍可用。测试结束显式删除临时秘密。
+- 现有替换、保留、清除、缺失、回滚恢复、秘密扫描和平台安全存储合同测试继续通过。
+
+### 验证
+
+- 定向测试`cargo test -p ember-tavern-windows credential_survives_the_full_game_generation_chain_cleanup_and_reopen -- --nocapture`通过（1项）。首次误用native bridge package过滤同名测试，结果为0项执行；发现后立即改用测试实际所属package重跑，不将空执行视为通过。
+- `cargo fmt --all -- --check`、workspace全target/all-feature Clippy（`-D warnings`）和`cargo test --workspace`通过；Rust workspace执行96项、0失败，另有1项需显式真实DeepSeek凭据的测试保持默认忽略。
+- `pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 87文件/477项、Node 27项；完整Rust工作区和TypeScript/Rust存档互操作均通过。
+- 用户已有`.gitignore`修改保持未暂存；本任务只提交凭据修复、回归测试和三份项目文档，不merge、不push。

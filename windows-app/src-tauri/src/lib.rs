@@ -522,6 +522,13 @@ fn retry_pending_credential_cleanup(
     vault: &impl SecureVault,
 ) -> Result<(), CampaignStoreError> {
     for pending in store.pending_credential_cleanups()? {
+        // Old databases, restored backups or a previously interrupted settings
+        // flow may contain a stale cleanup row for a credential that is active
+        // again. The SQLite reference is authoritative: never delete a secret
+        // that a provider configuration still owns.
+        if store.discard_cleanup_if_credential_active(&pending.credential_ref)? {
+            continue;
+        }
         let reference = pending
             .credential_ref
             .parse::<CredentialRef>()
@@ -1374,6 +1381,172 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(error.code, "MODEL_SELECTION_DRIFT");
+    }
+
+    #[tokio::test]
+    async fn credential_survives_the_full_game_generation_chain_cleanup_and_reopen() {
+        const TASKS: &[&str] = &[
+            "GENERATE_WORLD",
+            "COMPLETE_CHARACTER_BACKGROUND",
+            "GENERATE_NPCS",
+            "NPC_REPLY",
+            "GENERATE_QUEST",
+            "GENERATE_ADVENTURE_PLAN",
+            "GENERATE_ADVENTURE_TURN",
+            "RESOLVE_DICE_RESULT",
+            "SUMMARIZE_ADVENTURE",
+        ];
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1/", listener.local_addr().unwrap());
+        let runtime_secret = format!("runtime-{}", Uuid::new_v4());
+        let expected_secret = runtime_secret.clone();
+        let server = std::thread::spawn(move || {
+            for index in 0..TASKS.len() {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 4096];
+                let header_end = loop {
+                    let read = socket.read(&mut buffer).unwrap();
+                    assert_ne!(read, 0);
+                    request.extend_from_slice(&buffer[..read]);
+                    if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n")
+                    {
+                        break position + 4;
+                    }
+                };
+                let headers = String::from_utf8_lossy(&request[..header_end]);
+                let normalized_headers = headers.to_ascii_lowercase();
+                assert!(normalized_headers.contains(&format!(
+                    "authorization: bearer {}",
+                    expected_secret.to_ascii_lowercase()
+                )));
+                let content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    })
+                    .unwrap();
+                while request.len() - header_end < content_length {
+                    let read = socket.read(&mut buffer).unwrap();
+                    assert_ne!(read, 0);
+                    request.extend_from_slice(&buffer[..read]);
+                }
+                let body = serde_json::json!({
+                    "id": format!("credential-lifecycle-{index}"),
+                    "model": "lifecycle-model",
+                    "choices": [{
+                        "message": { "content": "{\"status\":\"ok\"}" },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": { "prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14 }
+                })
+                .to_string();
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                socket.write_all(response.as_bytes()).unwrap();
+            }
+        });
+
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("credential-game-lifecycle.sqlite");
+        let reference = SecretStore.save(runtime_secret).unwrap();
+        let cleanup = RealCredentialCleanup(reference.clone());
+        let mut store = CampaignStore::open(&database_path).unwrap();
+        store
+            .enqueue_credential_cleanup(
+                reference.expose_reference(),
+                CredentialCleanupReason::Rollback,
+            )
+            .unwrap();
+        let capabilities = ModelCapabilitiesRegistration {
+            text: true,
+            streaming: false,
+            system_messages: true,
+            json_mode: true,
+            json_schema: false,
+            tool_calling: false,
+            reasoning: false,
+            context_window_tokens: Some(8192),
+            cost_status: "UNKNOWN".to_owned(),
+            checked_at: "2026-08-13T00:00:00Z".to_owned(),
+        };
+        let endpoint = model_endpoint_fingerprint("custom", &base_url);
+        let probe = model_probe_fingerprint(
+            &endpoint,
+            "lifecycle-model",
+            CapabilitySource::Unknown,
+            &capabilities,
+        )
+        .unwrap();
+        let saved = store
+            .save_model_settings(ModelSettingsUpdate {
+                preset_key: "custom".to_owned(),
+                provider_display_name: "Credential lifecycle provider".to_owned(),
+                base_url: Some(base_url),
+                endpoint_fingerprint: endpoint,
+                credential_ref: Some(reference.to_string()),
+                credential_action: CredentialAction::Replace,
+                model_name: "lifecycle-model".to_owned(),
+                model_display_name: "Lifecycle Model".to_owned(),
+                capabilities,
+                capability_source: CapabilitySource::Unknown,
+                probe_fingerprint: probe,
+                probe_receipt_id: Uuid::new_v4().to_string(),
+                use_as_default: true,
+                use_as_fallback: false,
+            })
+            .unwrap();
+        let profile_id = saved.default_model_profile_id.unwrap();
+        assert!(store.pending_credential_cleanups().unwrap().is_empty());
+
+        for (index, task) in TASKS.iter().enumerate() {
+            if index == 3 {
+                // Simulate a stale cleanup row left by an older build or restore.
+                store
+                    .enqueue_credential_cleanup(
+                        reference.expose_reference(),
+                        CredentialCleanupReason::Transient,
+                    )
+                    .unwrap();
+                retry_pending_credential_cleanup(&store, &SecretStore).unwrap();
+                assert!(store.pending_credential_cleanups().unwrap().is_empty());
+                assert!(SecretStore.exists(&reference).unwrap());
+            }
+            if index == 5 {
+                drop(store);
+                store = CampaignStore::open(&database_path).unwrap();
+                retry_pending_credential_cleanup(&store, &SecretStore).unwrap();
+            }
+            let mut request = runtime_test_request(&profile_id, "lifecycle-model");
+            request.request_id = format!("credential-lifecycle-{index}");
+            request.task = (*task).to_owned();
+            let response = execute_ai_generate(request, &store).await.unwrap();
+            assert_eq!(response.selected_profile_id, profile_id);
+            assert!(SecretStore.exists(&reference).unwrap());
+            assert_eq!(
+                store
+                    .default_model_runtime_config()
+                    .unwrap()
+                    .credential_ref
+                    .as_deref(),
+                Some(reference.expose_reference())
+            );
+        }
+        server.join().unwrap();
+        drop(store);
+
+        let reopened = CampaignStore::open(database_path).unwrap();
+        retry_pending_credential_cleanup(&reopened, &SecretStore).unwrap();
+        assert!(reopened.model_settings().unwrap().profiles[0].has_credential);
+        assert!(SecretStore.exists(&reference).unwrap());
+        drop(reopened);
+        drop(cleanup);
+        assert!(!SecretStore.exists(&reference).unwrap());
     }
 
     #[tokio::test]

@@ -56,7 +56,7 @@
 
 ## M1-T01 Credential Lifecycle
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M0-T03。
 - **Deliverable**：页面无关的设备 Provider/Credential 生命周期；回归测试和安全审计记录。
 - **Acceptance**：设置 Key 后穿越世界、车卡、NPC、任务、冒险、D20、保存、退出、重启、继续仍可用；Key 不进入 SQLite、日志、配置、Inspector 或导出。
