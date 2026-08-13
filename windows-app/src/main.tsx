@@ -6,6 +6,7 @@ import { installDocumentLocale } from './localization/index.js';
 import { AppRoutes } from './routes.js';
 import './design-tokens.css';
 import './theme.css';
+import './ui/primitives.css';
 import './scroll-hardening.css';
 
 const root = document.querySelector('#root');

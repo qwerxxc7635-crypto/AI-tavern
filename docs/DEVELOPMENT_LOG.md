@@ -3810,3 +3810,29 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 91文件/545项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建210个模块；CSS被正式构建且没有解析警告。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变游戏逻辑、SQLite、Provider或玩家数据，不merge、不push。
+
+## 2026-08-13 — M2-T02 UI Primitives
+
+### Primitive实现
+
+- 新增Button、Input、Textarea、Select、Card、Modal、Drawer、Tabs、Tooltip、Toast、Skeleton、Progress、EmptyState和ErrorState共14类无业务primitive，使用React、原生HTML与M2-T01 token实现。
+- Button统一variant、loading/disabled和可见状态名；三类Field强制label并关联description/error/`aria-invalid`；Progress和Skeleton拒绝越界输入。
+- Modal/Drawer使用原生dialog，覆盖初始焦点、Esc/backdrop/关闭按钮意图、受控open和关闭后焦点归还；Tabs实现方向键、Home/End、循环与跳过disabled的roving focus。
+- Tooltip合并触发器`aria-describedby`；Toast按普通/成功与错误区分polite/assertive live region；Empty与Error不以颜色作为唯一状态。
+- CSS只消费正式token，提供44px target、focus-visible/scroll margin、窄窗Overlay、正式layer、reduced-motion和forced-colors；未复制第三方资产。
+
+### 架构与迁移
+
+- 新增`DEC-108`和`docs/V0.3_UI_PRIMITIVES.md`，记录原生优先、无业务状态、无障碍与渐进迁移合同。
+- UI styling技能用于组件组合和状态原则，accessibility技能用于WCAG 2.2 target/focus/ARIA/live region；因现有栈已满足需求且任务禁止无必要迁移，未采用技能建议的shadcn/Tailwind安装。
+- `AppErrorBoundary`迁移到ErrorState作为页面接入证明；仍隐藏原始异常、保留main landmark和返回酒馆action，没有修改路由或错误分类。
+
+### 验证
+
+- 首次定向门禁在TypeScript阶段发现`exactOptionalPropertyTypes`下Field可选prop未允许显式undefined；统一公共Field合同后编译通过，未关闭严格模式。
+- Primitive定向行为与CSS测试通过：2文件/15项；连同AppErrorBoundary/Routes回归为3文件/23项。
+- 行为覆盖loading/disabled、Field label/error、Card inline snapshot、Modal/Drawer焦点和关闭、Tabs键盘、Tooltip、Toast、Skeleton、Progress及Empty/Error；CSS覆盖token、target、focus、Overlay、motion和forced-colors。
+- 首次完整门禁在ESLint阶段发现HTML inline snapshot的12处多余转义；改为标签、命名、子区块和文本组成的稳定结构snapshot后从头重跑，不禁用lint规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 93文件/560项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建212个模块。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变业务逻辑、SQLite、Provider或游戏事实，不merge、不push。

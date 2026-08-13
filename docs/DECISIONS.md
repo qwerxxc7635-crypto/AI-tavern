@@ -2208,3 +2208,26 @@ Fake与Real报告必须显式区分；Fake报告必须标记真实Provider为`NO
 - M2-T01只迁移应用壳、My核心卡片及三个Paper核心页背景/主面板，不一次重写全部旧CSS，不引入CSS框架或主题runtime。
 - 四个固定桌面视口必须同时通过静态布局合同和真实浏览器无横向溢出检查；后续调色必须更新对比度和视觉证据，不能降低WCAG阈值。
 - layer固定为content 0、navigation 10、sticky 20、overlay 100、modal 200、toast 300，未来Primitive和Modal使用这些语义层级。
+
+## DEC-108：首批UI Primitives优先使用原生语义且不引入框架迁移
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T02`、`docs/V0.3_SPEC.md` 7.1
+
+### 背景
+
+V0.3需要Button、Field、Overlay、Tabs和Feedback等统一primitives，但仓库没有Tailwind、Radix或shadcn。为14类基础组件引入完整CSS框架和第三方状态层会扩大bundle、主题迁移和供应链面，也会与M2-T02“不做无必要框架迁移”的边界冲突。现有React、浏览器原生控件和M2-T01 token足以覆盖当前行为。
+
+### 决定与理由
+
+首批primitives使用原生button、input、textarea、select、dialog和progress，并以React受控props组合Card、Tabs、Tooltip、Toast、Skeleton、Empty和Error。组件只持有展示与无障碍所需的局部状态；业务加载、保存、错误分类和事实写入由调用页面拥有。
+
+Modal/Drawer采用原生`showModal`焦点陷阱、cancel语义和显式焦点归还；Tabs实现WAI-ARIA roving tabindex与方向键/Home/End；表单错误同时连接label、description、`aria-invalid`和alert。CSS只消费正式token，并覆盖reduced-motion、forced-colors和44px舒适target。
+
+### 影响与边界
+
+- 暂不新增shadcn、Radix、Tailwind、表单库或Toast runtime；未来只有出现可复现的原生实现缺口时，才能在独立任务评估依赖、License、bundle和回滚。
+- Primitives不得导入Repository、SQLite、Provider、AI orchestrator或业务合同；Overlay只发出关闭意图，不能自行保存或回滚。
+- 页面按组件族渐进迁移；M2-T02只迁移通用错误边界作为接入证明，不机械替换所有既有控件。
+- 六类产品错误、fallback资格和玩家文案仍由M1-T03合同决定，Error/Toast primitive不推断业务含义。

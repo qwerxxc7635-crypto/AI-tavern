@@ -105,7 +105,7 @@
 
 ## M2-T02 UI Primitives
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M2-T01。
 - **Deliverable**：Button/Input/Textarea/Select/Card/Modal/Drawer/Tabs/Tooltip/Toast/Skeleton/Progress/Empty/Error primitives。
 - **Acceptance**：键盘、焦点、disabled/loading/error 和可访问名称一致；页面可渐进迁移。

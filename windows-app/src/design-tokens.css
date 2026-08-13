@@ -51,6 +51,7 @@
   --et-alpha-paper-shadow-07: rgb(48 32 20 / 7%);
   --et-alpha-paper-shadow-10: rgb(48 32 20 / 10%);
   --et-alpha-paper-shadow-12: rgb(48 32 20 / 12%);
+  --et-alpha-overlay-72: rgb(0 0 0 / 72%);
 
   --et-font-family-body: 'Segoe UI Variable', 'Segoe UI', sans-serif;
   --et-font-family-display: Georgia, 'Times New Roman', serif;
@@ -124,6 +125,7 @@
   --color-accent-strong: var(--et-color-copper-700);
   --color-positive: var(--et-color-moss-400);
   --color-danger: var(--et-color-danger-400);
+  --color-on-accent: var(--et-color-night-900);
   --color-focus-ring: var(--et-color-moss-400);
   --color-surface-translucent: var(--et-alpha-panel-72);
   --color-navigation-translucent: var(--et-alpha-panel-82);
@@ -140,6 +142,7 @@
   --color-surface-panel-subtle: var(--et-alpha-panel-82);
   --color-surface-card: var(--et-alpha-panel-72);
   --color-transparent: var(--et-color-transparent);
+  --color-overlay: var(--et-alpha-overlay-72);
 
   --font-family-body: var(--et-font-family-body);
   --font-family-display: var(--et-font-family-display);
@@ -208,6 +211,32 @@
   --layout-panel-background-subtle: var(--color-surface-panel-subtle);
   --layout-panel-shadow: var(--shadow-layout-panel);
   --layout-panel-shadow-strong: var(--shadow-layout-panel-strong);
+  --button-primary-background: var(--color-accent);
+  --button-primary-foreground: var(--color-on-accent);
+  --button-secondary-background: var(--color-surface-raised);
+  --button-secondary-foreground: var(--color-text-primary);
+  --button-quiet-background: var(--color-transparent);
+  --button-quiet-foreground: var(--color-text-primary);
+  --button-danger-background: var(--color-danger);
+  --button-danger-foreground: var(--color-canvas);
+  --button-border: var(--color-border-strong);
+  --button-hover-overlay: var(--color-hover);
+  --field-background: var(--control-background);
+  --field-foreground: var(--control-text);
+  --field-border: var(--control-border);
+  --field-error: var(--color-danger);
+  --dialog-backdrop: var(--color-overlay);
+  --dialog-background: var(--color-surface);
+  --dialog-foreground: var(--color-text-primary);
+  --dialog-border: var(--color-border-strong);
+  --tabs-active: var(--color-accent);
+  --tooltip-background: var(--color-text-primary);
+  --tooltip-foreground: var(--color-canvas);
+  --toast-background: var(--color-surface-raised);
+  --toast-foreground: var(--color-text-primary);
+  --skeleton-background: var(--color-border-subtle);
+  --progress-background: var(--color-border-subtle);
+  --progress-value: var(--color-accent);
 }
 
 /* === PAPER THEME === */
@@ -228,6 +257,7 @@
   --color-accent-strong: var(--et-color-ember-700);
   --color-positive: var(--et-color-moss-700);
   --color-focus-ring: var(--et-color-ember-600);
+  --color-on-accent: var(--et-color-paper-100);
   --color-accent-wash: var(--et-alpha-ember-08);
   --color-paper-glow: var(--et-alpha-ember-12);
   --color-paper-glow-soft: var(--et-alpha-ember-10);
