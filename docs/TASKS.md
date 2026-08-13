@@ -145,7 +145,7 @@
 
 ## M3-T01 Generator Framework
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M2-T05。
 - **Deliverable**：`Generator<T>` 生命周期、共享基类/组合器和首个迁移切片。
 - **Acceptance**：Context、Prompt、Provider、parse/validate/repair/rules/persist/events 边界可替换且可审计；旧桌面编排能力不回退。

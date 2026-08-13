@@ -2,11 +2,15 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  GeneratorRunner,
+  NOOP_GENERATOR_TRANSACTION,
   assertTaskContextBudget,
   classifyApplicationError,
   validateAIOutput,
   type AIProvider,
   type AITask,
+  type Generator,
+  type GeneratorAuditEntry,
   type ModelInfo,
   type NormalizedAIRequest,
   type NormalizedAIResponse,
@@ -34,6 +38,7 @@ export interface DesktopAIExecution {
   readonly selectedPresetKey: string;
   readonly selectedProviderDisplayName: string;
   readonly cachePrefixHash: string;
+  readonly lifecycle: readonly GeneratorAuditEntry[];
 }
 
 export interface DesktopAIExecuteOptions {
@@ -101,54 +106,140 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     input: unknown,
     options: DesktopAIExecuteOptions,
   ): Promise<DesktopAIExecution> {
+    const result = await new GeneratorRunner({
+      transaction: NOOP_GENERATOR_TRANSACTION,
+    }).run(
+      new DesktopStructuredGenerator(this.provider),
+      { selection, task, input, options },
+      { executionId: options.requestId, idempotencyKey: options.requestId },
+    );
+    return Object.freeze({ ...result.value, lifecycle: result.audit });
+  }
+}
+
+interface DesktopGeneratorInput {
+  readonly selection: RuntimeSelection;
+  readonly task: AITask;
+  readonly input: unknown;
+  readonly options: DesktopAIExecuteOptions;
+}
+
+interface DesktopPreparedPrompt extends DesktopGeneratorInput {
+  readonly request: NormalizedAIRequest;
+  readonly providerConfig: ProviderConfig;
+  readonly cachePrefixHash: string;
+}
+
+interface DesktopRawGeneration {
+  readonly prepared: DesktopPreparedPrompt;
+  readonly request: NormalizedAIRequest;
+  readonly response: NormalizedAIResponse;
+}
+
+interface DesktopValidatedGeneration extends DesktopRawGeneration {
+  readonly validatedOutput: unknown;
+}
+
+class DesktopStructuredGenerator implements Generator<
+  DesktopGeneratorInput,
+  DesktopGeneratorInput,
+  DesktopPreparedPrompt,
+  DesktopRawGeneration,
+  DesktopRawGeneration,
+  DesktopValidatedGeneration,
+  DesktopValidatedGeneration,
+  Omit<DesktopAIExecution, 'lifecycle'>,
+  never
+> {
+  public constructor(private readonly provider: AIProvider) {}
+
+  public buildContext(input: DesktopGeneratorInput) {
+    return input;
+  }
+
+  public async buildPrompt(context: DesktopGeneratorInput): Promise<DesktopPreparedPrompt> {
     let prompt: ReturnType<typeof formatTaskPrompt>;
     let cachePrefixHash: string;
     try {
-      prompt = formatTaskPrompt(task, input, selection.model.capabilities);
+      prompt = formatTaskPrompt(context.task, context.input, context.selection.model.capabilities);
       cachePrefixHash = await sha256(renderStablePromptProfile(prompt.stableProfile));
     } catch (error) {
       throw preserveOrchestrationError(error, 'PROMPT_PREPARATION_FAILED');
     }
-    let request: NormalizedAIRequest = {
-      requestId: aiRequestId(options.requestId),
-      task,
+    const request: NormalizedAIRequest = {
+      requestId: aiRequestId(context.options.requestId),
+      task: context.task,
       promptVersion: prompt.promptVersion,
-      modelName: selection.model.name,
+      modelName: context.selection.model.name,
       messages: prompt.messages,
       responseFormat: prompt.responseFormat,
-      temperature: options.temperature,
-      maxOutputTokens: options.maxOutputTokens,
-      timeoutMs: effectiveTimeoutMs(selection.profile, options.timeoutMs),
+      temperature: context.options.temperature,
+      maxOutputTokens: context.options.maxOutputTokens,
+      timeoutMs: effectiveTimeoutMs(context.selection.profile, context.options.timeoutMs),
     };
-    const providerConfig = {
-      ...selection.providerConfig,
-      options: { ...selection.providerConfig.options, cachePrefixHash },
-    };
-    let response = await this.provider.generate(request, providerConfig);
-    assertResponseIdentity(request, response);
-    let validated = validateAIOutput(task, response.content);
+    return Object.freeze({
+      ...context,
+      request,
+      cachePrefixHash,
+      providerConfig: Object.freeze({
+        ...context.selection.providerConfig,
+        options: { ...context.selection.providerConfig.options, cachePrefixHash },
+      }),
+    });
+  }
+
+  public async generate(prepared: DesktopPreparedPrompt): Promise<DesktopRawGeneration> {
+    const response = await this.provider.generate(prepared.request, prepared.providerConfig);
+    return Object.freeze({ prepared, request: prepared.request, response });
+  }
+
+  public parse(raw: DesktopRawGeneration): DesktopRawGeneration {
+    assertResponseIdentity(raw.request, raw.response);
+    return raw;
+  }
+
+  public validate(parsed: DesktopRawGeneration): DesktopValidatedGeneration {
+    const validated = validateAIOutput(parsed.prepared.task, parsed.response.content);
     if (!validated.ok) {
-      const repair = formatOutputRepairPrompt(
-        task,
-        input,
-        response.content,
+      throw new DesktopOutputValidationError(
+        validationFailureCode(validated.error),
         validated.error,
-        selection.model.capabilities,
       );
-      request = {
-        ...request,
-        requestId: aiRequestId(`${options.requestId}-repair`),
-        messages: repair.messages,
-        responseFormat: repair.responseFormat,
-      };
-      response = await this.provider.generate(request, providerConfig);
-      assertResponseIdentity(request, response);
-      validated = validateAIOutput(task, response.content);
     }
-    if (!validated.ok) {
-      throw new DesktopAIOrchestrationError(validationFailureCode(validated.error));
-    }
-    const native = response as Partial<NativeGenerateResponse>;
+    return Object.freeze({ ...parsed, validatedOutput: validated.validatedOutput });
+  }
+
+  public async repair({
+    failedStage,
+    raw,
+    error,
+  }: {
+    readonly failedStage: 'PARSE' | 'VALIDATE';
+    readonly raw: DesktopRawGeneration;
+    readonly error: unknown;
+  }): Promise<DesktopRawGeneration | null> {
+    if (failedStage !== 'VALIDATE' || !(error instanceof DesktopOutputValidationError)) return null;
+    const prepared = raw.prepared;
+    const repair = formatOutputRepairPrompt(
+      prepared.task,
+      prepared.input,
+      raw.response.content,
+      error.validation,
+      prepared.selection.model.capabilities,
+    );
+    const request: NormalizedAIRequest = {
+      ...raw.request,
+      requestId: aiRequestId(`${prepared.options.requestId}-repair`),
+      messages: repair.messages,
+      responseFormat: repair.responseFormat,
+    };
+    const response = await this.provider.generate(request, prepared.providerConfig);
+    return Object.freeze({ prepared, request, response });
+  }
+
+  public rulesCheck(validated: DesktopValidatedGeneration): DesktopValidatedGeneration {
+    const native = validated.response as Partial<NativeGenerateResponse>;
+    const selection = validated.prepared.selection;
     if (
       native.selectedProfileId !== undefined &&
       (native.selectedProfileId !== selection.profile.id ||
@@ -157,17 +248,30 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     ) {
       throw new DesktopAIOrchestrationError('MODEL_SELECTION_DRIFT');
     }
+    return validated;
+  }
+
+  public persist(checked: DesktopValidatedGeneration) {
+    const native = checked.response as Partial<NativeGenerateResponse>;
+    const selection = checked.prepared.selection;
     return Object.freeze({
-      request,
-      response,
-      validatedOutput: validated.validatedOutput,
-      selectedProfileId: native.selectedProfileId ?? selection.profile.id,
-      selectedProviderId: native.selectedProviderId ?? selection.profile.providerId,
-      selectedPresetKey: native.selectedPresetKey ?? selection.profile.presetKey,
-      selectedProviderDisplayName:
-        native.selectedProviderDisplayName ?? selection.profile.providerDisplayName,
-      cachePrefixHash,
+      status: 'COMMITTED' as const,
+      value: Object.freeze({
+        request: checked.request,
+        response: checked.response,
+        validatedOutput: checked.validatedOutput,
+        selectedProfileId: native.selectedProfileId ?? selection.profile.id,
+        selectedProviderId: native.selectedProviderId ?? selection.profile.providerId,
+        selectedPresetKey: native.selectedPresetKey ?? selection.profile.presetKey,
+        selectedProviderDisplayName:
+          native.selectedProviderDisplayName ?? selection.profile.providerDisplayName,
+        cachePrefixHash: checked.prepared.cachePrefixHash,
+      }),
     });
+  }
+
+  public emitEvents(): readonly never[] {
+    return Object.freeze([]);
   }
 }
 
@@ -252,6 +356,16 @@ export class DesktopAIOrchestrationError extends Error {
   public constructor(public readonly code: string) {
     super('Desktop AI orchestration failed');
     this.name = 'DesktopAIOrchestrationError';
+  }
+}
+
+class DesktopOutputValidationError extends DesktopAIOrchestrationError {
+  public constructor(
+    code: string,
+    public readonly validation: Parameters<typeof formatOutputRepairPrompt>[3],
+  ) {
+    super(code);
+    this.name = 'DesktopOutputValidationError';
   }
 }
 

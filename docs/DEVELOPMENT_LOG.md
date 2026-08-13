@@ -3904,3 +3904,24 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 99文件/596项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建214个模块；NPC页面chunk略降，ActionComposer保持共享lazy chunk。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、硬结果或既有消息/行动事实，不merge、不push。
+
+## 2026-08-13 — M3-T01 Generator Framework
+
+### 框架与首个迁移切片
+
+- 在ai-core新增九阶段泛型Generator/Runner，Context、Prompt、raw、parsed、validated、rules-checked、persisted和events类型分离；repair仅处理首次parse/validate失败并强制重新验证。
+- 新增内容无关审计entry与安全LifecycleError；每阶段STARTED/SUCCEEDED/SKIPPED/FAILED可观察，未知异常只投影稳定通用码。
+- 通过Transaction Port把persist与emitEvents置于同一事务；事件失败回滚，`ALREADY_COMMITTED`跳过事件，框架不导入SQLite/Persistence。
+- 首个迁移切片为Windows DesktopAIOrchestrator共享结构化生成：复用既有Model Settings、Prompt、cache、Provider、validate/repair和selection drift，不建立第二套Provider。
+- Desktop的persist阶段只返回已验证候选，事件为空，正式事实继续由现有Application/Gateway事务提交；未批量迁移其他生成器，未修改schema。
+- 新增`DEC-112`与`docs/V0.3_GENERATOR_FRAMEWORK.md`，固定阶段、一次repair、事务、幂等、审计与渐进迁移边界。
+
+### 验证
+
+- 首次实现补丁因`ai-core/index.ts`导出位置假设不匹配而整体拒绝；读取真实export布局后分两次添加文件与显式exports，没有产生半应用文件。
+- 首次Desktop迁移TypeScript发现validation subclass在base class声明前求值；将subclass移动到base之后通过，未关闭严格检查。
+- 框架与Desktop/AITurn定向3文件/24项通过，覆盖阶段顺序、失败短路、repair、规则拒绝、事务rollback、幂等事件和既有桌面能力。
+- 首次定向ESLint发现测试残留未使用的LifecycleError import；删除无用import后重新执行lint、TypeScript和定向测试通过，未忽略规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 100文件/603项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建215个模块；Generator形成共享依赖且桌面编排保持路由lazy chunk。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、Provider配置或已持久化游戏事实，不merge、不push。

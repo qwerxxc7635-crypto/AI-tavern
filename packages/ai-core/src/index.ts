@@ -100,6 +100,24 @@ export {
 } from './standard-ai-error.js';
 export type { StandardAIErrorCode } from './standard-ai-error.js';
 export {
+  GENERATOR_STAGES,
+  GeneratorLifecycleError,
+  GeneratorRunner,
+  NOOP_GENERATOR_TRANSACTION,
+} from './generator.js';
+export type {
+  Generator,
+  GeneratorAuditEntry,
+  GeneratorExecution,
+  GeneratorPersistence,
+  GeneratorRepairRequest,
+  GeneratorResult,
+  GeneratorRunnerOptions,
+  GeneratorStage,
+  GeneratorStageStatus,
+  GeneratorTransactionPort,
+} from './generator.js';
+export {
   APPLICATION_ERROR_KINDS,
   ERROR_ACTIONS,
   ApplicationError,

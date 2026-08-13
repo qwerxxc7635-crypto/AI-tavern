@@ -2300,3 +2300,26 @@ NPC建议话题和冒险建议行动各自使用按钮填充Textarea，但NPC只
 - 页面服务目前返回终态结果；组件/状态机预留真实stream与cancel合同，但不伪造Provider流。M3-T02与M10-T03随后接线，不另建Composer。
 - retry保留原文本；恢复SQLite待处理提交时不重新发送。冒险既有幂等/恢复状态机继续是持久化权威，Composer不是事实源。
 - UI组件不导入Repository、Provider或规则引擎，建议选择永远可以被编辑、清除或忽略。
+
+## DEC-112：Generator只编排边界并以事务端口提交事实与事件
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M3-T01`、`docs/V0.3_SPEC.md` 8.1
+
+### 背景
+
+现有DesktopAIOrchestrator、AITurnOrchestrator及多个Application use case都包含部分Context、Prompt、Provider和验证流程，但生命周期形状不同。直接一次迁移所有生成器会扩大数据库与Provider回归面；把SQLite或具体Provider放进共享基类又会形成第二套事实源或厂商耦合。
+
+### 决定与理由
+
+Generator使用泛型阶段接口与Runner组合，不拥有Provider、Repository或SQL。九个阶段分别接收/返回不同类型；parse/validate失败最多repair一次并重新经过两阶段，rules拒绝不能进入persist。Persist与emitEvents由调用方事务端口包裹，`ALREADY_COMMITTED`跳过事件实现幂等重放。
+
+审计只记录stage/status/安全code，不记录内容。首个迁移选择Windows共享桌面结构化生成链，继续委托原Provider栈并把通过验证的候选交回Application；它不直接保存游戏事实。其他业务生成器逐切片迁移，不建立并行Provider或一次性重写。
+
+### 影响与边界
+
+- ai-core只声明Transaction Port，不依赖Persistence；Application adapter负责SQLite事务、revision、Repository与Event ID。
+- emitEvents失败必须使persist回滚；重放幂等键返回既有值且不重复发事件。框架测试使用可回滚内存端口证明合同，真实SQLite回归仍由现有AITurn测试覆盖。
+- Desktop结果新增不可变lifecycle trace，旧request/response/validatedOutput/model/cache字段不变；fallback仍读取既有稳定错误码。
+- M3-T01不迁移全部生成器、不实现Queue、不改变Prompt业务内容、不新增真实模型调用或数据库schema。

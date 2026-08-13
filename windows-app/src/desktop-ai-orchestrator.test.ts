@@ -40,6 +40,20 @@ describe('DesktopAIOrchestrator', () => {
     expect(provider.calls[1]?.request.requestId).toBe('orchestrator-repair-repair');
     expect(provider.calls[1]?.config.options['profileId']).toBe('deepseek-profile');
     expect(result.validatedOutput).toBeDefined();
+    expect(
+      result.lifecycle.filter(({ status }) => status === 'SUCCEEDED').map(({ stage }) => stage),
+    ).toEqual([
+      'BUILD_CONTEXT',
+      'BUILD_PROMPT',
+      'GENERATE',
+      'PARSE',
+      'REPAIR',
+      'PARSE',
+      'VALIDATE',
+      'RULES_CHECK',
+      'EMIT_EVENTS',
+      'PERSIST',
+    ]);
   });
 
   it('uses the saved default Provider and Model for the final generation request', async () => {
@@ -59,6 +73,9 @@ describe('DesktopAIOrchestrator', () => {
       selectedPresetKey: 'deepseek',
       request: { modelName: 'deepseek-v4-flash' },
     });
+    expect(first.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'REPAIR', status: 'SKIPPED' }),
+    );
     expect(provider.calls[0]).toMatchObject({
       request: { modelName: 'deepseek-v4-flash' },
       config: { id: 'provider-deepseek-profile', options: { presetKey: 'deepseek' } },
