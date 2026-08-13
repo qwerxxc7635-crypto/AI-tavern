@@ -5,6 +5,7 @@ import { HashRouter } from 'react-router-dom';
 import { installDocumentLocale } from './localization/index.js';
 import { AppRoutes } from './routes.js';
 import './theme.css';
+import './scroll-hardening.css';
 
 const root = document.querySelector('#root');
 if (root === null) throw new Error('Application root element is missing');
