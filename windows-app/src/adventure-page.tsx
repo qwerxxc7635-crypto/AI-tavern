@@ -199,8 +199,10 @@ export function AdventurePage({
     setAiError(null);
     setRetryAction(null);
     try {
-      setSnapshot(await service.completeCheck(submittedCampaignId, submittedAdventureId));
+      const completed = await service.completeCheck(submittedCampaignId, submittedAdventureId);
+      setSnapshot(completed);
       setAction('');
+      dispatchTurn({ type: 'RESTORED', phase: restoredTurnPhase(completed) });
     } catch (error) {
       setAiError(error);
       setRetryAction(() => () => void finishDice(submittedCampaignId, submittedAdventureId));

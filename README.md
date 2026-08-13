@@ -1,20 +1,21 @@
 # Ember Tavern
 
-Ember Tavern（炉火酒馆）是一款面向 Windows 和 iOS 的单人 AI 文字冒险应用。模型负责生成世界与叙事，本地程序负责规则、验证、状态和存档；本地 SQLite 是游戏事实的唯一数据源。
+Ember Tavern（炉火酒馆）是一款面向 Windows 和 macOS 的单人 AI 文字冒险桌面应用。模型负责生成世界与叙事，本地程序负责规则、验证、状态和存档；本地 SQLite 是游戏事实的唯一数据源。
 
 ## 当前状态
 
-当前采用Windows-first发布策略：先完成可安装、可实际使用和可验收的Windows v0.1；M9 iOS专属任务保留原规划并标记为`DEFERRED`，待Windows首版完成且具备macOS/Xcode环境后恢复。Windows-first不改变共享领域、应用、持久化协议的跨平台边界。
+当前版本为 v0.2.0，采用桌面端优先策略。Tauri 2 客户端已具备世界与角色创建、酒馆、NPC 对话、任务、8～12 回合冒险、本地 D20、原子结算、档案、存档迁移和“我的”设备设置；Windows NSIS 与 macOS app 都有 CI 构建及生命周期门禁。iOS 仍不在 v0.2 范围内。
 
-项目准备里程碑 M0、领域模型里程碑 M1、持久化里程碑 M2、AI基础设施里程碑 M3 和应用用例里程碑 M4 已完成。Windows Tauri 2客户端可启动，应用壳可在酒馆、任务、冒险、角色、档案和设置间导航；存档首页支持在系统应用数据目录的SQLite中新建、继续和归档存档。世界创建与车卡流程可使用Fake Provider完成；酒馆页会生成并展示老板、两名常驻NPC、一名访客、三条不显示真伪的传闻、任务入口和三个SQLite世界时钟。NPC聊天支持历史恢复，任务告示支持单主任务接受；冒险页提供角色/目标/时钟、剧情/行动、物品/线索/骰子三栏，可完成并在重启后恢复8回合Fake冒险。结算会原子提交任务、NPC、奖励、世界时钟与事实，档案页从SQLite恢复完整结局摘要。Rust安全HTTP传输层已提供受限端点、超时、取消、流式响应、响应上限和标准化错误；模型凭据保存到Windows Credential Manager，SQLite只接收不透明引用。OpenAI-Compatible适配器以及DeepSeek V4、Qwen 3.7预设已通过本地Provider合同测试，尚未执行真实厂商调用。
+第一轮审查整改后，模型设置中的默认/备用 Provider、模型、端点和系统安全凭据已经进入统一桌面 AI 编排路径；世界、车卡、酒馆、NPC、任务、冒险和结算共用同一套模型选择、Prompt、结构校验、错误和缓存机制。DeepSeek 真实 API、缓存命中、保存/重开和针对性可玩性验证已经完成，当前状态为 `READY FOR SECOND AUDIT`。详见 [`docs/V0.2_FIRST_AUDIT_REPORT.md`](docs/V0.2_FIRST_AUDIT_REPORT.md) 与 [`docs/V0.2_PLAYABILITY_REPORT.md`](docs/V0.2_PLAYABILITY_REPORT.md)。
 
 完整产品规格见 [`docs/spec.md`](docs/spec.md)，任务顺序与验收标准见 [`docs/TASKS.md`](docs/TASKS.md)。
 
 ## 启动说明
 
-需要 Node.js、pnpm、Rust/Cargo、Microsoft C++ Build Tools 和WebView2。设置下文的本地缓存环境变量后，可从仓库根目录启动Windows开发窗口：
+需要 Node.js、pnpm 和 Rust/Cargo；Windows 另需 Microsoft C++ Build Tools 与 WebView2，macOS 另需 Xcode Command Line Tools。安装依赖后，从仓库根目录启动桌面开发窗口：
 
-```powershell
+```sh
+pnpm install --frozen-lockfile
 pnpm --filter @ember-tavern/windows-app tauri dev
 ```
 
@@ -22,6 +23,12 @@ pnpm --filter @ember-tavern/windows-app tauri dev
 
 ```powershell
 pnpm --filter @ember-tavern/windows-app tauri build --bundles nsis --no-sign
+```
+
+构建 macOS app：
+
+```sh
+pnpm --filter @ember-tavern/windows-app tauri build --bundles app
 ```
 
 本地命令生成未签名的内部验收候选；正式对外发布需要代码签名证书。安装、WebView2、用户数据位置与卸载保留策略见[`docs/WINDOWS_INSTALL.md`](docs/WINDOWS_INSTALL.md)。如只需开发期裸EXE，仍可在命令末尾使用`--no-bundle`。
@@ -47,7 +54,7 @@ cargo metadata --format-version 1
 cargo test --workspace
 ```
 
-应用默认进入存档首页，未完成的世界、车卡或冒险存档会返回对应页面；GENERATING_TAVERN存档会在进入酒馆时完成离线初始化。酒馆选择NPC后可继续已保存对话，任务告示可接受一项主任务，冒险支持本地D20、无检定回合和ENDING恢复；结算后的奖励、NPC心情、酒馆陈设、世界时钟与历史档案均可在重启后恢复。Windows设置页可配置Provider、Base URL、模型、系统安全密钥、连接测试、默认与备用模型，并可删除系统凭据；设置与游戏事实隔离。恢复中心会取消未完成请求并原子返回最近已提交阶段。`.emtavern` v1导出、备份保护的永久删除、重新导入和继续游戏均已通过实际系统文件对话框验收。上述真实模型路由、故障切换和结构修复是共享应用层的已测试能力，尚未接入Windows 0.1游戏服务；当前游戏内容均由本地Fake Provider生成，云配置只用于连接测试、模型发现和本机设置保存。Windows 0.1最终验收、全质量门、秘密扫描和NSIS复建已完成；详见`docs/WINDOWS_ACCEPTANCE_0.1.md`与`docs/WINDOWS_V0_1.md`。
+应用默认进入存档首页，未完成的世界、车卡或冒险存档会返回对应页面。酒馆选择 NPC 后可继续已保存对话，任务告示可接受一项主任务；冒险支持候选操作、自由输入、本地 D20 和中断恢复。结算后的奖励、NPC 心情、酒馆陈设、世界时钟和档案均从 SQLite 恢复。模型设置支持 Provider、Base URL、模型、系统安全密钥、连接测试及默认/备用选择；保存后，下一次游戏生成会读取该设备配置。只有明确授权的备用模型会在网络、限流、超时或服务不可用时接手一次，认证、额度或非法输出不会触发静默跨 Provider 切换。
 
 ## 玩家文档
 
@@ -56,6 +63,8 @@ cargo test --workspace
 - [Windows 安装、数据保留与卸载](docs/WINDOWS_INSTALL.md)
 - [Windows 自动端到端测试](docs/WINDOWS_E2E.md)
 - [Windows 0.1 最终验收记录](docs/WINDOWS_ACCEPTANCE_0.1.md)
+- [v0.2 第一轮技术审查](docs/V0.2_FIRST_AUDIT_REPORT.md)
+- [v0.2 第一轮可玩性报告](docs/V0.2_PLAYABILITY_REPORT.md)
 
 ## 本地开发缓存
 

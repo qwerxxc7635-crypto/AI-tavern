@@ -1,0 +1,18 @@
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* Keep the standalone save selector as the wheel/trackpad scroll owner even when the
+   desktop WebView keeps body overflow locked. 100dvh avoids stale viewport sizing when
+   the native titlebar or window chrome changes the effective content height. */
+.save-home {
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-x: hidden;
+  overflow-y: scroll;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
+  -webkit-overflow-scrolling: touch;
+}

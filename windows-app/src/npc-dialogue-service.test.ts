@@ -38,6 +38,12 @@ describe('WindowsNpcDialogueService', () => {
         },
       ],
     });
+
+    for (let turn = 3; turn <= 12; turn += 1) {
+      await expect(
+        service.send('campaign-tavern', 'npc-owner', `Continue the conversation ${turn}.`),
+      ).resolves.toMatchObject({ relationship: { trust: Math.min(turn, 5) } });
+    }
   });
 });
 
@@ -68,7 +74,10 @@ class MemoryDialogueGateway implements NpcDialogueGateway {
       npc: { ...this.snapshot.npc, currentMood: output.mood },
       relationship: {
         ...this.snapshot.relationship,
-        trust: this.snapshot.relationship.trust + (output.relationshipProposal.trust ?? 0),
+        trust: Math.min(
+          5,
+          this.snapshot.relationship.trust + (output.relationshipProposal.trust ?? 0),
+        ),
       },
       messages: nextMessages,
       suggestedTopics: output.suggestedTopics,
@@ -80,9 +89,12 @@ class MemoryDialogueGateway implements NpcDialogueGateway {
         },
         relationship: {
           ...this.snapshot.relationship,
-          trust: this.snapshot.relationship.trust + (output.relationshipProposal.trust ?? 0),
+          trust: Math.min(
+            5,
+            this.snapshot.relationship.trust + (output.relationshipProposal.trust ?? 0),
+          ),
         },
-        recentMessages: nextMessages.map(({ role, content }) => ({ role, content })),
+        recentMessages: nextMessages.slice(-12).map(({ role, content }) => ({ role, content })),
       },
     };
     return this.snapshot;

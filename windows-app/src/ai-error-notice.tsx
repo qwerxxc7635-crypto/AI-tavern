@@ -69,6 +69,7 @@ export interface AIErrorNoticeProps {
 
 export function AIErrorNotice({ error, onRetry }: AIErrorNoticeProps) {
   const classified = standardizeAIError(error);
+  const diagnosticCode = safeErrorCode(error) ?? classified.code;
   const presentation = PRESENTATIONS[classified.code];
   return (
     <section
@@ -78,6 +79,7 @@ export function AIErrorNotice({ error, onRetry }: AIErrorNoticeProps) {
     >
       <strong>{presentation.title}</strong>
       <p>{presentation.detail}</p>
+      <small>错误代码：{diagnosticCode}</small>
       {presentation.action === 'RETRY' && onRetry !== undefined ? (
         <button className="secondary-action" type="button" onClick={onRetry}>
           {presentation.actionLabel}
@@ -89,4 +91,16 @@ export function AIErrorNotice({ error, onRetry }: AIErrorNoticeProps) {
       )}
     </section>
   );
+}
+
+function safeErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || Array.isArray(error)) return null;
+  const code = (error as Readonly<Record<string, unknown>>)['code'];
+  if (typeof code === 'string' && /^[A-Z0-9_]{2,64}$/.test(code)) {
+    if (error instanceof Error && error.cause !== undefined) {
+      return safeErrorCode(error.cause) ?? code;
+    }
+    return code;
+  }
+  return error instanceof Error && error.cause !== undefined ? safeErrorCode(error.cause) : null;
 }

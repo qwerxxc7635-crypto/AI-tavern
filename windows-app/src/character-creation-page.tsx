@@ -467,7 +467,7 @@ export function CharacterCreationPage({
       <section className="character-intro">
         <p className="eyebrow">{playerText.coreUi.buildTraveler}</p>
         <h1>谁会推开酒馆的门？</h1>
-        <p>基础事实由你决定；Fake Provider 只负责生成候选特质与背景文本。</p>
+        <p>基础事实由你决定；当前默认模型只负责生成候选特质与背景文本。</p>
       </section>
       {aiError === null ? null : (
         <AIErrorNotice

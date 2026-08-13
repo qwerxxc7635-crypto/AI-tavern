@@ -29,7 +29,7 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_WORLD: define(
     'GENERATE_WORLD',
     'WORLD_DESIGNER',
-    'Create a coherent original world from the player concept, preferences, and boundaries. Make every requested world field concrete and mutually consistent.',
+    'Create a coherent original world from the player concept, preferences, and boundaries. Make every requested world field concrete and mutually consistent. Faction and location names must each be unique. Every parentName must be null or exactly match another generated location name, never itself. Every factionNames entry must exactly match a generated faction name.',
   ),
   REFINE_WORLD: define(
     'REFINE_WORLD',
@@ -56,7 +56,7 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_NPCS: define(
     'GENERATE_NPCS',
     'WORLD_DESIGNER',
-    'Create the requested number of non-owner tavern NPCs. Give each a distinct identity and personality archetype unlike existingNpcArchetypes, with independent motives, secrets, speech, and a valid residency-specific visit reason. Do not repeat substantial phrases. Also create exactly three rumors attributed to generated NPC names. Classify each source as witness, hearsay, personal belief, or faction message and give the Claim confidence independently from its hidden veracity proposal.',
+    'Create exactly three non-owner tavern NPCs: exactly two RESIDENT and exactly one TEMPORARY_VISITOR. Only the temporary visitor has a non-null visitReason. Give each a unique name and a distinct identity and personality archetype unlike existingNpcArchetypes, with independent motives, secrets, and speech. Do not repeat substantial phrases. Also create exactly three rumors whose sourceNpcName exactly matches one of the three generated NPC names. Classify each source as witness, hearsay, personal belief, or faction message and give the Claim confidence independently from its hidden veracity proposal.',
     4,
   ),
   NPC_REPLY: define(
@@ -68,7 +68,7 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_QUEST: define(
     'GENERATE_QUEST',
     'WORLD_DESIGNER',
-    'Create a short-session quest grounded in supplied facts and NPCs. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. Separate narrative content from program-controlled risk and reward proposals.',
+    'Create a short-session quest grounded in supplied facts and NPCs. expectedTurns min and max must both be between 8 and 12 inclusive, with max at least min. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. relatedNpcIds may contain only exact IDs from availableNpcs; relatedFactIds must be empty because no fact IDs are supplied. Separate narrative content from program-controlled risk and reward proposals.',
     2,
   ),
   GENERATE_ADVENTURE_PLAN: define(
@@ -79,14 +79,14 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_ADVENTURE_TURN: define(
     'GENERATE_ADVENTURE_TURN',
     'GAME_MASTER',
-    'Resolve only the submitted intent from the supplied SceneFrame. ACTION changes the situation, DIALOGUE addresses a participant, and OBSERVE gathers perceivable information. For an active scene, return 3-5 distinct suggestions grounded jointly in the scene, quest, player character, knownFacts, and npcKnowledge; return none for ENDING. Preserve authority boundaries and propose, but never apply, state changes.',
+    'Resolve only the submitted intent from the supplied SceneFrame. ACTION changes the situation, DIALOGUE addresses a participant, and OBSERVE gathers perceivable information. For an active scene, return 3-5 distinct suggestions grounded jointly in the scene, quest, player character, knownFacts, and npcKnowledge; return none for ENDING. checkRequest must be non-null exactly when adventureState is CHECK_REQUIRED. speakerNpcIds may contain only exact NPC IDs supplied by the quest; discoveredClues may contain only exact titles supplied in the adventure plan. statePatchProposals must be empty unless proposing a new FACT; every FACT proposal has targetId null and a non-empty string payload.statement. Preserve authority boundaries and propose, but never apply, state changes.',
     4,
   ),
   RESOLVE_DICE_RESULT: define(
     'RESOLVE_DICE_RESULT',
     'GAME_MASTER',
-    'Narrate the supplied immutable local dice result only after hard logic has fixed raw, modifier, total, DC, and result. Never reroll or change any of those five values.',
-    2,
+    'Narrate the supplied immutable local dice result only after hard logic has fixed raw, modifier, total, DC, and result. Never reroll or change any of those five values. statePatchProposals must be empty unless proposing a new FACT; every FACT proposal has targetId null and a non-empty string payload.statement. Preserve authority boundaries and propose, but never apply, state changes.',
+    3,
   ),
   GENERATE_WORLD_EVENT: define(
     'GENERATE_WORLD_EVENT',

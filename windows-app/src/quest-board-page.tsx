@@ -8,6 +8,7 @@ import {
   type WindowsQuestBoardService,
 } from './quest-board-service.js';
 import { playerText } from './localization/index.js';
+import { AIErrorNotice } from './ai-error-notice.js';
 
 type QuestActions = Pick<WindowsQuestBoardService, 'load' | 'initialize' | 'accept'>;
 
@@ -35,7 +36,7 @@ export function QuestBoardPage({
   const [snapshot, setSnapshot] = useState<QuestBoardSnapshot | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown | null>(null);
 
   useEffect(() => {
     if (campaignId === null) return;
@@ -52,8 +53,8 @@ export function QuestBoardPage({
             null,
         );
       })
-      .catch(() => {
-        if (active) setError('任务告示没有成功展开，本地存档没有发生改变。');
+      .catch((caught: unknown) => {
+        if (active) setError(caught);
       });
     return () => {
       active = false;
@@ -90,7 +91,11 @@ export function QuestBoardPage({
         <h1>正在整理任务告示…</h1>
       </main>
     ) : (
-      <QuestMessage title={error} />
+      <main className="quest-board-page">
+        <p className="eyebrow">任务告示尚未完成</p>
+        <h1>本地存档没有发生改变。</h1>
+        <AIErrorNotice error={error} />
+      </main>
     );
   }
   if (snapshot.campaignState !== 'TAVERN') {
@@ -185,7 +190,7 @@ export function QuestBoardPage({
             )}
             {error === null ? null : (
               <p className="form-error" role="alert">
-                {error}
+                {typeof error === 'string' ? error : '操作未完成，请重试。'}
               </p>
             )}
           </article>

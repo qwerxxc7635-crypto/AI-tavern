@@ -30,4 +30,10 @@ describe('standard AI errors', () => {
       },
     );
   });
+
+  it('reads a safe code from Tauri command errors serialized as JSON text', () => {
+    expect(standardizeAIError('{"code":"AUTHENTICATION_FAILED","message":"safe"}')).toMatchObject({
+      code: 'AUTHENTICATION_FAILED',
+    });
+  });
 });

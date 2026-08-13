@@ -47,7 +47,7 @@ export const zhCN = Object.freeze({
     connectionProfileLabel: '连接配置',
     apiBindingPhase: (phase: string) => apiBindingPhaseLabel(phase),
     modelPrivacySummary:
-      '当前版本的游戏内容由本地演示模型生成；保存默认或备用模型不会发送游戏存档内容。',
+      '默认模型会用于实际游戏生成；每次只发送完成当前任务所需的上下文，SQLite 本地事实和 API Key 不会作为提示词发送。',
     localProfile: '本机档案',
     connectionProfiles: '连接配置',
     modelRouting: '模型路由',

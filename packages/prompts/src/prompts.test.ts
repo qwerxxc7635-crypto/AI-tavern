@@ -68,11 +68,13 @@ describe('central prompt catalog', () => {
         version:
           task === 'GENERATE_ADVENTURE_TURN'
             ? 4
-            : task === 'GENERATE_NPCS'
-              ? 4
-              : task === 'NPC_REPLY'
-                ? 3
-                : expectedVersion,
+            : task === 'RESOLVE_DICE_RESULT'
+              ? 3
+              : task === 'GENERATE_NPCS'
+                ? 4
+                : task === 'NPC_REPLY'
+                  ? 3
+                  : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }
@@ -184,7 +186,7 @@ describe('stable prompt profile', () => {
     expect(formatted.stableProfile.sections[3]?.content).toMatchObject({
       task: 'GENERATE_WORLD',
       logicalRole: 'WORLD_DESIGNER',
-      stableProfileVersion: 1,
+      stableProfileVersion: 2,
     });
   });
 

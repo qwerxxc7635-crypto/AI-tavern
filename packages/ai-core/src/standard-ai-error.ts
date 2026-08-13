@@ -30,12 +30,15 @@ const LEGACY_CODES: Readonly<Record<string, StandardAIErrorCode>> = Object.freez
   INVALID_OUTPUT: 'INVALID_OUTPUT',
   INVALID_RESPONSE: 'INVALID_OUTPUT',
   MODEL_NOT_FOUND: 'MODEL_NOT_FOUND',
+  MODEL_NOT_CONFIGURED: 'MODEL_NOT_FOUND',
+  MODEL_SELECTION_DRIFT: 'MODEL_NOT_FOUND',
   MODEL_PROFILE_MISSING: 'MODEL_NOT_FOUND',
   NETWORK: 'NETWORK_FAILED',
   NETWORK_FAILED: 'NETWORK_FAILED',
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
   NO_MODEL_CANDIDATE: 'MODEL_NOT_FOUND',
   RATE_LIMITED: 'RATE_LIMITED',
+  REPETITION_DETECTED: 'INVALID_OUTPUT',
   SCHEMA_VALIDATION_FAILED: 'INVALID_OUTPUT',
   TIMEOUT: 'TIMEOUT',
 });
@@ -65,6 +68,13 @@ export function standardizeAIError(
 }
 
 function readErrorCode(error: unknown): string | null {
+  if (typeof error === 'string') {
+    try {
+      return readErrorCode(JSON.parse(error) as unknown);
+    } catch {
+      return null;
+    }
+  }
   if (typeof error !== 'object' || error === null || Array.isArray(error)) return null;
   const code = (error as Readonly<Record<string, unknown>>)['code'];
   return typeof code === 'string' ? code : null;

@@ -2,6 +2,21 @@
 
 本文件按任务记录实际变更、验证证据、限制和后续边界。每次完成任务后追加记录，不覆盖历史。
 
+## 2026-08-13 — 修复模型设置保存 `PROBE_STALE`
+
+### 根因与修复
+
+- Native Provider probe 使用 RFC3339 输出微秒时间戳，并基于该原始能力数据生成 probe fingerprint；前端 `Date.toISOString()` 将时间截断为三位毫秒，保存时 Native receipt 逐值校验因此稳定返回 `PROBE_STALE`。
+- 在 Native probe 生成能力数据和 fingerprint 前统一产生三位毫秒 UTC 时间戳，保持前端 canonical ISO 合同、receipt 安全门禁与后续统一 AI 编排三者一致。
+- 未放宽 receipt 对 Provider、端点、模型、能力内容与 fingerprint 的校验，也未改动 API Key 生命周期或联网边界。
+
+### 回归验证
+
+- 新增 Native 回归测试，以微秒输入锁定 probe 时间戳为 `2026-08-12T10:01:28.700Z`。
+- 保留前端微秒 RFC3339 防御性规范化测试，覆盖 Native/前端时间精度边界。
+- `pnpm check:shared` 全量通过：Prettier、release metadata、zh-CN、ESLint、TypeScript、87个Vitest文件/477项、Node 27项、Rust workspace 95项执行通过/0失败/1项真实API测试按设计忽略，以及TypeScript/Rust存档互操作全部通过。
+- 用户既有 `.gitignore` 修改保持未暂存，不纳入本次提交。
+
 ## 2026-07-30 — M0-T01 初始化 Git 仓库和基础规范
 
 ### 范围
@@ -3512,3 +3527,87 @@
 ### 结论
 
 - `V02-M10-T04`完成；v0.2 M0–M10权威任务全部完成。iOS及其余默认延期范围不自动启动。
+
+## 2026-08-12 — v0.2 First-Pass Release Audit
+
+### 基线与范围
+
+- 审查基线为分支`codex/v0.2-windows-gate`、commit `451a09d9d7c55f342ca63dfef20a28d56d0294e5`；开始时只有用户已有`.gitignore`修改，本轮全程保留且未覆盖。
+- 环境为macOS 14.7.6 arm64、Node 26.7.0、pnpm 11.9.0、Rust/Cargo 1.97.1；原生可玩性使用隔离数据根，不读取正式应用数据。
+- 按spec、任务、决策、README、实际调用链、自动测试和release `.app`重新建立验收矩阵，不采信单纯DONE标记。
+
+### 发现
+
+- `AUDIT-001`（P1，OPEN）：模型设置、默认/备用与凭据能够保存，但不会进入世界、角色、酒馆、NPC、任务、冒险或结算调用；production singleton仍固定`FakeAIProvider`与`ember-fake-v1`。
+- `AUDIT-002`（P1，OPEN）：共享`AITurnOrchestrator`、路由、pending request、修复和故障切换虽有测试，桌面游戏服务实际绕过该编排层直接调用Provider。
+- `AUDIT-003`（P2，FIXED）：打包app的版本读取缺少`core:app:allow-version`，原生页面显示“不可用”。
+- `AUDIT-004`（P2，FIXED）：WKWebView没有呈现归档用`window.confirm`，点击后直接归档；覆盖导入和删除凭据存在同类风险。
+- `PLAY-001`（P1，OPEN）：Fake冒险按回合数给固定输出，不同自由行动大多得到相同场景，玩家选择缺乏实际意义。
+- `PLAY-002`（P2，FIXED）：Fake NPC第二轮后固定同一句，第三轮被重复检测拒绝。
+- `PLAY-003`（P2，FIXED）：关系trust到达5后Fake仍提出+1，native事务拒绝后续对话。
+- `PLAY-004`（P2，OPEN）：默认世界、NPC、任务、剧情与档案内容大量固定英文且模板重复。
+
+### 修复与修改文件
+
+- 在`windows-app/src-tauri/capabilities/default.json`增加最小app version和dialog message权限，并在`tauri-config.test.ts`锁定精确能力集合。
+- 新增`windows-app/src/confirmation-service.ts`，Tauri环境使用原生warning confirm；归档、覆盖导入和删除系统凭据不再依赖WKWebView `window.confirm`。
+- 调整`packages/ai-core/src/fake-ai-provider.ts`：长对话回复包含当前玩家输入，trust达到5时不提出越界增量。
+- 扩展`windows-app/src/npc-dialogue-service.test.ts`为12轮连续对话回归，并让测试网关遵守关系钳制和最近12条上下文合同。
+- 更新`README.md`为v0.2桌面现状与真实Provider未接线限制；新增`docs/V0.2_FIRST_AUDIT_REPORT.md`和`docs/V0.2_PLAYABILITY_REPORT.md`。
+
+### 自动验证
+
+- 最终`pnpm check:shared`通过：格式、release metadata、zh-CN、ESLint、TypeScript、86个Vitest文件/465项、Node 27项、Rust workspace 88项、archive interoperability全部通过。
+- `pnpm --dir windows-app tauri build --bundles app`通过，Vite 204 modules，release `.app`生成成功。
+- 原生确认相关3文件/19项定向测试及12轮NPC回归通过。
+- npm官方registry production audit返回`No known vulnerabilities found`；默认npmmirror无advisory endpoint。环境未安装`cargo-audit`，RustSec检查标记BLOCKED。
+
+### 可玩性验证
+
+- 完成新世界、AI候选车卡、酒馆、Ilyra 10轮对话、Nessa 3轮对话、任务接受、8回合冒险、3次D20、结算、档案、退出、重开与继续；合计21轮AI交互。
+- 三次D20分别为7+2=9/11失败、2+2=4/11失败、15+2=17/11成功，档案与当时UI一致。
+- 修复后长对话不再失败，trust稳定在5；原生归档sheet取消不写入、确认后才归档；版本显示0.2.0。
+- Playability Verdict为`TECHNICALLY PLAYABLE`，综合5/10。Fake纵向路径完整，但不代表真实AI可玩性。
+
+### 未解决与BLOCKED
+
+- P1真实Provider/统一编排接线和P1选择意义问题未解决，因此总体Verdict为`NOT READY`。
+- 真实DeepSeek cache hit/miss、真实API错误/延迟/随机性、Windows当前轮实机生命周期、Rust advisory audit及原生手工跳过D20动画为BLOCKED。
+- 第二轮优先复核真实模型端到端调用、Windows实机、DeepSeek命中、20轮真实对话/冒险一致性、错误恢复和`.emtavern`覆盖导入。
+
+## 2026-08-12 — v0.2 第一轮审查整改完成
+
+### P1 架构整改
+
+- 新增桌面统一`DesktopAIOrchestrator`与Tauri native adapter；世界、车卡、酒馆、NPC、任务、冒险和结算的production singleton全部迁移到同一模型选择、Prompt、结构校验、修复、错误和缓存路径。
+- 原生`ai_generate`按SQLite中精确profile解析Provider、模型、端点、能力与系统凭据引用；前后端双向验证profile/provider/preset/model身份，拒绝模型漂移。
+- 默认与显式备用配置以设备模型设置为唯一真源；只有网络、限流、超时和服务不可用允许fallback，认证、额度和非法输出不会静默切换。
+- DeepSeek缓存遥测以best-effort写入，失败可观察但不覆盖成功生成；指标保持200条上限且不含Prompt、上下文、请求ID或凭据。
+
+### 业务合同与可玩性整改
+
+- 将世界引用、NPC 3人组成与传闻来源、任务8～12回合、冒险checkRequest、FACT patch、D20结果patch和nullable relationship proposal等native业务边界前移到共享schema与Prompt。
+- 统一层允许同一已选模型进行一次结构修复；修复仍失败时拒绝提交，不降低校验标准。
+- Fake冒险测试adapter按ACTION、DIALOGUE、OBSERVE和玩家文本返回不同语义结果；基础生成规则要求自然简体中文。
+- 修复Rust微秒RFC3339时间戳进入前端ISO合同的问题，以及从RESOLVING恢复并成功结算后UI仍保持提交中状态的问题。
+- 保留并扩展第一轮版本权限、Tauri原生危险确认、NPC重复和关系上限修复。
+
+### 真实DeepSeek验证
+
+- 使用仅限本轮的授权凭据，在隔离数据根完成设置探测、保存、世界、角色、酒馆/NPC、两轮对话、两项任务、冒险计划、自由行动和D20结果叙事；共形成12条真实生成记录，模型均为`deepseek-v4-flash`。
+- 自由输入中的守塔灯、潮汐罗盘、井壁潮痕与“下井前先观察”均改变结果并触发知识检定；NPC第二轮引用Lin、失踪守塔人和罗盘。
+- 真实缓存同一世界前缀第一次hit 0/miss 1072，第二次hit 1024/miss 48，命中率0.9552；独立原生真实测试第二次hit 128/miss 114。
+- 退出、重开、继续后默认模型、NPC历史/关系、pending action和locked D20均从SQLite恢复；D20手工跳过动画复用20+2=22/DC11的同一硬结果。
+
+### 最终质量门
+
+- 格式、release metadata、zh-CN、ESLint和TypeScript通过。
+- Vitest 87文件/477项、Node 27项通过。
+- `cargo fmt`、workspace all-target/all-feature Clippy通过；Rust workspace 94项执行通过、0失败，默认忽略1项真实API测试（本轮已独立真实执行通过）。
+- TypeScript/Rust存档互操作通过；`pnpm --dir windows-app tauri build --bundles app`生成正式macOS release app。
+- Windows实机生命周期和RustSec advisory因缺少对应环境/工具保持BLOCKED，不宣称已验证。
+
+### 结论
+
+- P0=0、P1=0、P2=0；第一轮整改结论更新为`READY FOR SECOND AUDIT`。
+- 用户既有`.gitignore`修改全程保留，整改提交不会纳入该文件；不merge、不push。

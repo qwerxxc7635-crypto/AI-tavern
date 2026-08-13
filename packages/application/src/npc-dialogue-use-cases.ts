@@ -472,10 +472,10 @@ function generationError(code: string, message: string) {
 
 function definedRelationshipPatch(
   proposal: Readonly<{
-    trust?: number | undefined;
-    closeness?: number | undefined;
-    awe?: number | undefined;
-    obligation?: number | undefined;
+    trust?: number | null | undefined;
+    closeness?: number | null | undefined;
+    awe?: number | null | undefined;
+    obligation?: number | null | undefined;
   }>,
 ): RelationshipPatch {
   const patch: {
@@ -484,10 +484,10 @@ function definedRelationshipPatch(
     awe?: number;
     obligation?: number;
   } = {};
-  if (proposal.trust !== undefined) patch.trust = proposal.trust;
-  if (proposal.closeness !== undefined) patch.closeness = proposal.closeness;
-  if (proposal.awe !== undefined) patch.awe = proposal.awe;
-  if (proposal.obligation !== undefined) patch.obligation = proposal.obligation;
+  if (proposal.trust != null) patch.trust = proposal.trust;
+  if (proposal.closeness != null) patch.closeness = proposal.closeness;
+  if (proposal.awe != null) patch.awe = proposal.awe;
+  if (proposal.obligation != null) patch.obligation = proposal.obligation;
   return patch;
 }
 

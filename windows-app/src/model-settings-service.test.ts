@@ -147,4 +147,41 @@ describe('model settings contract', () => {
       }),
     ).toThrow('timestamp');
   });
+
+  it('normalizes Rust RFC3339 sub-millisecond precision for the shared runtime contract', () => {
+    const snapshot = parseModelSettingsSnapshot({
+      profiles: [
+        {
+          id: 'profile-1',
+          providerId: 'provider-1',
+          presetKey: 'deepseek',
+          providerDisplayName: 'DeepSeek',
+          baseUrl: 'https://api.deepseek.com/',
+          endpointFingerprint: null,
+          hasCredential: true,
+          modelName: 'deepseek-v4-flash',
+          modelDisplayName: 'DeepSeek V4 Flash',
+          capabilities: {
+            text: true,
+            streaming: false,
+            systemMessages: true,
+            jsonMode: true,
+            jsonSchema: false,
+            toolCalling: false,
+            reasoning: true,
+            contextWindowTokens: 1048576,
+            costStatus: 'UNKNOWN',
+            checkedAt: '2026-08-12T10:01:28.700286Z',
+          },
+          capabilitySource: 'PRESET_METADATA',
+          probeFingerprint: null,
+        },
+      ],
+      defaultModelProfileId: 'profile-1',
+      fallbackModelProfileId: null,
+      pendingCredentialCleanupCount: 0,
+    });
+
+    expect(snapshot.profiles[0]?.capabilities?.checkedAt).toBe('2026-08-12T10:01:28.700Z');
+  });
 });

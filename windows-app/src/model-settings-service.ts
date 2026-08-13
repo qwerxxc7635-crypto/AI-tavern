@@ -345,5 +345,5 @@ function requireTimestamp(value: unknown): string {
   ) {
     throw new TypeError('Model capability timestamp is invalid');
   }
-  return value;
+  return new Date(value).toISOString();
 }

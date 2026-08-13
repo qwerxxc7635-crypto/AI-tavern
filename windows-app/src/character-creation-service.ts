@@ -3,15 +3,10 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   CompleteCharacterBackgroundInputSchema,
   CompleteCharacterBackgroundOutputSchema,
-  FakeAIProvider,
-  assertTaskContextBudget,
   GenerateCharacterTraitsInputSchema,
   GenerateCharacterTraitsOutputSchema,
-  validateAIOutput,
   type AIProvider,
   type AITask,
-  type NormalizedAIRequest,
-  type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
@@ -27,8 +22,11 @@ import {
   type ContentBoundaries,
   type PlayerAttributesInput,
 } from '@ember-tavern/contracts';
-import { formatTaskPrompt } from '@ember-tavern/prompts';
-import { recordContextInspection } from './context-inspector-service.js';
+import {
+  desktopAIEngine,
+  tauriDesktopAIOrchestrator,
+  type DesktopAIEngine,
+} from './desktop-ai-orchestrator.js';
 import {
   balancedRandomnessTemperatureSource,
   tauriRandomnessTemperatureSource,
@@ -146,17 +144,6 @@ interface RequestIdentity {
   readonly idempotencyKey: string;
 }
 
-const PROVIDER_CONFIG: ProviderConfig = Object.freeze({
-  id: 'windows-offline-fake',
-  providerType: 'LOCAL_OPENAI_COMPATIBLE',
-  presetKey: 'custom',
-  displayName: 'Ember Fake',
-  baseUrl: null,
-  credentialRef: null,
-  options: {},
-  enabled: true,
-});
-
 export const tauriCharacterCreationGateway: CharacterCreationGateway = {
   async load(id) {
     return parseSnapshot(await invoke<unknown>('character_creation_get', { id }), id);
@@ -186,10 +173,14 @@ export const tauriCharacterCreationGateway: CharacterCreationGateway = {
 export class WindowsCharacterCreationService {
   public constructor(
     private readonly gateway: CharacterCreationGateway = tauriCharacterCreationGateway,
-    private readonly provider: AIProvider = new FakeAIProvider(),
+    provider?: AIProvider | DesktopAIEngine,
     private readonly createIdentity: (task: CharacterTask) => RequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
-  ) {}
+  ) {
+    this.ai = desktopAIEngine(provider);
+  }
+
+  private readonly ai: DesktopAIEngine;
 
   public load(campaignIdValue: string): Promise<CharacterCreationSnapshot> {
     campaignId(campaignIdValue);
@@ -274,45 +265,29 @@ export class WindowsCharacterCreationService {
     observer?: CharacterGenerationObserver,
   ): Promise<GenerationAudit> {
     const identity = this.createIdentity(task);
-    const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
-    if (model === undefined) throw new CharacterCreationServiceError('MODEL_NOT_FOUND');
-    assertTaskContextBudget(task, input);
-    await recordContextInspection(task, input);
-    const prompt = formatTaskPrompt(task, input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
-    const request: NormalizedAIRequest = {
-      requestId: aiRequestId(identity.requestId),
-      task,
-      promptVersion: prompt.promptVersion,
-      modelName: model.name,
-      messages: prompt.messages,
-      responseFormat: prompt.responseFormat,
+    const generated = await this.ai.execute(task, input, {
+      requestId: identity.requestId,
       temperature,
       maxOutputTokens: 4_000,
       timeoutMs: 5_000,
-    };
-    const response = await this.provider.generate(request, PROVIDER_CONFIG);
-    if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
-      throw new CharacterCreationServiceError('PROVIDER_IDENTITY_MISMATCH');
-    }
+    });
     observer?.onValidationStarted();
-    const validated = validateAIOutput(task, response.content);
-    if (!validated.ok) throw new CharacterCreationServiceError(validated.error.code);
     return {
       ...identity,
-      promptVersion: request.promptVersion,
+      promptVersion: generated.request.promptVersion,
       input,
       context,
-      request,
-      rawResponseText: response.content,
-      validatedOutput: validated.validatedOutput,
+      request: generated.request,
+      rawResponseText: generated.response.content,
+      validatedOutput: generated.validatedOutput,
     };
   }
 }
 
 export const windowsCharacterCreationService = new WindowsCharacterCreationService(
   tauriCharacterCreationGateway,
-  new FakeAIProvider(),
+  tauriDesktopAIOrchestrator,
   defaultIdentity,
   tauriRandomnessTemperatureSource,
 );

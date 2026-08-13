@@ -1,15 +1,10 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import {
-  FakeAIProvider,
-  assertTaskContextBudget,
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
   findRepeatedPhrase,
-  validateAIOutput,
   type AIProvider,
-  type NormalizedAIRequest,
-  type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
@@ -18,8 +13,11 @@ import {
   idempotencyKey,
   isoTimestamp,
 } from '@ember-tavern/contracts';
-import { formatTaskPrompt } from '@ember-tavern/prompts';
-import { recordContextInspection } from './context-inspector-service.js';
+import {
+  desktopAIEngine,
+  tauriDesktopAIOrchestrator,
+  type DesktopAIEngine,
+} from './desktop-ai-orchestrator.js';
 import {
   balancedRandomnessTemperatureSource,
   tauriRandomnessTemperatureSource,
@@ -90,17 +88,6 @@ interface RequestIdentity {
   readonly idempotencyKey: string;
 }
 
-const PROVIDER_CONFIG: ProviderConfig = Object.freeze({
-  id: 'windows-offline-fake',
-  providerType: 'LOCAL_OPENAI_COMPATIBLE',
-  presetKey: 'custom',
-  displayName: 'Ember Fake',
-  baseUrl: null,
-  credentialRef: null,
-  options: {},
-  enabled: true,
-});
-
 export const tauriNpcDialogueGateway: NpcDialogueGateway = {
   async load(campaign, npc) {
     return parseSnapshot(
@@ -121,10 +108,14 @@ export const tauriNpcDialogueGateway: NpcDialogueGateway = {
 export class WindowsNpcDialogueService {
   public constructor(
     private readonly gateway: NpcDialogueGateway = tauriNpcDialogueGateway,
-    private readonly provider: AIProvider = new FakeAIProvider(),
+    provider?: AIProvider | DesktopAIEngine,
     private readonly createIdentity: () => RequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
-  ) {}
+  ) {
+    this.ai = desktopAIEngine(provider);
+  }
+
+  private readonly ai: DesktopAIEngine;
 
   public load(campaign: string, npc: string): Promise<NpcDialogueSnapshot> {
     campaignId(campaign);
@@ -143,30 +134,14 @@ export class WindowsNpcDialogueService {
       playerMessage,
     });
     const identity = this.createIdentity();
-    const model = (await this.provider.listModels()).find(({ name }) => name === 'ember-fake-v1');
-    if (model === undefined) throw new NpcDialogueServiceError('MODEL_NOT_FOUND');
-    assertTaskContextBudget('NPC_REPLY', input);
-    await recordContextInspection('NPC_REPLY', input);
-    const prompt = formatTaskPrompt('NPC_REPLY', input, model.capabilities);
     const temperature = await this.randomness.resolveTemperature();
-    const request: NormalizedAIRequest = {
-      requestId: aiRequestId(identity.requestId),
-      task: 'NPC_REPLY',
-      promptVersion: prompt.promptVersion,
-      modelName: model.name,
-      messages: prompt.messages,
-      responseFormat: prompt.responseFormat,
+    const generated = await this.ai.execute('NPC_REPLY', input, {
+      requestId: identity.requestId,
       temperature,
       maxOutputTokens: 2_000,
       timeoutMs: 5_000,
-    };
-    const response = await this.provider.generate(request, PROVIDER_CONFIG);
-    if (response.requestId !== request.requestId || response.modelName !== request.modelName) {
-      throw new NpcDialogueServiceError('PROVIDER_IDENTITY_MISMATCH');
-    }
-    const validated = validateAIOutput('NPC_REPLY', response.content);
-    if (!validated.ok) throw new NpcDialogueServiceError(validated.error.code);
-    const output = NpcReplyOutputSchema.parse(validated.validatedOutput);
+    });
+    const output = NpcReplyOutputSchema.parse(generated.validatedOutput);
     const repeatedPhrase = findRepeatedPhrase(
       [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
       snapshot.messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
@@ -180,11 +155,11 @@ export class WindowsNpcDialogueService {
       playerMessage: input.playerMessage,
       generation: {
         ...identity,
-        promptVersion: request.promptVersion,
+        promptVersion: generated.request.promptVersion,
         input,
         context: { npcId: npc },
-        request,
-        rawResponseText: response.content,
+        request: generated.request,
+        rawResponseText: generated.response.content,
         validatedOutput: output,
       },
     });
@@ -193,7 +168,7 @@ export class WindowsNpcDialogueService {
 
 export const windowsNpcDialogueService = new WindowsNpcDialogueService(
   tauriNpcDialogueGateway,
-  new FakeAIProvider(),
+  tauriDesktopAIOrchestrator,
   defaultIdentity,
   tauriRandomnessTemperatureSource,
 );
