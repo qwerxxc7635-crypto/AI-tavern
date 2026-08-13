@@ -126,6 +126,7 @@ export function NpcDialoguePage({
             <label htmlFor="dialogue-message">你想说什么？</label>
             <textarea
               id="dialogue-message"
+              data-ai-field="npc-dialogue-free-input"
               maxLength={4_000}
               value={draft}
               onChange={(event) => setDraft(event.target.value)}

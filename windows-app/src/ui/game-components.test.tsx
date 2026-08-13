@@ -138,14 +138,55 @@ describe('shared game components', () => {
 
   it('presents field assistance states without owning field or persistence state', () => {
     const generate = vi.fn();
+    const operation = vi.fn();
     const apply = vi.fn();
+    const select = vi.fn();
+    const undo = vi.fn();
+    const retry = vi.fn();
+    const lock = vi.fn();
+    const unlock = vi.fn();
     const { rerender } = render(<AIFieldAssist state="IDLE" onGenerate={generate} />);
-    fireEvent.click(screen.getByRole('button', { name: 'AI 辅助' }));
+    fireEvent.click(screen.getByRole('button', { name: 'AI 生成' }));
     expect(generate).toHaveBeenCalledOnce();
-    rerender(<AIFieldAssist state="CANDIDATE" candidate="更简洁的背景" onApply={apply} />);
+
+    rerender(<AIFieldAssist state="IDLE" onOperation={operation} onLock={lock} />);
+    fireEvent.click(screen.getByRole('button', { name: 'AI 完善' }));
+    fireEvent.click(screen.getByRole('button', { name: '多个候选' }));
+    fireEvent.click(screen.getByRole('button', { name: '扩写' }));
+    fireEvent.click(screen.getByRole('button', { name: '缩写' }));
+    fireEvent.click(screen.getByRole('button', { name: '锁定字段' }));
+    expect(operation.mock.calls.map(([value]) => value)).toEqual([
+      'IMPROVE',
+      'OPTIONS',
+      'EXPAND',
+      'SHORTEN',
+    ]);
+    expect(lock).toHaveBeenCalledOnce();
+
+    rerender(
+      <AIFieldAssist
+        state="CANDIDATE"
+        candidates={['简洁背景', '细致背景']}
+        selectedCandidate={1}
+        onSelect={select}
+        onApply={apply}
+      />,
+    );
+    fireEvent.click(screen.getByRole('radio', { name: '简洁背景' }));
     fireEvent.click(screen.getByRole('button', { name: '采用候选' }));
+    expect(select).toHaveBeenCalledWith(0);
     expect(apply).toHaveBeenCalledOnce();
-    expect(screen.getByText('更简洁的背景')).toBeTruthy();
+    expect(screen.getByText('细致背景')).toBeTruthy();
+
+    rerender(<AIFieldAssist state="APPLIED" onUndo={undo} />);
+    fireEvent.click(screen.getByRole('button', { name: '撤销采用' }));
+    expect(undo).toHaveBeenCalledOnce();
+    rerender(<AIFieldAssist state="ERROR" error="输出不合规" onRetry={retry} />);
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    expect(retry).toHaveBeenCalledOnce();
+    rerender(<AIFieldAssist state="LOCKED" onUnlock={unlock} />);
+    fireEvent.click(screen.getByRole('button', { name: '解锁' }));
+    expect(unlock).toHaveBeenCalledOnce();
   });
 
   it('shows bounded generation and status projections with retry/cancel intents', () => {

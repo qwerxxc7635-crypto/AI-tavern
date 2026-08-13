@@ -137,6 +137,7 @@ export function WorldCreationPage({
             <p className="eyebrow">{playerText.coreUi.worldBibleReview}</p>
             <input
               aria-label="世界名称"
+              data-ai-field="world-name"
               className="world-title-input"
               value={editor.name}
               disabled={isLocked('name', current.lockedFields)}
@@ -172,48 +173,56 @@ export function WorldCreationPage({
         <div className="world-layout">
           <section className="world-editor" aria-label="世界圣经编辑">
             <WorldTextField
+              fieldId="world-current-region"
               label="当前地区"
               value={editor.currentRegion}
               locked={isLocked('currentRegion', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, currentRegion: value })}
             />
             <WorldTextArea
+              fieldId="world-summary"
               label="世界简介"
               value={editor.summary}
               locked={isLocked('summary', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, summary: value })}
             />
             <WorldTextArea
+              fieldId="world-core-conflict"
               label="核心冲突"
               value={editor.coreConflict}
               locked={isLocked('coreConflict', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, coreConflict: value })}
             />
             <WorldTextField
+              fieldId="world-technology-level"
               label="技术水平"
               value={editor.technologyLevel}
               locked={isLocked('technologyLevel', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, technologyLevel: value })}
             />
             <WorldTextArea
+              fieldId="world-power-rules"
               label="力量规则（每行一条）"
               value={editor.powerRules.join('\n')}
               locked={isLocked('powerRules', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, powerRules: lines(value) })}
             />
             <WorldTextArea
+              fieldId="world-narrative-style"
               label="叙事风格"
               value={editor.narrativeStyle}
               locked={isLocked('narrativeStyle', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, narrativeStyle: value })}
             />
             <WorldTextArea
+              fieldId="world-forbidden-elements"
               label="禁止设定（每行一条）"
               value={editor.forbiddenElements.join('\n')}
               locked={isLocked('forbiddenElements', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, forbiddenElements: lines(value) })}
             />
             <WorldTextArea
+              fieldId="world-tavern-reason"
               label="酒馆存在的原因"
               value={editor.tavernReason}
               locked={isLocked('tavernReason', current.lockedFields)}
@@ -264,6 +273,7 @@ export function WorldCreationPage({
               <h2>局部修改</h2>
               <textarea
                 aria-label="修改要求"
+                data-ai-field="world-revision"
                 rows={5}
                 maxLength={4_000}
                 placeholder="例如：让主要势力的目标更明确，但保留力量规则。"
@@ -442,6 +452,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
             自定义世界构想 <small>可选</small>
           </span>
           <textarea
+            data-ai-field="world-options-concept"
             rows={6}
             maxLength={4_000}
             placeholder="例如：这是一个漂浮在云海上的群岛世界……"
@@ -463,6 +474,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
           <label className="boundary-options__excluded">
             <span>不希望出现的内容（每行一项）</span>
             <textarea
+              data-ai-field="world-options-excluded-content"
               rows={3}
               value={excluded}
               onChange={(event) => setExcluded(event.target.value)}
@@ -523,11 +535,13 @@ function BooleanOption({
 }
 
 function WorldTextField({
+  fieldId,
   label,
   value,
   locked,
   onChange,
 }: {
+  readonly fieldId: string;
   readonly label: string;
   readonly value: string;
   readonly locked: boolean;
@@ -536,17 +550,24 @@ function WorldTextField({
   return (
     <label>
       <span>{label}</span>
-      <input value={value} disabled={locked} onChange={(event) => onChange(event.target.value)} />
+      <input
+        data-ai-field={fieldId}
+        value={value}
+        disabled={locked}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
 
 function WorldTextArea({
+  fieldId,
   label,
   value,
   locked,
   onChange,
 }: {
+  readonly fieldId: string;
   readonly label: string;
   readonly value: string;
   readonly locked: boolean;
@@ -556,6 +577,7 @@ function WorldTextArea({
     <label>
       <span>{label}</span>
       <textarea
+        data-ai-field={fieldId}
         rows={4}
         value={value}
         disabled={locked}

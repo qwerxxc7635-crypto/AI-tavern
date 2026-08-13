@@ -3861,3 +3861,25 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 95文件/568项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建214个模块；共享Game Components形成独立lazy chunk，三份迁移页面bundle均保持按路由拆分。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、Provider、业务规则或持久化，不merge、不push。
+
+## 2026-08-13 — M2-T04 AI Field Assist
+
+### 字段合同与安全边界
+
+- 建立21项自然语言字段权威清单，覆盖世界创建/预览/修订、角色创建以及NPC与冒险自由输入；页面以唯一`data-ai-field`登记，测试审计所有者、重复与未知marker。
+- AIFieldAssist补齐生成、完善、多个候选、扩写、缩写、采用、撤销、取消、重试和锁定展示；radio使用组件独立分组，空候选不能采用。
+- 新增纯状态机和React适配器：结果先进入候选，只有显式采用才通知页面；生成器只接收operation/value/AbortSignal，没有SQLite、Repository或save能力。
+- 活动请求期间拒绝编辑、二次生成和锁定；取消abort，迟到/失序响应按请求ID忽略。软锁可解，硬锁拒绝编辑、生成及解锁，保护游戏开始后的世界事实。
+- 候选限定1–5个，“多个候选”至少2个；拒绝空白、重复、危险控制符和超过8000字符输出。Provider原始异常不进入玩家状态。
+- 新增`DEC-110`与`docs/V0.3_AI_FIELD_ASSIST.md`。M2不伪造候选、不调用真实模型、不复用会持久化的现有世界整体生成；M3 Generator通过无持久化接口接入。
+
+### 验证
+
+- 首轮格式化命令错误使用不存在的`src/pages`路径，Prettier明确失败且未更改这些页面；改用真实`src`路径后成功，未将部分格式化视为完成。
+- 首次定向TypeScript发现Error结构断言和async rejection写法不满足严格类型；改为显式验证`FieldAssistStateError.code`及Promise rejection后通过，未放宽tsconfig。
+- 首次字段审计准确发现`world-name`使用直接字面marker而非World helper动态marker；审计改为同时验证所有清单源登记和所有字面marker均受清单管理，不删除该字段。
+- 专项测试4文件/23项通过，覆盖字段审计、state machine、cancel/race、locked field、不合规输出、适配器无直接发布及组件交互。
+- 首次完整门禁在ESLint阶段发现测试中的非空断言和两个无用转义；改为显式null保护和规范正则后从头重跑，不禁用规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 98文件/586项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建214个模块；没有新增Provider依赖或改变路由拆分。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、真实模型配置或已保存游戏事实，不merge、不push。

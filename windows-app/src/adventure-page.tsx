@@ -450,6 +450,7 @@ export function AdventurePage({
               </p>
               <textarea
                 id="player-action"
+                data-ai-field="adventure-free-input"
                 aria-describedby="free-input-help"
                 value={action}
                 maxLength={4000}

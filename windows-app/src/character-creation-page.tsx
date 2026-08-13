@@ -488,6 +488,7 @@ export function CharacterCreationPage({
           <label>
             <span>姓名</span>
             <input
+              data-ai-field="character-name"
               required
               value={draft.name}
               onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
@@ -496,6 +497,7 @@ export function CharacterCreationPage({
           <label>
             <span>性别（可选）</span>
             <input
+              data-ai-field="character-gender"
               value={draft.gender ?? ''}
               onChange={(event) =>
                 updateDraft({ ...draft, gender: emptyToNull(event.target.value) })
@@ -519,6 +521,7 @@ export function CharacterCreationPage({
           <label className="character-form__wide">
             <span>角色概念</span>
             <textarea
+              data-ai-field="character-concept"
               required
               rows={3}
               value={draft.concept}
@@ -548,6 +551,7 @@ export function CharacterCreationPage({
           <label>
             <span>职业显示名</span>
             <input
+              data-ai-field="character-class-name"
               required
               value={draft.classDisplayName}
               onChange={(event) => updateDraft({ ...draft, classDisplayName: event.target.value })}
@@ -556,6 +560,7 @@ export function CharacterCreationPage({
           <label className="character-form__wide">
             <span>个人目标</span>
             <textarea
+              data-ai-field="character-personal-goal"
               required
               rows={2}
               value={draft.personalGoal}
@@ -565,6 +570,7 @@ export function CharacterCreationPage({
           <label className="character-form__wide">
             <span>故事偏好（每行一项）</span>
             <textarea
+              data-ai-field="character-story-preferences"
               rows={2}
               value={draft.storyPreferences.join('\n')}
               onChange={(event) =>
@@ -652,6 +658,7 @@ export function CharacterCreationPage({
           <label className="character-boundaries__wide">
             <span>排除内容（每行一项）</span>
             <textarea
+              data-ai-field="character-excluded-content"
               rows={2}
               value={draft.contentBoundaries.excludedContent.join('\n')}
               onChange={(event) =>

@@ -155,6 +155,24 @@
   background: var(--card-background);
 }
 
+.game-ai-assist fieldset {
+  display: grid;
+  margin: 0;
+  padding: var(--et-space-3);
+  border: 1px solid var(--color-border-subtle);
+  gap: var(--et-space-2);
+}
+
+.game-ai-assist fieldset label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-height: 2.75rem;
+  padding: var(--et-space-2);
+  align-items: start;
+  gap: var(--et-space-2);
+  cursor: pointer;
+}
+
 .game-generation-panel h2,
 .game-status-panel h2 {
   margin: 0;

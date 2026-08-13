@@ -1,5 +1,6 @@
 import { useId, type FormEvent, type ReactNode } from 'react';
 
+import type { FieldAssistOperation } from '../ai-field-assist-state.js';
 import { Button, EmptyState, ErrorState, Progress, Skeleton, Textarea } from './primitives.js';
 
 interface SelectableCardProps {
@@ -314,40 +315,120 @@ export function ActionComposer({
   );
 }
 
-export type FieldAssistState = 'IDLE' | 'LOADING' | 'CANDIDATE' | 'ERROR' | 'LOCKED';
+export type FieldAssistState = 'IDLE' | 'LOADING' | 'CANDIDATE' | 'APPLIED' | 'ERROR' | 'LOCKED';
 
 export function AIFieldAssist({
   state,
   candidate,
+  candidates,
+  selectedCandidate = 0,
   error,
   onGenerate,
+  onOperation,
   onApply,
   onCancel,
+  onSelect,
+  onUndo,
+  onRetry,
+  onLock,
+  onUnlock,
 }: {
   readonly state: FieldAssistState;
   readonly candidate?: string;
+  readonly candidates?: readonly string[];
+  readonly selectedCandidate?: number;
   readonly error?: string;
   readonly onGenerate?: () => void;
+  readonly onOperation?: (operation: FieldAssistOperation) => void;
   readonly onApply?: () => void;
   readonly onCancel?: () => void;
+  readonly onSelect?: (index: number) => void;
+  readonly onUndo?: () => void;
+  readonly onRetry?: () => void;
+  readonly onLock?: () => void;
+  readonly onUnlock?: () => void;
 }) {
+  const candidateGroup = useId();
+  const visibleCandidates = candidates ?? (candidate === undefined ? [] : [candidate]);
   return (
     <section className="game-ai-assist" aria-busy={state === 'LOADING'}>
       {state === 'ERROR' ? (
         <ErrorState title="辅助未完成" description={error ?? '请稍后重试。'} />
       ) : null}
-      {state === 'CANDIDATE' && candidate !== undefined ? <p>{candidate}</p> : null}
+      {state === 'CANDIDATE' ? (
+        <fieldset>
+          <legend>AI 候选</legend>
+          {visibleCandidates.map((entry, index) => (
+            <label key={`${index}:${entry}`}>
+              <input
+                type="radio"
+                name={candidateGroup}
+                checked={index === selectedCandidate}
+                onChange={() => onSelect?.(index)}
+              />
+              <span>{entry}</span>
+            </label>
+          ))}
+        </fieldset>
+      ) : null}
       <div>
-        {state === 'IDLE' || state === 'ERROR' ? (
-          <Button onClick={onGenerate}>AI 辅助</Button>
+        {state === 'IDLE' ? (
+          <>
+            <Button onClick={() => (onOperation ? onOperation('GENERATE') : onGenerate?.())}>
+              AI 生成
+            </Button>
+            {onOperation === undefined ? null : (
+              <>
+                <Button variant="secondary" onClick={() => onOperation('IMPROVE')}>
+                  AI 完善
+                </Button>
+                <Button variant="secondary" onClick={() => onOperation('OPTIONS')}>
+                  多个候选
+                </Button>
+                <Button variant="quiet" onClick={() => onOperation('EXPAND')}>
+                  扩写
+                </Button>
+                <Button variant="quiet" onClick={() => onOperation('SHORTEN')}>
+                  缩写
+                </Button>
+              </>
+            )}
+          </>
         ) : null}
         {state === 'LOADING' ? (
           <Button variant="quiet" onClick={onCancel}>
             取消
           </Button>
         ) : null}
-        {state === 'CANDIDATE' ? <Button onClick={onApply}>采用候选</Button> : null}
-        {state === 'LOCKED' ? <span>字段已锁定</span> : null}
+        {state === 'CANDIDATE' ? (
+          <Button disabled={visibleCandidates.length === 0} onClick={onApply}>
+            采用候选
+          </Button>
+        ) : null}
+        {state === 'APPLIED' ? (
+          <Button variant="quiet" onClick={onUndo}>
+            撤销采用
+          </Button>
+        ) : null}
+        {state === 'ERROR' ? (
+          <Button variant="secondary" onClick={onRetry}>
+            重试
+          </Button>
+        ) : null}
+        {state === 'LOCKED' ? (
+          <>
+            <span>字段已锁定</span>
+            {onUnlock === undefined ? null : (
+              <Button variant="quiet" onClick={onUnlock}>
+                解锁
+              </Button>
+            )}
+          </>
+        ) : onLock === undefined ? null : (
+          <Button variant="quiet" onClick={onLock}>
+            锁定字段
+          </Button>
+        )}
       </div>
     </section>
   );

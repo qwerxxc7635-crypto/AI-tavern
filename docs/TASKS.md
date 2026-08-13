@@ -123,7 +123,7 @@
 
 ## M2-T04 AI Field Assist
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M2-T03。
 - **Deliverable**：所有自然语言字段的统一生成/完善/候选/扩写/缩写/锁定交互合同和组件。
 - **Acceptance**：现有自然语言输入无遗漏；采用、撤销、取消、重试、字段锁定和并发状态一致。
