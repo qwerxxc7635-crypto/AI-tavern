@@ -65,7 +65,7 @@
 
 ## M1-T02 Unified Navigation
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M1-T01。
 - **Deliverable**：统一 Router、history/back、breadcrumb 规则与迁移后的页面导航。
 - **Acceptance**：所有层级页面自然返回；刷新、深链和恢复保持 Campaign/实体上下文；页面不再自建互相冲突的返回逻辑。

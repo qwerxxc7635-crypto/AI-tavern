@@ -18,6 +18,7 @@ import { windowsSettlementService, type WindowsSettlementService } from './settl
 import { AIErrorNotice } from './ai-error-notice.js';
 import { D20Animation } from './d20-animation.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
 import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 type AdventureActions = Pick<
@@ -236,7 +237,7 @@ export function AdventurePage({
         >
           重新载入并继续
         </button>
-        <Link className="text-link" to={`/recovery?campaignId=${encodeURIComponent(campaignId)}`}>
+        <Link className="text-link" to={campaignRoute(APP_PATHS.recovery, campaignId)}>
           打开恢复中心
         </Link>
       </main>
@@ -371,7 +372,7 @@ export function AdventurePage({
                 onClick={() =>
                   void run(async () => {
                     const archive = await settlementService.settle(campaignId, snapshot);
-                    navigate(`/archives?campaignId=${encodeURIComponent(archive.campaignId)}`);
+                    navigate(campaignRoute(APP_PATHS.archives, archive.campaignId));
                     return snapshot;
                   })
                 }
@@ -624,13 +625,14 @@ function stateLabel(state: Exclude<AdventureSnapshot['state'], null>): string {
 }
 
 function AdventureMessage({ title, detail }: { readonly title: string; readonly detail?: string }) {
+  const [search] = useSearchParams();
   return (
     <main className="adventure-page adventure-preparation">
       <p className="eyebrow">{playerText.coreUi.adventureUnavailable}</p>
       <h1>{title}</h1>
       {detail === undefined ? null : <p>{detail}</p>}
-      <Link className="text-link" to="/quests">
-        返回任务告示
+      <Link className="text-link" to={campaignParentRoute(search, APP_PATHS.quests)}>
+        {search.has('campaignId') ? '返回任务告示' : '返回存档首页'}
       </Link>
     </main>
   );

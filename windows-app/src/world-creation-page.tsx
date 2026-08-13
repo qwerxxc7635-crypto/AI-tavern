@@ -10,6 +10,7 @@ import {
 } from './world-creation-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignRoute } from './navigation.js';
 
 type WorldCreationActions = Pick<
   WindowsWorldCreationService,
@@ -90,7 +91,7 @@ export function WorldCreationPage({
       <main className="world-studio world-studio--message">
         <p className="eyebrow">{playerText.coreUi.missingChronicle}</p>
         <h1>先选择一个存档。</h1>
-        <Link className="text-link" to="/saves">
+        <Link className="text-link" to={APP_PATHS.saves}>
           返回存档首页
         </Link>
       </main>
@@ -128,7 +129,7 @@ export function WorldCreationPage({
     return (
       <main className="world-studio">
         <header className="world-studio__topline">
-          <Link to="/saves">← 存档首页</Link>
+          <Link to={APP_PATHS.saves}>← 存档首页</Link>
           <p>当前默认模型 · 生成结果预览</p>
         </header>
         <section className="world-hero">
@@ -150,7 +151,7 @@ export function WorldCreationPage({
             onClick={() =>
               void perform('confirm', async () => {
                 const confirmed = await service.confirm(campaignId);
-                navigate(`/character/create?campaignId=${encodeURIComponent(campaignId)}`);
+                navigate(campaignRoute(APP_PATHS.characterCreation, campaignId));
                 return confirmed;
               })
             }
@@ -326,7 +327,7 @@ export function WorldCreationPage({
     <main className="world-studio world-studio--message" role="alert">
       <p className="eyebrow">{playerText.coreUi.worldStageUnavailable}</p>
       <h1>这个存档不在世界构筑阶段。</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>
@@ -338,7 +339,7 @@ function WorldMessage({ title }: { readonly title: string }) {
     <main className="world-studio world-studio--message" role="alert">
       <p className="eyebrow">{playerText.coreUi.worldStageUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>
@@ -368,7 +369,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
   return (
     <main className="world-studio world-studio--options">
       <header className="world-studio__topline">
-        <Link to="/saves">← 存档首页</Link>
+        <Link to={APP_PATHS.saves}>← 存档首页</Link>
         <p>{playerText.coreUi.worldCreationStep}</p>
       </header>
       <section className="world-options__intro">

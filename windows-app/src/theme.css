@@ -275,6 +275,32 @@ button:focus-visible {
   font-size: 1.4rem;
 }
 
+.breadcrumbs {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0 0 0.35rem;
+  color: var(--muted);
+  font-family: Consolas, 'Cascadia Mono', monospace;
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+}
+
+.breadcrumbs > span {
+  display: inline-flex;
+  gap: 0.4rem;
+}
+
+.breadcrumbs a {
+  color: var(--moss);
+  text-decoration: none;
+}
+
+.breadcrumbs a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
 .titlebar__mode {
   margin: 0;
   color: var(--muted);

@@ -9,6 +9,7 @@ import {
   type WindowsTavernService,
 } from './tavern-service.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, buildRoute, campaignRoute } from './navigation.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 
 type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
@@ -189,7 +190,10 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
               )}
               <Link
                 className="primary-action"
-                to={`/npc?campaignId=${encodeURIComponent(campaignId)}&npcId=${encodeURIComponent(selectedNpc.id)}`}
+                to={buildRoute(APP_PATHS.npc, {
+                  campaignId,
+                  npcId: selectedNpc.id,
+                })}
               >
                 开始交谈
               </Link>
@@ -219,10 +223,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
             <p className="eyebrow">{playerText.coreUi.questBoard}</p>
             <h2>告示板</h2>
             <p>常驻者会把需要帮手的事情钉在这里。任务详情与接受操作由任务页面处理。</p>
-            <Link
-              className="primary-action"
-              to={`/quests?campaignId=${encodeURIComponent(campaignId)}`}
-            >
+            <Link className="primary-action" to={campaignRoute(APP_PATHS.quests, campaignId)}>
               选择任务入口
             </Link>
           </section>
@@ -284,7 +285,7 @@ function TavernMessage({ title }: { readonly title: string }) {
     <main className="tavern-room tavern-room--loading" role="alert">
       <p className="eyebrow">{playerText.coreUi.tavernUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>

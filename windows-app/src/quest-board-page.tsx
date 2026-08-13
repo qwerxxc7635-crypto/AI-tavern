@@ -8,6 +8,7 @@ import {
   type WindowsQuestBoardService,
 } from './quest-board-service.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, buildRoute, campaignParentRoute } from './navigation.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 
 type QuestActions = Pick<WindowsQuestBoardService, 'load' | 'initialize' | 'accept'>;
@@ -174,7 +175,10 @@ export function QuestBoardPage({
             {selected.status === 'ACCEPTED' || selected.status === 'ACTIVE' ? (
               <Link
                 className="primary-action"
-                to={`/adventure?campaignId=${encodeURIComponent(campaignId)}&questId=${encodeURIComponent(selected.id)}`}
+                to={buildRoute(APP_PATHS.adventure, {
+                  campaignId,
+                  questId: selected.id,
+                })}
               >
                 进入冒险准备
               </Link>
@@ -218,13 +222,14 @@ function statusLabel(status: QuestView['status']): string {
 }
 
 function QuestMessage({ title, detail }: { readonly title: string; readonly detail?: string }) {
+  const [search] = useSearchParams();
   return (
     <main className="quest-board-page">
       <p className="eyebrow">{playerText.coreUi.questBoardUnavailable}</p>
       <h1>{title}</h1>
       {detail === undefined ? null : <p>{detail}</p>}
-      <Link className="text-link" to="/tavern">
-        返回酒馆
+      <Link className="text-link" to={campaignParentRoute(search, APP_PATHS.tavern)}>
+        {search.has('campaignId') ? '返回酒馆' : '返回存档首页'}
       </Link>
     </main>
   );

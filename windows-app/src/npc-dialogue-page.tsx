@@ -8,6 +8,7 @@ import {
 } from './npc-dialogue-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
 
 type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
 
@@ -84,7 +85,7 @@ export function NpcDialoguePage({
             {snapshot.npc.identity} · {snapshot.npc.currentMood}
           </p>
         </div>
-        <Link className="text-link" to={`/tavern?campaignId=${encodeURIComponent(campaignId)}`}>
+        <Link className="text-link" to={campaignRoute(APP_PATHS.tavern, campaignId)}>
           返回酒馆
         </Link>
       </header>
@@ -177,12 +178,13 @@ function Relationship({ label, value }: { readonly label: string; readonly value
 }
 
 function DialogueMessage({ title }: { readonly title: string }) {
+  const [search] = useSearchParams();
   return (
     <main className="dialogue-room">
       <p className="eyebrow">{playerText.coreUi.conversationUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/tavern">
-        返回酒馆
+      <Link className="text-link" to={campaignParentRoute(search, APP_PATHS.tavern)}>
+        {search.has('campaignId') ? '返回酒馆' : '返回存档首页'}
       </Link>
     </main>
   );

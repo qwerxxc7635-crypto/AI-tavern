@@ -1,6 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 
 import { standardizeAIError, type StandardAIErrorCode } from '@ember-tavern/ai-core';
+
+import { APP_PATHS, optionalCampaignRoute } from './navigation.js';
 
 type ErrorAction = 'OPEN_SETTINGS' | 'RETRY';
 
@@ -68,6 +70,7 @@ export interface AIErrorNoticeProps {
 }
 
 export function AIErrorNotice({ error, onRetry }: AIErrorNoticeProps) {
+  const [search] = useSearchParams();
   const classified = standardizeAIError(error);
   const diagnosticCode = safeErrorCode(error) ?? classified.code;
   const presentation = PRESENTATIONS[classified.code];
@@ -85,7 +88,7 @@ export function AIErrorNotice({ error, onRetry }: AIErrorNoticeProps) {
           {presentation.actionLabel}
         </button>
       ) : (
-        <Link className="text-link" to="/settings">
+        <Link className="text-link" to={optionalCampaignRoute(search, APP_PATHS.settings)}>
           {presentation.action === 'RETRY' ? '检查模型设置' : presentation.actionLabel}
         </Link>
       )}

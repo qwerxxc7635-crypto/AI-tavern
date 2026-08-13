@@ -1,10 +1,10 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { AppLoading, AppRoutes, WINDOWS_NAVIGATION } from './routes.js';
+import { AppLoading, AppRoutes, AppShell, WINDOWS_NAVIGATION } from './routes.js';
 import { AppErrorBoundary } from './ui-states.js';
 
 afterEach(cleanup);
@@ -12,20 +12,28 @@ afterEach(cleanup);
 describe('Windows application shell', () => {
   it('navigates all six required sections through the shared shell', async () => {
     render(
-      <MemoryRouter initialEntries={['/tavern']}>
-        <AppRoutes />
+      <MemoryRouter initialEntries={['/tavern?campaignId=campaign-shell']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            {WINDOWS_NAVIGATION.map(({ path, label }) => (
+              <Route
+                key={path}
+                path={path.slice(1)}
+                element={
+                  <main>
+                    <h1>{label}</h1>
+                  </main>
+                }
+              />
+            ))}
+          </Route>
+        </Routes>
       </MemoryRouter>,
     );
 
     expect(screen.getByRole('navigation', { name: '主导航' })).toBeTruthy();
     expect(WINDOWS_NAVIGATION).toHaveLength(6);
-    expect(
-      await screen.findByRole(
-        'heading',
-        { name: '先从存档首页选择一段旅程。' },
-        { timeout: 5_000 },
-      ),
-    ).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '酒馆' })).toBeTruthy();
     expect(screen.getByRole('link', { name: '酒馆' }).getAttribute('aria-current')).toBe('page');
 
     for (const { label } of WINDOWS_NAVIGATION.slice(1)) {
@@ -33,6 +41,45 @@ describe('Windows application shell', () => {
       expect(await screen.findByRole('heading', { name: label })).toBeTruthy();
       expect(screen.getByRole('link', { name: label }).getAttribute('aria-current')).toBe('page');
     }
+  });
+
+  it('keeps only campaign context when leaving an entity deep link', () => {
+    render(
+      <MemoryRouter initialEntries={['/npc?campaignId=campaign-deep-link&npcId=npc-one']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="npc" element={<main>NPC 页面</main>} />
+            <Route
+              path="quests"
+              element={
+                <main>
+                  <LocationValue />
+                </main>
+              }
+            />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    fireEvent.click(screen.getByRole('link', { name: '任务' }));
+    expect(screen.getByText('/quests?campaignId=campaign-deep-link')).toBeTruthy();
+  });
+
+  it.each([
+    ['/tavern', '链接缺少存档信息。'],
+    ['/npc?campaignId=campaign-route', '链接缺少NPC信息。'],
+    ['/tavern?campaignId=%20bad', '存档链接无效。'],
+    ['/tavern?campaignId=one&campaignId=two', '存档链接无效。'],
+  ])('rejects an incomplete or invalid deep link %s', async (entry, message) => {
+    render(
+      <MemoryRouter initialEntries={[entry]}>
+        <AppRoutes />
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByRole('heading', { name: message })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '返回存档首页' })).toBeTruthy();
   });
 
   it('renders the loading state with accessible progress semantics', () => {
@@ -56,6 +103,11 @@ describe('Windows application shell', () => {
     consoleError.mockRestore();
   });
 });
+
+function LocationValue() {
+  const location = useLocation();
+  return `${location.pathname}${location.search}`;
+}
 
 function BrokenPage(): never {
   throw new Error('private failure detail');

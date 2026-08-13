@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
-import type { CampaignSummary } from './campaign-gateway.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignRoute, destinationForCampaign } from './navigation.js';
 import {
   tauriRecoveryGateway,
   type CampaignRecoverySnapshot,
@@ -43,7 +43,7 @@ export function RecoveryPage({
     setStatus(null);
     try {
       const campaign = await gateway.restore(campaignId);
-      navigate(destinationFor(campaign));
+      navigate(destinationForCampaign(campaign));
     } catch {
       setStatus('恢复没有完成；本地存档保持在恢复状态，请重启应用后再试。');
       setBusy(false);
@@ -54,7 +54,7 @@ export function RecoveryPage({
     return (
       <main className="recovery-page">
         <h1>没有选择需要恢复的存档</h1>
-        <Link to="/saves">返回存档首页</Link>
+        <Link to={APP_PATHS.saves}>返回存档首页</Link>
       </main>
     );
   }
@@ -84,16 +84,10 @@ export function RecoveryPage({
             >
               {busy ? '正在恢复…' : '恢复最近完整状态'}
             </button>
-            <Link
-              className="quiet-action"
-              to={{
-                pathname: '/settings',
-                search: `?campaignId=${encodeURIComponent(campaignId)}`,
-              }}
-            >
+            <Link className="quiet-action" to={campaignRoute(APP_PATHS.settings, campaignId)}>
               打开模型设置
             </Link>
-            <Link className="quiet-action" to="/saves">
+            <Link className="quiet-action" to={APP_PATHS.saves}>
               返回存档首页
             </Link>
           </div>
@@ -106,16 +100,4 @@ export function RecoveryPage({
       )}
     </main>
   );
-}
-
-function destinationFor(campaign: CampaignSummary): string {
-  const path =
-    campaign.state === 'CREATING_WORLD' || campaign.state === 'REVIEWING_WORLD'
-      ? '/world'
-      : campaign.state === 'CREATING_CHARACTER'
-        ? '/character/create'
-        : campaign.state === 'ADVENTURE'
-          ? '/adventure'
-          : '/tavern';
-  return `${path}?campaignId=${encodeURIComponent(campaign.id)}`;
 }

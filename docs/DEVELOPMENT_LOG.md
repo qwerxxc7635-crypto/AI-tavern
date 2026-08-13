@@ -3705,3 +3705,28 @@
 - `cargo fmt --all -- --check`、workspace全target/all-feature Clippy（`-D warnings`）和`cargo test --workspace`通过；Rust workspace执行96项、0失败，另有1项需显式真实DeepSeek凭据的测试保持默认忽略。
 - `pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 87文件/477项、Node 27项；完整Rust工作区和TypeScript/Rust存档互操作均通过。
 - 用户已有`.gitignore`修改保持未暂存；本任务只提交凭据修复、回归测试和三份项目文档，不merge、不push。
+
+## 2026-08-13 — M1-T02 Unified Navigation
+
+### 导航合同
+
+- 新增单一`navigation.ts`，集中定义桌面路径、规范查询参数编码、Campaign父级链接、可选Campaign设备页链接，以及Campaign状态到继续/恢复页面的唯一映射。
+- 修复侧栏复制完整查询字符串的问题：跨栏目只保留合法`campaignId`，不再把`npcId`或`questId`泄漏到无关页面。
+- 将世界、角色、酒馆、NPC、任务、冒险、结算档案、恢复、我的、模型设置与AI错误入口迁移到统一构造器；层级页返回链接不再丢失Campaign上下文。
+- `SETTLEMENT`与`ADVENTURE`统一恢复到冒险页面；失败、等待模型和需恢复状态统一进入恢复页，避免存档首页与恢复页维护不同映射。
+
+### 深链、返回与错误边界
+
+- 在React Router层增加必要上下文边界。世界、角色创建、恢复和五个Campaign主栏目要求唯一合法`campaignId`；NPC对话额外要求唯一合法`npcId`。
+- 缺失、重复、首尾空白、控制字符或超过256字符的参数在业务页面加载前被拒绝，显示不修改事实的安全错误页并可返回存档首页；实体是否存在仍由SQLite服务校验。
+- AppShell增加“当前位置”面包屑：NPC返回酒馆、冒险返回任务、模型设置返回我的；链接保留Campaign且不依赖历史栈。HashRouter历史和系统返回行为保持由React Router管理。
+- 新增13项纯导航合同测试，并扩展AppRoutes/AppShell测试，覆盖六栏目、实体参数隔离、缺失/重复/非法深链、Campaign状态恢复、面包屑跳转和上下文保持。
+
+### 验证
+
+- 定向TypeScript与导航测试采用红绿修复：首次编译发现三个消息组件引用页面局部`campaignId`及exact optional property类型问题；改为从统一查询合同生成安全父级后通过。首次UI测试发现重复文本选择器及非法参数下AppShell提前构造链接，收紧查询范围并让Shell仅使用已验证Campaign后通过。
+- `pnpm exec vitest run`通过：88文件/496项；`pnpm --dir windows-app build`通过，Vite production构建207个模块。
+- `pnpm check:shared`首次在ESLint阶段发现控制字符正则违反`no-control-regex`和一个迁移后未使用import；改为code point校验并删除遗留import后从头重跑通过。
+- 最终统一门禁通过Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript、Vitest 88文件/496项、Node 27项、完整Rust workspace（96项执行、0失败、1项真实API测试默认忽略）及TypeScript/Rust存档互操作。
+- 审计硬编码路径时，首次`rg`命令因zsh将未引用模式中的反引号与通配符解释为命令/文件匹配而在读取前失败；改用单引号模式重跑通过，未产生文件写入。
+- 用户已有`.gitignore`修改保持未暂存；本任务不修改SQLite、Provider或真实模型配置，不merge、不push。

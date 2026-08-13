@@ -17,6 +17,7 @@ import {
   type CharacterAIPhase,
 } from './character-ai-state-machine.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignRoute } from './navigation.js';
 
 type CharacterCreationActions = Pick<
   WindowsCharacterCreationService,
@@ -313,7 +314,7 @@ export function CharacterCreationPage({
             <button
               className="primary-action character-next"
               type="button"
-              onClick={() => navigate(`/tavern?campaignId=${encodeURIComponent(campaignId)}`)}
+              onClick={() => navigate(campaignRoute(APP_PATHS.tavern, campaignId))}
             >
               进入酒馆生成流程
             </button>
@@ -685,7 +686,7 @@ export function CharacterCreationPage({
 function CharacterTopline({ step }: { readonly step: string }) {
   return (
     <header className="character-studio__topline">
-      <Link to="/saves">← 存档首页</Link>
+      <Link to={APP_PATHS.saves}>← 存档首页</Link>
       <p>{step} · 本地离线</p>
     </header>
   );
@@ -723,7 +724,7 @@ function CharacterMessage({ title }: { readonly title: string }) {
     <main className="character-studio character-studio--message" role="alert">
       <p className="eyebrow">{playerText.coreUi.characterStageUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>

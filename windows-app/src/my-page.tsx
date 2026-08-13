@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useSearchParams } from 'react-router-dom';
 
 import {
   sessionContextInspectorGateway,
@@ -9,6 +9,7 @@ import {
 import { tauriVersionGateway, type VersionGateway } from './version-service.js';
 import { RELEASE_INFO } from './generated-release-info.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, optionalCampaignRoute } from './navigation.js';
 import {
   tauriRandomnessSettingsGateway,
   type RandomnessProfile,
@@ -35,6 +36,7 @@ export function MyPage({
   readonly randomnessGateway?: RandomnessSettingsGateway;
   readonly contextInspectorGateway?: ContextInspectorGateway;
 }) {
+  const [search] = useSearchParams();
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,7 +77,10 @@ export function MyPage({
             <SectionCopy eyebrow={playerText.coreUi.connectionProfiles} title="API">
               管理本机Provider连接与模型能力登记。API Key只进入系统凭据库，不进入SQLite存档。
             </SectionCopy>
-            <NavLink className="quiet-action" to="/settings">
+            <NavLink
+              className="quiet-action"
+              to={optionalCampaignRoute(search, APP_PATHS.settings)}
+            >
               打开模型设置
             </NavLink>
           </section>
@@ -130,7 +135,7 @@ export function MyPage({
         </div>
       </div>
 
-      <NavLink className="text-link" to="/saves">
+      <NavLink className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </NavLink>
     </main>
