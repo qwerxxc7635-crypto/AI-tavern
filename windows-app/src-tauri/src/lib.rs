@@ -33,7 +33,7 @@ use ember_provider_openai_compatible::{
 use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
 use serde::{Deserialize, Serialize};
 use tauri::{Manager, State};
-use time::{OffsetDateTime, format_description::well_known::Rfc3339};
+use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -554,9 +554,7 @@ async fn provider_probe(
         "custom" => OpenAiCompatibleConfig::new(&normalized_base_url, credential)?,
         _ => return Err(ProviderError::InvalidConfig.into()),
     };
-    let checked_at = OffsetDateTime::now_utc()
-        .format(&Rfc3339)
-        .map_err(|_| ProviderError::InvalidResponse)?;
+    let checked_at = canonical_probe_timestamp(OffsetDateTime::now_utc());
     let preset_key = input.preset_key;
     let endpoint_fingerprint = model_endpoint_fingerprint(&preset_key, &normalized_base_url);
     let models = OpenAiCompatibleProvider::new()?
@@ -669,6 +667,19 @@ fn normalize_url(value: &str) -> String {
     } else {
         format!("{value}/")
     }
+}
+
+fn canonical_probe_timestamp(value: OffsetDateTime) -> String {
+    format!(
+        "{:04}-{:02}-{:02}T{:02}:{:02}:{:02}.{:03}Z",
+        value.year(),
+        value.month() as u8,
+        value.day(),
+        value.hour(),
+        value.minute(),
+        value.second(),
+        value.millisecond(),
+    )
 }
 
 #[tauri::command]
@@ -1154,6 +1165,7 @@ mod tests {
     use ember_secure_secrets::SecretStoreError;
     use std::io::{Read, Write};
     use std::net::TcpListener;
+    use time::format_description::well_known::Rfc3339;
 
     #[test]
     fn cache_telemetry_failure_is_observable_but_does_not_replace_generation() {
@@ -1251,6 +1263,16 @@ mod tests {
             Some("Qwen 3.7 Plus")
         );
         assert_eq!(preset_display_name("custom", "custom-model"), None);
+    }
+
+    #[test]
+    fn probe_timestamp_matches_the_frontend_canonical_iso_contract() {
+        let timestamp = OffsetDateTime::parse("2026-08-12T10:01:28.700286Z", &Rfc3339).unwrap();
+
+        assert_eq!(
+            canonical_probe_timestamp(timestamp),
+            "2026-08-12T10:01:28.700Z"
+        );
     }
 
     #[tokio::test]
