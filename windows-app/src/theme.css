@@ -1,19 +1,22 @@
 :root {
-  color: #e8edf0;
-  background: #101821;
-  font-family: 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  color: var(--color-text-primary);
+  background: var(--color-canvas);
+  font-family: var(--font-family-body);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --ink: #e8edf0;
-  --muted: #a9b3b7;
-  --night: #101821;
-  --night-deep: #091016;
-  --panel: #131e28;
-  --panel-raised: #182631;
-  --copper: #c17853;
-  --copper-dark: #754834;
-  --moss: #92a67a;
-  --line: rgb(232 237 240 / 12%);
+  /* Legacy aliases remain during the page-by-page migration. */
+  --ink: var(--color-text-primary);
+  --muted: var(--color-text-secondary);
+  --night: var(--color-canvas);
+  --night-deep: var(--color-canvas-deep);
+  --panel: var(--color-surface);
+  --panel-raised: var(--color-surface-raised);
+  --copper: var(--color-accent);
+  --copper-dark: var(--color-accent-strong);
+  --moss: var(--color-positive);
+  --line: var(--color-border-subtle);
+  --text-muted: var(--color-text-secondary);
+  --ember-gold: var(--color-accent);
 }
 
 .archive-page {
@@ -72,8 +75,7 @@ body,
 body {
   min-height: 100vh;
   overflow: hidden;
-  background:
-    radial-gradient(circle at 84% 100%, rgb(193 120 83 / 10%), transparent 30rem), var(--night);
+  background: var(--app-background);
 }
 
 button,
@@ -87,7 +89,7 @@ a {
 
 a:focus-visible,
 button:focus-visible {
-  outline: 2px solid var(--moss);
+  outline: 2px solid var(--control-focus-ring);
   outline-offset: 3px;
 }
 
@@ -101,14 +103,14 @@ button:focus-visible {
 
 .sidebar {
   position: relative;
-  z-index: 1;
+  z-index: var(--layer-navigation);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   padding: 1.35rem 1rem 1.2rem;
-  border-right: 1px solid rgb(193 120 83 / 24%);
-  background: linear-gradient(180deg, rgb(9 16 22 / 12%), rgb(9 16 22 / 68%)), var(--panel);
-  box-shadow: 1rem 0 4rem rgb(0 0 0 / 16%);
+  border-right: 1px solid var(--sidebar-border);
+  background: var(--sidebar-background);
+  box-shadow: var(--sidebar-shadow);
 }
 
 .brand {
@@ -184,20 +186,20 @@ button:focus-visible {
   color: var(--muted);
   text-decoration: none;
   transition:
-    color 160ms ease,
-    background-color 160ms ease,
-    border-color 160ms ease;
+    color var(--duration-interface) var(--easing-interface),
+    background-color var(--duration-interface) var(--easing-interface),
+    border-color var(--duration-interface) var(--easing-interface);
 }
 
 .navigation a:hover {
-  color: var(--ink);
-  background: rgb(232 237 240 / 4%);
+  color: var(--color-text-primary);
+  background: var(--navigation-hover-background);
 }
 
 .navigation a[aria-current='page'] {
-  color: var(--ink);
-  border-color: rgb(193 120 83 / 28%);
-  background: linear-gradient(90deg, rgb(193 120 83 / 16%), rgb(193 120 83 / 3%));
+  color: var(--color-text-primary);
+  border-color: var(--navigation-current-border);
+  background: var(--navigation-current-background);
 }
 
 .navigation__marker {
@@ -257,7 +259,7 @@ button:focus-visible {
   justify-content: space-between;
   padding: 1rem clamp(1.5rem, 4vw, 3.5rem);
   border-bottom: 1px solid var(--line);
-  background: rgb(9 16 22 / 42%);
+  background: var(--titlebar-background);
 }
 
 .eyebrow {
@@ -850,10 +852,10 @@ textarea:disabled {
 }
 
 .danger-action {
-  border: 1px solid color-mix(in srgb, var(--danger, #b94a48) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-danger) 62%, transparent);
   border-radius: 999px;
   background: transparent;
-  color: var(--danger, #b94a48);
+  color: var(--color-danger);
   padding: 0.65rem 1rem;
 }
 
@@ -2040,25 +2042,26 @@ textarea:disabled {
 .dialogue-room,
 .quest-board-page,
 .adventure-page {
-  --ink: #2b2925;
-  --ink-muted: #5d5851;
-  --muted: #69635b;
-  --paper: #f2ebda;
-  --paper-deep: #e6ddcd;
-  --line: rgb(59 48 37 / 18%);
-  --line-strong: rgb(59 48 37 / 34%);
-  --ember: #934326;
-  --ember-bright: #74301b;
-  --moss: #526441;
-  --brass: #765824;
+  --ink: var(--color-text-primary);
+  --ink-muted: var(--color-text-tertiary);
+  --muted: var(--color-text-secondary);
+  --paper: var(--color-canvas);
+  --paper-deep: var(--color-canvas-deep);
+  --line: var(--color-border-subtle);
+  --line-strong: var(--color-border-strong);
+  --ember: var(--color-accent);
+  --ember-bright: var(--color-accent-strong);
+  --moss: var(--color-positive);
+  --brass: var(--et-color-brass-700);
 }
 
 .dialogue-room {
   min-height: 100%;
   padding: clamp(1.5rem, 4vw, 3.5rem);
-  color: var(--ink);
+  color: var(--color-text-primary);
   background:
-    radial-gradient(circle at 18% 0%, rgb(180 77 38 / 12%), transparent 34rem), var(--paper);
+    radial-gradient(circle at 18% 0%, var(--color-paper-glow), var(--color-transparent) 34rem),
+    var(--color-canvas);
 }
 
 .dialogue-profile {
@@ -2101,10 +2104,10 @@ textarea:disabled {
 
 .dialogue-panel,
 .dialogue-sidebar section {
-  border: 1px solid var(--line);
-  border-radius: 0.35rem;
-  background: rgb(255 252 245 / 86%);
-  box-shadow: 0 1rem 3rem rgb(48 32 20 / 7%);
+  border: 1px solid var(--card-border);
+  border-radius: var(--et-radius-sm);
+  background: var(--card-background);
+  box-shadow: var(--card-shadow);
 }
 
 .dialogue-panel {
@@ -2283,7 +2286,7 @@ textarea:disabled {
   top: 1rem;
   display: grid;
   border: 1px solid var(--line);
-  background: rgb(10 18 25 / 82%);
+  background: var(--color-navigation-translucent);
 }
 
 .my-hub__sections a {
@@ -2300,7 +2303,7 @@ textarea:disabled {
 }
 
 .my-hub__sections a:hover {
-  background: rgb(193 120 83 / 9%);
+  background: var(--color-accent-hover);
 }
 
 .my-hub__sections span {
@@ -2318,10 +2321,10 @@ textarea:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 1.5rem;
-  padding: 1.25rem;
-  border: 1px solid var(--line);
-  border-radius: 0.5rem;
-  background: rgb(17 27 36 / 72%);
+  padding: var(--card-padding);
+  border: 1px solid var(--card-border);
+  border-radius: var(--card-radius);
+  background: var(--card-background);
 }
 
 .my-hub__entry h2 {
@@ -2506,9 +2509,10 @@ textarea:disabled {
 .adventure-page {
   min-height: 100%;
   padding: clamp(1rem, 2.5vw, 2.5rem);
-  color: var(--ink);
+  color: var(--color-text-primary);
   background:
-    radial-gradient(circle at 50% 0, rgb(170 104 55 / 10%), transparent 34rem), var(--paper);
+    radial-gradient(circle at 50% 0, var(--color-paper-glow-soft), var(--color-transparent) 34rem),
+    var(--color-canvas);
 }
 
 .adventure-page--loading,
@@ -2583,9 +2587,9 @@ textarea:disabled {
   max-width: 96rem;
   min-height: calc(100vh - 11rem);
   margin: 0 auto;
-  border: 1px solid var(--line-strong);
-  background: rgb(255 252 245 / 80%);
-  box-shadow: 0 1.2rem 4rem rgb(48 32 20 / 12%);
+  border: 1px solid var(--color-border-strong);
+  background: var(--layout-panel-background);
+  box-shadow: var(--layout-panel-shadow);
 }
 
 .adventure-column {
@@ -2936,10 +2940,14 @@ textarea:disabled {
 .quest-board-page {
   min-height: 100%;
   padding: clamp(1.5rem, 4vw, 3.5rem);
-  color: var(--ink);
+  color: var(--color-text-primary);
   background:
-    linear-gradient(rgb(242 235 218 / 82%), rgb(242 235 218 / 82%)),
-    repeating-linear-gradient(90deg, transparent 0 3rem, rgb(91 67 42 / 5%) 3rem 3.1rem);
+    linear-gradient(var(--color-paper-overlay), var(--color-paper-overlay)),
+    repeating-linear-gradient(
+      90deg,
+      var(--color-transparent) 0 3rem,
+      var(--color-paper-grid) 3rem 3.1rem
+    );
 }
 
 .quest-board-header {
@@ -2968,9 +2976,9 @@ textarea:disabled {
   grid-template-columns: minmax(16rem, 0.75fr) minmax(24rem, 1.25fr);
   max-width: 76rem;
   margin: 0 auto;
-  border: 1px solid var(--line-strong);
-  background: rgb(255 252 245 / 78%);
-  box-shadow: 0 1.5rem 4rem rgb(48 32 20 / 10%);
+  border: 1px solid var(--color-border-strong);
+  background: var(--layout-panel-background-subtle);
+  box-shadow: var(--layout-panel-shadow-strong);
 }
 
 .quest-list {

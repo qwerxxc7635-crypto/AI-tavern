@@ -96,7 +96,7 @@
 
 ## M2-T01 Design Tokens
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M1-T04。
 - **Deliverable**：正式 color/type/spacing/radius/shadow/motion/layer tokens 和旧样式迁移策略。
 - **Acceptance**：核心页面使用语义 token；主题对比度和减少动态效果有明确合同；显著减少任意 hard-code。

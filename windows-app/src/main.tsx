@@ -4,6 +4,7 @@ import { HashRouter } from 'react-router-dom';
 
 import { installDocumentLocale } from './localization/index.js';
 import { AppRoutes } from './routes.js';
+import './design-tokens.css';
 import './theme.css';
 import './scroll-hardening.css';
 

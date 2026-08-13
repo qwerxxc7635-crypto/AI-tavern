@@ -1,0 +1,255 @@
+/* Ember Tavern design tokens: primitive -> semantic -> component. */
+
+/* === PRIMITIVE TOKENS === */
+:root {
+  --et-color-night-950: #091016;
+  --et-color-night-900: #101821;
+  --et-color-slate-850: #131e28;
+  --et-color-slate-800: #182631;
+  --et-color-slate-100: #e8edf0;
+  --et-color-slate-400: #a9b3b7;
+  --et-color-copper-500: #c17853;
+  --et-color-copper-700: #754834;
+  --et-color-moss-400: #92a67a;
+  --et-color-danger-400: #f1c5ae;
+  --et-color-paper-100: #f2ebda;
+  --et-color-paper-200: #e6ddcd;
+  --et-color-ink-900: #2b2925;
+  --et-color-ink-600: #5d5851;
+  --et-color-ink-500: #69635b;
+  --et-color-ember-600: #934326;
+  --et-color-ember-700: #74301b;
+  --et-color-moss-700: #526441;
+  --et-color-brass-700: #765824;
+  --et-color-transparent: transparent;
+
+  --et-alpha-light-04: rgb(232 237 240 / 4%);
+  --et-alpha-light-12: rgb(232 237 240 / 12%);
+  --et-alpha-copper-03: rgb(193 120 83 / 3%);
+  --et-alpha-copper-09: rgb(193 120 83 / 9%);
+  --et-alpha-copper-10: rgb(193 120 83 / 10%);
+  --et-alpha-copper-16: rgb(193 120 83 / 16%);
+  --et-alpha-copper-24: rgb(193 120 83 / 24%);
+  --et-alpha-copper-28: rgb(193 120 83 / 28%);
+  --et-alpha-night-12: rgb(9 16 22 / 12%);
+  --et-alpha-night-42: rgb(9 16 22 / 42%);
+  --et-alpha-night-68: rgb(9 16 22 / 68%);
+  --et-alpha-panel-72: rgb(17 27 36 / 72%);
+  --et-alpha-panel-82: rgb(10 18 25 / 82%);
+  --et-alpha-shadow-07: rgb(0 0 0 / 7%);
+  --et-alpha-shadow-16: rgb(0 0 0 / 16%);
+  --et-alpha-paper-78: rgb(255 252 245 / 78%);
+  --et-alpha-paper-80: rgb(255 252 245 / 80%);
+  --et-alpha-paper-82: rgb(242 235 218 / 82%);
+  --et-alpha-paper-86: rgb(255 252 245 / 86%);
+  --et-alpha-ink-05: rgb(91 67 42 / 5%);
+  --et-alpha-ink-18: rgb(59 48 37 / 18%);
+  --et-alpha-ink-34: rgb(59 48 37 / 34%);
+  --et-alpha-ember-08: rgb(180 77 38 / 8%);
+  --et-alpha-ember-10: rgb(170 104 55 / 10%);
+  --et-alpha-ember-12: rgb(180 77 38 / 12%);
+  --et-alpha-paper-shadow-07: rgb(48 32 20 / 7%);
+  --et-alpha-paper-shadow-10: rgb(48 32 20 / 10%);
+  --et-alpha-paper-shadow-12: rgb(48 32 20 / 12%);
+
+  --et-font-family-body: 'Segoe UI Variable', 'Segoe UI', sans-serif;
+  --et-font-family-display: Georgia, 'Times New Roman', serif;
+  --et-font-family-mono: Consolas, 'Cascadia Mono', monospace;
+  --et-font-size-xs: 0.75rem;
+  --et-font-size-sm: 0.875rem;
+  --et-font-size-md: 1rem;
+  --et-font-size-lg: 1.125rem;
+  --et-font-size-xl: 1.5rem;
+  --et-font-size-2xl: 2rem;
+  --et-line-height-tight: 1.2;
+  --et-line-height-body: 1.6;
+  --et-line-height-relaxed: 1.75;
+  --et-font-weight-regular: 400;
+  --et-font-weight-medium: 600;
+  --et-font-weight-bold: 700;
+
+  --et-space-0: 0;
+  --et-space-1: 0.25rem;
+  --et-space-2: 0.5rem;
+  --et-space-3: 0.75rem;
+  --et-space-4: 1rem;
+  --et-space-5: 1.25rem;
+  --et-space-6: 1.5rem;
+  --et-space-8: 2rem;
+  --et-space-10: 2.5rem;
+  --et-space-12: 3rem;
+  --et-space-16: 4rem;
+
+  --et-radius-xs: 0.2rem;
+  --et-radius-sm: 0.35rem;
+  --et-radius-md: 0.5rem;
+  --et-radius-lg: 1rem;
+  --et-radius-pill: 999px;
+  --et-radius-round: 50%;
+
+  --et-shadow-sm: 0 0.25rem 1rem var(--et-alpha-shadow-07);
+  --et-shadow-md: 0 1rem 3rem var(--et-alpha-shadow-16);
+  --et-shadow-sidebar: 1rem 0 4rem var(--et-alpha-shadow-16);
+  --et-shadow-paper-sm: 0 1rem 3rem var(--et-alpha-paper-shadow-07);
+  --et-shadow-paper-md: 0 1.2rem 4rem var(--et-alpha-paper-shadow-12);
+  --et-shadow-paper-lg: 0 1.5rem 4rem var(--et-alpha-paper-shadow-10);
+
+  --et-duration-instant: 1ms;
+  --et-duration-fast: 120ms;
+  --et-duration-normal: 160ms;
+  --et-duration-slow: 300ms;
+  --et-easing-standard: ease;
+  --et-easing-emphasized: cubic-bezier(0.2, 0.7, 0.2, 1);
+
+  --et-layer-base: 0;
+  --et-layer-navigation: 10;
+  --et-layer-sticky: 20;
+  --et-layer-overlay: 100;
+  --et-layer-modal: 200;
+  --et-layer-toast: 300;
+}
+
+/* === SEMANTIC TOKENS === */
+:root {
+  color-scheme: dark;
+  --color-canvas: var(--et-color-night-900);
+  --color-canvas-deep: var(--et-color-night-950);
+  --color-surface: var(--et-color-slate-850);
+  --color-surface-raised: var(--et-color-slate-800);
+  --color-text-primary: var(--et-color-slate-100);
+  --color-text-secondary: var(--et-color-slate-400);
+  --color-border-subtle: var(--et-alpha-light-12);
+  --color-border-strong: var(--et-alpha-copper-28);
+  --color-accent: var(--et-color-copper-500);
+  --color-accent-strong: var(--et-color-copper-700);
+  --color-positive: var(--et-color-moss-400);
+  --color-danger: var(--et-color-danger-400);
+  --color-focus-ring: var(--et-color-moss-400);
+  --color-surface-translucent: var(--et-alpha-panel-72);
+  --color-navigation-translucent: var(--et-alpha-panel-82);
+  --color-hover: var(--et-alpha-light-04);
+  --color-accent-hover: var(--et-alpha-copper-09);
+  --color-accent-wash: var(--et-alpha-copper-10);
+  --color-sidebar-gradient-start: var(--et-alpha-night-12);
+  --color-sidebar-gradient-end: var(--et-alpha-night-68);
+  --color-sidebar-border: var(--et-alpha-copper-24);
+  --color-navigation-current-start: var(--et-alpha-copper-16);
+  --color-navigation-current-end: var(--et-alpha-copper-03);
+  --color-titlebar: var(--et-alpha-night-42);
+  --color-surface-panel: var(--et-alpha-panel-72);
+  --color-surface-panel-subtle: var(--et-alpha-panel-82);
+  --color-surface-card: var(--et-alpha-panel-72);
+  --color-transparent: var(--et-color-transparent);
+
+  --font-family-body: var(--et-font-family-body);
+  --font-family-display: var(--et-font-family-display);
+  --font-family-mono: var(--et-font-family-mono);
+  --font-display: var(--font-family-display);
+  --font-body: var(--font-family-body);
+  --font-size-body: var(--et-font-size-md);
+  --line-height-body: var(--et-line-height-body);
+
+  --space-control-inline: var(--et-space-4);
+  --space-control-block: var(--et-space-2);
+  --space-card: var(--et-space-5);
+  --space-section: var(--et-space-8);
+  --space-page-inline: clamp(var(--et-space-5), 4vw, var(--et-space-16));
+  --space-page-block: clamp(var(--et-space-5), 3vw, var(--et-space-12));
+
+  --radius-control: var(--et-radius-md);
+  --radius-card: var(--et-radius-md);
+  --radius-pill: var(--et-radius-pill);
+  --shadow-surface: var(--et-shadow-md);
+  --shadow-floating: var(--et-shadow-md);
+  --shadow-sidebar: var(--et-shadow-sidebar);
+  --shadow-layout-panel: var(--et-shadow-md);
+  --shadow-layout-panel-strong: var(--et-shadow-md);
+  --shadow-card: var(--et-shadow-md);
+  --duration-feedback: var(--et-duration-fast);
+  --duration-interface: var(--et-duration-normal);
+  --easing-interface: var(--et-easing-standard);
+  --layer-content: var(--et-layer-base);
+  --layer-navigation: var(--et-layer-navigation);
+  --layer-sticky: var(--et-layer-sticky);
+  --layer-overlay: var(--et-layer-overlay);
+  --layer-modal: var(--et-layer-modal);
+  --layer-toast: var(--et-layer-toast);
+}
+
+/* === COMPONENT TOKENS === */
+:root {
+  --app-background:
+    radial-gradient(circle at 84% 100%, var(--color-accent-wash), var(--color-transparent) 30rem),
+    var(--color-canvas);
+  --sidebar-background:
+    linear-gradient(180deg, var(--color-sidebar-gradient-start), var(--color-sidebar-gradient-end)),
+    var(--color-surface);
+  --sidebar-border: var(--color-sidebar-border);
+  --sidebar-shadow: var(--shadow-sidebar);
+  --navigation-hover-background: var(--color-hover);
+  --navigation-current-background: linear-gradient(
+    90deg,
+    var(--color-navigation-current-start),
+    var(--color-navigation-current-end)
+  );
+  --navigation-current-border: var(--color-border-strong);
+  --titlebar-background: var(--color-titlebar);
+  --card-background: var(--color-surface-card);
+  --card-border: var(--color-border-subtle);
+  --card-radius: var(--radius-card);
+  --card-padding: var(--space-card);
+  --card-shadow: var(--shadow-card);
+  --control-background: var(--color-surface-raised);
+  --control-border: var(--color-border-subtle);
+  --control-text: var(--color-text-primary);
+  --control-radius: var(--radius-control);
+  --control-focus-ring: var(--color-focus-ring);
+  --layout-panel-background: var(--color-surface-panel);
+  --layout-panel-background-subtle: var(--color-surface-panel-subtle);
+  --layout-panel-shadow: var(--shadow-layout-panel);
+  --layout-panel-shadow-strong: var(--shadow-layout-panel-strong);
+}
+
+/* === PAPER THEME === */
+.dialogue-room,
+.quest-board-page,
+.adventure-page {
+  color-scheme: light;
+  --color-canvas: var(--et-color-paper-100);
+  --color-canvas-deep: var(--et-color-paper-200);
+  --color-surface: var(--et-alpha-paper-86);
+  --color-surface-raised: var(--et-color-paper-200);
+  --color-text-primary: var(--et-color-ink-900);
+  --color-text-secondary: var(--et-color-ink-500);
+  --color-text-tertiary: var(--et-color-ink-600);
+  --color-border-subtle: var(--et-alpha-ink-18);
+  --color-border-strong: var(--et-alpha-ink-34);
+  --color-accent: var(--et-color-ember-600);
+  --color-accent-strong: var(--et-color-ember-700);
+  --color-positive: var(--et-color-moss-700);
+  --color-focus-ring: var(--et-color-ember-600);
+  --color-accent-wash: var(--et-alpha-ember-08);
+  --color-paper-glow: var(--et-alpha-ember-12);
+  --color-paper-glow-soft: var(--et-alpha-ember-10);
+  --color-paper-grid: var(--et-alpha-ink-05);
+  --color-paper-overlay: var(--et-alpha-paper-82);
+  --color-surface-panel: var(--et-alpha-paper-80);
+  --color-surface-panel-subtle: var(--et-alpha-paper-78);
+  --color-surface-card: var(--et-alpha-paper-86);
+  --shadow-card: var(--et-shadow-paper-sm);
+  --shadow-layout-panel: var(--et-shadow-paper-md);
+  --shadow-layout-panel-strong: var(--et-shadow-paper-lg);
+}
+
+/* === REDUCED MOTION CONTRACT === */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --duration-feedback: var(--et-duration-instant);
+    --duration-interface: var(--et-duration-instant);
+    --et-duration-slow: var(--et-duration-instant);
+  }
+
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+}

@@ -2185,3 +2185,26 @@ Fake与Real报告必须显式区分；Fake报告必须标记真实Provider为`NO
 - M1-T04只测现有Fake Provider，不读取正式Key、不调用真实模型；真实证据需要未来单独授权并生成独立报告。
 - Fake延迟只代表本机调度、协议和序列化开销，不是网络或模型SLA；M12-T03可沿用合同进行可比回归门禁。
 - 性能优化不能通过删除校验、失败记录、隐私边界或硬事实规则取得表面改善。
+
+## DEC-107：视觉值采用三层Token并在语义层切换主题
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T01`、`docs/V0.3_SPEC.md` 7.1
+
+### 背景
+
+现有Windows样式以一组扁平深色变量为主，NPC对话、任务和冒险又各自在组合选择器内重定义同名纸张色。颜色、字体、间距、圆角、阴影、motion和layer没有统一层次；若直接全量重写三千余行CSS，会扩大回归面并提前侵入M2-T02/T03组件任务。
+
+### 决定与理由
+
+正式视觉值采用Primitive、Semantic、Component三层CSS custom properties。Primitive使用`--et-*`并集中保存原始值；Semantic按用途引用Primitive，是深色Ember与浅色Paper主题唯一允许覆盖的层；Component只引用Semantic。应用壳和核心Paper页面先迁移，旧变量保留为指向Semantic的兼容别名，后续按页面删除。
+
+排版、spacing、radius、shadow、motion和layer与颜色一起进入同一合同。WCAG适用阈值通过直接计算Primitive配色验证；`prefers-reduced-motion`在Semantic层将界面时长降为1ms，并继续显式关闭导航、加载和D20动画，不改变业务超时或游戏规则。
+
+### 影响与边界
+
+- 新组件不得在TSX中写视觉值，Component token不得直接使用hex/rgb或Primitive颜色名；主题切换不进入React业务状态或SQLite。
+- M2-T01只迁移应用壳、My核心卡片及三个Paper核心页背景/主面板，不一次重写全部旧CSS，不引入CSS框架或主题runtime。
+- 四个固定桌面视口必须同时通过静态布局合同和真实浏览器无横向溢出检查；后续调色必须更新对比度和视觉证据，不能降低WCAG阈值。
+- layer固定为content 0、navigation 10、sticky 20、overlay 100、modal 200、toast 300，未来Primitive和Modal使用这些语义层级。

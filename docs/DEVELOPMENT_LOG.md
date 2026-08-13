@@ -3780,3 +3780,33 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 90文件/528项通过，另有1项只在CLI环境运行的runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建209个模块。本任务没有以优化或删除校验改变基线结果。
 - 用户已有`.gitignore`修改保持未暂存；本任务不优化运行路径、不修改SQLite schema、不merge、不push。
+
+## 2026-08-13 — M2-T01 Design Tokens
+
+### Token架构与渐进迁移
+
+- 新增正式三层CSS token：Primitive集中color/type/spacing/radius/shadow/motion/layer原值，Semantic表达主题用途，Component只消费Semantic；单一文件在`theme.css`前加载。
+- 深色Ember为默认Semantic映射；NPC对话、任务板和冒险在自身根节点切换浅色Paper映射。旧`--ink`、`--muted`、`--panel`等变量暂时作为Semantic别名，避免全量重写。
+- 补齐此前已使用但未正式定义的display/body字体、muted文本与Ember强调别名；应用body、sidebar、navigation、titlebar、My核心卡片和三个Paper页背景/主面板完成迁移。
+- `theme.css`原始颜色从92处降至43处，减少49处（约53%）；其余旧页面留待后续逐页迁移，不引入CSS框架、主题状态库或运行时JavaScript。
+- 新增`DEC-107`与`docs/V0.3_DESIGN_TOKENS.md`，记录三层所有权、WCAG、motion、layer、迁移范围和后续规则。设计系统技能的三层架构用于约束实现，未采用其无关的slide流程。
+
+### 自动合同
+
+- 新增静态测试验证三层顺序、七类必需token、Semantic/Component无原始颜色、Component不直连Primitive、全部custom property均有定义，以及核心选择器不再写raw颜色。
+- 深色与Paper主题共8组文本/强调/焦点配色达到WCAG 2.2适用的7:1、4.5:1或3:1阈值；Paper主题仅作用于NPC对话、任务和冒险页面根节点。
+- reduced-motion合同在Semantic层把界面时长降为1ms，并验证导航和D20显式禁用动画；不会跳过规则、持久化或业务timeout。
+- 四分辨率静态smoke覆盖860×600、1180×760、1366×768和1920×1080，以及760px紧凑sidebar和已有页面堆叠断点。
+
+### 浏览器证据
+
+- `playwright-cli`技能要求的CLI未安装；未修改全局npm环境，改用已安装的应用内Browser控制本地Vite页面，并在结束时恢复视口、关闭测试页和停止服务器。
+- 四视口实际渲染均无document/body横向溢出；workspace宽度依次为612、932、1118和1672px，sidebar固定248px，navigation计算层级为10。
+- 深色canvas、正文、焦点和半透明卡片均解析到预期token；应用壳、导航、标题栏、My页卡片和错误状态可见，浏览器控制台0项warning/error。
+
+### 验证
+
+- 定向token、对比度和既有布局测试通过：5文件/22项。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 91文件/545项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建210个模块；CSS被正式构建且没有解析警告。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变游戏逻辑、SQLite、Provider或玩家数据，不merge、不push。
