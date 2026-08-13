@@ -2062,3 +2062,19 @@ V0.3 在现有分层上增量演进：Generator Framework 组合或替换现有�
 ### 影响与边界
 
 每项任务必须证明所解决的问题并优先复用现有能力。V0.3 不提前全面开发 iOS，不以接入更多 Provider 为目标，不把 TTS、图像、多人、云同步或插件商店纳入核心交付。若后续证据表明某个 V0.2 模块必须替换，需要新增 Decision，说明兼容、迁移、回滚和测试策略。
+
+## DEC-101：借鉴 SillyTavern 的上下文控制力但拒绝可刷新事实和开放执行面
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M0-T02`、`docs/V0.3_ST_FEATURE_MATRIX.md`
+
+### 决定与理由
+
+V0.3 高度覆盖 SillyTavern 在 Character、Persona、World Info、Prompt、Preset、Context、Memory、Multi-character Scene、Import/Export 和生成交互上的产品能力，但在 Ember 自有架构中独立实现。SillyTavern 的 Swipe、Regenerate、历史编辑和 Branch 适合可塑聊天；Ember 正式游戏的 NPC 回复、D20、Quest 后果、死亡和世界事实必须进入不可随意改写的 SQLite 时间线，因此普通 Swipe/Regenerate 不进入正式玩法。
+
+SillyTavern 的扩展生态展示了可扩展价值，也暴露了第三方代码执行和凭据风险。V0.3 只提供内部 typed ports 和受限 preset/action seam，不开放任意第三方 JavaScript、Server Plugin、SQL、HTTP 或文件访问。未来插件能力必须先设计沙箱、权限、签名、供应链和撤销模型。
+
+### 影响与边界
+
+Prompt Manager 必须区分 User Editable 与不可覆盖的 Core Rule Prompt；导入的角色、Lore、Memory 和外部资料必须经过隔离解析与授权，不能直接成为 WorldTruth。AI Inspector 提供可观察性但默认遮罩秘密且不能编辑正式事实。本决定不复制 SillyTavern 的 AGPL 源码、UI、CSS、品牌或素材。

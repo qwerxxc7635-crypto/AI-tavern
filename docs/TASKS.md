@@ -34,7 +34,7 @@
 
 ## M0-T02 SillyTavern 功能审计
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M0-T01。
 - **Deliverable**：`docs/V0.3_ST_FEATURE_MATRIX.md`。
 - **Acceptance**：覆盖 Character Card、Persona、World Info/Lorebook、Prompt Manager、Preset、Chat、Group Chat、Context、Memory、Branch/Checkpoint、Model Settings、Import/Export、Extension、Roleplay UX 和生成交互；逐项标记已有/缺失/采用/不采用/后续。

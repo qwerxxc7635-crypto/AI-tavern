@@ -3638,3 +3638,25 @@
 - V0.3任务结构检查通过：59个Task，每项均包含Status、Dependency、Deliverable、Acceptance、Tests和Do Not六个字段。
 - 文档目标检查通过；V0.3入口、历史v0.1规格、v0.2任务和两份v0.2审计/可玩性报告均存在。
 - 首次组合shell检查因使用变量名`path`覆盖zsh特殊`$path`数组，导致末尾两个`git`命令未被找到；文档检查本身已通过，Git检查随后以独立命令重跑，不修改系统或仓库配置。
+
+## 2026-08-13 — M0-T02 SillyTavern 功能审计
+
+### 研究
+
+- 核对官方SillyTavern仓库、1.18.0 Release和官方文档，覆盖Character Card、Persona、World Info/Lorebook、Prompt Manager、Preset、Chat、Group Chat、Context、Memory、Branch/Checkpoint、Model Settings、Import/Export、Extension、Roleplay UX和生成交互。
+- 定位本机`SillyTavern-1.13.3`整合包；只读取package版本、AGPL-3.0 License、README标题和内置扩展目录，未读取兑换码、secret、用户聊天或其他数据，也未启动或联网该包。
+- 官方2026年安全公告将1.17.0之前版本视为不安全；因此本机包仅作为历史结构样本，不作为可运行参考。
+
+### 输出与决定
+
+- 新增`docs/V0.3_ST_FEATURE_MATRIX.md`，逐项标记Ember已有、缺失、V0.3采用、不采用和后续考虑，并附官方直接来源。
+- 新增`DEC-101`：采用SillyTavern的角色/Persona/Lore/Prompt/Context/Memory/多角色和生成UX控制力；拒绝正式游戏Swipe、静默历史编辑和开放第三方执行面。
+- 本任务只修改审计与项目文档，未修改产品代码、数据库、Provider配置或用户本机整合包，未开始M0-T03。
+
+### 验证
+
+- Prettier定向写入和检查通过。首次提交前的tracked diff检查通过；文件暂存后检查发现新矩阵末尾多一个空行，随即删除、复核并修订同一任务commit。
+- 矩阵结构检查通过：26行表格数据，Character、Persona、World Info、Prompt、Preset、Chat、Group Chat、Context、Memory、Branch、Model、Import/Export、Extension和生成UX等必需类别及五种Ember分类均存在。
+- 文档包含16处官方/直接参考链接；秘密样式扫描通过，未发现Key或Bearer token样式内容。
+- 首次验证命令因shell正则内引号组合导致zsh在执行前报parse error；未产生写入。随后改用Node执行同等秘密与结构检查并完整通过。
+- Git状态复核只包含本任务四份文档以及用户原有`.gitignore`修改；后者不纳入暂存和提交。
