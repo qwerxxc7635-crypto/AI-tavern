@@ -19,6 +19,7 @@ import { AIErrorNotice } from './ai-error-notice.js';
 import { D20Animation } from './d20-animation.js';
 import { playerText } from './localization/index.js';
 import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
+import { ActionComposer } from './ui/game-components.js';
 import type { AdventureActionMode } from '@ember-tavern/contracts';
 
 type AdventureActions = Pick<
@@ -56,6 +57,7 @@ export function AdventurePage({
   const questId = search.get('questId') ?? undefined;
   const [snapshot, setSnapshot] = useState<AdventureSnapshot | null>(null);
   const [action, setAction] = useState('');
+  const [selectedActionId, setSelectedActionId] = useState<string | null>(null);
   const [actionMode, setActionMode] = useState<AdventureActionMode>('ACTION');
   const [busy, setBusy] = useState(false);
   const [turnState, dispatchTurn] = useReducer(
@@ -126,6 +128,7 @@ export function AdventurePage({
     try {
       setSnapshot(await operation());
       setAction('');
+      setSelectedActionId(null);
     } catch (error) {
       setAiError(error);
       setRetryAction(() => () => void run(operation));
@@ -158,6 +161,7 @@ export function AdventurePage({
       );
       setSnapshot(committed);
       setAction('');
+      setSelectedActionId(null);
       dispatchTurn({ type: 'NARRATION_STARTED', operationId, revision });
     } catch (error) {
       dispatchTurn({ type: 'FAILED', operationId, revision });
@@ -203,6 +207,7 @@ export function AdventurePage({
       const completed = await service.completeCheck(submittedCampaignId, submittedAdventureId);
       setSnapshot(completed);
       setAction('');
+      setSelectedActionId(null);
       dispatchTurn({ type: 'RESTORED', phase: restoredTurnPhase(completed) });
     } catch (error) {
       setAiError(error);
@@ -401,15 +406,7 @@ export function AdventurePage({
               </button>
             </div>
           ) : (
-            <form
-              className="adventure-actions"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (action.trim().length > 0) {
-                  void submitTurn(campaignId, adventureId, actionMode, action.trim());
-                }
-              }}
-            >
+            <div className="adventure-actions">
               <fieldset className="adventure-action-modes">
                 <legend>选择意图</legend>
                 {ACTION_MODES.map(({ mode, label }) => (
@@ -422,6 +419,7 @@ export function AdventurePage({
                       disabled={actionDisabled}
                       onChange={() => {
                         setActionMode(mode);
+                        setSelectedActionId(null);
                         draftChanged();
                       }}
                     />
@@ -429,52 +427,41 @@ export function AdventurePage({
                   </label>
                 ))}
               </fieldset>
-              <div className="suggested-actions">
-                {snapshot.suggestedActions.map((suggestion) => (
-                  <button
-                    type="button"
-                    key={suggestion}
-                    disabled={actionDisabled}
-                    onClick={() => {
-                      setAction(suggestion);
-                      draftChanged();
-                    }}
-                  >
-                    {suggestion}
-                  </button>
-                ))}
-              </div>
-              <label htmlFor="player-action">自由输入</label>
-              <p className="adventure-muted" id="free-input-help">
-                可以忽略上方建议，直接描述角色想做、想说或想观察的内容。
-              </p>
-              <textarea
-                id="player-action"
-                data-ai-field="adventure-free-input"
-                aria-describedby="free-input-help"
+              <ActionComposer
+                fieldId="adventure-free-input"
+                label="自由输入"
+                description="可以忽略上方建议，直接描述角色想做、想说或想调查的内容。按住控制键或命令键，再按回车提交。"
                 value={action}
-                maxLength={4000}
                 disabled={actionDisabled}
-                onChange={(event) => {
-                  setAction(event.target.value);
+                submitting={turnBusy}
+                suggestions={snapshot.suggestedActions.map((suggestion, index) => ({
+                  id: `adventure-action-${index + 1}`,
+                  label: suggestion,
+                }))}
+                selectedSuggestionId={selectedActionId}
+                submitLabel={`提交${actionModeLabel(actionMode)}`}
+                status={turnPhaseLabel(turnState.phase, turnState.failure)}
+                onChange={(value) => {
+                  setAction(value);
+                  setSelectedActionId(null);
                   draftChanged();
+                }}
+                onSuggestion={(suggestion) => {
+                  setAction(suggestion.label);
+                  setSelectedActionId(suggestion.id);
+                  draftChanged();
+                }}
+                onSubmit={() => {
+                  if (action.trim().length > 0) {
+                    void submitTurn(campaignId, adventureId, actionMode, action.trim());
+                  }
                 }}
                 placeholder={
                   ACTION_MODES.find(({ mode }) => mode === actionMode)?.placeholder ??
                   '描述角色下一步要做什么…'
                 }
               />
-              <p className="adventure-muted" role="status" aria-live="polite">
-                {turnPhaseLabel(turnState.phase, turnState.failure)}
-              </p>
-              <button
-                className="primary-action"
-                type="submit"
-                disabled={actionDisabled || action.trim().length === 0}
-              >
-                {turnBusy ? '正在推进…' : `提交${actionModeLabel(actionMode)}`}
-              </button>
-            </form>
+            </div>
           )}
           {aiError === null ? null : (
             <AIErrorNotice error={aiError} onRetry={retryAction ?? undefined} />

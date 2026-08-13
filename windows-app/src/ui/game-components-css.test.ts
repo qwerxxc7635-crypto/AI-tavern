@@ -27,6 +27,9 @@ describe('game component visual contract', () => {
       '.game-npc-card.is-selected,\n.game-quest-card.is-selected,\n.game-trait-card.is-selected',
     );
     expect(selected).toContain('box-shadow: inset 3px 0 0');
+    expect(css).toMatch(
+      /\.game-action-composer__suggestions \[aria-pressed='true'\][\s\S]*box-shadow:/,
+    );
     expect(css).toContain('@media (forced-colors: active)');
   });
 });

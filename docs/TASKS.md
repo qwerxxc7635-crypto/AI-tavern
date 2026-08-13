@@ -132,7 +132,7 @@
 
 ## M2-T05 Action Composer
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M2-T04。
 - **Deliverable**：统一对话/行动 Composer，3–5 候选和永久自由输入。
 - **Acceptance**：候选与自由输入走同一合法性/持久化路径；键盘、streaming、取消和错误状态一致。

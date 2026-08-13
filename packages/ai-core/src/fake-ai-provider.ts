@@ -154,7 +154,11 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
         return {
           reply: `Ilyra weighs "${inlinePlayerMessage}" and marks another safe step toward the sealed passage before the tide changes.`,
           mood: 'Focused',
-          suggestedTopics: [`Tide mark ${answerNumber}`, `Passage sign ${answerNumber}`],
+          suggestedTopics: [
+            `Tide mark ${answerNumber}`,
+            `Passage sign ${answerNumber}`,
+            `Safe step ${answerNumber}`,
+          ],
           memoryCandidate: `The player asked about "${inlinePlayerMessage}" while investigating the sealed route beneath the tavern.`,
           relationshipProposal: trust === 5 ? {} : { trust: 1 },
         };
@@ -162,7 +166,7 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       return {
         reply: 'The lower stones have cooled, so the old tunnel can be approached carefully.',
         mood: 'Focused',
-        suggestedTopics: ['The tide marks', 'The sealed passage'],
+        suggestedTopics: ['The tide marks', 'The sealed passage', 'The cooled stones'],
         memoryCandidate: 'The player returned to ask what lies beyond the cellar threshold.',
         relationshipProposal: { trust: 1 },
       };

@@ -89,6 +89,11 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     change: 'Reject substantial phrase repetition inside a generated reply.',
   }),
   Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(4),
+    change: 'Require 3-5 distinct optional Action Composer topics.',
+  }),
+  Object.freeze({
     task: 'GENERATE_QUEST',
     version: promptVersion(2),
     change: 'Avoid recent quest structures and substantial repeated phrases.',

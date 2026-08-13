@@ -2277,3 +2277,26 @@ ActionComposer和AIFieldAssist在本任务只建立presentation contract；M2-T0
 - 不合规候选在状态机边界拒绝，不能进入采用态；未来M3仍须执行Schema、业务规则和安全验证，UI验证不能替代Generator验证。
 - M2-T04不调用真实模型、不复用会直接提交草稿的世界生成命令、不写死候选。M3只需实现无持久化生成适配器，不另建字段状态机。
 - NPC与冒险自由输入已纳入清单，但其3–5建议、streaming和统一提交由紧邻的M2-T05完成，不提前侵入。
+
+## DEC-111：候选与自由行动共享同一提交权力
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T05`、`docs/V0.3_SPEC.md` 7.4
+
+### 背景
+
+NPC建议话题和冒险建议行动各自使用按钮填充Textarea，但NPC只生成1–2项，表单、键盘和并发保护重复实现。若候选直接走专用命令或携带额外规则身份，AI建议将获得自由输入没有的权限；若为“调查”提前增加无后端页面，则会制造伪集成。
+
+### 决定与理由
+
+候选只选择草稿，提交时与自由输入归一为同一ActionSubmission和既有Application入口。origin和suggestionId只用于UI/审计，不改变验证、检定、规则或持久化。新生成的活动场景候选统一为3–5个唯一值；无候选时自由输入仍存在，旧存档较少候选可以安全显示。
+
+统一状态机以submission ID处理submit、stream、cancel、fail、retry和recovery；活动提交拒绝重复操作，迟到事件忽略。NPC与冒险页面复用同一组件，但保留各自既有Application和SQLite事务边界。调查由现有OBSERVE意图承载，不创建第二条提交路径。
+
+### 影响与边界
+
+- NPC Reply输出schema和prompt升级v4，明确3–5候选及无额外权限；Fake输出同步升级，不改变既有正式消息事实。
+- 页面服务目前返回终态结果；组件/状态机预留真实stream与cancel合同，但不伪造Provider流。M3-T02与M10-T03随后接线，不另建Composer。
+- retry保留原文本；恢复SQLite待处理提交时不重新发送。冒险既有幂等/恢复状态机继续是持久化权威，Composer不是事实源。
+- UI组件不导入Repository、Provider或规则引擎，建议选择永远可以被编辑、清除或忽略。

@@ -1,4 +1,4 @@
-import { useId, type FormEvent, type ReactNode } from 'react';
+import { useId, type FormEvent, type KeyboardEvent, type ReactNode } from 'react';
 
 import type { FieldAssistOperation } from '../ai-field-assist-state.js';
 import { Button, EmptyState, ErrorState, Progress, Skeleton, Textarea } from './primitives.js';
@@ -261,10 +261,20 @@ export function ActionComposer({
   suggestions,
   disabled = false,
   submitting = false,
+  streaming = false,
   submitLabel,
+  placeholder,
+  fieldId,
+  selectedSuggestionId,
+  status,
+  streamedText,
+  error,
   onChange,
   onSuggestion,
   onSubmit,
+  onCancel,
+  onRetry,
+  className,
 }: {
   readonly label: string;
   readonly description: string;
@@ -272,23 +282,41 @@ export function ActionComposer({
   readonly suggestions: readonly ActionSuggestion[];
   readonly disabled?: boolean;
   readonly submitting?: boolean;
+  readonly streaming?: boolean;
   readonly submitLabel: string;
+  readonly placeholder?: string;
+  readonly fieldId?: string;
+  readonly selectedSuggestionId?: string | null;
+  readonly status?: string;
+  readonly streamedText?: string;
+  readonly error?: string;
   readonly onChange: (value: string) => void;
   readonly onSuggestion: (suggestion: ActionSuggestion) => void;
   readonly onSubmit: () => void;
+  readonly onCancel?: () => void;
+  readonly onRetry?: () => void;
+  readonly className?: string;
 }) {
+  const busy = submitting || streaming;
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    if (!disabled && !submitting && value.trim().length > 0) onSubmit();
+    if (!disabled && !busy && value.trim().length > 0) onSubmit();
+  };
+  const keyboardSubmit = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+      event.preventDefault();
+      if (!disabled && !busy && value.trim().length > 0) onSubmit();
+    }
   };
   return (
-    <form className="game-action-composer" onSubmit={submit}>
+    <form className={classes('game-action-composer', className)} onSubmit={submit} aria-busy={busy}>
       <div className="game-action-composer__suggestions" aria-label="行动建议">
         {suggestions.map((suggestion) => (
           <Button
             key={suggestion.id}
             variant="quiet"
-            disabled={disabled || submitting}
+            aria-pressed={selectedSuggestionId === suggestion.id}
+            disabled={disabled || busy}
             onClick={() => onSuggestion(suggestion)}
           >
             {suggestion.label}
@@ -296,21 +324,47 @@ export function ActionComposer({
         ))}
       </div>
       <Textarea
+        data-ai-field={fieldId}
         label={label}
         description={description}
         value={value}
-        disabled={disabled || submitting}
+        disabled={disabled || busy}
         maxLength={4_000}
+        placeholder={placeholder}
         onChange={(event) => onChange(event.target.value)}
+        onKeyDown={keyboardSubmit}
       />
-      <Button
-        type="submit"
-        loading={submitting}
-        loadingLabel="正在提交"
-        disabled={disabled || value.trim().length === 0}
-      >
-        {submitLabel}
-      </Button>
+      {streamedText === undefined || streamedText.length === 0 ? null : (
+        <output className="game-action-composer__stream" aria-live="polite">
+          {streamedText}
+        </output>
+      )}
+      {error === undefined ? null : <ErrorState title="行动未完成" description={error} />}
+      {status === undefined ? null : (
+        <p className="game-action-composer__status" role="status" aria-live="polite">
+          {status}
+        </p>
+      )}
+      <div className="game-action-composer__actions">
+        <Button
+          type="submit"
+          loading={busy}
+          loadingLabel={streaming ? '正在生成' : '正在提交'}
+          disabled={disabled || value.trim().length === 0}
+        >
+          {submitLabel}
+        </Button>
+        {busy && onCancel !== undefined ? (
+          <Button variant="quiet" onClick={onCancel}>
+            取消
+          </Button>
+        ) : null}
+        {error !== undefined && onRetry !== undefined ? (
+          <Button variant="secondary" onClick={onRetry}>
+            重试
+          </Button>
+        ) : null}
+      </div>
     </form>
   );
 }

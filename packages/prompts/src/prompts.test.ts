@@ -73,7 +73,7 @@ describe('central prompt catalog', () => {
               : task === 'GENERATE_NPCS'
                 ? 4
                 : task === 'NPC_REPLY'
-                  ? 3
+                  ? 4
                   : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
@@ -87,9 +87,13 @@ describe('central prompt catalog', () => {
     expect(PROMPT_HISTORY).toContainEqual(
       expect.objectContaining({ task: 'GENERATE_QUEST', version: 2 }),
     );
+    expect(PROMPT_HISTORY).toContainEqual(
+      expect.objectContaining({ task: 'NPC_REPLY', version: 4 }),
+    );
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toMatch(/3-5 distinct suggestions/);
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('knownFacts');
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('npcKnowledge');
+    expect(TASK_PROMPTS.NPC_REPLY.instruction).toMatch(/3-5 distinct suggested topics/);
     expect(TASK_PROMPTS.RESOLVE_DICE_RESULT.instruction).toMatch(
       /raw, modifier, total, DC, and result/,
     );

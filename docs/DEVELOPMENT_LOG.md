@@ -3883,3 +3883,24 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 98文件/586项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建214个模块；没有新增Provider依赖或改变路由拆分。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、真实模型配置或已保存游戏事实，不merge、不push。
+
+## 2026-08-13 — M2-T05 Action Composer
+
+### 统一输入与候选合同
+
+- 新增Action Composer纯状态机，统一freeform/suggestion提交、3–5候选验证、streaming、取消、错误重试、禁用、草稿恢复与SQLite pending恢复语义；迟到事件按submission ID忽略。
+- 共享ActionComposer补齐`Ctrl/⌘ + Enter`、受控候选选择、aria-pressed、live stream/status、cancel和retry；自由Textarea始终存在，候选没有专用提交权限。
+- NPC和冒险移除各自重复候选/表单结构并迁移共享组件。NPC候选/自由文本均走`service.send`且以ref阻止双击；冒险三种模式均走`service.act`，其中OBSERVE作为当前调查集成。
+- NPC Reply schema、prompt与registry升级v4，新生成输出要求3–5个唯一建议话题；Fake Provider和fixtures同步为3项。旧存档快照加载不强制新下限，保证兼容。
+- 删除已无调用者的`.dialogue-topics`与`.suggested-actions`旧样式；共享组件只消费正式token，并为候选增加非颜色及forced-colors选择标记。
+- 新增`DEC-111`与`docs/V0.3_ACTION_COMPOSER.md`。实际Provider streaming/cancel分别属于M10-T03/M3-T02，本任务不伪造流或提前实现队列。
+
+### 验证
+
+- 首轮专项测试发现NPC schema版本矩阵仍期待v3，且冒险回归依赖“上方建议”既有文案；同步v4矩阵并保留用户文案后重跑通过，没有降低断言。
+- 定向8文件/92项通过，覆盖state machine、schema/prompt/Fake、共享组件、NPC Application与NPC/冒险页面集成；冒险既有自由输入失败保留、恢复和不可重复投骰回归继续通过。
+- 首次完整门禁在玩家文案阶段拒绝`Ctrl/Enter`英文键名；改为“控制键/命令键/回车”的完整中文说明后从头重跑。
+- 第二次完整门禁准确发现共享组件迁移后字段marker由字面属性变为受控prop，以及NPC prompt当前版本升到v4但缓存测试仍模拟v4；审计改为验证所有字面marker均在清单内（字段源登记仍逐项唯一），缓存变化测试改为v4→v5后从头重跑。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 99文件/596项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建214个模块；NPC页面chunk略降，ActionComposer保持共享lazy chunk。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、硬结果或既有消息/行动事实，不merge、不push。

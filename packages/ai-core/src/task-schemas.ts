@@ -462,7 +462,7 @@ export const NpcReplyOutputSchema = z
   .object({
     reply: text,
     mood: shortText,
-    suggestedTopics: stringList.max(5),
+    suggestedTopics: stringList.min(3).max(5),
     memoryCandidate: text.nullable(),
     relationshipProposal: z
       .object({
@@ -482,6 +482,16 @@ export const NpcReplyOutputSchema = z
     ]);
     if (phrase !== null) {
       context.addIssue({ code: 'custom', path: ['reply'], message: `repeated phrase: ${phrase}` });
+    }
+    const normalizedTopics = output.suggestedTopics.map((topic) =>
+      topic.toLocaleLowerCase('zh-CN'),
+    );
+    if (new Set(normalizedTopics).size !== normalizedTopics.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestedTopics'],
+        message: 'Suggested topics must be unique',
+      });
     }
   });
 

@@ -240,7 +240,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     output: {
       reply: 'I will show you, but stay close.',
       mood: 'Wary',
-      suggestedTopics: ['The old tunnel'],
+      suggestedTopics: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'],
       memoryCandidate: 'Mira asked to see the cellar door.',
       relationshipProposal: { trust: 1 },
     },
@@ -461,7 +461,7 @@ describe('versioned AI task schemas', () => {
         : task === 'GENERATE_NPCS'
           ? 4
           : task === 'NPC_REPLY'
-            ? 3
+            ? 4
             : [
                   'GENERATE_CHARACTER_TRAITS',
                   'COMPLETE_CHARACTER_BACKGROUND',
@@ -518,6 +518,25 @@ describe('versioned AI task schemas', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+
+  it('requires three to five unique optional topics for NPC replies', () => {
+    const output = fixtures.NPC_REPLY.output as Record<string, unknown>;
+    for (const suggestedTopics of [
+      ['one', 'two'],
+      ['one', 'two', 'three', 'four', 'five', 'six'],
+      ['one', 'two', 'ONE'],
+    ]) {
+      expect(
+        AI_TASK_SCHEMAS.NPC_REPLY.output.safeParse({ ...output, suggestedTopics }).success,
+      ).toBe(false);
+    }
+    expect(
+      AI_TASK_SCHEMAS.NPC_REPLY.output.safeParse({
+        ...output,
+        suggestedTopics: ['one', 'two', 'three'],
+      }).success,
+    ).toBe(true);
   });
 
   it('forbids suggestions after an adventure reaches its ending', () => {

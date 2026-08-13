@@ -134,6 +134,50 @@ describe('shared game components', () => {
     );
     fireEvent.click(screen.getByRole('button', { name: '提交行动' }));
     expect(submit).toHaveBeenCalledOnce();
+    fireEvent.keyDown(screen.getByRole('textbox', { name: '自由行动' }), {
+      key: 'Enter',
+      ctrlKey: true,
+    });
+    expect(submit).toHaveBeenCalledTimes(2);
+  });
+
+  it('renders consistent streaming, cancel, error and retry actions', () => {
+    const cancel = vi.fn();
+    const retry = vi.fn();
+    const { rerender } = render(
+      <ActionComposer
+        label="调查"
+        description="自由输入始终可用"
+        value="检查足迹"
+        suggestions={[]}
+        streaming
+        streamedText="雨水正沿着"
+        submitLabel="提交调查"
+        onChange={vi.fn()}
+        onSuggestion={vi.fn()}
+        onSubmit={vi.fn()}
+        onCancel={cancel}
+      />,
+    );
+    expect(screen.getByText('雨水正沿着')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    expect(cancel).toHaveBeenCalledOnce();
+    rerender(
+      <ActionComposer
+        label="调查"
+        description="自由输入始终可用"
+        value="检查足迹"
+        suggestions={[]}
+        error="生成暂时失败"
+        submitLabel="提交调查"
+        onChange={vi.fn()}
+        onSuggestion={vi.fn()}
+        onSubmit={vi.fn()}
+        onRetry={retry}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: '重试' }));
+    expect(retry).toHaveBeenCalledOnce();
   });
 
   it('presents field assistance states without owning field or persistence state', () => {

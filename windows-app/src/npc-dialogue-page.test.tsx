@@ -37,6 +37,23 @@ describe('NPC dialogue page', () => {
     expect(await screen.findByText('Stay close.')).toBeTruthy();
     expect(screen.getByLabelText('信任 2')).toBeTruthy();
   });
+
+  it('submits a suggestion through the same path and suppresses duplicate clicks', async () => {
+    const service = new FakeDialogueService();
+    render(
+      <MemoryRouter initialEntries={['/npc?campaignId=campaign-tavern&npcId=npc-owner']}>
+        <Routes>
+          <Route path="/npc" element={<NpcDialoguePage service={service} />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByRole('heading', { name: 'Ilyra Venn' });
+    fireEvent.click(screen.getByRole('button', { name: 'The cellar door' }));
+    const submit = screen.getByRole('button', { name: '发送' });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    await waitFor(() => expect(service.sent).toEqual(['The cellar door']));
+  });
 });
 
 class FakeDialogueService {
@@ -79,7 +96,7 @@ function initialSnapshot(): NpcDialogueSnapshot {
       dialogueMessage('player-1', 1, 'PLAYER', 'Earlier question'),
       dialogueMessage('npc-1', 2, 'NPC', 'Earlier answer'),
     ],
-    suggestedTopics: ['The old tunnel', 'The lighthouse keeper'],
+    suggestedTopics: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'],
     generationContext: {},
   };
 }

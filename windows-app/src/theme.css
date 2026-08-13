@@ -2154,36 +2154,12 @@ textarea:disabled {
   line-height: 1.6;
 }
 
-.dialogue-topics {
-  display: flex;
-  padding: 0.8rem 1.5rem;
-  border-top: 1px solid var(--line);
-  align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.dialogue-topics > span {
-  margin-right: 0.35rem;
-  color: var(--muted);
-  font-size: 0.8rem;
-}
-
-.dialogue-topics button {
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 0.4rem 0.7rem;
-  color: var(--ink);
-  background: transparent;
-  cursor: pointer;
-}
-
 .dialogue-composer {
   padding: 1rem 1.5rem 1.25rem;
   border-top: 1px solid var(--line);
 }
 
-.dialogue-composer label {
+.dialogue-composer .ui-field label {
   display: block;
   margin-bottom: 0.45rem;
   font-weight: 700;
@@ -2194,15 +2170,6 @@ textarea:disabled {
   width: 100%;
   min-height: 6rem;
   resize: vertical;
-}
-
-.dialogue-composer > div {
-  display: flex;
-  margin-top: 0.65rem;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 0.8rem;
 }
 
 .dialogue-sidebar {
@@ -2706,13 +2673,6 @@ textarea:disabled {
   background: var(--paper-deep);
 }
 
-.suggested-actions {
-  display: flex;
-  margin-bottom: 0.7rem;
-  gap: 0.45rem;
-  flex-wrap: wrap;
-}
-
 .adventure-action-modes {
   display: flex;
   margin: 0 0 0.8rem;
@@ -2746,15 +2706,6 @@ textarea:disabled {
 
 .adventure-action-modes input {
   margin: 0;
-}
-
-.suggested-actions button {
-  border: 1px solid var(--line-strong);
-  border-radius: 999px;
-  padding: 0.35rem 0.65rem;
-  color: var(--ink);
-  background: transparent;
-  cursor: pointer;
 }
 
 .adventure-actions label {

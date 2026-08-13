@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import {
@@ -9,7 +9,7 @@ import {
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
 import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
-import { DialogueView } from './ui/game-components.js';
+import { ActionComposer, DialogueView } from './ui/game-components.js';
 
 type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
 
@@ -23,9 +23,11 @@ export function NpcDialoguePage({
   const npcId = search.get('npcId');
   const [snapshot, setSnapshot] = useState<NpcDialogueSnapshot | null>(null);
   const [draft, setDraft] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
+  const sendInFlight = useRef(false);
 
   useEffect(() => {
     if (campaignId === null || npcId === null) return;
@@ -44,16 +46,26 @@ export function NpcDialoguePage({
   }, [campaignId, npcId, service]);
 
   async function send() {
-    if (campaignId === null || npcId === null || busy || draft.trim().length === 0) return;
+    if (
+      campaignId === null ||
+      npcId === null ||
+      busy ||
+      sendInFlight.current ||
+      draft.trim().length === 0
+    )
+      return;
     const message = draft.trim();
+    sendInFlight.current = true;
     setBusy(true);
     setAiError(null);
     try {
       setSnapshot(await service.send(campaignId, npcId, message));
       setDraft('');
+      setSelectedTopicId(null);
     } catch (error) {
       setAiError(error);
     } finally {
+      sendInFlight.current = false;
       setBusy(false);
     }
   }
@@ -105,40 +117,30 @@ export function NpcDialoguePage({
             }))}
           />
 
-          {snapshot.suggestedTopics.length === 0 ? null : (
-            <div className="dialogue-topics" aria-label="建议话题">
-              <span>建议话题</span>
-              {snapshot.suggestedTopics.map((topic) => (
-                <button type="button" key={topic} onClick={() => setDraft(topic)} disabled={busy}>
-                  {topic}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <form
+          <ActionComposer
             className="dialogue-composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send();
+            fieldId="npc-dialogue-free-input"
+            label="你想说什么？"
+            description="可以选择建议话题，也可以永久使用自由输入。按住控制键或命令键，再按回车发送。"
+            value={draft}
+            suggestions={snapshot.suggestedTopics.map((topic, index) => ({
+              id: `npc-topic-${index + 1}`,
+              label: topic,
+            }))}
+            selectedSuggestionId={selectedTopicId}
+            disabled={busy}
+            submitting={busy}
+            submitLabel="发送"
+            onChange={(value) => {
+              setDraft(value);
+              setSelectedTopicId(null);
             }}
-          >
-            <label htmlFor="dialogue-message">你想说什么？</label>
-            <textarea
-              id="dialogue-message"
-              data-ai-field="npc-dialogue-free-input"
-              maxLength={4_000}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={busy}
-            />
-            <div>
-              <span>{draft.length} / 4000</span>
-              <button className="primary-action" type="submit" disabled={busy || !draft.trim()}>
-                {busy ? '等待回应…' : '发送'}
-              </button>
-            </div>
-          </form>
+            onSuggestion={(suggestion) => {
+              setDraft(suggestion.label);
+              setSelectedTopicId(suggestion.id);
+            }}
+            onSubmit={() => void send()}
+          />
           {aiError === null ? null : <AIErrorNotice error={aiError} onRetry={() => void send()} />}
         </section>
 

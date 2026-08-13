@@ -157,7 +157,7 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
   NPC_REPLY: {
     reply: 'I will show you the cellar door, but stay close and touch nothing warm.',
     mood: 'Wary',
-    suggestedTopics: ['The old tunnel', 'The lighthouse keeper'],
+    suggestedTopics: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'],
     memoryCandidate: 'The player asked Ilyra to reveal the cellar door.',
     relationshipProposal: { trust: 1 },
   },
