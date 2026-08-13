@@ -3730,3 +3730,27 @@
 - 最终统一门禁通过Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript、Vitest 88文件/496项、Node 27项、完整Rust workspace（96项执行、0失败、1项真实API测试默认忽略）及TypeScript/Rust存档互操作。
 - 审计硬编码路径时，首次`rg`命令因zsh将未引用模式中的反引号与通配符解释为命令/文件匹配而在读取前失败；改用单引号模式重跑通过，未产生文件写入。
 - 用户已有`.gitignore`修改保持未暂存；本任务不修改SQLite、Provider或真实模型配置，不merge、不push。
+
+## 2026-08-13 — M1-T03 Error Architecture
+
+### 六类合同与跨语言映射
+
+- 在AI core新增稳定`ApplicationError`合同，产品错误严格投影为Provider、Generation、Validation、Persistence、Rule和Network六类，同时保留原有细粒度code与AI内部十类诊断。
+- 合同统一携带`retryable`、`fallbackEligible`、允许actions和Toast/Error State surface；构造器拒绝不可重试fallback，以及Validation/Persistence/Rule等非Provider/Network fallback伪造。
+- 新增六类代表性JSON fixture；TypeScript分类测试与Rust Tauri测试共同读取，逐项验证kind、retry、fallback、surface和actions。
+- Rust `CommandError`继续提供安全中文message和原code，同时序列化六类合同字段；未将原始Provider响应、秘密或内部异常文本暴露给UI。
+
+### 编排与UI策略
+
+- Desktop AI fallback改为读取统一`fallbackEligible`，不再维护独立code白名单；新增回归证明网络错误仍使用已保存备用模型，而认证、额度、Validation、Rule和Persistence均只调用主模型一次并原样失败。
+- `AITaskExecutionError`保留operation/request和内部category，同时增加稳定kind、fallback资格和actions投影。
+- AI错误组件现在按六类显示安全、具体的玩家文案与错误code，并只在合同和回调同时允许时展示Retry、Cancel、显式备用或Dismiss；认证/额度/模型问题提供模型设置入口。
+- Toast与持久Error State使用明确data contract和轻量视觉区分；Rule文案明确不能靠更换模型绕过，Validation文案明确技术重试不改变锁定硬结果。
+
+### 验证
+
+- 定向TypeScript测试通过：Application Error 11项、AI Task Orchestrator 8项、Desktop Orchestrator 11项、Error Notice 14项；Rust跨语言策略定向测试1项通过。
+- `pnpm check:shared`一次完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 89文件/518项、Node 27项；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- 完整门禁同时覆盖pending请求重试幂等、事务回滚、无部分事实写入、D20硬结果和恢复用例；未删除或降低既有校验。
+- `pnpm --dir windows-app build`通过，Vite production构建208个模块。
+- 用户已有`.gitignore`修改保持未暂存；本任务不调用真实模型、不修改SQLite schema、不merge、不push。

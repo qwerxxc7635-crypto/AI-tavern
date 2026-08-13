@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   FakeAIProvider,
   assertTaskContextBudget,
+  classifyApplicationError,
   validateAIOutput,
   type AIProvider,
   type AITask,
@@ -310,14 +311,7 @@ function resolveProfile(
 }
 
 function canUseFallback(error: unknown): boolean {
-  if (typeof error !== 'object' || error === null || Array.isArray(error)) return false;
-  const code = (error as Record<string, unknown>)['code'];
-  return (
-    code === 'NETWORK_FAILED' ||
-    code === 'RATE_LIMITED' ||
-    code === 'TIMEOUT' ||
-    code === 'PROVIDER_UNAVAILABLE'
-  );
+  return classifyApplicationError(error).fallbackEligible;
 }
 
 function fakeSettings(provider: AIProvider): ModelSettingsGateway {

@@ -2138,3 +2138,27 @@ V0.2页面各自拼接路径与查询参数。侧栏会复制当前页面的完�
 - 面包屑和页面内返回链接通过统一构造器保留Campaign上下文；设备级“我的”和模型设置在没有Campaign时仍可直接访问。
 - URL合法只代表定位格式合法，不证明实体存在或授权成立；Repository/Application仍必须从SQLite读取并校验Campaign与实体关系。
 - 不在本任务引入第二套路由库、全局业务状态或URL持久化，也不改动数据库schema。
+
+## DEC-105：细粒度诊断码投影为六类稳定产品错误
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M1-T03`、`docs/V0.3_SPEC.md` 6.3
+
+### 背景
+
+现有系统已有Provider标准码和AI编排内部类别，但Tauri命令只返回`code/message`，页面据此各自决定是否显示重试或模型设置。内部十类AI诊断并不能覆盖Persistence和Rule，也不适合作为长期UI合同。若直接用单一`retryable`布尔值推断备用模型，认证、额度、Schema、规则或本地存储失败可能被错误地跨Provider重试。
+
+### 决定与理由
+
+保留现有细粒度错误码和内部编排类别用于诊断，同时向产品层投影为且仅为六类：`PROVIDER`、`GENERATION`、`VALIDATION`、`PERSISTENCE`、`RULE`、`NETWORK`。稳定合同包含`code`、`kind`、`retryable`、`fallbackEligible`、`actions`和`surface`，其中actions只能来自`RETRY`、`CANCEL`、`USE_FALLBACK`、`OPEN_SETTINGS`和`DISMISS`，surface只能是`TOAST`或`ERROR_STATE`。
+
+只有瞬态Provider可用性、限流、超时和网络失败可标记`fallbackEligible`；且fallback必须同时可重试并属于Provider或Network。认证、额度、模型配置、凭据、Validation、Persistence和Rule永远不可通过模型fallback绕过。Validation技术重试允许使用同一意图、幂等键和已锁定硬结果，但不赋予改变事实的权限。
+
+### 影响与边界
+
+- TypeScript分类器不显示上游原始message，只保留经过格式限制的诊断code；`cause`仅用于内部链路，不进入玩家文案。
+- Rust `CommandError`序列化同一六类字段；TS与Rust读取同一代表性fixture，防止类别、动作和fallback资格漂移。
+- AI内部`configuration/credential/schema/domain_policy`等类别继续保留，`AITaskExecutionError`同时暴露稳定六类投影，不做破坏性重命名。
+- UI按合同显示可用动作并区分Toast/Error State；没有回调时不伪造可执行按钮。实际fallback仍要求已配置且已授权的备用模型。
+- 本决定不改变SQLite事务、pending请求幂等和硬结果规则；失败或取消不得留下部分事实，相关Repository/Application回归继续作为门禁。

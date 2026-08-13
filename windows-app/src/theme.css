@@ -675,8 +675,21 @@ button:focus-visible {
   margin: 0;
 }
 
-.ai-error-notice :is(.secondary-action, .text-link) {
+.ai-error-notice__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ai-error-notice :is(.secondary-action, .quiet-action, .text-link) {
   width: fit-content;
+}
+
+.ai-error-notice--toast {
+  border-color: rgb(146 166 122 / 42%);
+  color: var(--ink);
+  background: rgb(75 91 66 / 22%);
 }
 
 .save-home__footer {

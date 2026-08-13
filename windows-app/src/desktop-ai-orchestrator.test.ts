@@ -127,6 +127,34 @@ describe('DesktopAIOrchestrator', () => {
     });
   });
 
+  it.each([
+    'AUTHENTICATION_FAILED',
+    'QUOTA_EXCEEDED',
+    'INVALID_OUTPUT',
+    'DOMAIN_RULE_REJECTED',
+    'LOCAL_STORAGE_UNAVAILABLE',
+  ])('does not silently fallback for %s', async (code) => {
+    const primary = profile('primary-profile', 'deepseek', 'deepseek-v4-flash');
+    const fallback = profile('fallback-profile', 'custom', 'fallback-model');
+    const settings = new MutableSettings(primary);
+    settings.current = {
+      profiles: [primary, fallback],
+      defaultModelProfileId: primary.id,
+      fallbackModelProfileId: fallback.id,
+      pendingCredentialCleanupCount: 0,
+    };
+    const provider = new CapturingProvider('provider-primary-profile', code);
+
+    await expect(
+      new DesktopAIOrchestrator(settings, provider).execute(
+        'GENERATE_WORLD',
+        worldInput('风暴群岛'),
+        options(`no-fallback-${code}`),
+      ),
+    ).rejects.toMatchObject({ code });
+    expect(provider.calls).toHaveLength(1);
+  });
+
   it('keeps production game services behind the shared orchestration facade', async () => {
     const directory = fileURLToPath(new URL('.', import.meta.url));
     const files = [
@@ -179,7 +207,10 @@ class CapturingProvider implements AIProvider {
   public readonly calls: { request: NormalizedAIRequest; config: ProviderConfig }[] = [];
   private readonly fake = new FakeAIProvider();
 
-  public constructor(private readonly failingConfigId: string | null = null) {}
+  public constructor(
+    private readonly failingConfigId: string | null = null,
+    private readonly failureCode = 'NETWORK_FAILED',
+  ) {}
 
   public async listModels() {
     return [];
@@ -190,7 +221,7 @@ class CapturingProvider implements AIProvider {
   public async generate(request: NormalizedAIRequest, config: ProviderConfig) {
     this.calls.push({ request, config });
     if (config.id === this.failingConfigId) {
-      throw Object.freeze({ code: 'NETWORK_FAILED' });
+      throw Object.freeze({ code: this.failureCode });
     }
     const response = await this.fake.generate(
       { ...request, modelName: 'ember-fake-v1' },

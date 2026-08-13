@@ -31,7 +31,7 @@ use ember_provider_openai_compatible::{
     QWEN_BASE_URL, QwenPreset, ResponseFormat, TokenUsage,
 };
 use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
 use tauri::{Manager, State};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
@@ -40,11 +40,124 @@ use uuid::Uuid;
 const PROBE_RECEIPT_TTL: Duration = Duration::from_secs(15 * 60);
 const MAX_PROBE_RECEIPTS: usize = 64;
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 struct CommandError {
     code: &'static str,
     message: &'static str,
+}
+
+#[derive(Clone, Copy)]
+struct CommandErrorPolicy {
+    kind: &'static str,
+    retryable: bool,
+    fallback_eligible: bool,
+    surface: &'static str,
+    actions: &'static [&'static str],
+}
+
+impl Serialize for CommandError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let policy = command_error_policy(self.code);
+        let mut state = serializer.serialize_struct("CommandError", 7)?;
+        state.serialize_field("code", self.code)?;
+        state.serialize_field("message", self.message)?;
+        state.serialize_field("kind", policy.kind)?;
+        state.serialize_field("retryable", &policy.retryable)?;
+        state.serialize_field("fallbackEligible", &policy.fallback_eligible)?;
+        state.serialize_field("surface", policy.surface)?;
+        state.serialize_field("actions", policy.actions)?;
+        state.end()
+    }
+}
+
+fn command_error_policy(code: &str) -> CommandErrorPolicy {
+    match code {
+        "AUTHENTICATION_FAILED"
+        | "QUOTA_EXCEEDED"
+        | "MODEL_NOT_FOUND"
+        | "MODEL_NOT_CONFIGURED"
+        | "MODEL_PROFILE_MISSING"
+        | "NO_MODEL_CANDIDATE"
+        | "MODEL_SELECTION_DRIFT"
+        | "CREDENTIAL_INVALID"
+        | "CREDENTIAL_UNAVAILABLE"
+        | "CREDENTIAL_NOT_FOUND" => {
+            error_policy("PROVIDER", false, false, "ERROR_STATE", &["OPEN_SETTINGS"])
+        }
+        "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" => error_policy(
+            "PROVIDER",
+            true,
+            true,
+            "TOAST",
+            &["RETRY", "CANCEL", "USE_FALLBACK"],
+        ),
+        "TIMEOUT" | "NETWORK_FAILED" => error_policy(
+            "NETWORK",
+            true,
+            true,
+            "TOAST",
+            &["RETRY", "CANCEL", "USE_FALLBACK"],
+        ),
+        "CANCELLED" => error_policy("GENERATION", true, false, "TOAST", &["RETRY", "CANCEL"]),
+        "INVALID_OUTPUT"
+        | "PROBE_STALE"
+        | "REPETITION_DETECTED"
+        | "WORLD_COMMIT_OUTPUT_MISMATCH"
+        | "WORLD_COMMIT_ENVELOPE_INVALID" => error_policy(
+            "VALIDATION",
+            true,
+            false,
+            "ERROR_STATE",
+            &["RETRY", "CANCEL"],
+        ),
+        "CAMPAIGN_STATE_INVALID" | "UNCONFIRMED_CANDIDATE" | "WORLD_BUSINESS_RULE_INVALID" => {
+            error_policy("RULE", false, false, "ERROR_STATE", &["DISMISS"])
+        }
+        "CONCURRENT_MODIFICATION" | "APP_LOCK_UNAVAILABLE" | "LOCAL_STORAGE_UNAVAILABLE" => {
+            error_policy(
+                "PERSISTENCE",
+                true,
+                false,
+                "ERROR_STATE",
+                &["RETRY", "CANCEL"],
+            )
+        }
+        "CAMPAIGN_NOT_FOUND"
+        | "CAMPAIGN_ARCHIVED"
+        | "CAMPAIGN_DATA_INVALID"
+        | "SAVE_ARCHIVE_INVALID"
+        | "SAVE_ARCHIVE_CONFLICT"
+        | "SAVE_PATH_INVALID" => {
+            error_policy("PERSISTENCE", false, false, "ERROR_STATE", &["DISMISS"])
+        }
+        "UNKNOWN" => error_policy(
+            "GENERATION",
+            false,
+            false,
+            "ERROR_STATE",
+            &["OPEN_SETTINGS"],
+        ),
+        _ => error_policy("GENERATION", false, false, "ERROR_STATE", &["DISMISS"]),
+    }
+}
+
+const fn error_policy(
+    kind: &'static str,
+    retryable: bool,
+    fallback_eligible: bool,
+    surface: &'static str,
+    actions: &'static [&'static str],
+) -> CommandErrorPolicy {
+    CommandErrorPolicy {
+        kind,
+        retryable,
+        fallback_eligible,
+        surface,
+        actions,
+    }
 }
 
 impl From<CampaignStoreError> for CommandError {
@@ -1240,6 +1353,51 @@ mod tests {
             let command_error = CommandError::from(source);
             assert_eq!(command_error.code, expected);
             assert!(!command_error.message.is_empty());
+        }
+    }
+
+    #[test]
+    fn command_errors_serialize_the_six_kind_policy_without_unsafe_fallbacks() {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ErrorFixture {
+            code: String,
+            kind: String,
+            retryable: bool,
+            fallback_eligible: bool,
+            surface: String,
+            actions: Vec<String>,
+        }
+        let fixtures: Vec<ErrorFixture> = serde_json::from_str(include_str!(
+            "../../../packages/ai-core/src/application-error-contract.fixture.json"
+        ))
+        .unwrap();
+        assert_eq!(fixtures.len(), 6);
+        for fixture in fixtures {
+            let policy = command_error_policy(&fixture.code);
+            assert_eq!(policy.kind, fixture.kind);
+            assert_eq!(policy.retryable, fixture.retryable);
+            assert_eq!(policy.fallback_eligible, fixture.fallback_eligible);
+            assert_eq!(policy.surface, fixture.surface);
+            assert_eq!(policy.actions, fixture.actions);
+        }
+
+        let serialized = serde_json::to_value(CommandError {
+            code: "NETWORK_FAILED",
+            message: "安全错误说明",
+        })
+        .unwrap();
+        assert_eq!(serialized["kind"], "NETWORK");
+        assert_eq!(serialized["actions"][2], "USE_FALLBACK");
+
+        for code in [
+            "AUTHENTICATION_FAILED",
+            "QUOTA_EXCEEDED",
+            "INVALID_OUTPUT",
+            "WORLD_BUSINESS_RULE_INVALID",
+            "LOCAL_STORAGE_UNAVAILABLE",
+        ] {
+            assert!(!command_error_policy(code).fallback_eligible);
         }
     }
 

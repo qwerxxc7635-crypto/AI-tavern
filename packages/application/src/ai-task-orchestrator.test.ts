@@ -246,7 +246,14 @@ describe('AITaskOrchestrator', () => {
     });
     expect(
       new AITaskExecutionError(operationId, requestId, 'schema', 'INVALID_OUTPUT', true),
-    ).toMatchObject({ operationId, requestId, category: 'schema' });
+    ).toMatchObject({
+      operationId,
+      requestId,
+      category: 'schema',
+      kind: 'VALIDATION',
+      fallbackEligible: false,
+      actions: ['RETRY', 'CANCEL'],
+    });
   });
 });
 

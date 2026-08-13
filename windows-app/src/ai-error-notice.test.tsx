@@ -42,6 +42,53 @@ describe('AIErrorNotice', () => {
     expect(screen.queryByText(/secret upstream/)).toBeNull();
     expect(screen.getByRole('link', { name: '检查模型设置' })).toBeTruthy();
   });
+
+  it('offers retry, cancel and explicit fallback only for an eligible transient error', () => {
+    const retry = vi.fn();
+    const cancel = vi.fn();
+    const fallback = vi.fn();
+    render(
+      <MemoryRouter initialEntries={['/adventure?campaignId=campaign-error']}>
+        <AIErrorNotice
+          error={{ code: 'NETWORK_FAILED' }}
+          onRetry={retry}
+          onCancel={cancel}
+          onUseFallback={fallback}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('alert').getAttribute('data-error-kind')).toBe('NETWORK');
+    expect(screen.getByRole('alert').getAttribute('data-error-surface')).toBe('TOAST');
+    fireEvent.click(screen.getByRole('button', { name: '重试连接' }));
+    fireEvent.click(screen.getByRole('button', { name: '取消等待' }));
+    fireEvent.click(screen.getByRole('button', { name: '使用已授权备用模型' }));
+    expect(retry).toHaveBeenCalledOnce();
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(fallback).toHaveBeenCalledOnce();
+  });
+
+  it.each([
+    ['AUTHENTICATION_FAILED', 'PROVIDER'],
+    ['QUOTA_EXCEEDED', 'PROVIDER'],
+    ['INVALID_OUTPUT', 'VALIDATION'],
+    ['DOMAIN_RULE_REJECTED', 'RULE'],
+    ['LOCAL_STORAGE_UNAVAILABLE', 'PERSISTENCE'],
+  ] as const)('never offers fallback for %s', (code, kind) => {
+    render(
+      <MemoryRouter>
+        <AIErrorNotice
+          error={{ code }}
+          onRetry={() => undefined}
+          onUseFallback={() => undefined}
+          onDismiss={() => undefined}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole('alert').getAttribute('data-error-kind')).toBe(kind);
+    expect(screen.queryByRole('button', { name: '使用已授权备用模型' })).toBeNull();
+  });
 });
 
 function renderNotice(code: StandardAIErrorCode, onRetry?: () => void): void {

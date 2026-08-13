@@ -1,5 +1,6 @@
 import {
   assembleTaskContext,
+  classifyApplicationError,
   contextBudgetForTask,
   createContextBlock,
   providerConfigFromResolved,
@@ -7,6 +8,8 @@ import {
   standardizeAIError,
   verifyResolvedModelConfig,
   type AIProvider,
+  type ApplicationErrorKind,
+  type ErrorAction,
   type AITask,
   type ContextAssembly,
   type ModelCapabilities,
@@ -76,6 +79,10 @@ export interface AITaskResult {
 }
 
 export class AITaskExecutionError extends Error {
+  public readonly kind: ApplicationErrorKind;
+  public readonly fallbackEligible: boolean;
+  public readonly actions: readonly ErrorAction[];
+
   public constructor(
     public readonly operationId: AiOperationId,
     public readonly requestId: AiRequestId,
@@ -86,6 +93,10 @@ export class AITaskExecutionError extends Error {
   ) {
     super(`AI task failed: ${category}/${code}`, options);
     this.name = 'AITaskExecutionError';
+    const contract = classifyApplicationError({ code });
+    this.kind = contract.kind;
+    this.fallbackEligible = contract.fallbackEligible;
+    this.actions = contract.actions;
   }
 }
 

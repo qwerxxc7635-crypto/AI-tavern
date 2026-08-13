@@ -99,6 +99,19 @@ export {
   standardizeAIError,
 } from './standard-ai-error.js';
 export type { StandardAIErrorCode } from './standard-ai-error.js';
+export {
+  APPLICATION_ERROR_KINDS,
+  ERROR_ACTIONS,
+  ApplicationError,
+  applicationErrorFromStandardCode,
+  classifyApplicationError,
+} from './application-error.js';
+export type {
+  ApplicationErrorContract,
+  ApplicationErrorKind,
+  ErrorAction,
+  ErrorSurface,
+} from './application-error.js';
 export * from './repetition-detector.js';
 export {
   providerConfigFromResolved,

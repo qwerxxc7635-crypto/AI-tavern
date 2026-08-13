@@ -74,7 +74,7 @@
 
 ## M1-T03 Error Architecture
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-13）
 - **Dependency**：M1-T02。
 - **Deliverable**：六类统一错误合同、映射、UI actions 和页面错误状态。
 - **Acceptance**：Retry/Cancel/Fallback/Toast/Error State 与可恢复性一致；认证、额度、验证和规则错误不触发错误的静默 fallback。
