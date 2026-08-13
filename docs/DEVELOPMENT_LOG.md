@@ -3611,3 +3611,30 @@
 
 - P0=0、P1=0、P2=0；第一轮整改结论更新为`READY FOR SECOND AUDIT`。
 - 用户既有`.gitignore`修改全程保留，整改提交不会纳入该文件；不merge、不push。
+
+## 2026-08-13 — M0-T01 V0.3 规格冻结
+
+### Repo 与 Git 基线
+
+- 仓库根目录为`/Users/mac/Desktop/item/4D`；起始分支`chatgpt/v0.2-second-audit-fixes`，起始commit `0af183391a5d83406874db326ed02b175ba24e6e`。
+- 开始时唯一未提交修改为用户已有`.gitignore`中的`.gstack/`；本任务不覆盖、不暂存该修改。
+- 完整阅读仓库规则、README、历史规格/任务、V0.2两轮审计与可玩性报告，并核对现有workspace、AI、domain、persistence、native和Windows页面结构。
+
+### 规格与任务
+
+- 新增`docs/V0.3_SPEC.md`，冻结“AI creates. Rules decide. SQLite remembers.”、不可刷新硬事实、自由玩家行动、Windows桌面优先、V0.3范围/非目标、分层架构和最终验收。
+- 将`docs/TASKS.md`切换为V0.3 M0–M12权威顺序；每个Task均明确Status、Dependency、Deliverable、Acceptance、Tests和Do Not。
+- 统一原提示中重复的M5编号：Character Creation与Trait共同属于V0.3 M5；后续里程碑顺延并保持产品依赖顺序。
+- README增加V0.3入口，同时保留v0.1规格和v0.2历史任务链接。
+
+### 架构决定
+
+- 新增`DEC-100`：V0.3增量演进现有V0.2架构，不建立第二套Provider、事实库或持久化链；`docs/TASKS.md`成为V0.3权威执行顺序。
+- 当前任务只冻结规格和任务，未修改产品代码、数据库或真实Provider配置，未开始M0-T02。
+
+### 验证
+
+- Prettier定向写入及检查通过：README、V0.3 Spec、Tasks、Decisions和Development Log全部符合格式。
+- V0.3任务结构检查通过：59个Task，每项均包含Status、Dependency、Deliverable、Acceptance、Tests和Do Not六个字段。
+- 文档目标检查通过；V0.3入口、历史v0.1规格、v0.2任务和两份v0.2审计/可玩性报告均存在。
+- 首次组合shell检查因使用变量名`path`覆盖zsh特殊`$path`数组，导致末尾两个`git`命令未被找到；文档检查本身已通过，Git检查随后以独立命令重跑，不修改系统或仓库配置。

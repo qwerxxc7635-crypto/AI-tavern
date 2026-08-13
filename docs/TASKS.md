@@ -1,988 +1,603 @@
-# Ember Tavern v0.1 任务拆分
+# Ember Tavern V0.3 执行任务
 
-版本：v0.1  
-依据：`spec.md`  
-执行原则：一次只完成一个任务；每个任务都必须有可运行结果、测试或明确验收证据。
+版本：V0.3 Design Freeze
 
----
+依据：`docs/V0.3_SPEC.md`
 
-## 0. 执行规则
+执行原则：严格按任务顺序；每次只关闭当前任务，不提前实现后续范围。
 
-### 0.1 开发顺序
+## 0. 通用完成标准
 
-严格按照以下顺序推进：
+每个任务必须包含并满足以下六项：
 
-```text
-项目骨架
-→ 共享数据协议
-→ 游戏规则与本地数据库
-→ Fake Provider
-→ Windows离线纵向切片
-→ 真实模型接入
-→ 恢复与导入导出
-→ iOS适配
-→ 完整验收
-```
+- **Status**：`TODO`、`IN PROGRESS`、`BLOCKED` 或 `DONE`，关闭时记录日期。
+- **Dependency**：所有依赖均为 `DONE` 才可开始。
+- **Deliverable**：真实代码、迁移、文档或可复现证据，禁止空实现和写死结果。
+- **Acceptance**：逐项核对规格与业务边界。
+- **Tests**：执行与风险相称的自动测试；仅文档任务至少执行格式、链接/结构检查和 diff 自审。
+- **Do Not**：禁止提前接入未来阶段、削弱验证、覆盖用户修改、把 AI/React 状态当事实源。
 
-在 Windows 离线纵向切片完成前，不接入真实模型；在 Windows 版本稳定前，不全面开发 iOS。
-
-### 0.2 单任务完成标准
-
-每个任务完成时必须同时满足：
-
-- 代码能够编译或运行；
-- 新增逻辑有测试，或提供可重复的人工验收步骤；
-- 不绕过既定分层；
-- 不引入任务范围外的新功能；
-- 更新相关文档；
-- 创建独立 Git commit。
-
-### 0.3 优先级
-
-- `P0`：v0.1不可缺少；
-- `P1`：重要稳定性或体验；
-- `P2`：允许延后，不阻塞核心闭环。
+每个任务结束时必须更新 `docs/DEVELOPMENT_LOG.md`；重大决定更新 `docs/DECISIONS.md`；形成独立本地 commit。未经授权不 push、不 merge。
 
 ---
 
-# 里程碑 M0：项目准备
+# M0 — Design Freeze & Reference Audit
 
-目标：建立可持续开发的工程基础，不实现游戏功能。
+## M0-T01 V0.3 规格冻结
 
-## M0-T01 初始化Git仓库和基础规范
+- **Status**：DONE（2026-08-13）
+- **Dependency**：V0.2 基线和 Repo/Git audit。
+- **Deliverable**：`docs/V0.3_SPEC.md`；本 V0.3 任务序列；README、Decision、Development Log 的版本入口。
+- **Acceptance**：附件中的产品目标、硬原则、范围、非目标、数据/安全边界和最终验收均被无歧义固化；每个 V0.3 Task 均含六项标准。
+- **Tests**：Prettier；文档必需章节/Task 字段脚本检查；Git diff 与链接检查。
+- **Do Not**：不研究性复制第三方实现；不修改产品代码；不开始 M0-T02。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：无
-- 工作内容：
-  - 初始化Git；
-  - 添加`.gitignore`、`.editorconfig`；
-  - 约定分支和commit格式；
-  - 添加根目录`README.md`；
-  - 将`spec.md`放入`docs/`。
-- 产出：可正常提交的项目仓库。
-- 验收：新克隆仓库后可以阅读项目目标和启动说明。
+## M0-T02 SillyTavern 功能审计
 
-## M0-T02 创建pnpm与Cargo Workspace
+- **Status**：TODO
+- **Dependency**：M0-T01。
+- **Deliverable**：`docs/V0.3_ST_FEATURE_MATRIX.md`。
+- **Acceptance**：覆盖 Character Card、Persona、World Info/Lorebook、Prompt Manager、Preset、Chat、Group Chat、Context、Memory、Branch/Checkpoint、Model Settings、Import/Export、Extension、Roleplay UX 和生成交互；逐项标记已有/缺失/采用/不采用/后续。
+- **Tests**：来源链接、版本/访问日期、License 与矩阵分类完整性检查；文档格式检查。
+- **Do Not**：不复制品牌、图标、素材、CSS、文案或大段源码；不因功能相似就承诺采用。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M0-T01
-- 工作内容：
-  - 创建根`package.json`；
-  - 创建`pnpm-workspace.yaml`；
-  - 创建根`Cargo.toml` workspace；
-  - 添加统一lint、test、typecheck命令。
-- 验收：
-  - 根目录可运行空的`pnpm lint`和`pnpm test`；
-  - 根`Cargo.toml`的virtual workspace配置通过静态检查；
-  - 原定的`cargo test --workspace`动态验收，以及用于确认成员识别的`cargo metadata --format-version 1`，延后至`M0-T03`创建首个真实crate后执行；验证要求未取消。
+## M0-T03 GitHub Reference Audit
 
-## M0-T03 创建项目目录骨架
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M0-T02
-- 工作内容：创建：
-  - `windows-app/`；
-  - `ios-app/`；
-  - `packages/contracts/`；
-  - `packages/domain/`；
-  - `packages/application/`；
-  - `packages/persistence/`；
-  - `packages/ai-core/`；
-  - `packages/prompts/`；
-  - `packages/ui-kit/`；
-  - `packages/test-fixtures/`；
-  - `crates/native-bridge/`等原生模块目录；
-  - `database/migrations/`。
-- 验收：
-  - 所有workspace包可被根项目识别；
-  - 根Cargo workspace能识别首个真实crate；
-  - `cargo metadata --format-version 1`必须成功；
-  - `cargo test --workspace`必须成功；
-  - 上述Cargo动态验证成功前不得关闭`M0-T03`。
-
-## M0-T04 建立代码质量检查
-
-- 优先级：P1
-- 状态：已完成（2026-07-30）
-- 依赖：M0-T02
-- 工作内容：
-  - TypeScript严格模式；
-  - ESLint；
-  - Prettier；
-  - Rust fmt与Clippy；
-  - 基础CI。
-- 验收：CI能够运行格式、类型和测试检查。
+- **Status**：TODO
+- **Dependency**：M0-T02。
+- **Deliverable**：`docs/V0.3_REFERENCE_AUDIT.md`。
+- **Acceptance**：针对 AI Roleplay、RPG/TRPG、Tauri、offline SQLite、Prompt/Context、规则/状态机、Quest、Design System/插件选择多个成熟项目；记录 URL、License、模块、优缺点、适用性、采用判断和拒绝原因。
+- **Tests**：官方仓库/License 可访问；审计至少跨多个子系统和多个项目；格式检查。
+- **Do Not**：不复制 License 不兼容实现；不把 Star 数当架构证据；不改产品代码。
 
 ---
 
-# 里程碑 M1：共享协议与游戏领域模型
+# M1 — 基础稳定性整改
 
-目标：在不依赖UI、数据库和真实模型的情况下，定义游戏事实和规则。
+## M1-T01 Credential Lifecycle
 
-## M1-T01 定义通用ID、时间和版本类型
+- **Status**：TODO
+- **Dependency**：M0-T03。
+- **Deliverable**：页面无关的设备 Provider/Credential 生命周期；回归测试和安全审计记录。
+- **Acceptance**：设置 Key 后穿越世界、车卡、NPC、任务、冒险、D20、保存、退出、重启、继续仍可用；Key 不进入 SQLite、日志、配置、Inspector 或导出。
+- **Tests**：secure store contract；全链生命周期；删除/替换/缺失/重启；秘密扫描；平台适配测试。
+- **Do Not**：不让 React 状态成为凭据真源；不读取或提交正式用户 Key；不扩展 Provider 厂商范围。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M0-T03
-- 工作内容：定义：
-  - `CampaignId`、`NpcId`、`QuestId`、`AdventureId`、`TurnId`；
-  - Schema版本；
-  - Prompt版本；
-  - 时间戳格式；
-  - 枚举兼容策略。
-- 验收：所有实体禁止直接使用含义不明的裸字符串ID。
+## M1-T02 Unified Navigation
 
-## M1-T02 定义Campaign与状态机协议
+- **Status**：TODO
+- **Dependency**：M1-T01。
+- **Deliverable**：统一 Router、history/back、breadcrumb 规则与迁移后的页面导航。
+- **Acceptance**：所有层级页面自然返回；刷新、深链和恢复保持 Campaign/实体上下文；页面不再自建互相冲突的返回逻辑。
+- **Tests**：路由、back/deep-link、恢复、无 Campaign/非法参数、桌面视口回归。
+- **Do Not**：不重做视觉系统；不新增业务页面；不把路由状态当存档。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T01
-- 工作内容：
-  - Campaign结构；
-  - Campaign状态枚举；
-  - 合法状态迁移表；
-  - 异常状态。
-- 测试：合法迁移成功，非法迁移被拒绝。
+## M1-T03 Error Architecture
 
-## M1-T03 定义世界圣经与世界事实协议
+- **Status**：TODO
+- **Dependency**：M1-T02。
+- **Deliverable**：六类统一错误合同、映射、UI actions 和页面错误状态。
+- **Acceptance**：Retry/Cancel/Fallback/Toast/Error State 与可恢复性一致；认证、额度、验证和规则错误不触发错误的静默 fallback。
+- **Tests**：每类错误的 TS/Rust 映射、retry eligibility、UI action、pending 幂等和无部分写入。
+- **Do Not**：不吞错、不用通用“失败”替代可操作原因、不降低 Provider/Schema 校验。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T01
-- 工作内容：
-  - WorldBible；
-  - Faction；
-  - Location；
-  - WorldFact；
-  - 锁定规则、发展事实、临时事实、传闻、错误认知。
-- 验收：可表达世界生成结果和后续世界变化。
+## M1-T04 Performance Baseline
 
-## M1-T04 定义玩家角色协议
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T01
-- 工作内容：
-  - 四项属性；
-  - 职业原型；
-  - 特质；
-  - 个人目标；
-  - 背景；
-  - 内容边界；
-  - 初始装备引用。
-- 测试：属性点分配和单项上限验证。
-
-## M1-T05 定义酒馆与NPC协议
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T03、M1-T04
-- 工作内容：
-  - Tavern；
-  - TavernChange；
-  - NpcProfile；
-  - NpcKnowledge；
-  - NpcRelationship；
-  - NpcMemory；
-  - TemporaryVisitor。
-- 测试：关系值限制为-5至5；NPC知识范围可独立存储。
-
-## M1-T06 定义传闻、任务和物品协议
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T03、M1-T05
-- 工作内容：
-  - Rumor；
-  - Quest；
-  - QuestStatus；
-  - Item；
-  - ItemEffect；
-  - RewardTier。
-- 验收：AI生成名称与描述，程序字段控制实际效果。
-
-## M1-T07 定义冒险协议
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T04、M1-T06
-- 工作内容：
-  - AdventurePlan；
-  - AdventureState；
-  - AdventureTurn；
-  - PlayerAction；
-  - CheckRequest；
-  - DiceResult；
-  - AdventureEnding；
-  - Clue。
-- 测试：冒险状态机拒绝非法迁移。
-
-## M1-T08 实现D20规则引擎
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T04、M1-T07
-- 工作内容：
-  - D20检定；
-  - 属性和装备修正；
-  - 难度8、11、14、17；
-  - 成功/失败结构；
-  - 可注入随机数源。
-- 测试：使用固定随机数验证边界结果。
-
-## M1-T09 实现关系与世界时钟规则
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T05、M1-T07
-- 工作内容：
-  - 单回合关系变化上限；
-  - 世界时钟范围；
-  - 世界时钟阶段触发；
-  - 非法补丁拒绝。
-- 测试：越界变化不会写入。
-
-## M1-T10 定义GameEvent事件协议
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1-T02至M1-T09
-- 工作内容：定义所有关键事件及payload。
-- 验收：世界创建、角色创建、骰子、关系变化、任务和冒险均有事件类型。
+- **Status**：TODO
+- **Dependency**：M1-T03。
+- **Deliverable**：可重复基线工具与 `docs/V0.3_PERFORMANCE_BASELINE.md`。
+- **Acceptance**：记录 world/NPC/quest/action/D20 latency、queue wait、prompt/output tokens、cache、retry；Fake 与真实 Provider 证据明确区分。
+- **Tests**：指标 schema、上限/隐私、重复运行、失败记录和报告一致性。
+- **Do Not**：不先优化再补基线；不保存 Prompt、秘密或玩家全文到遥测。
 
 ---
 
-# 里程碑 M2：本地数据库与持久化
+# M2 — Design System / UI / UX
 
-目标：所有游戏事实都能可靠写入和恢复。
+## M2-T01 Design Tokens
 
-## M2-T01 设计SQLite ER模型
+- **Status**：TODO
+- **Dependency**：M1-T04。
+- **Deliverable**：正式 color/type/spacing/radius/shadow/motion/layer tokens 和旧样式迁移策略。
+- **Acceptance**：核心页面使用语义 token；主题对比度和减少动态效果有明确合同；显著减少任意 hard-code。
+- **Tests**：token 静态检查、主题对比度、四分辨率 smoke、visual evidence。
+- **Do Not**：不一次重写所有页面；不改变游戏逻辑；不引入无必要 CSS 框架迁移。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M1全部任务
-- 工作内容：输出`docs/data-model.md`，明确表、字段、主外键、索引和JSON字段。
-- 验收：覆盖`spec.md`规定的全部核心表。
+## M2-T02 UI Primitives
 
-## M2-T02 创建首版数据库迁移
+- **Status**：TODO
+- **Dependency**：M2-T01。
+- **Deliverable**：Button/Input/Textarea/Select/Card/Modal/Drawer/Tabs/Tooltip/Toast/Skeleton/Progress/Empty/Error primitives。
+- **Acceptance**：键盘、焦点、disabled/loading/error 和可访问名称一致；页面可渐进迁移。
+- **Tests**：组件行为、键盘/焦点、ARIA、主题、snapshot/visual tests。
+- **Do Not**：不在 primitives 内写业务逻辑；不复制第三方视觉资产。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M2-T01
-- 工作内容：创建`0001_initial.sql`。
-- 验收：新数据库可一次完成迁移，重复启动不会重复建表。
+## M2-T03 Game Components
 
-## M2-T03 实现Campaign Repository
+- **Status**：TODO
+- **Dependency**：M2-T02。
+- **Deliverable**：九类共享 Game Components 及核心页面迁移。
+- **Acceptance**：同类卡片、对话、状态和生成交互不重复；组件仅接收明确 view model/actions。
+- **Tests**：渲染、空/错/加载态、交互、窄窗口与回归。
+- **Do Not**：不让组件直连 SQLite/Provider；不提前实现动态实体规则。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M2-T02
-- 工作内容：创建、读取、更新、归档、列出存档。
-- 测试：重启数据库连接后数据仍存在。
+## M2-T04 AI Field Assist
 
-## M2-T04 实现世界与角色Repository
+- **Status**：TODO
+- **Dependency**：M2-T03。
+- **Deliverable**：所有自然语言字段的统一生成/完善/候选/扩写/缩写/锁定交互合同和组件。
+- **Acceptance**：现有自然语言输入无遗漏；采用、撤销、取消、重试、字段锁定和并发状态一致。
+- **Tests**：字段清单审计、state machine、cancel/race、locked field、不合规输出。
+- **Do Not**：不让 AI 直接保存字段；不在游戏开始后刷新已锁定世界事实。
 
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M2-T02
-- 工作内容：WorldBible、WorldFact、PlayerCharacter的读写。
-- 测试：锁定字段和JSON字段可正确恢复。
+## M2-T05 Action Composer
 
-## M2-T05 实现酒馆、NPC和关系Repository
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M2-T02
-- 工作内容：Tavern、Npc、Knowledge、Relationship、Memory。
-- 测试：多个NPC知识互不污染。
-
-## M2-T06 实现任务、冒险与对话Repository
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M2-T02
-- 工作内容：Quest、Adventure、Turn、Conversation、Message、Item、Clock。
-- 测试：完整冒险回合可关闭应用后恢复。
-
-## M2-T07 实现事务型回合提交
-
-- 优先级：P0
-- 状态：已完成（2026-07-30）
-- 依赖：M2-T03至M2-T06
-- 工作内容：将玩家输入、AI输出、状态补丁和GameEvent在单事务提交。
-- 测试：模拟中途失败后无部分数据残留。
-
-## M2-T08 实现pending_ai_requests
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M2-T02、M2-T07
-- 工作内容：请求状态、错误码、重试次数、幂等键。
-- 测试：重复幂等键不会重复提交奖励。
-
-## M2-T09 实现数据库启动检查和迁移框架
-
-- 优先级：P1
-- 状态：已完成（2026-07-31）
-- 依赖：M2-T02
-- 工作内容：版本检查、迁移执行、完整性检查、失败提示。
-- 验收：旧Schema可安全升级，失败时不覆盖原数据库。
+- **Status**：TODO
+- **Dependency**：M2-T04。
+- **Deliverable**：统一对话/行动 Composer，3–5 候选和永久自由输入。
+- **Acceptance**：候选与自由输入走同一合法性/持久化路径；键盘、streaming、取消和错误状态一致。
+- **Tests**：候选数量、自由输入、切换、重复提交、恢复、NPC/冒险/调查集成。
+- **Do Not**：不把候选做成唯一动作；不赋予候选额外规则权限。
 
 ---
 
-# 里程碑 M3：AI协议、Fake Provider与上下文构建
+# M3 — AI Generation Infrastructure
 
-目标：在不消耗真实API额度的情况下跑通全部AI任务。
+## M3-T01 Generator Framework
 
-## M3-T01 定义统一AI请求与响应协议
+- **Status**：TODO
+- **Dependency**：M2-T05。
+- **Deliverable**：`Generator<T>` 生命周期、共享基类/组合器和首个迁移切片。
+- **Acceptance**：Context、Prompt、Provider、parse/validate/repair/rules/persist/events 边界可替换且可审计；旧桌面编排能力不回退。
+- **Tests**：阶段顺序、失败短路、repair、规则拒绝、事务 rollback、幂等事件。
+- **Do Not**：不一次迁移全部生成器；不建立第二套 Provider 栈；不直接写 DB。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M1全部任务
-- 工作内容：
-  - `AIProvider`；
-  - `NormalizedAIRequest`；
-  - `NormalizedAIResponse`；
-  - `ProviderConfig`；
-  - `ModelInfo`；
-  - `ModelCapabilities`。
-- 验收：业务层不引用任何厂商SDK类型。
+## M3-T02 Generation Queue
 
-## M3-T02 定义首批AI任务Schema
+- **Status**：TODO
+- **Dependency**：M3-T01。
+- **Deliverable**：P0/P1/P2 队列、并发、取消、超时、重试、fallback、去重和指标。
+- **Acceptance**：P0 不被后台任务饿死；相同意图去重；取消/超时无部分事实；硬结果 retry 不变。
+- **Tests**：priority/fairness、concurrency、cancel race、timeout、dedupe、fallback policy、metrics。
+- **Do Not**：不启用无限后台生成；不绕过现有错误和凭据边界。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M3-T01
-- 工作内容：为以下任务定义输入输出Zod Schema：
-  - 世界生成；
-  - 世界修改；
-  - 特质生成；
-  - 背景补全；
-  - 酒馆生成；
-  - NPC生成；
-  - NPC回复；
-  - 任务生成；
-  - 冒险骨架；
-  - 冒险回合；
-  - 摘要和记忆提取。
-- 验收：每个任务有独立Schema和版本号。
+## M3-T03 Structured Entity Schemas
 
-## M3-T03 建立Prompt目录与版本机制
+- **Status**：TODO
+- **Dependency**：M3-T02。
+- **Deliverable**：V0.3 重要实体的版本化输入/输出 Schema 与 registry。
+- **Acceptance**：World Constitution、Career、Trait、Item、Location、Faction、NPC LOD、Quest/Graph、Director action 均非纯长文本；TS/Rust 关键边界一致。
+- **Tests**：有效/缺失/越界/未知版本/资源上限/cross-language fixtures。
+- **Do Not**：不把 schema parse 当业务验证；不静默丢弃未知数据。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M3-T02
-- 工作内容：
-  - Base规则；
-  - 任务提示词；
-  - Provider格式层；
-  - Prompt版本记录。
-- 验收：提示词不散落在页面和Repository中。
+## M3-T04 AI Inspector
 
-## M3-T04 实现FakeAIProvider
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M3-T01、M3-T02
-- 工作内容：为每个首批AI任务返回确定性测试数据。
-- 验收：无需网络即可生成世界、角色、酒馆、NPC、任务和完整冒险。
-
-## M3-T05 实现上下文构建器
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M2-T03至M2-T06、M3-T02
-- 工作内容：
-  - NPC对话上下文；
-  - 冒险上下文；
-  - 世界事件上下文；
-  - 长短期摘要组合；
-  - 上下文预算和裁剪。
-- 测试：NPC不会收到无关NPC秘密；冒险只包含相关记录。
-
-## M3-T06 实现AI输出结构验证
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M3-T02
-- 工作内容：Schema验证、错误定位、原始输出留存。
-- 测试：缺字段、错误枚举、越界值均被拒绝。
-
-## M3-T07 实现Domain状态补丁验证器
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M1-T08、M1-T09、M3-T06
-- 工作内容：验证AI提出的任务、关系、奖励、事实和时钟变化。
-- 测试：AI不能修改锁定规则、属性或凭空发放高级物品。
-
-## M3-T08 实现AI Orchestrator
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M2-T08、M3-T04至M3-T07
-- 工作内容：
-  - 创建pending请求；
-  - 构建上下文；
-  - 调用Provider；
-  - 验证；
-  - 事务提交；
-  - 失败记录。
-- 验收：Fake Provider请求可完整提交到SQLite。
+- **Status**：TODO
+- **Dependency**：M3-T03。
+- **Deliverable**：开发/高级 Inspector 的 generation、provider、latency、cache、tokens、context、prompt、raw/parsed/validation/repair 视图。
+- **Acceptance**：默认遮罩秘密和未授权 truth；失败也可定位；Inspector 不成为事实源。
+- **Tests**：redaction、权限/模式、空与失败记录、上限、无 API Key/Authorization。
+- **Do Not**：不默认暴露 Core Prompt、秘密或完整数据库；不让 Inspector 编辑正式事实。
 
 ---
 
-# 里程碑 M4：应用用例层
+# M4 — World Constitution + Rules
 
-目标：页面只调用稳定用例，不直接操作数据库或AI。
+## M4-T01 World Constitution
 
-## M4-T01 实现新建存档和世界生成用例
+- **Status**：TODO
+- **Dependency**：M3-T04。
+- **Deliverable**：合同、Generator、SQLite migration/repository、确认 UI 和下游约束入口。
+- **Acceptance**：必需字段齐全、版本化、锁定后不可随意改写；生成内容违反 Constitution 时拒绝/repair。
+- **Tests**：三种 Constitution、revision、locked mutation、下游 mismatch、save/reload/migration。
+- **Do Not**：不把 Constitution 只存 Prompt；不一次生成完整世界。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M3-T08
-- 用例：CreateCampaign、GenerateWorld、RefineWorld、ConfirmWorld。
-- 验收：可使用Fake Provider创建并确认世界。
+## M4-T02 World Seed
 
-## M4-T02 实现车卡用例
+- **Status**：TODO
+- **Dependency**：M4-T01。
+- **Deliverable**：持久 Seed、可注入程序随机流和确定性抽样工具。
+- **Acceptance**：相同 Seed/状态得到相同程序选择；事实写入后以 SQLite 为准；D20 保持独立受信随机边界。
+- **Tests**：repeatability、stream isolation、save/reload、migration、D20 independence。
+- **Do Not**：不宣称 LLM 完全 deterministic；不允许用户用 Seed 重投硬结果。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T01
-- 用例：CreateCharacter、GenerateCharacterTraits、CompleteCharacterBackground。
-- 验收：属性分配合法，背景和装备写入本地。
+## M4-T03 Rules Engine Expansion
 
-## M4-T03 实现酒馆初始化用例
+- **Status**：TODO
+- **Dependency**：M4-T02。
+- **Deliverable**：属性/技能/HP/状态/装备/钱/时间/Trait/Quest/资源的规则合同与 validator。
+- **Acceptance**：所有数值状态由本地规则裁决，AI proposal 无直接写入口；事务和事件可审计。
+- **Tests**：边界、组合、非法 patch、rollback、idempotency、property-based tests（适用时）。
+- **Do Not**：不复制完整 DND/COC 规则；不让叙事文本反解析为数值。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T02
-- 用例：GenerateTavern、GenerateNpcs。
-- 验收：生成酒馆、3名常驻NPC、1名访客、传闻和任务入口。
+## M4-T04 Knowledge Boundary
 
-## M4-T04 实现NPC对话用例
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T03
-- 用例：TalkToNpc、ExtractMemories。
-- 验收：连续对话可保存，重启后继续，NPC只使用自身认知。
-
-## M4-T05 实现任务用例
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T03
-- 用例：GenerateQuest、AcceptQuest。
-- 验收：至少生成两个任务，同时仅一个主任务进行中。
-
-## M4-T06 实现冒险开始用例
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T05
-- 用例：StartAdventure、GenerateAdventurePlan。
-- 验收：隐藏骨架保存本地但不直接展示给玩家。
-
-## M4-T07 实现冒险回合用例
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T06
-- 用例：SubmitPlayerAction、RollCheck、ResolveAdventureTurn。
-- 验收：可完成无检定回合和需要检定的回合。
-
-## M4-T08 实现冒险结算用例
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T07
-- 用例：FinishAdventure、AdvanceWorldClocks、SummarizeAdventure。
-- 验收：冒险结果更新NPC、酒馆、世界和档案，然后返回酒馆。
-
-## M4-T09 实现重生成和回退用例
-
-- 优先级：P1
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T07
-- 工作内容：保留玩家输入重生成、切换Provider重生成、回退快照。
-- 验收：旧AI结果不会与新结果同时生效。
+- **Status**：TODO
+- **Dependency**：M4-T03。
+- **Deliverable**：World/NPC/Player Knowledge 持久模型、provenance、上下文投影和授权规则。
+- **Acceptance**：NPC 不获得无权事实；Player Knowledge 独立；Memory/Claim 不升级 Truth；多 NPC 场景按 Actor 投影。
+- **Tests**：secret isolation、claim/truth、learn/forget/update、provenance、save/import、prompt leakage。
+- **Do Not**：不把完整 WorldTruth 发给 NPC；不靠 Prompt 单独保证知识边界。
 
 ---
 
-# 里程碑 M5：Windows离线纵向切片
+# M5 — Character Creation 2.0 + Trait
 
-目标：使用Fake Provider完成一个真正可玩的Windows闭环。
+## M5-T01 Universal Character Schema
 
-## M5-T01 初始化Windows Tauri应用
+- **Status**：TODO
+- **Dependency**：M4-T04。
+- **Deliverable**：通用角色合同、世界扩展定义、V0.2 兼容投影与存储迁移。
+- **Acceptance**：规格字段可表达；修仙/调查/Cyberpunk 扩展示例可验证；未知扩展安全保留或明确拒绝。
+- **Tests**：三世界 fixtures、schema version、migration、round-trip、资源上限。
+- **Do Not**：不把所有世界字段硬编码进核心类型；不丢 V0.2 角色。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M0-T03
-- 工作内容：React、Vite、Tauri、基础路由、主题。
-- 验收：Windows窗口可启动并访问共享包。
+## M5-T02 Quick / Advanced Creation
 
-## M5-T02 实现Windows应用壳和导航
+- **Status**：TODO
+- **Dependency**：M5-T01。
+- **Deliverable**：两种车卡流程和共享草稿/锁定/确认状态机。
+- **Acceptance**：Quick 一句生成完整合法卡；Advanced 全字段可编辑；切换模式不丢已锁内容；只有确认后写正式事实。
+- **Tests**：quick/advanced、mode switch、invalid fields、cancel/resume、save/reload。
+- **Do Not**：不让页面草稿成为正式角色；不先实现 Trait 点数 UI。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M5-T01
-- 工作内容：侧栏、标题栏、加载状态、错误边界。
-- 验收：酒馆、任务、冒险、角色、档案、设置页面可导航。
+## M5-T03 Character AI Everywhere
 
-## M5-T03 实现存档首页
+- **Status**：TODO
+- **Dependency**：M5-T02。
+- **Deliverable**：单字段、3 候选、补空、区域、整卡、未锁重生能力。
+- **Acceptance**：每个自然语言字段均接入统一 AIFieldAssist；生成读取锁定上下文并通过角色一致性校验。
+- **Tests**：字段覆盖、locked preservation、contradiction、concurrency、repair、undo。
+- **Do Not**：不改数值规则字段；不绕过世界 Constitution。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T01、M5-T02
-- 工作内容：新建、继续、归档、显示最后游玩时间。
-- 验收：应用重启后仍能列出存档。
+## M5-T04 Trait Point System
 
-## M5-T04 实现世界创建与预览页面
+- **Status**：TODO
+- **Dependency**：M5-T03。
+- **Deliverable**：Buff/Debuff/Mixed/Narrative Trait 合同、点数计算、规则 UI。
+- **Acceptance**：空集合和严格净 0 可开始；非零禁止；点值只由本地规则确认。
+- **Tests**：所有 Trait 类型、-5..+5、mixed、empty、strict zero、serialization。
+- **Do Not**：不以 UI 显示值代替规则重算；不允许 AI 自批点数。
 
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T01、M5-T02
-- 工作内容：基础选项、可选提示词、生成、锁定、局部修改、确认。
-- 验收：使用Fake Provider完成世界确认。
+## M5-T05 Trait Balance & Synergy
 
-## M5-T05 实现车卡页面
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T02、M5-T04
-- 工作内容：分步车卡、属性分配、特质选择、背景预览、装备。
-- 验收：完成后进入酒馆生成流程。
-
-## M5-T06 实现酒馆页面
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T03、M5-T05
-- 工作内容：酒馆描述、NPC、访客、传闻、任务入口、世界时钟。
-- 验收：能够选择NPC或任务。
-
-## M5-T07 实现NPC聊天页面
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T04、M5-T06
-- 工作内容：历史消息、自由输入、建议话题、关系状态。
-- 验收：连续发送消息并在重启后恢复。
-
-## M5-T08 实现任务页面
-
-- 优先级：P0
-- 状态：已完成（2026-07-31）
-- 依赖：M4-T05、M5-T06
-- 工作内容：任务列表、详情、接受、风险和推荐属性。
-- 验收：接受任务后可进入冒险准备。
-
-## M5-T09 实现Windows冒险三栏页面
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M4-T06、M4-T07、M5-T08
-- 工作内容：
-  - 左栏角色、目标、时钟；
-  - 中栏剧情和行动；
-  - 右栏物品、线索、骰子。
-- 验收：可完成8至12回合Fake冒险。
-
-## M5-T10 实现结算与冒险档案页面
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M4-T08、M5-T09
-- 工作内容：结算、世界变化、NPC变化、奖励、历史档案。
-- 验收：返回酒馆后能看到对应变化。
-
-## M5-T11 Windows离线纵向切片验收
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M5-T03至M5-T10
-- 验收流程：
-  - 创建世界；
-  - 完成车卡；
-  - 进入酒馆；
-  - NPC对话；
-  - 接任务；
-  - 完成冒险；
-  - 返回酒馆；
-  - 关闭并重启应用；
-  - 所有进度仍存在。
+- **Status**：TODO
+- **Dependency**：M5-T04。
+- **Deliverable**：`TraitBalanceValidator`、`TraitSynergyValidator`、解释性错误和生成反馈。
+- **Acceptance**：覆盖十项平衡维度并能拒绝明显组合套利；相同世界规则下结果可重复审计。
+- **Tests**：公平/不公平/条件/永久/环境/组合套利、三世界 cases、false-positive baseline。
+- **Do Not**：不把平衡交给 LLM 最终决定；不做无法解释的黑盒评分。
 
 ---
 
-# 里程碑 M6：真实模型接入
+# M6 — Dynamic World Entities
 
-目标：替换Fake Provider时不修改游戏业务逻辑。
+## M6-T01 Dynamic Career Pool
 
-## M6-T01 实现Rust安全HTTP传输层
+- **Status**：TODO
+- **Dependency**：M5-T05。
+- **Deliverable**：Career schema/generator/pool/repository/character integration。
+- **Acceptance**：按 Constitution 生成 rarity 分层和结构字段；运行中新职业合法持久化；三世界明显不同。
+- **Tests**：constitution compliance、rarity、requirements、dedupe、save/reload、V0.2 mapping。
+- **Do Not**：不以固定四职业作为玩家可见核心；不让职业直接修改角色数值。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M3-T01、M5-T11
-- 工作内容：请求、超时、取消、流式响应、错误标准化。
-- 验收：前端不能发起任意未经允许的模型HTTP请求。
+## M6-T02 Semantic Equipment
 
-## M6-T02 实现安全密钥仓库
+- **Status**：TODO
+- **Dependency**：M6-T01。
+- **Deliverable**：AI 语义 + Rules 数值的装备模型、Generator、平衡与触发器。
+- **Acceptance**：名称/历史/来源/剧情能力与 damage/defense/price 等物理分离；可绑定 Quest/NPC/Fact。
+- **Tests**：balance、rarity/price、trigger、no inflation、dedupe、save/import。
+- **Do Not**：不从描述解析数值；不生成无来源高阶装备。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M5-T01
-- 工作内容：保存、检查、删除credential；数据库仅存引用。
-- 验收：API Key不出现在SQLite、日志和导出文件中。
+## M6-T03 NPC LOD
 
-## M6-T03 实现OpenAI-Compatible适配器
+- **Status**：TODO
+- **Dependency**：M6-T02。
+- **Deliverable**：LOD0–3 合同、升级规则、Generator 和持久化。
+- **Acceptance**：世界创建不全量生成 NPC；互动提升细节且延续身份；升级幂等并保留知识边界。
+- **Tests**：each LOD、upgrade/downgrade rejection、concurrency、identity continuity、save/reload。
+- **Do Not**：不生成全世界人口；不让 LOD 升级改写既有事实。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T01、M6-T02
-- 工作内容：普通文本、JSON模式、模型列表、连接测试、错误映射。
-- 验收：通过Provider Contract Test。
+## M6-T04 Dynamic Locations
 
-## M6-T04 添加DeepSeek预设
+- **Status**：TODO
+- **Dependency**：M6-T03。
+- **Deliverable**：层级地点、按需具体化、移动和持久化规则。
+- **Acceptance**：多尺度地点可表达；玩家离开预设城市仍可继续；地点事实服从 Constitution。
+- **Tests**：hierarchy、travel、lazy generation、invalid topology、save/reload。
+- **Do Not**：不实现格子地图/战棋；不一次生成完整地图。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03
-- 验收：可连接、列出或配置模型并完成世界生成测试。
+## M6-T05 Active Factions
 
-## M6-T05 添加Qwen预设
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03
-- 验收：可完成中文NPC对话和结构化任务测试。
-
-## M6-T06 添加SiliconFlow或OpenRouter预设
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03
-- 工作内容：动态模型信息、免费状态不硬编码。
-- 验收：至少一个可用模型完成冒险回合测试。
-
-## M6-T07 添加Ollama预设
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03
-- 工作内容：localhost连接、模型列表、本地结构化输出。
-- 验收：Windows断网时可使用已安装本地模型生成内容。
-
-## M6-T08 添加自定义Base URL配置
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03
-- 工作内容：Base URL、模型名、额外Header、HTTPS校验。
-- 验收：可连接用户提供的OpenAI兼容服务。
-
-## M6-T09 实现模型设置页面
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T02至M6-T08
-- 工作内容：Provider、模型、API Key、连接测试、默认与备用模型。
-- 验收：切换设置不修改已有存档事实。
-
-## M6-T10 实现模型能力登记与路由
-
-- 优先级：P1
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03至M6-T08
-- 工作内容：根据JSON、流式、上下文长度等能力选择调用方式。
-- 验收：不支持JSON Schema的模型可使用兼容降级路径。
+- **Status**：TODO
+- **Dependency**：M6-T04。
+- **Deliverable**：Faction 结构、行动规则、关系和世界事件接口。
+- **Acceptance**：八项字段完整；势力可通过规则验证的行动改变实体/Quest；玩家关系持久化。
+- **Tests**：ally/enemy、territory/resource、action legality、consequence、save/reload。
+- **Do Not**：不让 AI 越过 Director budget；不预写固定势力剧情。
 
 ---
 
-# 里程碑 M7：稳定性、模型切换与恢复
+# M7 — Tavern Rebuild
 
-目标：任何一次模型或应用失败都不能让游戏进度归零。
+## M7-T01 Dynamic Tavern Population
 
-## M7-T01 实现标准错误分类
+- **Status**：TODO
+- **Dependency**：M6-T05。
+- **Deliverable**：按世界/地点/时间/势力/事件/历史投影酒馆 NPC 和机会。
+- **Acceptance**：不依赖固定 NPC；重要互动实体持久化；重开后身份/关系/历史一致。
+- **Tests**：context factors、LOD promotion、time/event changes、save/reopen、empty state。
+- **Do Not**：不每次进酒馆重生所有 NPC；不让临时 UI 列表成为事实。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T03
-- 错误包括：额度不足、认证失败、限流、超时、模型不存在、结构错误、网络失败。
-- 验收：UI显示可执行的下一步，而不是通用“失败”。
+## M7-T02 Multi-NPC Scene
 
-## M7-T02 实现模型切换和重试
+- **Status**：TODO
+- **Dependency**：M7-T01。
+- **Deliverable**：场景参与者、speaker/action proposal、turn arbitration 和 UI。
+- **Acceptance**：说话/打断/沉默/偷听/离开/介入由知识与目标驱动，不机械轮流；每个 Actor 只获授权 Context。
+- **Tests**：speaker selection、silence/leave/interruption、knowledge leakage、concurrency、persistence。
+- **Do Not**：不把多个 NPC 合成全知 Agent；不固定轮询。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M6-T09、M7-T01
-- 工作内容：同上下文重试、备用模型、跨厂商确认。
-- 验收：额度不足后切换模型继续同一回合，进度不重复也不丢失。
+## M7-T03 Immutable NPC Timeline
 
-## M7-T03 实现结构化输出修复流程
+- **Status**：TODO
+- **Dependency**：M7-T02。
+- **Deliverable**：正式回复锁定、技术 Retry、事实冲突修复和 UI 规则。
+- **Acceptance**：无普通 Swipe；成功回复不能刷新；技术 Retry 使用同一意图/硬结果且不重复提交。
+- **Tests**：success lock、network/schema/fact retry、duplicate、crash recovery、multi-NPC ordering。
+- **Do Not**：不删除既有消息换新结果；不让 Retry 重投 D20。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M3-T06、M6-T03
-- 工作内容：原模型修复、严格修复提示词、最终失败保护。
-- 验收：错误JSON永远不能破坏正式存档。
+## M7-T04 Dialogue Suggestions
 
-## M7-T04 实现自动快照
+- **Status**：TODO
+- **Dependency**：M7-T03。
+- **Deliverable**：3–5 对话建议接入 Action Composer 与候选缓存/失效规则。
+- **Acceptance**：建议符合当前 NPC/场景且自由输入永久存在；世界变化后旧建议失效。
+- **Tests**：count、relevance inputs、free input、cache invalidation、cancel/error。
+- **Do Not**：不自动发送建议；不把建议持久化为玩家行动。
 
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M2-T07
-- 工作内容：最近10个自动快照、轮换、恢复。
-- 验收：可回退到最近完整冒险回合。
+## M7-T05 Prompt Manager
 
-## M7-T05 实现完整备份
-
-- 优先级：P1
-- 状态：已完成（2026-08-01）
-- 依赖：M7-T04
-- 工作内容：最近3个数据库一致性备份、数据库迁移前备份。
-- 验收：备份失败不会破坏主数据库。
-
-## M7-T06 实现启动恢复中心
-
-- 优先级：P0
-- 状态：已完成（2026-08-01）
-- 依赖：M2-T08、M7-T02、M7-T04
-- 工作内容：检测pending请求、崩溃回合、数据库异常；提供继续、重试、更换模型和取消。
-- 验收：模拟崩溃后可恢复到最后完整状态。
-
-## M7-T07 实现上下文摘要和预算控制
-
-- 状态：已完成（2026-08-01）
-- 优先级：P1
-- 依赖：M3-T05、M4-T08
-- 工作内容：冒险摘要、NPC长期摘要、历史压缩、按任务预算。
-- 验收：长存档不会把全部历史发送给模型。
+- **Status**：TODO
+- **Dependency**：M7-T04。
+- **Deliverable**：User Editable 与 Core Rule Prompt 分层、preset/version/import/export（无秘密）。
+- **Acceptance**：用户调整风格不破坏规则、知识边界或 Schema；错误配置可恢复默认。
+- **Tests**：merge/order、core immutability、version、import/export、secret scan、cache revision。
+- **Do Not**：不提供覆盖系统安全/规则 Prompt 的入口；不复制 SillyTavern UI。
 
 ---
 
-# 里程碑 M8：存档导入导出
+# M8 — Quest Graph + World Director
 
-目标：玩家可以自行备份，并在Windows和iOS之间手动迁移。
+## M8-T01 Multi-Quest Pool
 
-## M8-T01 定义`.emtavern`格式
+- **Status**：TODO
+- **Dependency**：M7-T05。
+- **Deliverable**：完整 Quest 状态机、类型、Repository 和多任务 UI。
+- **Acceptance**：多任务并存且合法迁移；玩家介入可激活；失败/过期/放弃不可被生成抹掉。
+- **Tests**：all states/transitions、multiple active、implicit activation、save/reload/migration。
+- **Do Not**：不保留 `currentQuest` 为唯一真源；不强制接受按钮。
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- 依赖：M2全部任务
-- 工作内容：manifest、campaign、events、generation records、checksum、Schema版本。
-- 验收：格式文档写入`docs/save-format.md`。
+## M8-T02 Quest Graph
 
-## M8-T02 实现存档导出
+- **Status**：TODO
+- **Dependency**：M8-T01。
+- **Deliverable**：事实/实体/前置/后果边、依赖重评估和可视/调试投影。
+- **Acceptance**：Quest A 的事实变化能确定性更新 B/C；循环和悬空引用被拒绝；事件可审计。
+- **Tests**：chain/branch/cycle、NPC death/faction/location consequences、rollback、reload。
+- **Do Not**：不让每个任务成为隔离故事；不由 LLM 自行宣告依赖状态。
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- 依赖：M8-T01
-- 验收：导出文件包含完整游戏内容且不包含API Key。
+## M8-T03 Dynamic Quest Sources
 
-## M8-T03 实现存档导入
+- **Status**：TODO
+- **Dependency**：M8-T02。
+- **Deliverable**：NPC/Faction/Event/Discovery/Player Action/Consequence 的 Quest generation adapters。
+- **Acceptance**：来源与 provenance 持久化；任务符合世界和预算；自由行为可产生任务。
+- **Tests**：each source、dedupe、constitution、knowledge visibility、budget rejection。
+- **Do Not**：不为每个行为强行创建任务；不暴露隐藏任务。
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- 依赖：M8-T01、M8-T02
-- 工作内容：校验、迁移、新建或覆盖、导入快照。
-- 验收：删除本地存档后，可从导出文件恢复并继续。
+## M8-T04 World Director
 
-## M8-T04 实现Windows文件交互
+- **Status**：TODO
+- **Dependency**：M8-T03。
+- **Deliverable**：节奏评估、实体行动提案、调度和可解释决策记录。
+- **Acceptance**：Director 只提议何时/谁/什么需变化，Rules/Generator 决定合法内容；无固定主线。
+- **Tests**：quiet/overload/foreshadow/pressure/expiry、deterministic rules、failure safety。
+- **Do Not**：不让 Director 直接写事实；不后台无限调用模型。
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- 依赖：M8-T02、M8-T03
-- 工作内容：文件选择、拖放导入、保存位置选择。
-- 验收：普通用户无需手动操作数据库文件。
+## M8-T05 Director Budget
 
----
-
-# 里程碑 M9：iOS客户端
-
-目标：在共享核心不重写的前提下完成移动端客户端。
-
-## M9-T01 初始化独立iOS Tauri应用
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M5-T11
-- 工作内容：独立依赖、独立Tauri配置、访问共享packages和crates。
-- 验收：可在macOS/Xcode环境启动模拟器版本。
-
-## M9-T02 实现iOS导航和基础页面壳
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9-T01
-- 工作内容：底部导航、顶部菜单、移动端抽屉、触控布局。
-- 验收：主要页面可导航，无桌面三栏硬搬问题。
-
-## M9-T03 接入iOS本地SQLite
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9-T01、M2全部任务
-- 验收：创建、关闭、重启后存档仍存在。
-
-## M9-T04 适配世界创建和车卡页面
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9-T02、M4-T01、M4-T02
-- 验收：可完成世界创建和车卡。
-
-## M9-T05 适配酒馆、NPC与任务页面
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9-T04、M4-T03至M4-T05
-- 验收：可聊天、查看传闻并接受任务。
-
-## M9-T06 适配移动端冒险页面
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9-T05、M4-T06至M4-T08
-- 工作内容：消息流、底部输入、行动选项、状态抽屉。
-- 验收：可在iPhone尺寸完成完整冒险。
-
-## M9-T07 接入iOS云模型和密钥存储
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M6-T02、M6-T03、M9-T01
-- 验收：可使用DeepSeek或Qwen等云模型继续游戏。
-
-## M9-T08 实现iOS导入导出
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M8-T02、M8-T03、M9-T01
-- 验收：可导入Windows生成的`.emtavern`文件并继续游戏。
-
-## M9-T09 iOS真机与生命周期测试
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9-T03至M9-T08
-- 工作内容：前后台切换、系统终止、网络变化、文件权限、安全区域。
-- 验收：中途切到后台不会造成回合状态损坏。
+- **Status**：TODO
+- **Dependency**：M8-T04。
+- **Deliverable**：Active Quest、每日事件、紧急事件、NPC 主动和后台变化预算/冷却。
+- **Acceptance**：超预算请求延后/拒绝且可观察；预算持久化并随游戏时间恢复。
+- **Tests**：limits、cooldown、day rollover、priority、starvation、save/reload。
+- **Do Not**：不靠 Prompt 自律控制数量；不丢弃 P0 玩家操作。
 
 ---
 
-# 里程碑 M10：完整测试与发布准备
+# M9 — Context / Memory / World Info
 
-## M10-T01 完成Domain单元测试
+## M9-T01 Unified Context Builder
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- Windows v0.1分类：P0（领域正确性与状态一致性发布门）
-- 依赖：M1、M4全部任务
-- 验收：状态机、骰子、关系、时钟、补丁验证达到约定覆盖范围。
+- **Status**：TODO
+- **Dependency**：M8-T05。
+- **Deliverable**：统一分层 Context Builder，迁移所有重要 Generator。
+- **Acceptance**：只注入 Constitution、相关 Lore/Location/Player/Actor Knowledge/Quest/State/Memory/Recent/Action；无全库 dump。
+- **Tests**：relevance、ordering、secret isolation、budget、omission、all generator integrations。
+- **Do Not**：不为每个页面建独立上下文栈；不把完整 DB 序列化进 Prompt。
 
-## M10-T02 完成Provider Contract Test
+## M9-T02 Memory Layers
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- Windows v0.1分类：P0（正式启用Provider的统一合同发布门）
-- 依赖：M6全部任务
-- 验收：每个正式启用Provider均通过统一测试集合。
+- **Status**：TODO
+- **Dependency**：M9-T01。
+- **Deliverable**：Structured Fact、Recent、Summary、Long-term Memory、World Lore 的合同、生成、验证和存储。
+- **Acceptance**：摘要可追溯且不升级 Truth；长期记忆有来源/Actor/时间；旧史可压缩但 SQLite 原记录保留。
+- **Tests**：promotion rules、summary drift、actor isolation、source deletion/update、save/import。
+- **Do Not**：不把摘要作为唯一历史；不提前引入向量数据库。
 
-## M10-T03 完成Windows端到端测试
+## M9-T03 Retrieval Interface & World Info
 
-- 状态：已完成（2026-08-01）
-- 优先级：P0
-- Windows v0.1分类：P0（Windows纵向切片发布门）
-- 依赖：M5至M8
-- 验收：自动或半自动完成完整纵向切片。
-
-## M10-T04 完成iOS端到端测试
-
-- 状态：DEFERRED
-- 优先级：Windows v0.1 完成后
-- 原因：当前产品策略调整为Windows-first；当前环境无法完成Xcode模拟器验收。
-- 依赖：M9全部任务
-- 验收：导入存档、继续冒险、模型切换和重启恢复均通过。
-
-## M10-T05 完成隐私和数据说明
-
-- 状态：Windows范围已完成（2026-08-01）；iOS说明随M9补充
-- 优先级：P0
-- Windows v0.1分类：P1（先发布Windows本地存储、云模型与密钥说明；iOS部分随M9补充）
-- 依赖：M6、M8、M9
-- 工作内容：本地存储说明、云模型发送内容说明、跨厂商切换确认、API Key说明。
-- 验收：玩家能够明确理解哪些数据留在本地，哪些会发送给模型服务商。
-
-## M10-T06 v0.1最终验收
-
-- 优先级：P0
-- Windows v0.1分类：P0（本阶段只验收Windows范围；原双端验收在M9恢复后补齐）
-- 状态：Windows v0.1范围已完成（2026-08-01）；M9与M10-T04继续`DEFERRED`
-- 依赖：全部P0任务
-- 必须完成：
-
-```text
-玩家输入世界构想
-→ AI生成世界
-→ 完成车卡
-→ 进入酒馆
-→ 与NPC建立关系
-→ 接受任务
-→ 完成一次8～12回合冒险
-→ 返回酒馆看到变化
-→ 模型额度耗尽或模拟失败
-→ 切换到另一个模型继续
-→ 导出存档
-→ 删除本地存档
-→ 重新导入
-→ 继续游戏
-```
-
-- Windows验收记录：`docs/WINDOWS_ACCEPTANCE_0.1.md`
+- **Status**：TODO
+- **Dependency**：M9-T02。
+- **Deliverable**：结构化相关性检索接口、Lore 条目触发/优先级/预算和未来 RAG port。
+- **Acceptance**：无向量服务也可工作；触发规则可解释；稳定结果可缓存。
+- **Tests**：keyword/entity/location/quest triggers、priority、budget、false match、cache invalidation。
+- **Do Not**：不把外部向量服务设为 V0.3 前置；不复制 Lorebook 实现。
 
 ---
 
-# 推荐的首个开发批次
+# M10 — Lazy Generation / Performance / Persistence
 
-不要一次把所有任务交给Codex。首批只执行：
+## M10-T01 Lazy World Generation
 
-1. `M0-T01` 初始化仓库；
-2. `M0-T02` 创建Workspace；
-3. `M0-T03` 创建目录骨架；
-4. `M1-T01` 定义基础类型；
-5. `M1-T02` 定义Campaign状态机；
-6. `M1-T03` 定义世界协议；
-7. `M1-T04` 定义角色协议。
+- **Status**：TODO
+- **Dependency**：M9-T03。
+- **Deliverable**：核心骨架启动、按需具体化和后台生成计划。
+- **Acceptance**：新世界不等待全量 NPC/职业/Quest/地点；骨架足以安全进入；需要时幂等具体化。
+- **Tests**：cold start、partial failure、cancel/reopen、dedupe、no full-world generation。
+- **Do Not**：不以占位假数据冒充生成；不让后台失败破坏核心存档。
 
-完成后先人工检查目录、依赖方向和类型设计，再继续数据库与UI。
+## M10-T02 Prefetch
+
+- **Status**：TODO
+- **Dependency**：M10-T01。
+- **Deliverable**：Director 预测、P1/P2 预取、失效和命中指标。
+- **Acceptance**：预取不阻塞 P0、不提交未采用玩家行为、不泄露隐藏信息。
+- **Tests**：prediction hit/miss、priority、cancel/invalidate、budget、privacy。
+- **Do Not**：不无限猜测玩家路线；不将预取候选当事实。
+
+## M10-T03 Streaming
+
+- **Status**：TODO
+- **Dependency**：M10-T02。
+- **Deliverable**：NPC/介绍等可取消流式 UX、原生传输和提交边界。
+- **Acceptance**：流中断不产生正式消息；完整结果验证后一次提交；重开可辨 pending/failed/committed。
+- **Tests**：chunk order、unicode、cancel/timeout、malformed final、retry、no partial commit。
+- **Do Not**：不逐 chunk 修改世界状态；不把 streaming 作为 Provider 必需能力。
+
+## M10-T04 Cache Optimization
+
+- **Status**：TODO
+- **Dependency**：M10-T03。
+- **Deliverable**：Constitution/Rules/Prompt 稳定前缀、动态尾部、指标和基线对比。
+- **Acceptance**：相同稳定输入字节一致；动态行动不污染前缀；真实 Provider 指标与会话观察明确区分。
+- **Tests**：byte stability、revision invalidation、privacy、metric cap、real-provider test opt-in。
+- **Do Not**：不为命中牺牲正确上下文；不虚报 Provider cache。
+
+## M10-T05 V0.3 Save Schema & Migration
+
+- **Status**：TODO
+- **Dependency**：M10-T04。
+- **Deliverable**：save/world schema version、SQLite migrations、V0.2→V0.3 转换、导入导出升级和恢复 UI。
+- **Acceptance**：迁移前备份、隔离副本、完整性/领域重载、原子切换；无法转换时原件不变且明确提示。
+- **Tests**：all historical fixtures、cross-language、interrupted/corrupt/future version、secret scan、round-trip。
+- **Do Not**：不静默丢字段或覆盖原档；不删除历史 migrations/fixtures。
+
+## M10-T06 Performance Regression Gate
+
+- **Status**：TODO
+- **Dependency**：M10-T05。
+- **Deliverable**：与 M1-T04 对比的自动性能门和更新报告。
+- **Acceptance**：核心延迟、queue、token、cache、长期 DB/Context 增长有阈值和解释；回归必须修复或明确接受并记录决定。
+- **Tests**：repeatability、warm/cold、long-save、threshold failure、report generation。
+- **Do Not**：不以单次最快值为结论；不降低门槛掩盖回归。
 
 ---
 
-# 功能冻结线
+# M11 — Playability
 
-在`M5-T11 Windows离线纵向切片验收`通过前，禁止加入：
+## M11-T01 Three-World Test Harness
 
-- AI图片；
-- 语音；
-- 多人；
-- 酒馆经营；
-- 云同步；
-- 多Agent；
-- 社区和模组；
-- 复杂战斗；
-- 新的模型厂商适配。
+- **Status**：TODO
+- **Dependency**：M10-T06。
+- **Deliverable**：奇幻、调查/COC、Cyberpunk 三世界的隔离测试配置、行为脚本和证据格式。
+- **Acceptance**：三世界 Constitution/职业/装备/Trait/NPC/Quest/扩展字段明显不同；不使用正式用户数据。
+- **Tests**：fixture validity、isolation、reset/replay、secret scan。
+- **Do Not**：不把三个世界做成换名 fixture；不预判测试结果。
 
-完成核心闭环比扩大功能列表更重要。
+## M11-T02 Fantasy Long Playtest
+
+- **Status**：TODO
+- **Dependency**：M11-T01。
+- **Deliverable**：30–50 个有效行为、自动/人工证据、发现与修复。
+- **Acceptance**：覆盖完整 V0.3 核心功能、保存重启、知识/一致性/性能观察。
+- **Tests**：全量适用门禁 + 该世界回归。
+- **Do Not**：不只点候选；不忽略失败发现。
+
+## M11-T03 Investigation Long Playtest
+
+- **Status**：TODO
+- **Dependency**：M11-T02。
+- **Deliverable**：30–50 个调查世界行为、证据、发现与修复。
+- **Acceptance**：理智/幸运/信用等扩展、有限认知、误导信息、失败推进和多 Quest 一致。
+- **Tests**：全量适用门禁 + 该世界回归。
+- **Do Not**：不复制 COC 受版权保护文本/规则；不让一次失败锁死线索。
+
+## M11-T04 Cyberpunk Long Playtest
+
+- **Status**：TODO
+- **Dependency**：M11-T03。
+- **Deliverable**：30–50 个科幻世界行为、证据、发现与修复。
+- **Acceptance**：义体/负荷/声望、动态势力、经济/装备平衡、跨地点和多任务后果稳定。
+- **Tests**：全量适用门禁 + 该世界回归。
+- **Do Not**：不把奇幻内容换皮；不允许数值膨胀。
+
+## M11-T05 Free-Input Stress Test
+
+- **Status**：TODO
+- **Dependency**：M11-T04。
+- **Deliverable**：至少八类非推荐行为的跨世界压力证据与修复。
+- **Acceptance**：系统可合理成功/失败/拒绝，但不崩溃、丢档、跳过后果或强迫预设路线。
+- **Tests**：拒绝/欺骗/购买/偷窃/离城/路人长期交流/卖任务道具/投敌；重开与一致性。
+- **Do Not**：不为测试写死结果；不把“无法解析”当默认回应。
+
+## M11-T06 Playability Report
+
+- **Status**：TODO
+- **Dependency**：M11-T05。
+- **Deliverable**：`docs/V0.3_PLAYABILITY_REPORT.md`。
+- **Acceptance**：逐世界记录行为数、模型、延迟、知识/人格/Quest/World/Trait/Equipment/Director/Context、发现/修复/剩余和评分。
+- **Tests**：证据链接与统计复算；报告格式；最终回归。
+- **Do Not**：不把 Fake 测试冒充真实模型；不省略失败或 BLOCKED。
+
+---
+
+# M12 — Audit & Release
+
+## M12-T01 First Full Audit
+
+- **Status**：TODO
+- **Dependency**：M11-T06。
+- **Deliverable**：Architecture、Code、Security、Credential、Provider、AI、Rules、SQLite、Save/Migration、Performance/Cache、UI/UX/A11y、Regression、Playability 的 findings ledger。
+- **Acceptance**：每项含证据、P0–P3、状态、影响、修复建议；不采信 DONE 标签本身。
+- **Tests**：全量静态/动态检查和证据复核。
+- **Do Not**：不边审边降低标准；不遗漏外部环境限制。
+
+## M12-T02 Fix Audit Findings
+
+- **Status**：TODO
+- **Dependency**：M12-T01。
+- **Deliverable**：逐项修复、回归、Decision/Log 更新和原子 commits。
+- **Acceptance**：P0/P1 全部关闭；P2/P3 明确关闭、延期理由和风险；无新回归。
+- **Tests**：每项定向回归 + 全量质量门 + 适用 build。
+- **Do Not**：不删测试/跳验证/吞错误使门禁通过；不将 BLOCKED 写成 VERIFIED。
+
+## M12-T03 Release Gates
+
+- **Status**：TODO
+- **Dependency**：M12-T02。
+- **Deliverable**：Formatter、lint、typecheck、TS/Node/Rust、rustfmt/clippy、interop、desktop/release build、平台适用门禁和结构化证据。
+- **Acceptance**：所有适用门禁通过；平台不可用项明确 BLOCKED；产物来源 commit 与哈希可追溯。
+- **Tests**：门禁本身的自测、产物哈希、秘密扫描。
+- **Do Not**：不复用旧版本证据冒充 V0.3；不签名/发布/push，除非用户授权。
+
+## M12-T04 Reports & Final Verdict
+
+- **Status**：TODO
+- **Dependency**：M12-T03。
+- **Deliverable**：`docs/V0.3_FIRST_AUDIT_REPORT.md`、最终版 Playability Report、README/Tasks/Log/Decisions 和完整 Final Verdict。
+- **Acceptance**：明确 P0/P1/P2/P3、评分、测试、真实模型、性能、缓存、起止 commit、新增 commits、branch/status/clean、push/merge、Remaining Risks 和 `READY FOR SECOND AUDIT` 判断。
+- **Tests**：报告统计与证据一致；文档/链接/格式；最终 `git diff`/status/secret review。
+- **Do Not**：P0/P1 未清零时不得判定 READY；不隐瞒 dirty tree 或用户原有修改；不自动开始第二轮审计。

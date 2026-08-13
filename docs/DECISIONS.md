@@ -2042,3 +2042,23 @@ UI Gate固定覆盖存档、世界、车卡、酒馆、NPC、任务、冒险、�
 ### 影响与边界
 
 证据bundle、Application Support目录和`.emtavern`归档只属于隔离QA标识；不访问或修改正式用户数据。流程只使用确定性Fake Provider，不配置真实API Key，不调用真实Provider或付费API，也不启动iOS。该Gate关闭SR2-010并将严格下一任务推进到M10-T01 Windows v0.2 Build。
+
+## DEC-100：V0.3 采用增量演进而非推倒 V0.2 架构
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M0-T01`、`docs/V0.3_SPEC.md`、V0.2 两轮审计与可玩性证据
+
+### 背景
+
+V0.3 的产品范围显著扩大，包含动态实体、多任务图、Character Creation 2.0、World Director、Rules Engine 扩展和全新的生成/上下文基础设施。同时，V0.2 已经具备统一 AI 编排、Provider 抽象、安全凭据、SQLite 事务、事件、知识 provenance、Context budget、缓存遥测、恢复、导入导出和平台门禁。若以“大版本”为由另建并行栈，会重新引入已经关闭的 Provider 绕行、双真源、凭据生命周期和跨语言合同风险。
+
+### 决定与理由
+
+V0.3 在现有分层上增量演进：Generator Framework 组合或替换现有桌面编排入口，但不得建立第二套 Provider 调用栈；新规则和实体先进入共享合同与领域层，再进入迁移、Repository、Application 和 UI；SQLite 继续是唯一事实源。现有 V0.2 数据通过版本化兼容投影和明确迁移升级，不以删除旧结构换取开发便利。
+
+任务编号按 V0.3 产品里程碑重新建立 M0–M12。历史 v0.1 规格继续保留在 `docs/spec.md`，历史 v0.2 任务保留在 `docs/TASKS_V0.2.md`；`docs/TASKS.md` 从本任务起成为 V0.3 的唯一执行顺序。
+
+### 影响与边界
+
+每项任务必须证明所解决的问题并优先复用现有能力。V0.3 不提前全面开发 iOS，不以接入更多 Provider 为目标，不把 TTS、图像、多人、云同步或插件商店纳入核心交付。若后续证据表明某个 V0.2 模块必须替换，需要新增 Decision，说明兼容、迁移、回滚和测试策略。
