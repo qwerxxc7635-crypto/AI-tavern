@@ -18,6 +18,7 @@ mod tavern_initialization;
 #[cfg(test)]
 mod windows_e2e;
 mod world_creation;
+mod world_seed;
 pub use adventure_play::*;
 pub use cache_metrics::*;
 pub use character_creation::*;
@@ -29,6 +30,7 @@ pub use save_archive::*;
 pub use settlement::*;
 pub use tavern_initialization::*;
 pub use world_creation::*;
+pub use world_seed::*;
 
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
@@ -62,7 +64,8 @@ const RUMOR_CLAIM_SOURCES_MIGRATION: &str =
     include_str!("../../../database/migrations/0008_rumor_claim_sources.sql");
 const WORLD_CONSTITUTIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0009_world_constitutions.sql");
-const LATEST_SCHEMA_VERSION: i64 = 9;
+const WORLD_SEED_MIGRATION: &str = include_str!("../../../database/migrations/0010_world_seed.sql");
+const LATEST_SCHEMA_VERSION: i64 = 10;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -348,13 +351,21 @@ impl CampaignStore {
     fn create_at(&self, id: String, at: String) -> Result<CampaignSummary, CampaignStoreError> {
         validate_id(&id)?;
         validate_timestamp(&at)?;
-        let connection = self.connect()?;
-        connection.execute(
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        transaction.execute(
             "INSERT INTO campaigns (
                id, schema_version, state, resume_state, created_at, updated_at
              ) VALUES (?1, 1, 'CREATING_WORLD', NULL, ?2, ?2)",
-            params![id, at],
+            params![&id, &at],
         )?;
+        transaction.execute(
+            "INSERT INTO world_seeds (
+               campaign_id, schema_version, algorithm, seed, created_at
+             ) VALUES (?1, 1, 'EMBER_STREAM_V1', ?2, ?3)",
+            params![&id, Uuid::new_v4().simple().to_string(), &at],
+        )?;
+        transaction.commit()?;
         Ok(CampaignSummary {
             id,
             state: "CREATING_WORLD".to_owned(),
@@ -510,6 +521,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         ),
         (8_i64, "rumor_claim_sources", RUMOR_CLAIM_SOURCES_MIGRATION),
         (9_i64, "world_constitutions", WORLD_CONSTITUTIONS_MIGRATION),
+        (10_i64, "world_seed", WORLD_SEED_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

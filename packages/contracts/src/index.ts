@@ -169,6 +169,13 @@ export type {
   WorldConstitutionStatus,
   WorldFact,
 } from './world.js';
+export { WORLD_SEED_ALGORITHMS } from './world-seed.js';
+export type {
+  WorldRandomCursor,
+  WorldRandomReservation,
+  WorldSeed,
+  WorldSeedAlgorithm,
+} from './world-seed.js';
 export {
   CAMPAIGN_ACTIVE_STATES,
   CAMPAIGN_EXCEPTION_STATES,

@@ -53,6 +53,11 @@ const migrations = [
     name: 'world_constitutions',
     source: new URL('../../../database/migrations/0009_world_constitutions.sql', import.meta.url),
   },
+  {
+    version: 10,
+    name: 'world_seed',
+    source: new URL('../../../database/migrations/0010_world_seed.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

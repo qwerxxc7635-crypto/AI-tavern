@@ -35,6 +35,7 @@ import {
   PendingAiRequestRepository,
   WorldConstitutionRepository,
   WorldRepository,
+  WorldSeedRepository,
   type TransactionalSqliteDatabase,
 } from '@ember-tavern/persistence';
 import { formatTaskPrompt } from '@ember-tavern/prompts';
@@ -46,6 +47,7 @@ export interface WorldIdentityFactory {
   faction(name: string, index: number): FactionId;
   location(name: string, index: number): LocationId;
 }
+export type WorldSeedFactory = () => string;
 export interface WorldGenerationRequest {
   readonly campaignId: CampaignId;
   readonly requestId: AiRequestId;
@@ -76,6 +78,7 @@ export class WorldCreationUseCases {
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
   private readonly constitutions: WorldConstitutionRepository;
+  private readonly seeds: WorldSeedRepository;
 
   public constructor(
     private readonly database: TransactionalSqliteDatabase,
@@ -83,18 +86,41 @@ export class WorldCreationUseCases {
     private readonly providerConfig: ProviderConfig,
     private readonly identities: WorldIdentityFactory,
     private readonly now: () => IsoTimestamp,
+    private readonly seedFactory: WorldSeedFactory = randomWorldSeed,
   ) {
     this.campaigns = new CampaignRepository(database);
     this.worlds = new WorldRepository(database);
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
     this.constitutions = new WorldConstitutionRepository(database);
+    this.seeds = new WorldSeedRepository(database);
   }
 
   public createCampaign(id: CampaignId): Campaign {
-    const value = createCampaign({ id, schemaVersion: schemaVersion(1), now: this.now() });
-    this.campaigns.create(value);
-    return value;
+    const timestamp = this.now();
+    const value = createCampaign({ id, schemaVersion: schemaVersion(1), now: timestamp });
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      this.campaigns.create(value);
+      this.seeds.create({
+        campaignId: id,
+        schemaVersion: schemaVersion(1),
+        algorithm: 'EMBER_STREAM_V1',
+        seed: this.seedFactory(),
+        createdAt: timestamp,
+      });
+      this.database.exec('COMMIT');
+      return value;
+    } catch (error) {
+      try {
+        this.database.exec('ROLLBACK');
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], 'Campaign creation rollback failed', {
+          cause: rollbackError,
+        });
+      }
+      throw error;
+    }
   }
 
   public generateWorld(command: GenerateWorldCommand): Promise<WorldBible> {
@@ -454,4 +480,9 @@ function json(value: unknown): JsonValue {
   if (typeof value === 'object')
     return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, json(entry)]));
   throw new TypeError('Value must be finite JSON');
+}
+
+function randomWorldSeed(): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(16));
+  return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('');
 }

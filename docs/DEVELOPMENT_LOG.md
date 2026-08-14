@@ -4006,3 +4006,23 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 105文件/646项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建218个模块；World Creation chunk包含确认UI，不新增Provider或完整世界生成链。
 - 用户已有`.gitignore`修改保持未暂存；本任务不merge、不push，也不提前执行M4-T02。
+
+## 2026-08-14 — M4-T02 World Seed
+
+### 持久Seed与独立程序随机流
+
+- 新增version 1 World Seed合同：每个Campaign持久128-bit小写hex Seed和`EMBER_STREAM_V1`算法标识；新Campaign在同一事务创建Seed，非法注入会回滚Campaign，migration 10为既有Campaign一次性回填。
+- 新增`world_seeds`与`world_random_streams`；Seed由SQLite trigger永久不可变，每个用途流独立保存next position。Repository以单条UPSERT原子预留1–4096次draw，重开后继续cursor且不会因其他流推进而漂移。
+- 新增可注入`DeterministicWorldRandom`，提供uint32/unit、pick、weightedPick和Fisher–Yates shuffle；严格验证Seed、流名、position、候选、权重和reservation边界，耗尽后拒绝继续抽样。
+- TypeScript与Rust共同实现`EMBER_STREAM_V1`随机访问算法，并以固定向量验证一致；Windows CampaignStore创建/读取Seed、预留map流，E2E在正式纵向切片证明落库。
+- `d20`、`dice`及其命名空间在Domain、Repository、SQLite和Rust拒绝；程序抽样器不实现`nextD20`。既有D20仍由独立受信`D20RandomSource`裁决并持久硬结果，设备模型温度设置也不与Seed混用。
+- 新增`DEC-117`与`docs/V0.3_WORLD_SEED.md`；不声称LLM完全确定，不提供Seed重置/查看UI，不提前实现地图、事件池或Director消费者。portable archive新表升级仍按M10-T05集中处理。
+
+### 验证
+
+- Domain/Repository/Application专项11项通过，覆盖shared vector、repeatability、pick/weight/shuffle、reservation耗尽、stream isolation、save/reopen、Seed/cursor、创建rollback、不可变trigger、SQLite硬随机命名拒绝及D20 independence。
+- migration/database startup 9项通过；从schema 6升级到10时既有Campaign获得合法Seed，完整新库包含两张Seed表且重复启动幂等。
+- 首次完整门禁在Rust Clippy唯一拒绝手写position闭区间判断；按建议改用`RangeInclusive::contains`，未添加allow或降低warnings，随后Clippy、Rust workspace与互操作全部通过。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 107文件/654项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行102项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建219个模块；Seed基础设施不增加玩家UI或模型调用。
+- 用户已有`.gitignore`修改保持未暂存；本任务不merge、不push，也不提前执行M4-T03。

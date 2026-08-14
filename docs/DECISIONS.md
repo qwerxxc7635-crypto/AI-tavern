@@ -2415,3 +2415,26 @@ World Constitution若只存在于Prompt，重启后无法证明后续内容遵�
 - TypeScript Repository与Rust Windows命令共享字段、资源上限、revision及锁定语义；SQLite重开保持完整记录。
 - 违反Constitution的生成结果记录安全错误并整批拒绝，不写入半个World或半个Constitution；repair仍只用于Schema/解析技术失败，不可绕过规则拒绝。
 - M4-T01不提前生成Career、Trait、Item、NPC、Quest或完整世界；portable archive schema集中迁移留在M10-T05，避免逐表破坏跨语言格式。
+
+## DEC-117：程序随机采用Seed加命名cursor，D20保留独立受信源
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M4-T02`、`docs/V0.3_SPEC.md` 9.2
+
+### 背景
+
+单个可变PRNG会使地图抽样次数改变事件结果，重启后若只保存Seed又会从头重放；直接使用全局随机则无法复现测试。把同一个Seed接入D20会让用户通过复制Seed或恢复cursor重投硬结果。模型温度只是内容多样性设置，也不能冒充程序确定性。
+
+### 决定与理由
+
+每个Campaign持久一个不可变128-bit Seed，并按用途保存独立命名流cursor。Repository以单条SQLite语句原子预留draw区间；纯TypeScript/Rust `EMBER_STREAM_V1`算法根据Seed、stream与position随机访问结果。抽样器只消费预留区间并在耗尽时失败。
+
+Seed在Campaign创建事务内写入，migration 10为旧Campaign一次性回填。`d20`/`dice`命名空间在四层边界拒绝，程序抽样器不实现`nextD20`；现有D20继续依赖独立注入的受信随机源及持久DiceResult。
+
+### 影响与边界
+
+- 同一Seed与cursor状态得到相同程序选择；不同用途流互不扰动，重开继续已持久position。
+- 已写入SQLite的事实始终优先，不能因Seed重算而改写；reservation推进只说明程序随机已被消费。
+- LLM文本、Provider采样温度和技术retry不承诺由Seed决定；Seed也不暴露为玩家重置或重投功能。
+- M4-T02不提前开发地图、事件池或Director；portable archive加入新V0.3表仍集中留给M10-T05。

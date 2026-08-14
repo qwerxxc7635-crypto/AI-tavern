@@ -36,6 +36,8 @@ const coreTables = [
   'world_clocks',
   'world_constitutions',
   'world_facts',
+  'world_random_streams',
+  'world_seeds',
 ];
 
 async function withDatabase(run) {
@@ -213,8 +215,13 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      9,
+      10,
     );
+    const seed = database
+      .prepare("SELECT algorithm, seed FROM world_seeds WHERE campaign_id = 'campaign-provenance'")
+      .get();
+    assert.equal(seed.algorithm, 'EMBER_STREAM_V1');
+    assert.match(seed.seed, /^[0-9a-f]{32}$/u);
   });
 });
 

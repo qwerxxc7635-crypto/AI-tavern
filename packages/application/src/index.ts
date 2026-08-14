@@ -30,6 +30,7 @@ export type {
   RefineWorldCommand,
   WorldGenerationRequest,
   WorldIdentityFactory,
+  WorldSeedFactory,
 } from './world-creation-use-cases.js';
 export { CharacterCreationUseCases } from './character-creation-use-cases.js';
 export type {

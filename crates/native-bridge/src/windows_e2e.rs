@@ -24,6 +24,18 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             "2026-08-01T14:00:00.000Z".to_owned(),
         )
         .expect("create campaign");
+    let seed = store
+        .world_seed(CAMPAIGN_ID)
+        .expect("persistent world seed");
+    assert_eq!(seed.algorithm, "EMBER_STREAM_V1");
+    assert_eq!(seed.seed.len(), 32);
+    assert_eq!(
+        store
+            .reserve_world_random(CAMPAIGN_ID, "map.initial", 2)
+            .expect("reserve deterministic map stream")
+            .start_position,
+        0
+    );
 
     let world = world_draft();
     let world_output = serde_json::to_value(&world).expect("serialize world output");

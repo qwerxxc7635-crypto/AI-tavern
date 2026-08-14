@@ -194,7 +194,7 @@
 
 ## M4-T02 World Seed
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M4-T01。
 - **Deliverable**：持久 Seed、可注入程序随机流和确定性抽样工具。
 - **Acceptance**：相同 Seed/状态得到相同程序选择；事实写入后以 SQLite 为准；D20 保持独立受信随机边界。

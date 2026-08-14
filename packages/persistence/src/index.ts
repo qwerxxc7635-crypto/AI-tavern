@@ -64,6 +64,7 @@ export { TurnTransaction } from './turn-transaction.js';
 export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';
 export { WorldConstitutionRepository } from './world-constitution-repository.js';
+export { WorldSeedRepository } from './world-seed-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';
 export { exportCampaignSave } from './save-export.js';

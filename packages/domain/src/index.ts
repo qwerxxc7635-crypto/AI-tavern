@@ -30,3 +30,10 @@ export type {
   ConstitutionBoundContent,
   ConstitutionWorldProjection,
 } from './world-constitution-validator.js';
+export {
+  DeterministicWorldRandom,
+  WorldSeedError,
+  assertWorldRandomStreamId,
+  assertWorldSeed,
+  deterministicWorldUint32,
+} from './world-seed.js';

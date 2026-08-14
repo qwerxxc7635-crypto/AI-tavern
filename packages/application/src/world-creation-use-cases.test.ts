@@ -19,6 +19,7 @@ import {
   PendingAiRequestRepository,
   WorldConstitutionRepository,
   WorldRepository,
+  WorldSeedRepository,
   type SqliteStatement,
   type SqliteValue,
   type TransactionalSqliteDatabase,
@@ -55,6 +56,10 @@ describe('WorldCreationUseCases', () => {
       const sqlite = adaptDatabase(database);
       const useCases = createUseCases(sqlite);
       expect(useCases.createCampaign(campaignKey).state).toBe('CREATING_WORLD');
+      expect(new WorldSeedRepository(sqlite).get(campaignKey)).toMatchObject({
+        algorithm: 'EMBER_STREAM_V1',
+        seed: '00112233445566778899aabbccddeeff',
+      });
 
       const generated = await useCases.generateWorld({
         ...request('generate'),
@@ -139,6 +144,19 @@ describe('WorldCreationUseCases', () => {
     }
   });
 
+  it('rolls back campaign creation when the injected Seed is invalid', async () => {
+    const database = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      const useCases = createUseCases(sqlite, new FakeAIProvider(() => at), () => 'invalid-seed');
+      expect(() => useCases.createCampaign(campaignKey)).toThrow();
+      expect(new CampaignRepository(sqlite).get(campaignKey)).toBeNull();
+      expect(new WorldSeedRepository(sqlite).get(campaignKey)).toBeNull();
+    } finally {
+      database.close();
+    }
+  });
+
   it('rejects a schema-valid generated world that contradicts its Constitution', async () => {
     const database = await createDatabase();
     try {
@@ -198,6 +216,7 @@ function request(suffix: string) {
 function createUseCases(
   database: TransactionalSqliteDatabase,
   provider: AIProvider = new FakeAIProvider(() => at),
+  seedFactory = () => '00112233445566778899aabbccddeeff',
 ) {
   return new WorldCreationUseCases(
     database,
@@ -208,6 +227,7 @@ function createUseCases(
       location: (_name, index) => locationId(`location-${index}`),
     },
     () => at,
+    seedFactory,
   );
 }
 
