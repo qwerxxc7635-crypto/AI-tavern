@@ -554,6 +554,24 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
 
 fn world_draft() -> WorldDraft {
     WorldDraft {
+        constitution: WorldConstitutionDraft {
+            schema_version: 1,
+            world_type: "Low coastal fantasy".to_owned(),
+            era: "Early industrial".to_owned(),
+            technology: "Early industrial".to_owned(),
+            magic: "Weather magic has a cost.".to_owned(),
+            peoples: vec!["Coastal communities".to_owned()],
+            society: "Guilds connect isolated ports.".to_owned(),
+            politics: "Harbor councils share authority.".to_owned(),
+            economy: "Fishing and shipping.".to_owned(),
+            combat_scale: "Personal and small-group conflict.".to_owned(),
+            death_rules: "Death is permanent.".to_owned(),
+            career_rules: "Careers arise from local institutions.".to_owned(),
+            equipment_rules: "Equipment follows local craft.".to_owned(),
+            npc_rules: "NPC motives follow knowledge and obligations.".to_owned(),
+            trait_rules: "Benefits require balancing drawbacks.".to_owned(),
+            taboos: vec![],
+        },
         name: "Ember Coast".to_owned(),
         current_region: "Ash Harbor".to_owned(),
         summary: "A storm-bound coast.".to_owned(),

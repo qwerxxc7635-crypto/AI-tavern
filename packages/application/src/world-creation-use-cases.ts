@@ -25,11 +25,15 @@ import {
   type LocationId,
   type ModelProfileId,
   type WorldBible,
+  type WorldConstitution,
+  type WorldConstitutionContent,
 } from '@ember-tavern/contracts';
+import { assertWorldConstitutionCompliance } from '@ember-tavern/domain';
 import {
   CampaignRepository,
   GenerationRecordRepository,
   PendingAiRequestRepository,
+  WorldConstitutionRepository,
   WorldRepository,
   type TransactionalSqliteDatabase,
 } from '@ember-tavern/persistence';
@@ -71,9 +75,10 @@ export class WorldCreationUseCases {
   private readonly worlds: WorldRepository;
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
+  private readonly constitutions: WorldConstitutionRepository;
 
   public constructor(
-    database: TransactionalSqliteDatabase,
+    private readonly database: TransactionalSqliteDatabase,
     private readonly provider: AIProvider,
     private readonly providerConfig: ProviderConfig,
     private readonly identities: WorldIdentityFactory,
@@ -83,6 +88,7 @@ export class WorldCreationUseCases {
     this.worlds = new WorldRepository(database);
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
+    this.constitutions = new WorldConstitutionRepository(database);
   }
 
   public createCampaign(id: CampaignId): Campaign {
@@ -103,21 +109,23 @@ export class WorldCreationUseCases {
       storyPreferences: command.storyPreferences,
       contentBoundaries: command.contentBoundaries,
     });
-    return this.run('GENERATE_WORLD', command, input, (output) =>
-      this.fromDraft(command.campaignId, GenerateWorldOutputSchema.parse(output), null),
-    );
+    return this.run('GENERATE_WORLD', command, input, (output) => {
+      const draft = GenerateWorldOutputSchema.parse(output);
+      return this.fromDraft(command.campaignId, draft, null);
+    });
   }
 
   public refineWorld(command: RefineWorldCommand): Promise<WorldBible> {
     const campaign = this.requireCampaign(command.campaignId);
     const current = this.requireWorld(command.campaignId);
+    const constitution = this.requireConstitution(command.campaignId);
     if (campaign.state !== 'REVIEWING_WORLD')
       throw new AIOrchestrationError(
         'WORLD_NOT_REVIEWABLE',
         'World refinement requires REVIEWING_WORLD',
       );
     const input = RefineWorldInputSchema.parse({
-      world: toDraft(current),
+      world: toDraft(current, constitution),
       revisionInstructions: command.revisionInstructions,
       lockedFields: current.lockedFields,
     });
@@ -128,7 +136,7 @@ export class WorldCreationUseCases {
         current,
       );
       for (const field of current.lockedFields)
-        if (JSON.stringify(current[field]) !== JSON.stringify(next[field]))
+        if (JSON.stringify(current[field]) !== JSON.stringify(next.world[field]))
           throw new Error(`Locked world field changed: ${field}`);
       return next;
     });
@@ -137,8 +145,17 @@ export class WorldCreationUseCases {
   public confirmWorld(id: CampaignId): Campaign {
     const campaign = this.requireCampaign(id);
     this.requireWorld(id);
+    const constitution = this.requireConstitution(id);
     const next = transitionCampaign(campaign, 'CREATING_CHARACTER', this.now());
-    this.campaigns.update(next);
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      this.constitutions.lock(id, constitution.revision, next.updatedAt);
+      this.campaigns.update(next);
+      this.database.exec('COMMIT');
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
     return next;
   }
 
@@ -146,7 +163,10 @@ export class WorldCreationUseCases {
     task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     command: WorldGenerationRequest,
     input: unknown,
-    build: (output: JsonValue) => WorldBible,
+    build: (output: JsonValue) => Readonly<{
+      world: WorldBible;
+      constitution: WorldConstitutionContent;
+    }>,
   ): Promise<WorldBible> {
     const inputJson = json(input);
     const pending = this.requests.createOrGet({
@@ -230,9 +250,9 @@ export class WorldCreationUseCases {
       this.fail(command, 'INVALID_OUTPUT', 'AI output structure validation failed', true);
       throw new AIOrchestrationError('INVALID_OUTPUT', 'AI output structure validation failed');
     }
-    let world: WorldBible;
+    let generated: Readonly<{ world: WorldBible; constitution: WorldConstitutionContent }>;
     try {
-      world = build(validated.validatedOutput);
+      generated = build(validated.validatedOutput);
     } catch (error) {
       this.record(
         command,
@@ -259,7 +279,13 @@ export class WorldCreationUseCases {
         ? transitionCampaign(current, 'REVIEWING_WORLD', this.now())
         : { ...current, updatedAt: this.now() };
     try {
-      this.requests.commitWorldOnce(command.idempotencyKey, campaign, world, this.now());
+      this.requests.commitWorldOnce(
+        command.idempotencyKey,
+        campaign,
+        generated.world,
+        generated.constitution,
+        this.now(),
+      );
     } catch (error) {
       this.fail(command, 'COMMIT_FAILED', 'World commit failed', false);
       throw new AIOrchestrationError('COMMIT_FAILED', 'World commit failed', { cause: error });
@@ -271,8 +297,11 @@ export class WorldCreationUseCases {
     campaignId: CampaignId,
     draft: ReturnType<typeof GenerateWorldOutputSchema.parse>,
     current: WorldBible | null,
-  ): WorldBible {
-    const factions = draft.factions.map((value, index) => ({
+  ): Readonly<{ world: WorldBible; constitution: WorldConstitutionContent }> {
+    const { constitution: proposal, ...worldDraft } = draft;
+    const constitution = constitutionContent(proposal);
+    assertWorldConstitutionCompliance(constitution, worldDraft);
+    const factions = worldDraft.factions.map((value, index) => ({
       ...value,
       id:
         current?.factions.find(({ name }) => name === value.name)?.id ??
@@ -280,19 +309,19 @@ export class WorldCreationUseCases {
       relations: current?.factions.find(({ name }) => name === value.name)?.relations ?? [],
     }));
     const locationIds = new Map(
-      draft.locations.map((value, index) => [
+      worldDraft.locations.map((value, index) => [
         value.name,
         current?.locations.find(({ name }) => name === value.name)?.id ??
           this.identities.location(value.name, index),
       ]),
     );
     const timestamp = this.now();
-    return {
+    const world: WorldBible = {
       campaignId,
       schemaVersion: schemaVersion(1),
-      ...draft,
+      ...worldDraft,
       factions,
-      locations: draft.locations.map((value) => {
+      locations: worldDraft.locations.map((value) => {
         const id = locationIds.get(value.name);
         const parentLocationId =
           value.parentName === null ? null : locationIds.get(value.parentName);
@@ -314,6 +343,7 @@ export class WorldCreationUseCases {
       createdAt: current?.createdAt ?? timestamp,
       updatedAt: timestamp,
     };
+    return Object.freeze({ world, constitution });
   }
 
   private record(
@@ -352,12 +382,22 @@ export class WorldCreationUseCases {
     if (value === null) throw new AIOrchestrationError('WORLD_NOT_FOUND', 'World not found');
     return value;
   }
+  private requireConstitution(id: CampaignId) {
+    const value = this.constitutions.get(id);
+    if (value === null)
+      throw new AIOrchestrationError('CONSTITUTION_NOT_FOUND', 'World Constitution not found');
+    return value;
+  }
 }
 
-function toDraft(world: WorldBible) {
+function toDraft(world: WorldBible, constitution: WorldConstitution) {
   const factions = new Map(world.factions.map((value) => [value.id, value.name]));
   const locations = new Map(world.locations.map((value) => [value.id, value.name]));
   return {
+    constitution: {
+      schemaVersion: constitution.schemaVersion,
+      ...constitutionContent(constitution),
+    },
     name: world.name,
     currentRegion: world.currentRegion,
     summary: world.summary,
@@ -380,6 +420,26 @@ function toDraft(world: WorldBible) {
     tavernReason: world.tavernReason,
     storyHooks: world.storyHooks,
   };
+}
+
+function constitutionContent(value: WorldConstitutionContent): WorldConstitutionContent {
+  return Object.freeze({
+    worldType: value.worldType,
+    era: value.era,
+    technology: value.technology,
+    magic: value.magic,
+    peoples: Object.freeze([...value.peoples]),
+    society: value.society,
+    politics: value.politics,
+    economy: value.economy,
+    combatScale: value.combatScale,
+    deathRules: value.deathRules,
+    careerRules: value.careerRules,
+    equipmentRules: value.equipmentRules,
+    npcRules: value.npcRules,
+    traitRules: value.traitRules,
+    taboos: Object.freeze([...value.taboos]),
+  });
 }
 
 function json(value: unknown): JsonValue {

@@ -34,6 +34,7 @@ const coreTables = [
   'taverns',
   'world_bibles',
   'world_clocks',
+  'world_constitutions',
   'world_facts',
 ];
 
@@ -212,7 +213,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      8,
+      9,
     );
   });
 });

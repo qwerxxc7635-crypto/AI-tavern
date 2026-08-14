@@ -993,6 +993,45 @@ textarea:disabled {
   padding: 2.5rem 0;
 }
 
+.world-constitution {
+  display: grid;
+  gap: 1rem;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--panel);
+}
+
+.world-constitution__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.world-constitution dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 0.8rem;
+  margin: 0;
+}
+
+.world-constitution dl div {
+  padding: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+}
+
+.world-constitution dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.world-constitution dd {
+  margin: 0.35rem 0 0;
+}
+
 .world-editor {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

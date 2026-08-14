@@ -3986,3 +3986,23 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 103文件/635项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建218个模块；Inspector保持My与Desktop orchestrator现有lazy chunks，不新增Provider或持久化依赖。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、GenerationRecord、已保存事实或模型凭据，不merge、不push。
+
+## 2026-08-14 — M4-T01 World Constitution
+
+### 结构化规则与锁定边界
+
+- 新增version 1 World Constitution合同，覆盖世界类型、时代、技术、魔法、族群、社会/政治/经济、战斗/死亡、职业/装备/NPC/Trait规则及禁忌；`GENERATE_WORLD`与`REFINE_WORLD`升级v2，在既有Generator/Provider响应内同批生成World与Constitution，不增加模型调用或提前生成后续实体。
+- 新增migration 9及`world_constitutions`独立表；TypeScript Repository与Rust Windows命令支持完整读写、revision递增、expected revision确认和SQLite重开。锁定trigger阻止已确认记录的任何UPDATE，绕过Repository也不能改写。
+- World与Constitution在同一事务提交；本地规则要求technology精确匹配、magic进入power rules、所有taboo进入forbidden elements。Schema有效但关系冲突的模型输出以稳定错误整批拒绝，Campaign、World和Constitution均不产生半提交。
+- 新增下游`assertConstitutionBinding`入口，要求LOCKED状态、campaign与revision完全一致；后续Career/Item/NPC/Trait业务规则仍由各自任务实现，不把结构parse误当成合法性裁决。
+- 世界确认UI增加醒目的只读Constitution区，显示revision/status及全部规则；AI refinement可在确认前同步修订并递增revision，确认后进入车卡且不可继续修订。
+- 新增`DEC-116`与`docs/V0.3_WORLD_CONSTITUTION.md`。portable archive仍保持v2，集中升级属于M10-T05；本任务不提前改变跨语言存档协议。
+
+### 验证
+
+- 新增三类Constitution（低魔、无魔调查、赛博朋克）save/reload测试，并覆盖revision、错误expected revision、Repository锁定拒绝、SQLite trigger、migration 9及数据库重开。
+- Domain/Application测试覆盖未锁定、campaign mismatch、revision mismatch、World technology/magic/taboo mismatch、原子拒绝及确认锁定；Windows UI/Service与Rust纵向切片覆盖展示、修订和确认。
+- 首次Rust reopen测试发现native migration最新版仍写死为8；改为集中`LATEST_SCHEMA_VERSION = 9`后通过。完整门禁随后发现archive本地数据库白名单也仍为8；同步本地识别为9但不改变portable v2格式，再从头执行完整门禁。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 105文件/646项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建218个模块；World Creation chunk包含确认UI，不新增Provider或完整世界生成链。
+- 用户已有`.gitignore`修改保持未暂存；本任务不merge、不push，也不提前执行M4-T02。

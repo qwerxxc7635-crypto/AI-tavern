@@ -41,7 +41,43 @@ pub struct LocationDraft {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(deny_unknown_fields)]
+pub struct WorldConstitutionDraft {
+    pub schema_version: i64,
+    pub world_type: String,
+    pub era: String,
+    pub technology: String,
+    pub magic: String,
+    pub peoples: Vec<String>,
+    pub society: String,
+    pub politics: String,
+    pub economy: String,
+    pub combat_scale: String,
+    pub death_rules: String,
+    pub career_rules: String,
+    pub equipment_rules: String,
+    pub npc_rules: String,
+    pub trait_rules: String,
+    pub taboos: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorldConstitutionView {
+    pub campaign_id: String,
+    #[serde(flatten)]
+    pub draft: WorldConstitutionDraft,
+    pub revision: i64,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub locked_at: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
 pub struct WorldDraft {
+    pub constitution: WorldConstitutionDraft,
     pub name: String,
     pub current_region: String,
     pub summary: String,
@@ -72,6 +108,7 @@ pub struct WorldBibleView {
 pub struct WorldCreationSnapshot {
     pub campaign_state: String,
     pub world: Option<WorldBibleView>,
+    pub constitution: Option<WorldConstitutionView>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -162,6 +199,7 @@ impl CampaignStore {
 
         let state = require_campaign_state(&transaction, &command.campaign_id)?;
         let current = load_world(&transaction, &command.campaign_id)?;
+        let current_constitution = load_constitution(&transaction, &command.campaign_id)?;
         match command.task {
             WorldGenerationTask::GenerateWorld
                 if state == "CREATING_WORLD" && current.is_none() => {}
@@ -177,6 +215,13 @@ impl CampaignStore {
         let at = current_timestamp()?;
         let world = build_world_view(&command.campaign_id, command.world, current.as_ref(), &at)?;
         save_world(&transaction, &world, current.as_ref())?;
+        save_constitution(
+            &transaction,
+            &command.campaign_id,
+            &world.draft.constitution,
+            current_constitution.as_ref(),
+            &at,
+        )?;
         transaction.execute(
             "UPDATE campaigns SET state = 'REVIEWING_WORLD', resume_state = NULL, updated_at = ?1
              WHERE id = ?2",
@@ -235,11 +280,20 @@ impl CampaignStore {
         }
         let current = load_world(&transaction, &command.campaign_id)?
             .ok_or(CampaignStoreError::InvalidData)?;
+        let current_constitution = load_constitution(&transaction, &command.campaign_id)?
+            .ok_or(CampaignStoreError::InvalidData)?;
         validate_locked_values(&current, &command.world)?;
         let at = current_timestamp()?;
         let mut world = build_world_view(&command.campaign_id, command.world, Some(&current), &at)?;
         world.locked_fields = command.locked_fields;
         save_world(&transaction, &world, Some(&current))?;
+        save_constitution(
+            &transaction,
+            &command.campaign_id,
+            &world.draft.constitution,
+            Some(&current_constitution),
+            &at,
+        )?;
         transaction.execute(
             "UPDATE campaigns SET updated_at = ?1 WHERE id = ?2",
             params![at, command.campaign_id],
@@ -256,9 +310,21 @@ impl CampaignStore {
         let at = current_timestamp()?;
         let mut connection = self.connect()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let constitution = load_constitution(&transaction, campaign_id)?;
         if require_campaign_state(&transaction, campaign_id)? != "REVIEWING_WORLD"
             || load_world(&transaction, campaign_id)?.is_none()
+            || constitution.is_none()
         {
+            return Err(CampaignStoreError::InvalidState);
+        }
+        let constitution = constitution.ok_or(CampaignStoreError::InvalidState)?;
+        let locked = transaction.execute(
+            "UPDATE world_constitutions
+             SET status = 'LOCKED', locked_at = ?1, updated_at = ?1
+             WHERE campaign_id = ?2 AND revision = ?3 AND status = 'DRAFT'",
+            params![at, campaign_id, constitution.revision],
+        )?;
+        if locked != 1 {
             return Err(CampaignStoreError::InvalidState);
         }
         let changed = transaction.execute(
@@ -317,6 +383,7 @@ fn snapshot(
     Ok(WorldCreationSnapshot {
         campaign_state: require_campaign_state(connection, campaign_id)?,
         world: load_world(connection, campaign_id)?,
+        constitution: load_constitution(connection, campaign_id)?,
     })
 }
 
@@ -338,6 +405,7 @@ fn load_world(
     connection: &Connection,
     campaign_id: &str,
 ) -> Result<Option<WorldBibleView>, CampaignStoreError> {
+    let constitution = load_constitution(connection, campaign_id)?.map(|value| value.draft);
     connection
         .query_row(
             "SELECT name, current_region, summary, core_conflict, technology_level,
@@ -360,6 +428,7 @@ fn load_world(
                 Ok(WorldBibleView {
                     campaign_id: campaign_id.to_owned(),
                     draft: WorldDraft {
+                        constitution: constitution.clone().ok_or(rusqlite::Error::InvalidQuery)?,
                         name: row.get(0)?,
                         current_region: row.get(1)?,
                         summary: row.get(2)?,
@@ -420,6 +489,55 @@ fn load_world(
             validate_world_draft(&world.draft)?;
             validate_locks(&world.locked_fields)?;
             Ok(world)
+        })
+        .transpose()
+}
+
+fn load_constitution(
+    connection: &Connection,
+    campaign_id: &str,
+) -> Result<Option<WorldConstitutionView>, CampaignStoreError> {
+    connection
+        .query_row(
+            "SELECT schema_version, revision, status, world_type, era, technology, magic,
+                    peoples_json, society, politics, economy, combat_scale, death_rules,
+                    career_rules, equipment_rules, npc_rules, trait_rules, taboos_json,
+                    created_at, updated_at, locked_at
+             FROM world_constitutions WHERE campaign_id = ?1",
+            [campaign_id],
+            |row| {
+                Ok(WorldConstitutionView {
+                    campaign_id: campaign_id.to_owned(),
+                    draft: WorldConstitutionDraft {
+                        schema_version: row.get(0)?,
+                        world_type: row.get(3)?,
+                        era: row.get(4)?,
+                        technology: row.get(5)?,
+                        magic: row.get(6)?,
+                        peoples: parse_json(row.get::<_, String>(7)?)?,
+                        society: row.get(8)?,
+                        politics: row.get(9)?,
+                        economy: row.get(10)?,
+                        combat_scale: row.get(11)?,
+                        death_rules: row.get(12)?,
+                        career_rules: row.get(13)?,
+                        equipment_rules: row.get(14)?,
+                        npc_rules: row.get(15)?,
+                        trait_rules: row.get(16)?,
+                        taboos: parse_json(row.get::<_, String>(17)?)?,
+                    },
+                    revision: row.get(1)?,
+                    status: row.get(2)?,
+                    created_at: row.get(18)?,
+                    updated_at: row.get(19)?,
+                    locked_at: row.get(20)?,
+                })
+            },
+        )
+        .optional()?
+        .map(|value| {
+            validate_constitution_view(&value)?;
+            Ok(value)
         })
         .transpose()
 }
@@ -575,6 +693,60 @@ fn save_world(
     Ok(())
 }
 
+fn save_constitution(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+    draft: &WorldConstitutionDraft,
+    current: Option<&WorldConstitutionView>,
+    at: &str,
+) -> Result<(), CampaignStoreError> {
+    validate_constitution_draft(draft)?;
+    if current.is_some_and(|value| value.status == "LOCKED") {
+        return Err(CampaignStoreError::InvalidState);
+    }
+    let revision = current.map(|value| value.revision + 1).unwrap_or(1);
+    transaction.execute(
+        "INSERT INTO world_constitutions (
+           campaign_id, schema_version, revision, status, world_type, era, technology,
+           magic, peoples_json, society, politics, economy, combat_scale, death_rules,
+           career_rules, equipment_rules, npc_rules, trait_rules, taboos_json,
+           created_at, updated_at, locked_at
+         ) VALUES (?1, 1, ?2, 'DRAFT', ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12,
+                   ?13, ?14, ?15, ?16, ?17, ?18, ?19, NULL)
+         ON CONFLICT(campaign_id) DO UPDATE SET
+           revision = excluded.revision, world_type = excluded.world_type, era = excluded.era,
+           technology = excluded.technology, magic = excluded.magic,
+           peoples_json = excluded.peoples_json, society = excluded.society,
+           politics = excluded.politics, economy = excluded.economy,
+           combat_scale = excluded.combat_scale, death_rules = excluded.death_rules,
+           career_rules = excluded.career_rules, equipment_rules = excluded.equipment_rules,
+           npc_rules = excluded.npc_rules, trait_rules = excluded.trait_rules,
+           taboos_json = excluded.taboos_json, updated_at = excluded.updated_at",
+        params![
+            campaign_id,
+            revision,
+            draft.world_type,
+            draft.era,
+            draft.technology,
+            draft.magic,
+            to_json(&draft.peoples)?,
+            draft.society,
+            draft.politics,
+            draft.economy,
+            draft.combat_scale,
+            draft.death_rules,
+            draft.career_rules,
+            draft.equipment_rules,
+            draft.npc_rules,
+            draft.trait_rules,
+            to_json(&draft.taboos)?,
+            current.map(|value| value.created_at.as_str()).unwrap_or(at),
+            at,
+        ],
+    )?;
+    Ok(())
+}
+
 fn load_stored_factions(
     connection: &Connection,
     campaign_id: &str,
@@ -604,6 +776,7 @@ fn to_json(value: &impl Serialize) -> Result<String, CampaignStoreError> {
 }
 
 fn validate_world_draft(world: &WorldDraft) -> Result<(), CampaignStoreError> {
+    validate_constitution_draft(&world.constitution)?;
     validate_text(&world.name, 200)?;
     validate_text(&world.current_region, 200)?;
     validate_text(&world.summary, 4_000)?;
@@ -650,6 +823,62 @@ fn validate_world_draft(world: &WorldDraft) -> Result<(), CampaignStoreError> {
         {
             return Err(CampaignStoreError::InvalidData);
         }
+    }
+    if world.technology_level != world.constitution.technology
+        || !world.power_rules.contains(&world.constitution.magic)
+        || world
+            .constitution
+            .taboos
+            .iter()
+            .any(|taboo| !world.forbidden_elements.contains(taboo))
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(())
+}
+
+fn validate_constitution_draft(
+    constitution: &WorldConstitutionDraft,
+) -> Result<(), CampaignStoreError> {
+    if constitution.schema_version != 1 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    for value in [
+        &constitution.world_type,
+        &constitution.era,
+        &constitution.technology,
+        &constitution.magic,
+        &constitution.society,
+        &constitution.politics,
+        &constitution.economy,
+        &constitution.combat_scale,
+        &constitution.death_rules,
+        &constitution.career_rules,
+        &constitution.equipment_rules,
+        &constitution.npc_rules,
+        &constitution.trait_rules,
+    ] {
+        validate_text(value, 4_000)?;
+    }
+    validate_text_list(&constitution.peoples, 0, 24, 200)?;
+    validate_text_list(&constitution.taboos, 0, 24, 200)
+}
+
+fn validate_constitution_view(
+    constitution: &WorldConstitutionView,
+) -> Result<(), CampaignStoreError> {
+    validate_constitution_draft(&constitution.draft)?;
+    if constitution.revision < 1
+        || !matches!(constitution.status.as_str(), "DRAFT" | "LOCKED")
+        || (constitution.status == "DRAFT" && constitution.locked_at.is_some())
+        || (constitution.status == "LOCKED" && constitution.locked_at.is_none())
+        || constitution.updated_at < constitution.created_at
+        || constitution
+            .locked_at
+            .as_ref()
+            .is_some_and(|locked| locked < &constitution.created_at)
+    {
+        return Err(CampaignStoreError::InvalidData);
     }
     Ok(())
 }
@@ -767,6 +996,13 @@ mod tests {
             .confirm_world("campaign-world")
             .expect("confirm world");
         assert_eq!(confirmed.campaign_state, "CREATING_CHARACTER");
+        assert_eq!(
+            confirmed
+                .constitution
+                .as_ref()
+                .map(|value| value.status.as_str()),
+            Some("LOCKED")
+        );
     }
 
     #[test]
@@ -867,6 +1103,24 @@ mod tests {
 
     fn sample_world() -> WorldDraft {
         WorldDraft {
+            constitution: WorldConstitutionDraft {
+                schema_version: 1,
+                world_type: "Low coastal fantasy".to_owned(),
+                era: "Early industrial".to_owned(),
+                technology: "Early industrial".to_owned(),
+                magic: "Weather magic changes the nearby climate.".to_owned(),
+                peoples: vec!["Coastal communities".to_owned()],
+                society: "Harbor guilds connect isolated towns.".to_owned(),
+                politics: "Councils negotiate with lighthouse guilds.".to_owned(),
+                economy: "Fishing, shipping, and beacon tolls.".to_owned(),
+                combat_scale: "Personal and small-group conflict.".to_owned(),
+                death_rules: "Death is permanent.".to_owned(),
+                career_rules: "Careers arise from local institutions.".to_owned(),
+                equipment_rules: "Equipment follows local craft.".to_owned(),
+                npc_rules: "NPC motives follow knowledge and obligations.".to_owned(),
+                trait_rules: "Benefits require balancing drawbacks.".to_owned(),
+                taboos: vec![],
+            },
             name: "Ember Coast".to_owned(),
             current_region: "Ash Harbor".to_owned(),
             summary: "A storm-bound coast of old beacon roads.".to_owned(),

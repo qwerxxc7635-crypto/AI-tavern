@@ -124,8 +124,14 @@ export function WorldCreationPage({
     );
   }
 
-  if (snapshot?.campaignState === 'REVIEWING_WORLD' && snapshot.world !== null && editor !== null) {
+  if (
+    snapshot?.campaignState === 'REVIEWING_WORLD' &&
+    snapshot.world !== null &&
+    snapshot.constitution !== null &&
+    editor !== null
+  ) {
     const current = snapshot.world;
+    const constitution = snapshot.constitution;
     return (
       <main className="world-studio">
         <header className="world-studio__topline">
@@ -159,6 +165,56 @@ export function WorldCreationPage({
           >
             {busy === 'confirm' ? '正在确认…' : '确认世界'}
           </button>
+        </section>
+
+        <section className="world-constitution" aria-label="世界宪法确认">
+          <div className="world-constitution__heading">
+            <div>
+              <p className="eyebrow">世界宪法 · 修订 {constitution.revision}</p>
+              <h2>
+                {constitution.worldType} · {constitution.era}
+              </h2>
+            </div>
+            <strong>{constitution.status === 'DRAFT' ? '确认后永久锁定' : '已锁定'}</strong>
+          </div>
+          <dl>
+            <div>
+              <dt>技术</dt>
+              <dd>{constitution.technology}</dd>
+            </div>
+            <div>
+              <dt>魔法与力量</dt>
+              <dd>{constitution.magic}</dd>
+            </div>
+            <div>
+              <dt>族群</dt>
+              <dd>{constitution.peoples.join('、') || '未设定特殊族群'}</dd>
+            </div>
+            <div>
+              <dt>社会 / 政治 / 经济</dt>
+              <dd>
+                {constitution.society}；{constitution.politics}；{constitution.economy}
+              </dd>
+            </div>
+            <div>
+              <dt>战斗与死亡</dt>
+              <dd>
+                {constitution.combatScale}；{constitution.deathRules}
+              </dd>
+            </div>
+            <div>
+              <dt>生成规则</dt>
+              <dd>
+                职业：{constitution.careerRules}；装备：{constitution.equipmentRules}；NPC：
+                {constitution.npcRules}；特质：{constitution.traitRules}
+              </dd>
+            </div>
+            <div>
+              <dt>世界禁忌</dt>
+              <dd>{constitution.taboos.join('、') || '无额外禁忌'}</dd>
+            </div>
+          </dl>
+          <p>确认世界会同时锁定本修订；后续生成必须携带并匹配修订号。</p>
         </section>
 
         {aiError === null ? null : (
@@ -619,6 +675,11 @@ function lines(value: string): string[] {
 
 function draftOf(world: WorldBibleView): WorldDraft {
   return {
+    constitution: {
+      ...world.constitution,
+      peoples: [...world.constitution.peoples],
+      taboos: [...world.constitution.taboos],
+    },
     name: world.name,
     currentRegion: world.currentRegion,
     summary: world.summary,

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
-import { FakeAIProvider, type ProviderConfig } from '@ember-tavern/ai-core';
+import { FakeAIProvider, type AIProvider, type ProviderConfig } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
   campaignId,
@@ -17,6 +17,7 @@ import {
   CampaignRepository,
   GenerationRecordRepository,
   PendingAiRequestRepository,
+  WorldConstitutionRepository,
   WorldRepository,
   type SqliteStatement,
   type SqliteValue,
@@ -75,6 +76,11 @@ describe('WorldCreationUseCases', () => {
         locations: [{ id: locationId('location-0') }],
       });
       expect(new CampaignRepository(sqlite).get(campaignKey)?.state).toBe('REVIEWING_WORLD');
+      expect(new WorldConstitutionRepository(sqlite).get(campaignKey)).toMatchObject({
+        revision: 1,
+        status: 'DRAFT',
+        technology: generated.technologyLevel,
+      });
       expect(
         new PendingAiRequestRepository(sqlite).get(aiRequestId('request-generate'))?.status,
       ).toBe('COMMITTED');
@@ -96,9 +102,25 @@ describe('WorldCreationUseCases', () => {
       expect(refined.lockedFields).toEqual(['powerRules']);
       expect(refined.createdAt).toBe(generated.createdAt);
       expect(refined.factions[0]?.id).toBe(generated.factions[0]?.id);
+      expect(new WorldConstitutionRepository(sqlite).get(campaignKey)).toMatchObject({
+        revision: 2,
+        status: 'DRAFT',
+      });
 
       expect(useCases.confirmWorld(campaignKey).state).toBe('CREATING_CHARACTER');
       expect(new WorldRepository(sqlite).getBible(campaignKey)).toEqual(refined);
+      expect(new WorldConstitutionRepository(sqlite).get(campaignKey)).toMatchObject({
+        revision: 2,
+        status: 'LOCKED',
+        lockedAt: at,
+      });
+      expect(() =>
+        useCases.refineWorld({
+          ...request('after-confirm'),
+          campaignId: campaignKey,
+          revisionInstructions: ['Rewrite the locked Constitution.'],
+        }),
+      ).toThrow(AIOrchestrationError);
     } finally {
       database.close();
     }
@@ -116,6 +138,50 @@ describe('WorldCreationUseCases', () => {
       database.close();
     }
   });
+
+  it('rejects a schema-valid generated world that contradicts its Constitution', async () => {
+    const database = await createDatabase();
+    try {
+      const sqlite = adaptDatabase(database);
+      const base = new FakeAIProvider(() => at);
+      const provider: AIProvider = {
+        id: 'constitution-violator',
+        listModels: () => base.listModels(),
+        testConnection: (providerConfig) => base.testConnection(providerConfig),
+        async generate(aiRequest, providerConfig) {
+          const response = await base.generate(aiRequest, providerConfig);
+          const output = JSON.parse(response.content) as Record<string, unknown>;
+          output['technologyLevel'] = 'Impossible orbital technology';
+          return { ...response, content: JSON.stringify(output) };
+        },
+      };
+      const useCases = createUseCases(sqlite, provider);
+      useCases.createCampaign(campaignKey);
+      await expect(
+        useCases.generateWorld({
+          ...request('mismatch'),
+          campaignId: campaignKey,
+          concept: 'A contradictory world',
+          storyPreferences: [],
+          contentBoundaries: {
+            allowHorror: false,
+            allowPermanentDeath: false,
+            allowRomance: false,
+            allowBetrayal: false,
+            excludedContent: [],
+          },
+        }),
+      ).rejects.toMatchObject({ code: 'WORLD_VALIDATION_FAILED' });
+      expect(new CampaignRepository(sqlite).get(campaignKey)?.state).toBe('CREATING_WORLD');
+      expect(new WorldRepository(sqlite).getBible(campaignKey)).toBeNull();
+      expect(new WorldConstitutionRepository(sqlite).get(campaignKey)).toBeNull();
+      expect(
+        new PendingAiRequestRepository(sqlite).get(aiRequestId('request-mismatch'))?.status,
+      ).toBe('FAILED');
+    } finally {
+      database.close();
+    }
+  });
 });
 
 function request(suffix: string) {
@@ -129,10 +195,13 @@ function request(suffix: string) {
   };
 }
 
-function createUseCases(database: TransactionalSqliteDatabase) {
+function createUseCases(
+  database: TransactionalSqliteDatabase,
+  provider: AIProvider = new FakeAIProvider(() => at),
+) {
   return new WorldCreationUseCases(
     database,
-    new FakeAIProvider(() => at),
+    provider,
     config,
     {
       faction: (_name, index) => factionId(`faction-${index}`),

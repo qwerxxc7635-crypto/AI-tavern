@@ -48,6 +48,11 @@ const migrations = [
     name: 'rumor_claim_sources',
     source: new URL('../../../database/migrations/0008_rumor_claim_sources.sql', import.meta.url),
   },
+  {
+    version: 9,
+    name: 'world_constitutions',
+    source: new URL('../../../database/migrations/0009_world_constitutions.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

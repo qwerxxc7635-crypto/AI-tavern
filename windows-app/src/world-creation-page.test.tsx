@@ -16,7 +16,11 @@ afterEach(cleanup);
 
 describe('world creation page', () => {
   it('submits base options and an optional concept before showing the generated preview', async () => {
-    const service = new FakeWorldService({ campaignState: 'CREATING_WORLD', world: null });
+    const service = new FakeWorldService({
+      campaignState: 'CREATING_WORLD',
+      world: null,
+      constitution: null,
+    });
     renderWorldPage(service);
 
     fireEvent.change(await screen.findByLabelText(/自定义世界构想/), {
@@ -36,10 +40,16 @@ describe('world creation page', () => {
     const service = new FakeWorldService({
       campaignState: 'REVIEWING_WORLD',
       world: worldView(),
+      constitution: constitutionView(),
     });
     renderWorldPage(service);
 
-    fireEvent.click(await screen.findByRole('checkbox', { name: '世界简介' }));
+    expect(await screen.findByLabelText('世界宪法确认')).toBeTruthy();
+    expect(screen.getByText('世界宪法 · 修订 1')).toBeTruthy();
+    expect(screen.getByText('Low coastal fantasy · Early industrial')).toBeTruthy();
+    expect(screen.getByText(/Death is permanent\./)).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('checkbox', { name: '世界简介' }));
     fireEvent.click(screen.getByRole('button', { name: '保存手动修改' }));
     await waitFor(() => expect(service.updateCalls.at(-1)?.lockedFields).toContain('summary'));
 
@@ -88,7 +98,11 @@ class FakeWorldService {
     options: GenerateWorldOptions,
   ): Promise<WorldCreationSnapshot> {
     this.generateOptions = options;
-    this.snapshot = { campaignState: 'REVIEWING_WORLD', world: worldView() };
+    this.snapshot = {
+      campaignState: 'REVIEWING_WORLD',
+      world: worldView(),
+      constitution: constitutionView(),
+    };
     return this.snapshot;
   }
 
@@ -101,6 +115,7 @@ class FakeWorldService {
     this.snapshot = {
       campaignState: 'REVIEWING_WORLD',
       world: { ...worldView(), ...world, lockedFields },
+      constitution: constitutionView(),
     };
     return this.snapshot;
   }
@@ -114,6 +129,7 @@ class FakeWorldService {
     this.snapshot = {
       campaignState: 'REVIEWING_WORLD',
       world: { ...current, coreConflict: 'Refined conflict.' },
+      constitution: constitutionView(2),
     };
     return this.snapshot;
   }
@@ -128,6 +144,7 @@ class FakeWorldService {
 function worldView(): WorldBibleView {
   return {
     campaignId: 'campaign-world',
+    constitution: constitutionDraft(),
     name: 'Ember Coast',
     currentRegion: 'Ash Harbor',
     summary: 'A storm-bound coast.',
@@ -156,5 +173,38 @@ function worldView(): WorldBibleView {
     lockedFields: [],
     createdAt: '2026-07-31T01:00:00.000Z',
     updatedAt: '2026-07-31T01:00:00.000Z',
+  };
+}
+
+function constitutionDraft() {
+  return {
+    schemaVersion: 1 as const,
+    worldType: 'Low coastal fantasy',
+    era: 'Early industrial',
+    technology: 'Early industrial',
+    magic: 'Weather magic changes nearby climate.',
+    peoples: ['Coastal communities'],
+    society: 'Guilds connect isolated ports.',
+    politics: 'Harbor councils share authority.',
+    economy: 'Fishing and shipping.',
+    combatScale: 'Personal and small-group conflict.',
+    deathRules: 'Death is permanent.',
+    careerRules: 'Careers arise from local institutions.',
+    equipmentRules: 'Equipment follows local craft.',
+    npcRules: 'NPC motives follow knowledge and obligations.',
+    traitRules: 'Benefits require balancing drawbacks.',
+    taboos: [],
+  };
+}
+
+function constitutionView(revision = 1) {
+  return {
+    ...constitutionDraft(),
+    campaignId: 'campaign-world',
+    revision,
+    status: 'DRAFT' as const,
+    createdAt: '2026-07-31T01:00:00.000Z',
+    updatedAt: '2026-07-31T01:00:00.000Z',
+    lockedAt: null,
   };
 }

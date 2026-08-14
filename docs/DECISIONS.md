@@ -2392,3 +2392,26 @@ Inspector复用Windows共享DesktopAIOrchestrator与Generator audit，在生成�
 - Context只复用既有无内容manifest；cache观察、tokens和latency来自实际请求/响应，不伪造Provider计费缓存命中。
 - API Key、Authorization、Cookie、Password、Credential、secret/hidden/unrevealed和World Truth字段在高级/开发模式均遮罩。
 - M3-T04不改变GenerationRecord schema、不持久化或导出Inspector、不提供事实编辑/重放，也不提前实现M4领域存储。
+
+## DEC-116：World Constitution与World同批提案、独立存储并在确认时锁定
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M4-T01`、`docs/V0.3_SPEC.md` 9.1
+
+### 背景
+
+World Constitution若只存在于Prompt，重启后无法证明后续内容遵守哪个版本；若由独立模型调用生成，又会产生World与规则不同步、额外成本及双重重试。把它塞进World Bible长文本同样无法提供revision、并发确认和数据库级不可变性。
+
+### 决定与理由
+
+`GENERATE_WORLD`与`REFINE_WORLD` v2在一次结构化响应中同时提案World和version 1 Constitution。Schema完成结构验证后，本地规则验证technology、magic和taboo投影；二者在同一SQLite事务提交。Constitution使用独立`world_constitutions`表与递增revision，玩家确认以expected revision锁定，SQLite trigger禁止对旧状态为LOCKED的记录做任何更新。
+
+下游内容携带campaign与constitutionRevision并通过共享Domain binding入口，只有已锁定且完全匹配的revision可进入后续业务规则。AI不拥有锁定权，结构有效也不等于业务合法。
+
+### 影响与边界
+
+- World review期间的AI局部修订可以同步修改Constitution并增加revision；手动修改World若违反投影关系会被本地边界拒绝。
+- TypeScript Repository与Rust Windows命令共享字段、资源上限、revision及锁定语义；SQLite重开保持完整记录。
+- 违反Constitution的生成结果记录安全错误并整批拒绝，不写入半个World或半个Constitution；repair仍只用于Schema/解析技术失败，不可绕过规则拒绝。
+- M4-T01不提前生成Career、Trait、Item、NPC、Quest或完整世界；portable archive schema集中迁移留在M10-T05，避免逐表破坏跨语言格式。

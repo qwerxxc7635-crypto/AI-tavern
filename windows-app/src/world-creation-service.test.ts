@@ -48,7 +48,7 @@ describe('WindowsWorldCreationService', () => {
     expect(gateway.commits[0]).toMatchObject({
       task: 'GENERATE_WORLD',
       requestId: 'request-1',
-      promptVersion: 1,
+      promptVersion: 2,
       request: { temperature: 1.4 },
     });
 
@@ -97,6 +97,7 @@ class FakeWorldGateway implements WorldCreationGateway {
   public snapshot: WorldCreationSnapshot = {
     campaignState: 'CREATING_WORLD',
     world: null,
+    constitution: null,
   };
   public readonly commits: Array<Parameters<WorldCreationGateway['commit']>[0]> = [];
   public readonly confirmCalls: string[] = [];
@@ -113,6 +114,7 @@ class FakeWorldGateway implements WorldCreationGateway {
     this.snapshot = {
       campaignState: 'REVIEWING_WORLD',
       world: viewOf(command.campaignId, command.world, previous?.lockedFields ?? []),
+      constitution: constitutionView(command.campaignId, command.world.constitution, 1, 'DRAFT'),
     };
     return this.snapshot;
   }
@@ -125,13 +127,30 @@ class FakeWorldGateway implements WorldCreationGateway {
     this.snapshot = {
       campaignState: 'REVIEWING_WORLD',
       world: viewOf(id, world, lockedFields),
+      constitution: constitutionView(
+        id,
+        world.constitution,
+        (this.snapshot.constitution?.revision ?? 0) + 1,
+        'DRAFT',
+      ),
     };
     return this.snapshot;
   }
 
   public async confirm(id: string): Promise<WorldCreationSnapshot> {
     this.confirmCalls.push(id);
-    this.snapshot = { ...this.snapshot, campaignState: 'CREATING_CHARACTER' };
+    this.snapshot = {
+      ...this.snapshot,
+      campaignState: 'CREATING_CHARACTER',
+      constitution:
+        this.snapshot.constitution === null
+          ? null
+          : {
+              ...this.snapshot.constitution,
+              status: 'LOCKED',
+              lockedAt: '2026-07-31T01:01:00.000Z',
+            },
+    };
     return this.snapshot;
   }
 }
@@ -167,6 +186,7 @@ function defaultOptions() {
 function worldDraft(): WorldDraft {
   const view = worldView();
   return {
+    constitution: view.constitution,
     name: view.name,
     currentRegion: view.currentRegion,
     summary: view.summary,
@@ -184,6 +204,7 @@ function worldDraft(): WorldDraft {
 
 function worldView(): WorldBibleView {
   const draft = {
+    constitution: constitutionDraft(),
     name: 'Ember Coast',
     currentRegion: 'Ash Harbor',
     summary: 'A storm-bound coast.',
@@ -216,5 +237,43 @@ function worldView(): WorldBibleView {
     lockedFields: [],
     createdAt: '2026-07-31T01:00:00.000Z',
     updatedAt: '2026-07-31T01:00:00.000Z',
+  };
+}
+
+function constitutionDraft() {
+  return {
+    schemaVersion: 1 as const,
+    worldType: 'Low coastal fantasy',
+    era: 'Early industrial',
+    technology: 'Early industrial',
+    magic: 'Weather magic changes nearby climate.',
+    peoples: ['Coastal communities'],
+    society: 'Guilds connect isolated ports.',
+    politics: 'Harbor councils share authority.',
+    economy: 'Fishing and shipping.',
+    combatScale: 'Personal and small-group conflict.',
+    deathRules: 'Death is permanent.',
+    careerRules: 'Careers arise from local institutions.',
+    equipmentRules: 'Equipment follows local craft.',
+    npcRules: 'NPC motives follow knowledge and obligations.',
+    traitRules: 'Benefits require balancing drawbacks.',
+    taboos: [],
+  };
+}
+
+function constitutionView(
+  campaignId: string,
+  draft: WorldDraft['constitution'],
+  revision: number,
+  status: 'DRAFT' | 'LOCKED',
+) {
+  return {
+    ...draft,
+    campaignId,
+    revision,
+    status,
+    createdAt: '2026-07-31T01:00:00.000Z',
+    updatedAt: '2026-07-31T01:00:00.000Z',
+    lockedAt: status === 'LOCKED' ? '2026-07-31T01:01:00.000Z' : null,
   };
 }

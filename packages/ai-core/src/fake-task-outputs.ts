@@ -1,6 +1,24 @@
 import type { AITask } from './protocol.js';
 
 const world = {
+  constitution: {
+    schemaVersion: 1,
+    worldType: 'Low heroic fantasy',
+    era: 'Late medieval sail age',
+    technology: 'Late medieval',
+    magic: 'Magic always leaves a warm trace.',
+    peoples: ['Coastal humans', 'Ash-cliff communities'],
+    society: 'Harbor guilds connect isolated settlements',
+    politics: 'Local councils negotiate with navigation guilds',
+    economy: 'Fishing, coastal trade, and beacon tolls',
+    combatScale: 'Personal and small-group conflict',
+    deathRules: 'Death is permanent and resurrection does not exist',
+    careerRules: 'Careers arise from local guilds, travel, and civic needs',
+    equipmentRules: 'Equipment uses available materials and grounded craft',
+    npcRules: 'NPC motives follow their knowledge, obligations, and local conditions',
+    traitRules: 'Mechanical benefits require balancing drawbacks',
+    taboos: [],
+  },
   name: 'Ember Coast',
   currentRegion: 'Ash Harbor',
   summary: 'A storm-bound coast linked by old beacon roads.',

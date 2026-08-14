@@ -18,6 +18,16 @@ const initial: readonly PromptHistoryEntry[] = AI_TASKS.map((task) =>
 export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
   ...initial,
   Object.freeze({
+    task: 'GENERATE_WORLD',
+    version: promptVersion(2),
+    change: 'Generate a structured World Constitution before downstream world details.',
+  }),
+  Object.freeze({
+    task: 'REFINE_WORLD',
+    version: promptVersion(2),
+    change: 'Keep revised world content consistent with the structured Constitution.',
+  }),
+  Object.freeze({
     task: 'GENERATE_CHARACTER_TRAITS',
     version: promptVersion(2),
     change: 'Generate six candidates so the player can choose exactly two.',

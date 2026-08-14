@@ -17,8 +17,27 @@ const world = {
   technologyLevel: 'Late medieval',
   powerRules: ['Magic always leaves a warm trace.'],
 };
+const constitution = {
+  schemaVersion: 1,
+  worldType: 'Low fantasy coast',
+  era: 'Late medieval',
+  technology: 'Late medieval',
+  magic: 'Magic always leaves a warm trace.',
+  peoples: ['Coastal humans'],
+  society: 'Guilds connect isolated settlements',
+  politics: 'Harbor councils share authority with guilds',
+  economy: 'Fishing and coastal trade',
+  combatScale: 'Personal and small-group conflict',
+  deathRules: 'Death is permanent',
+  careerRules: 'Careers arise from local institutions',
+  equipmentRules: 'Equipment follows available craft and materials',
+  npcRules: 'NPC motives follow knowledge and obligations',
+  traitRules: 'Benefits require balancing drawbacks',
+  taboos: [],
+};
 const worldDraft = {
   ...world,
+  constitution,
   factions: [
     {
       name: 'Lantern Guild',
@@ -463,6 +482,8 @@ describe('versioned AI task schemas', () => {
           : task === 'NPC_REPLY'
             ? 4
             : [
+                  'GENERATE_WORLD',
+                  'REFINE_WORLD',
                   'GENERATE_CHARACTER_TRAITS',
                   'COMPLETE_CHARACTER_BACKGROUND',
                   'GENERATE_QUEST',

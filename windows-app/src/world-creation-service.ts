@@ -5,6 +5,7 @@ import {
   GenerateWorldOutputSchema,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
+  WorldConstitutionOutputSchema,
   type AIProvider,
   type AITask,
 } from '@ember-tavern/ai-core';
@@ -40,6 +41,18 @@ export interface WorldBibleView extends WorldDraft {
 export interface WorldCreationSnapshot {
   readonly campaignState: string;
   readonly world: WorldBibleView | null;
+  readonly constitution: WorldConstitutionView | null;
+}
+
+export interface WorldConstitutionView extends ReturnType<
+  typeof WorldConstitutionOutputSchema.parse
+> {
+  readonly campaignId: string;
+  readonly revision: number;
+  readonly status: 'DRAFT' | 'LOCKED';
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lockedAt: string | null;
 }
 
 export interface GenerateWorldOptions {
@@ -230,6 +243,7 @@ function defaultIdentity(
 
 function draftOf(world: WorldBibleView): WorldDraft {
   return GenerateWorldOutputSchema.parse({
+    constitution: world.constitution,
     name: world.name,
     currentRegion: world.currentRegion,
     summary: world.summary,
@@ -267,18 +281,28 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): WorldCreatio
   }
   const rawWorld = record['world'];
   const world = rawWorld === null ? null : parseWorld(rawWorld);
+  const rawConstitution = record['constitution'];
+  const constitution = rawConstitution === null ? null : parseConstitution(rawConstitution);
   if (world !== null && world.campaignId !== expectedCampaignId) {
     throw new TypeError('World belongs to another campaign');
+  }
+  if (constitution !== null && constitution.campaignId !== expectedCampaignId) {
+    throw new TypeError('World Constitution belongs to another campaign');
+  }
+  if ((world === null) !== (constitution === null)) {
+    throw new TypeError('World and Constitution must exist together');
   }
   return Object.freeze({
     campaignState,
     world,
+    constitution,
   });
 }
 
 function parseWorld(value: unknown): WorldBibleView {
   const record = requireRecord(value);
   const draft = GenerateWorldOutputSchema.parse({
+    constitution: record['constitution'],
     name: record['name'],
     currentRegion: record['currentRegion'],
     summary: record['summary'],
@@ -313,6 +337,60 @@ function parseWorld(value: unknown): WorldBibleView {
     createdAt,
     updatedAt,
   });
+}
+
+function parseConstitution(value: unknown): WorldConstitutionView {
+  const record = requireRecord(value);
+  const content = WorldConstitutionOutputSchema.parse(constitutionContentRecord(record));
+  const revision = record['revision'];
+  if (!Number.isSafeInteger(revision) || (revision as number) < 1) {
+    throw new TypeError('World Constitution revision is invalid');
+  }
+  const status = requireString(record['status']);
+  if (status !== 'DRAFT' && status !== 'LOCKED') {
+    throw new TypeError('World Constitution status is invalid');
+  }
+  const createdAt = isoTimestamp(requireString(record['createdAt']));
+  const updatedAt = isoTimestamp(requireString(record['updatedAt']));
+  const rawLockedAt = record['lockedAt'];
+  const lockedAt = rawLockedAt === null ? null : isoTimestamp(requireString(rawLockedAt));
+  if (
+    updatedAt < createdAt ||
+    (status === 'DRAFT' && lockedAt !== null) ||
+    (status === 'LOCKED' && lockedAt === null)
+  ) {
+    throw new TypeError('World Constitution metadata is invalid');
+  }
+  return Object.freeze({
+    ...content,
+    campaignId: campaignId(requireString(record['campaignId'])),
+    revision: revision as number,
+    status,
+    createdAt,
+    updatedAt,
+    lockedAt,
+  });
+}
+
+function constitutionContentRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return {
+    schemaVersion: record['schemaVersion'],
+    worldType: record['worldType'],
+    era: record['era'],
+    technology: record['technology'],
+    magic: record['magic'],
+    peoples: record['peoples'],
+    society: record['society'],
+    politics: record['politics'],
+    economy: record['economy'],
+    combatScale: record['combatScale'],
+    deathRules: record['deathRules'],
+    careerRules: record['careerRules'],
+    equipmentRules: record['equipmentRules'],
+    npcRules: record['npcRules'],
+    traitRules: record['traitRules'],
+    taboos: record['taboos'],
+  };
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {

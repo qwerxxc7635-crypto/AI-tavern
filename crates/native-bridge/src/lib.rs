@@ -60,6 +60,9 @@ const KNOWLEDGE_PROVENANCE_MIGRATION: &str =
     include_str!("../../../database/migrations/0007_knowledge_provenance.sql");
 const RUMOR_CLAIM_SOURCES_MIGRATION: &str =
     include_str!("../../../database/migrations/0008_rumor_claim_sources.sql");
+const WORLD_CONSTITUTIONS_MIGRATION: &str =
+    include_str!("../../../database/migrations/0009_world_constitutions.sql");
+const LATEST_SCHEMA_VERSION: i64 = 9;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -481,7 +484,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if latest_version > 8 {
+    if latest_version > LATEST_SCHEMA_VERSION {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
 
@@ -506,6 +509,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             KNOWLEDGE_PROVENANCE_MIGRATION,
         ),
         (8_i64, "rumor_claim_sources", RUMOR_CLAIM_SOURCES_MIGRATION),
+        (9_i64, "world_constitutions", WORLD_CONSTITUTIONS_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

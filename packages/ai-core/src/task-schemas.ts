@@ -2,6 +2,7 @@ import type { JsonValue } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
 import { findRepeatedNpcArchetype, findRepeatedPhrase } from './repetition-detector.js';
+import { WorldConstitutionOutputSchema } from './entity-schemas.js';
 
 const text = z.string().trim().min(1).max(4_000);
 const sceneText = z.string().trim().min(1).max(12_000);
@@ -51,6 +52,7 @@ const locationDraft = z
   })
   .strict();
 const worldDraftShape = {
+  constitution: WorldConstitutionOutputSchema,
   name: shortText,
   currentRegion: shortText,
   summary: text,

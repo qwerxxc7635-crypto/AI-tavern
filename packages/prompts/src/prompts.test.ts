@@ -54,6 +54,8 @@ describe('central prompt catalog', () => {
     expect(PROMPT_HISTORY.slice(0, AI_TASKS.length).map(({ task }) => task)).toEqual(AI_TASKS);
     for (const task of AI_TASKS) {
       const expectedVersion = [
+        'GENERATE_WORLD',
+        'REFINE_WORLD',
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
         'GENERATE_QUEST',
@@ -113,7 +115,7 @@ describe('provider-neutral prompt formatting', () => {
   it('validates input and emits system/user messages with JSON Schema when supported', () => {
     const formatted = formatTaskPrompt('GENERATE_WORLD', worldInput, capabilities);
 
-    expect(formatted.promptVersion).toBe(1);
+    expect(formatted.promptVersion).toBe(2);
     expect(formatted.messages.map(({ role }) => role)).toEqual(['SYSTEM', 'USER']);
     expect(formatted.messages[0]?.content).toContain('WORLD_DESIGNER');
     expect(formatted.messages[0]?.content).toContain('[SYSTEM_CONTRACT]');
@@ -121,7 +123,7 @@ describe('provider-neutral prompt formatting', () => {
     expect(formatted.messages[1]?.content).toContain(canonicalJson(worldInput));
     expect(formatted.responseFormat).toMatchObject({
       kind: 'JSON_SCHEMA',
-      name: 'generate_world_v1',
+      name: 'generate_world_v2',
       schema: { type: 'object' },
     });
   });
@@ -181,7 +183,7 @@ describe('stable prompt profile', () => {
       id: STABLE_PROMPT_PROFILE_ID,
       version: STABLE_PROMPT_PROFILE_VERSION,
       task: 'GENERATE_WORLD',
-      promptVersion: 1,
+      promptVersion: 2,
     });
     expect(formatted.stableProfile.sections.map(({ kind }) => kind)).toEqual(
       STABLE_PROMPT_SECTION_KINDS,

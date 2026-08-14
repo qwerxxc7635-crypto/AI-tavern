@@ -144,7 +144,12 @@ export type {
   PlayerAttributesInput,
   PlayerCharacter,
 } from './character.js';
-export { RUMOR_SOURCE_BASES, WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
+export {
+  RUMOR_SOURCE_BASES,
+  WORLD_BIBLE_LOCKABLE_FIELDS,
+  WORLD_CONSTITUTION_STATUSES,
+  isLockedWorldFact,
+} from './world.js';
 export type {
   DevelopingFact,
   Faction,
@@ -159,6 +164,9 @@ export type {
   TemporaryNarrativeFact,
   WorldBible,
   WorldBibleLockableField,
+  WorldConstitution,
+  WorldConstitutionContent,
+  WorldConstitutionStatus,
   WorldFact,
 } from './world.js';
 export {

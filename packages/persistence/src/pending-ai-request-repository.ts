@@ -27,6 +27,7 @@ import {
   type Tavern,
   type TemporaryVisitor,
   type WorldBible,
+  type WorldConstitutionContent,
   type WorldFact,
 } from '@ember-tavern/contracts';
 
@@ -45,6 +46,7 @@ import {
 import type { SqliteRunResult, TransactionalSqliteDatabase } from './sqlite-port.js';
 import { applyTurnCommit, type TurnCommit } from './turn-transaction.js';
 import { WorldRepository } from './world-repository.js';
+import { WorldConstitutionRepository } from './world-constitution-repository.js';
 import { PlayerCharacterRepository } from './player-character-repository.js';
 import { QuestRepository } from './quest-adventure-repository.js';
 import { AdventureRepository } from './quest-adventure-repository.js';
@@ -276,6 +278,7 @@ export class PendingAiRequestRepository {
     key: IdempotencyKey,
     campaign: Campaign,
     world: WorldBible,
+    constitution: WorldConstitutionContent,
     at: IsoTimestamp,
   ): IdempotentCommitResult {
     this.database.exec('BEGIN IMMEDIATE');
@@ -299,6 +302,7 @@ export class PendingAiRequestRepository {
         throw new PersistenceDataError('Pending AI request does not match the world commit');
       }
       new WorldRepository(this.database).saveBible(world);
+      new WorldConstitutionRepository(this.database).saveDraft(campaign.id, constitution, at);
       new CampaignRepository(this.database).update(campaign);
       one(
         this.database

@@ -47,8 +47,8 @@ const definition = (
 ): AITaskSchemaDefinition => Object.freeze({ schemaVersion, input, output });
 
 export const AI_TASK_SCHEMAS = Object.freeze({
-  GENERATE_WORLD: definition(GenerateWorldInputSchema, GenerateWorldOutputSchema),
-  REFINE_WORLD: definition(RefineWorldInputSchema, RefineWorldOutputSchema),
+  GENERATE_WORLD: definition(GenerateWorldInputSchema, GenerateWorldOutputSchema, 2),
+  REFINE_WORLD: definition(RefineWorldInputSchema, RefineWorldOutputSchema, 2),
   GENERATE_CHARACTER_TRAITS: definition(
     GenerateCharacterTraitsInputSchema,
     GenerateCharacterTraitsOutputSchema,

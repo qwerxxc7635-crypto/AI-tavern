@@ -185,7 +185,7 @@
 
 ## M4-T01 World Constitution
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M3-T04。
 - **Deliverable**：合同、Generator、SQLite migration/repository、确认 UI 和下游约束入口。
 - **Acceptance**：必需字段齐全、版本化、锁定后不可随意改写；生成内容违反 Constitution 时拒绝/repair。
