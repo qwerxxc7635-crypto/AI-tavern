@@ -12,6 +12,7 @@ mod npc_dialogue;
 mod quest_board;
 mod randomness_settings;
 mod repetition;
+mod rules_engine;
 mod save_archive;
 mod settlement;
 mod tavern_initialization;
@@ -26,6 +27,7 @@ pub use model_settings::*;
 pub use npc_dialogue::*;
 pub use quest_board::*;
 pub use randomness_settings::*;
+pub use rules_engine::*;
 pub use save_archive::*;
 pub use settlement::*;
 pub use tavern_initialization::*;
@@ -65,7 +67,9 @@ const RUMOR_CLAIM_SOURCES_MIGRATION: &str =
 const WORLD_CONSTITUTIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0009_world_constitutions.sql");
 const WORLD_SEED_MIGRATION: &str = include_str!("../../../database/migrations/0010_world_seed.sql");
-const LATEST_SCHEMA_VERSION: i64 = 10;
+const RULES_ENGINE_MIGRATION: &str =
+    include_str!("../../../database/migrations/0011_rules_engine.sql");
+const LATEST_SCHEMA_VERSION: i64 = 11;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -522,6 +526,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (8_i64, "rumor_claim_sources", RUMOR_CLAIM_SOURCES_MIGRATION),
         (9_i64, "world_constitutions", WORLD_CONSTITUTIONS_MIGRATION),
         (10_i64, "world_seed", WORLD_SEED_MIGRATION),
+        (11_i64, "rules_engine", RULES_ENGINE_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

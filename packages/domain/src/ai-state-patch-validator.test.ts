@@ -283,6 +283,26 @@ describe('AI domain state patch validation', () => {
       patch.kind === 'ATTRIBUTES' ? 'ATTRIBUTE_CHANGE_FORBIDDEN' : 'INVALID_PATCH';
     expectValidationError(() => validateDomainStatePatches([patch], context()), expectedCode);
   });
+
+  it.each([
+    'TAKE_DAMAGE',
+    'RECOVER_HP',
+    'DEFINE_SKILL',
+    'CHANGE_SKILL',
+    'ADD_STATUS',
+    'EQUIP_ITEM',
+    'CHANGE_MONEY',
+    'ADVANCE_TIME',
+    'DEFINE_RESOURCE',
+    'CHANGE_RESOURCE',
+    'SET_TRAIT_MODIFIER',
+    'TRANSITION_QUEST',
+  ])('rejects AI attempts to execute local numeric command %s', (kind) => {
+    expectValidationError(
+      () => validateDomainStatePatches([proposal(kind, playerIdentifier, {})], context()),
+      'NUMERIC_STATE_CHANGE_FORBIDDEN',
+    );
+  });
 });
 
 function context(

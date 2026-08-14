@@ -2461,3 +2461,27 @@ Seed在Campaign创建事务内写入，migration 10为旧Campaign一次性回填
 - M10-T07加入M10-T06之后并成为M11-T01的新依赖，不改变既有里程碑顺序或其他业务依赖。
 - 视觉迁移不得改变业务语义、状态机、数据合同、SQLite事实、存档兼容性或Provider/Rules权限；发生冲突时功能正确性、数据合同和存档兼容性优先，例外必须显式记录。
 - M12-T01逐页复核Token唯一来源、组件复用、Feature/Legacy完成度、四视口、WCAG AA、焦点、非颜色状态和reduced-motion，不能以换色或背景替代完整验收。
+
+## DEC-119：数值状态只通过本地命令事务演进并追加不可变事件
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M4-T03`、`docs/V0.3_SPEC.md` 9.3节
+
+### 背景
+
+既有角色属性、D20、物品、金钱、世界时钟和Quest分别已有局部合同，但缺少统一的角色数值状态、revision、幂等命令和审计事件。让AI patch、叙事文本或各Feature直接更新表会产生多套裁决入口，无法证明回滚、重放和恢复后的状态一致；把完整DND/COC规则提前复制又会超出V0.3范围，并与后续Trait/Character任务耦合。
+
+### 决定与理由
+
+新增version 1 `CharacterRuleState`及闭集`RulesCommand`。合同只承认`LOCAL_RULE`、`PLAYER_ACTION`和`SYSTEM` authority；AI proposal validator显式拒绝规则命令和属性变更。所有命令先通过严格结构、所属关系与业务边界校验，再在同一SQLite即时事务中更新角色规则状态、可选Quest状态并追加`rules_events`。
+
+提交以expected revision防止并发漂移，以idempotency key与canonical command实现安全重放；同key不同命令、越界、引用错误或事件冲突全部回滚。事件保存前后状态、revision、Quest迁移与时间戳且append-only。TypeScript Repository和Windows原生命令共享相同权限、边界及迁移11数据合同。
+
+### 影响与边界
+
+- 基础属性在角色表与规则状态副本中均由SQLite trigger保持不可变；技能、HP、状态、装备、钱、时间、Trait修正和资源只能通过规则命令演进。
+- D20继续使用独立受信随机源，修正只取本地状态与角色实际拥有且已装备的合法物品；叙事文本不能产生数值。
+- M4-T03只提供通用Trait修正边界，不提前实现M5的点数、频率或协同平衡，也不提前实现M4-T04知识模型。
+- 本地schema 11可完整关闭重开；portable archive仍为v2，尚不携带规则状态与事件，统一格式迁移保留给M10-T05。
+- 后续Feature必须复用该命令/validator/事务入口，不得创建平行数值写通道；视觉迁移不得改变已验证的规则语义和状态机。

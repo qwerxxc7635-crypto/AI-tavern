@@ -29,6 +29,7 @@ export type ActionOptionId = Branded<string, 'ActionOptionId'>;
 export type WorldClockId = Branded<string, 'WorldClockId'>;
 export type GameEventId = Branded<string, 'GameEventId'>;
 export type EventLedgerId = Branded<string, 'EventLedgerId'>;
+export type RulesEventId = Branded<string, 'RulesEventId'>;
 export type ConversationId = Branded<string, 'ConversationId'>;
 export type MessageId = Branded<string, 'MessageId'>;
 export type GenerationRecordId = Branded<string, 'GenerationRecordId'>;
@@ -80,6 +81,7 @@ export const actionOptionId = (value: string): ActionOptionId => createId(value,
 export const worldClockId = (value: string): WorldClockId => createId(value, 'WorldClockId');
 export const gameEventId = (value: string): GameEventId => createId(value, 'GameEventId');
 export const eventLedgerId = (value: string): EventLedgerId => createId(value, 'EventLedgerId');
+export const rulesEventId = (value: string): RulesEventId => createId(value, 'RulesEventId');
 export const conversationId = (value: string): ConversationId => createId(value, 'ConversationId');
 export const messageId = (value: string): MessageId => createId(value, 'MessageId');
 export const generationRecordId = (value: string): GenerationRecordId =>

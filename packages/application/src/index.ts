@@ -93,6 +93,8 @@ export type {
   RegenerateAdventureTurnCommand,
   RegenerationPolicy,
 } from './regeneration-use-cases.js';
+export { RulesEngineUseCases } from './rules-engine-use-cases.js';
+export type { ExecuteRulesCommand, RulesEventIdentityFactory } from './rules-engine-use-cases.js';
 export { inspectDatabaseStartup, RecoveryCenterUseCases } from './recovery-center-use-cases.js';
 export type {
   AdventureContinueTarget,

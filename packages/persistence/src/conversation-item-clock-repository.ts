@@ -14,7 +14,7 @@ import {
   type Message,
   type playerCharacterId,
 } from '@ember-tavern/contracts';
-import type { WorldClock } from '@ember-tavern/domain';
+import { validateItemNumericEffect, type WorldClock } from '@ember-tavern/domain';
 
 import { PersistenceDataError } from './campaign-repository.js';
 import {
@@ -99,6 +99,7 @@ export class ItemRepository {
   public constructor(private readonly database: SqliteDatabase) {}
 
   public create(item: Item, ownerId: ReturnType<typeof playerCharacterId> | null = null): void {
+    const effect = validateItemNumericEffect(item.effect);
     this.database
       .prepare(
         `INSERT INTO items (
@@ -112,7 +113,7 @@ export class ItemRepository {
         ownerId,
         JSON.stringify(item.content),
         item.rewardTier,
-        JSON.stringify(item.effect),
+        JSON.stringify(effect),
         item.createdAt,
       );
   }
@@ -261,7 +262,7 @@ function mapItem(value: unknown): Item {
       description: requireString(content['description'], 'Item.content.description'),
     }),
     rewardTier: requireEnum(REWARD_TIERS, row['reward_tier'], 'reward_tier'),
-    effect: parseEffect(parseJson(row['effect_json'], 'effect_json')),
+    effect: validateItemNumericEffect(parseEffect(parseJson(row['effect_json'], 'effect_json'))),
     createdAt: isoTimestamp(requireString(row['created_at'], 'created_at')),
   });
 }

@@ -4042,3 +4042,23 @@
 
 - 文档追加完成后继续`M4-T03 Rules Engine Expansion`现有属性、D20、装备、金钱、时间、Trait、Quest和事务盘点；未开始M4-T04，也未因视觉规范扩大或重构规则业务范围。
 - 用户已有`.gitignore`修改继续保持未暂存；本次只修改V0.3全局文档与尚未完成任务的标准/依赖，不修改已完成任务历史状态。
+
+## 2026-08-14 — M4-T03 Rules Engine Expansion
+
+### 本地裁决、事务与审计
+
+- 新增version 1角色规则状态与闭集命令合同，覆盖技能、HP、状态、装备、金钱、游戏时间、Trait修正、资源和Quest迁移；基础属性继续采用既有五属性合同并在两张表由SQLite trigger保持不可变。
+- authority只允许`LOCAL_RULE`、`PLAYER_ACTION`和`SYSTEM`。AI state patch validator显式拒绝所有规则命令和属性写入；未知命令/字段、非法所属关系和越界数值在写入前拒绝，不从Narrative反解析任何数值。
+- 新增migration 11、`character_rule_states`和append-only `rules_events`。TypeScript Repository以即时事务、expected revision、canonical command及idempotency key原子提交角色状态、可选Quest迁移和事件；碰撞、漂移或任一步失败完整回滚。
+- Windows原生桥接实现相同严格反序列化、裁决、幂等与事务语义，并提供受限前端gateway；未新增规则编辑页面或扩大视觉重构范围。
+- D20仍使用独立受信随机源；修正来自本地基础属性、状态、Trait和角色实际拥有且已装备的合法物品。World Seed、Provider和叙事输出均不能决定硬结果。
+- 新增`docs/V0.3_RULES_ENGINE.md`与`DEC-119`。本任务不实现完整DND/COC，不提前完成M5 Trait平衡或M4-T04 Knowledge Boundary。
+
+### 验证与限制
+
+- Domain专项覆盖组合、边界、非法authority/字段、property matrix、Trait/资源、D20/装备和物品效果；AI patch回归覆盖全部数值命令拒绝。
+- Persistence与migration测试覆盖schema 11升级/回填、save/reopen、审计append-only、ownership、事件碰撞rollback、Quest原子提交、幂等冲突、属性不可变及Campaign级联。
+- `pnpm check:shared`中的Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript及Vitest通过：110个文件/682项通过，另有1文件/1项CLI基线runner按设计跳过。Rust workspace 106项通过、0失败，另有1项真实API测试默认忽略；Clippy全workspace以`-D warnings`通过；TypeScript/Rust archive互操作通过；Windows production build通过（220个模块）。
+- Node独立测试28项通过；其中既有`node:sqlite backup()`一致性测试在当前Node 26环境耗时约46秒，但最终正常退出且未被修改、跳过或降低断言。
+- 本地数据库schema已为11并可关闭重开。portable`.emtavern`仍保持v2且暂不包含规则状态/事件，跨语言格式升级严格留给M10-T05；不得将本地恢复能力表述为portable archive已覆盖。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，也不进入M4-T04。

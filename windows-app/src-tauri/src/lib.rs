@@ -15,13 +15,13 @@ use ember_native_bridge::{
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
     CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
     CampaignStoreError, CampaignSummary, CapabilitySource, CharacterCandidateConfirm,
-    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterTraitGenerationCommit,
-    CredentialAction, CredentialCleanupReason, ModelCapabilitiesRegistration,
-    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
-    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
-    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, TavernGenerationCommit, TavernSnapshot,
-    WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
-    model_probe_fingerprint,
+    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterRulesState,
+    CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
+    ModelCapabilitiesRegistration, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
+    NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
+    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
+    TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
+    WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -849,6 +849,24 @@ fn campaign_recovery_restore(
 }
 
 #[tauri::command]
+fn rules_state_get(
+    player_character_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CharacterRulesState, CommandError> {
+    store
+        .character_rules_state(&player_character_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn rules_apply(
+    command: RulesApplyCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<RulesCommitReceipt, CommandError> {
+    store.apply_rules_command(command).map_err(Into::into)
+}
+
+#[tauri::command]
 async fn save_archive_inspect(
     path: String,
     store: State<'_, CampaignStore>,
@@ -1235,6 +1253,8 @@ pub fn run() {
             campaign_delete,
             campaign_recovery_get,
             campaign_recovery_restore,
+            rules_state_get,
+            rules_apply,
             save_archive_inspect,
             save_archive_export,
             save_archive_import,

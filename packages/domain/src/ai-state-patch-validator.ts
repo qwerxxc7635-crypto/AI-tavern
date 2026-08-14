@@ -21,15 +21,8 @@ import {
   type WorldClock,
   type WorldClockAdvanceResult,
 } from './relationship-clock.js';
+import { RULE_QUEST_TRANSITIONS } from './rules-engine.js';
 
-const QUEST_TRANSITIONS: Readonly<Record<QuestStatus, readonly QuestStatus[]>> = {
-  AVAILABLE: ['ACCEPTED'],
-  ACCEPTED: ['ACTIVE', 'ABANDONED'],
-  ACTIVE: ['COMPLETED', 'FAILED', 'ABANDONED'],
-  COMPLETED: [],
-  FAILED: [],
-  ABANDONED: [],
-};
 const REWARD_RANK: Readonly<Record<RewardTier, number>> = {
   BASIC: 0,
   NOTABLE: 1,
@@ -75,6 +68,7 @@ export type DomainPatchErrorCode =
   | 'REWARD_TIER_EXCEEDED'
   | 'LOCKED_RULE'
   | 'ATTRIBUTE_CHANGE_FORBIDDEN'
+  | 'NUMERIC_STATE_CHANGE_FORBIDDEN'
   | 'CLOCK_LIMIT';
 
 export class DomainPatchValidationError extends Error {
@@ -130,7 +124,7 @@ export function validateDomainStatePatches(
         }
         const payload = payloadRecord(proposal, index, ['status']);
         const status = requiredString(payload, 'status', index);
-        if (!isQuestStatus(status) || !QUEST_TRANSITIONS[current.status].includes(status)) {
+        if (!isQuestStatus(status) || !RULE_QUEST_TRANSITIONS[current.status].includes(status)) {
           fail(
             'ILLEGAL_QUEST_TRANSITION',
             index,
@@ -290,6 +284,28 @@ export function validateDomainStatePatches(
       case 'ATTRIBUTES':
         fail('ATTRIBUTE_CHANGE_FORBIDDEN', index, ['kind'], 'AI cannot modify player attributes');
         break;
+      case 'TAKE_DAMAGE':
+      case 'RECOVER_HP':
+      case 'DEFINE_SKILL':
+      case 'CHANGE_SKILL':
+      case 'ADD_STATUS':
+      case 'REMOVE_STATUS':
+      case 'EQUIP_ITEM':
+      case 'UNEQUIP_ITEM':
+      case 'CHANGE_MONEY':
+      case 'ADVANCE_TIME':
+      case 'DEFINE_RESOURCE':
+      case 'CHANGE_RESOURCE':
+      case 'SET_TRAIT_MODIFIER':
+      case 'REMOVE_TRAIT_MODIFIER':
+      case 'TRANSITION_QUEST':
+        fail(
+          'NUMERIC_STATE_CHANGE_FORBIDDEN',
+          index,
+          ['kind'],
+          'AI proposals cannot execute local Rules commands',
+        );
+        break;
       default:
         fail('INVALID_PATCH', index, ['kind'], `Unsupported state patch kind: ${kind}`);
     }
@@ -366,7 +382,7 @@ function requireNullTarget(record: Record<string, unknown>, index: number): void
 }
 
 function isQuestStatus(value: string): value is QuestStatus {
-  return Object.hasOwn(QUEST_TRANSITIONS, value);
+  return Object.hasOwn(RULE_QUEST_TRANSITIONS, value);
 }
 
 function isRewardTier(value: string): value is RewardTier {

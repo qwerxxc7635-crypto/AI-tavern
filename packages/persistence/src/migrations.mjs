@@ -58,6 +58,11 @@ const migrations = [
     name: 'world_seed',
     source: new URL('../../../database/migrations/0010_world_seed.sql', import.meta.url),
   },
+  {
+    version: 11,
+    name: 'rules_engine',
+    source: new URL('../../../database/migrations/0011_rules_engine.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

@@ -211,7 +211,7 @@
 
 ## M4-T03 Rules Engine Expansion
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M4-T02。
 - **Deliverable**：属性/技能/HP/状态/装备/钱/时间/Trait/Quest/资源的规则合同与 validator。
 - **Acceptance**：所有数值状态由本地规则裁决，AI proposal 无直接写入口；事务和事件可审计。

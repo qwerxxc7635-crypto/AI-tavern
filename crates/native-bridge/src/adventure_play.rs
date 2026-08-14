@@ -540,19 +540,15 @@ impl CampaignStore {
         let check: Value = turn.check_request.ok_or(CampaignStoreError::InvalidData)?;
         let attribute = text_field(&check, "attribute")?;
         let difficulty = integer_field(&check, "difficulty")?;
-        let character = character_data(&transaction, campaign_id)?;
-        let attributes = record_field(&character, "attributes")?;
-        let attribute_value = attributes
-            .get(&attribute)
-            .and_then(Value::as_i64)
-            .ok_or(CampaignStoreError::InvalidData)?;
+        let (attribute_value, status_modifier) =
+            crate::rules_engine::character_check_modifiers(&transaction, campaign_id, &attribute)?;
         let equipment_modifier = equipment_modifier(&transaction, campaign_id, &attribute)?;
         let dice = resolve_d20_hard_logic(
             &text_field(&check, "id")?,
             roll_unbiased_d20(),
             attribute_value,
             equipment_modifier,
-            0,
+            status_modifier,
             difficulty,
         )?;
         let at = current_timestamp()?;
@@ -2015,13 +2011,19 @@ fn apply_fact_patches(
     Ok(())
 }
 
-fn equipment_modifier(
+pub(crate) fn equipment_modifier(
     connection: &Connection,
     campaign_id: &str,
     attribute: &str,
 ) -> Result<i64, CampaignStoreError> {
     let mut statement = connection.prepare(
-        "SELECT effect_json FROM items WHERE campaign_id = ?1 AND owner_character_id IS NOT NULL",
+        "SELECT items.effect_json
+         FROM character_rule_states
+         JOIN json_each(character_rule_states.equipped_item_ids_json) AS equipped
+         JOIN items ON items.id = equipped.value
+         WHERE character_rule_states.campaign_id = ?1
+           AND items.campaign_id = character_rule_states.campaign_id
+           AND items.owner_character_id = character_rule_states.player_character_id",
     )?;
     let effects = statement
         .query_map([campaign_id], |row| from_json::<Value>(row.get(0)?))?

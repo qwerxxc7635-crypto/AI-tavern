@@ -22,6 +22,25 @@ export type {
 export { D20RuleError, resolveD20Check } from './d20.js';
 export type { D20CheckInput, D20RandomSource } from './d20.js';
 export {
+  RULE_QUEST_TRANSITIONS,
+  RulesEngineError,
+  applyRulesCommand,
+  checkModifierBreakdown,
+  createCharacterRuleState,
+  effectiveSkillValue,
+  resolveCharacterD20Check,
+  validateCharacterRuleState,
+  validateItemNumericEffect,
+} from './rules-engine.js';
+export type {
+  CheckModifierBreakdown,
+  CharacterD20CheckInput,
+  CreateCharacterRuleStateInput,
+  RulesCommandResult,
+  RulesErrorCode,
+  RulesEvaluationContext,
+} from './rules-engine.js';
+export {
   WorldConstitutionRuleError,
   assertConstitutionBinding,
   assertWorldConstitutionCompliance,

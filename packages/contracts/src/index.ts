@@ -14,6 +14,20 @@ export type {
   GameEventType,
   ModelSelectionRef,
 } from './game-event.js';
+export { RULE_COMMAND_AUTHORITIES, RULE_STATUS_KINDS } from './rules.js';
+export type {
+  CharacterRuleState,
+  RuleCommandAuthority,
+  RuleResource,
+  RuleSkill,
+  RuleStatus,
+  RuleStatusKind,
+  RulesCommand,
+  RulesCommandKind,
+  RulesEvent,
+  TraitModifierTarget,
+  TraitRuleModifier,
+} from './rules.js';
 export { AI_REQUEST_STATUSES } from './pending-ai-request.js';
 export type {
   AiRequestError,
@@ -208,6 +222,7 @@ export {
   conversationId,
   factionId,
   eventLedgerId,
+  rulesEventId,
   gameEventId,
   generationRecordId,
   idempotencyKey,
@@ -249,6 +264,7 @@ export type {
   ConversationId,
   FactionId,
   EventLedgerId,
+  RulesEventId,
   GameEventId,
   GenerationRecordId,
   IdempotencyKey,

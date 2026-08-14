@@ -14,6 +14,7 @@ const coreTables = [
   'ai_candidates',
   'app_settings',
   'campaigns',
+  'character_rule_states',
   'conversations',
   'credential_cleanup_queue',
   'event_ledger',
@@ -29,6 +30,7 @@ const coreTables = [
   'player_characters',
   'provider_configs',
   'quests',
+  'rules_events',
   'save_snapshots',
   'scene_frames',
   'taverns',
@@ -94,6 +96,90 @@ test('skips an already applied migration on repeated startup', async () => {
       database.prepare(`SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table'`).get()
         .count,
       coreTables.length + 1,
+    );
+  });
+});
+
+test('backfills rules state from schema 10 characters and keeps base attributes immutable', async () => {
+  await withDatabase(async (database) => {
+    database.exec(`CREATE TABLE schema_migrations (
+      version INTEGER PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL
+    )`);
+    const names = [
+      'initial',
+      'credential_cleanup_queue',
+      'provider_probe_consistency',
+      'ai_candidates',
+      'event_ledger',
+      'scene_frames',
+      'knowledge_provenance',
+      'rumor_claim_sources',
+      'world_constitutions',
+      'world_seed',
+    ];
+    for (let version = 1; version <= 10; version += 1) {
+      const filename = `${String(version).padStart(4, '0')}_${names[version - 1]}.sql`;
+      database.exec(
+        await readFile(
+          new URL(`../../../database/migrations/${filename}`, import.meta.url),
+          'utf8',
+        ),
+      );
+      database
+        .prepare('INSERT INTO schema_migrations VALUES (?, ?, ?)')
+        .run(version, names[version - 1], '2026-08-14T00:00:00.000Z');
+    }
+    database.exec(`
+      INSERT INTO campaigns (id, schema_version, state, created_at, updated_at)
+      VALUES ('campaign-rules-backfill', 1, 'CREATING_CHARACTER',
+              '2026-08-14T00:00:00.000Z', '2026-08-14T00:00:00.000Z');
+      INSERT INTO player_characters (
+        id, campaign_id, name, concept, story_preferences_json, content_boundaries_json,
+        class_archetype, class_display_name, attributes_json, traits_json, personal_goal,
+        background_json, initial_equipment_ids_json, created_at, updated_at
+      ) VALUES (
+        'character-rules-backfill', 'campaign-rules-backfill', 'Hero', 'Test', '[]',
+        '{"allowHorror":true,"allowPermanentDeath":false,"allowRomance":false,"allowBetrayal":true,"excludedContent":[]}',
+        'SCHOLAR', 'Scholar', '{"physique":3,"agility":2,"knowledge":3,"charisma":2}',
+        '[{"id":"trait-one","name":"One","description":"One"},{"id":"trait-two","name":"Two","description":"Two"}]',
+        'Verify',
+        '{"birthplace":"A","formativeExperience":"B","adventureMotivation":"C","secret":"D","importantPerson":"E","tavernArrivalReason":"F"}',
+        '[]', '2026-08-14T00:00:00.000Z', '2026-08-14T00:00:00.000Z'
+      );
+    `);
+
+    await applyMigrations(database);
+
+    const state = database
+      .prepare(
+        `SELECT base_attributes_json, hp_current, hp_max, money, revision
+         FROM character_rule_states WHERE player_character_id = 'character-rules-backfill'`,
+      )
+      .get();
+    assert.deepEqual(JSON.parse(state.base_attributes_json), {
+      physique: 3,
+      agility: 2,
+      knowledge: 3,
+      charisma: 2,
+    });
+    assert.deepEqual(
+      {
+        hpCurrent: state.hp_current,
+        hpMax: state.hp_max,
+        money: state.money,
+        revision: state.revision,
+      },
+      { hpCurrent: 10, hpMax: 10, money: 0, revision: 1 },
+    );
+    assert.throws(() =>
+      database
+        .prepare('UPDATE character_rule_states SET base_attributes_json = ?')
+        .run('{"physique":4,"agility":2,"knowledge":2,"charisma":2}'),
+    );
+    assert.throws(() =>
+      database
+        .prepare('UPDATE player_characters SET attributes_json = ?')
+        .run('{"physique":4,"agility":2,"knowledge":2,"charisma":2}'),
     );
   });
 });
@@ -215,7 +301,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      10,
+      11,
     );
     const seed = database
       .prepare("SELECT algorithm, seed FROM world_seeds WHERE campaign_id = 'campaign-provenance'")
