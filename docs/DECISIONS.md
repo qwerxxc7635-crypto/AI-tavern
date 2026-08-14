@@ -2369,3 +2369,26 @@ V0.3的World Constitution、Career、Trait、Item、Location、Faction、NPC LOD
 - 未知版本和字段直接失败，不静默丢弃；破坏性修改必须升级版本并提供显式兼容路径。
 - 资源上限是防止生成放大的结构安全边界，不代表业务允许生成到上限。
 - M3-T03不新增SQLite表、Repository、Provider、Prompt或事实提交入口，也不提前实现M4至M8的领域功能。
+
+## DEC-115：AI Inspector采用会话只读投影并按模式逐级遮罩
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M3-T04`、`docs/V0.3_SPEC.md` 6.3、8.3
+
+### 背景
+
+现有Context Inspector只显示装配清单，无法同时定位Provider、latency、tokens、raw、validation和repair；GenerationRecord又是事务审计证据，不适合作为可任意展开的调试UI。直接把完整Prompt、模型响应或SQLite记录展示到“我的”页面，会泄露Core Prompt、秘密、未授权World Truth甚至凭据，并诱使UI成为第二事实源。
+
+### 决定与理由
+
+Inspector复用Windows共享DesktopAIOrchestrator与Generator audit，在生成边界创建有界、会话内、只读投影。玩家模式返回空；高级模式只显示指标、清单和结构，遮罩Prompt/raw/parsed值；开发模式允许查看有界净化内容，但Core Prompt、合并Prompt中`[TASK_INPUT]`之前的稳定前缀、凭据和秘密字段始终不可见。
+
+记录过程best-effort，失败不能替换原生成结果或错误。Gateway只有按模式读取能力，没有save/retry/edit；UI必须显式开启高级检查器。失败记录以null/empty表达未到达阶段，并保留稳定错误、validation issue、repair结果和lifecycle用于定位。
+
+### 影响与边界
+
+- 会话最多保留20个内部投影，单段、消息、字段、数组、深度、issue和lifecycle均有上限，不能用Inspector转储完整数据库。
+- Context只复用既有无内容manifest；cache观察、tokens和latency来自实际请求/响应，不伪造Provider计费缓存命中。
+- API Key、Authorization、Cookie、Password、Credential、secret/hidden/unrevealed和World Truth字段在高级/开发模式均遮罩。
+- M3-T04不改变GenerationRecord schema、不持久化或导出Inspector、不提供事实编辑/重放，也不提前实现M4领域存储。

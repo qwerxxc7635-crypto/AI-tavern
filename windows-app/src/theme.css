@@ -2339,6 +2339,63 @@ textarea:disabled {
   flex-direction: column;
 }
 
+#ai-inspector.my-hub__entry {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+.ai-inspector {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ai-inspector > label,
+.ai-inspector__heading {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+}
+
+.ai-inspector__heading {
+  justify-content: space-between;
+}
+
+.ai-inspector__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.65rem;
+  margin: 0;
+}
+
+.ai-inspector__metrics div,
+.ai-inspector details {
+  padding: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: 0.4rem;
+  background: var(--panel);
+}
+
+.ai-inspector__metrics dt {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.ai-inspector__metrics dd {
+  margin: 0.25rem 0 0;
+}
+
+.ai-inspector summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.ai-inspector pre {
+  max-height: 18rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .context-inspector {
   display: grid;
   gap: 0.75rem;

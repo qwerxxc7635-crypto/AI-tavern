@@ -3966,3 +3966,23 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 102文件/627项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建217个模块；实体Schema作为共享结构合同进入现有bundle，不新增运行时Provider或数据库依赖。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、已保存事实或模型配置，不merge、不push。
+
+## 2026-08-14 — M3-T04 AI Inspector
+
+### 会话诊断与权限边界
+
+- 新增session AI Inspector只读Gateway与有界投影，覆盖generation/task/status/error、provider/model、latency、cache、tokens、Context manifest、Prompt、raw、parsed、validation、repair和Generator lifecycle。
+- DesktopAIOrchestrator在每个primary/fallback实际attempt边界记录成功或失败；Inspector记录失败本身best-effort，不会替换原生成结果、稳定错误或fallback策略。
+- 玩家模式返回空且UI默认关闭；“我的”新增第八个AI检查器分区，只有显式开启才以ADVANCED模式读取，面板无编辑、retry、save或事实提交能力。
+- ADVANCED遮罩Prompt/raw/parsed scalar；DEVELOPER仅展示有界净化内容。SYSTEM Core Prompt始终隐藏；无system-role时只显示`[TASK_INPUT]`之后部分，防止合并的Core/stable truth泄露。
+- 递归遮罩API Key、Authorization/Bearer、Cookie、Password、Credential、secret/hidden/unrevealed和World Truth字段；Context继续只显示既有manifest metadata。
+- 会话记录、段长、消息、数组、对象字段、嵌套深度、validation issue和lifecycle都有硬上限；新增`DEC-115`与`docs/V0.3_AI_INSPECTOR.md`，不新增SQLite或导出面。
+
+### 验证
+
+- 首次严格TypeScript发现Provider cache token字段在协议中可为undefined，而Inspector合同只接受number/null；显式归一为null后通过，未放宽类型。
+- 专项4文件/24项通过，覆盖redaction、PLAYER/ADVANCED/DEVELOPER模式、空记录、成功、Provider失败、repair成功/失败、validation、metrics、内容/集合上限、UI显式启用和Context metadata回归。
+- 安全复核发现不支持system role时Core Prompt与用户输入合并；新增`[TASK_INPUT]`切分和回归测试，开发模式也不显示Core/stable prefix。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 103文件/635项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建218个模块；Inspector保持My与Desktop orchestrator现有lazy chunks，不新增Provider或持久化依赖。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、GenerationRecord、已保存事实或模型凭据，不merge、不push。

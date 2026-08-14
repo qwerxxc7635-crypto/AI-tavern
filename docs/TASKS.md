@@ -172,7 +172,7 @@
 
 ## M3-T04 AI Inspector
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-14）
 - **Dependency**：M3-T03。
 - **Deliverable**：开发/高级 Inspector 的 generation、provider、latency、cache、tokens、context、prompt、raw/parsed/validation/repair 视图。
 - **Acceptance**：默认遮罩秘密和未授权 truth；失败也可定位；Inspector 不成为事实源。

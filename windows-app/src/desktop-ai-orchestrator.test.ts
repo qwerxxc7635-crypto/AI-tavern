@@ -12,6 +12,7 @@ import {
 } from '@ember-tavern/ai-core';
 import { isoTimestamp } from '@ember-tavern/contracts';
 import { DesktopAIOrchestrator, canonicalRuntimeTimestamp } from './desktop-ai-orchestrator.js';
+import { resetAIInspectorForTests, sessionAIInspectorGateway } from './ai-inspector-service.js';
 import type {
   ModelProfile,
   ModelSettingsGateway,
@@ -26,6 +27,7 @@ describe('DesktopAIOrchestrator', () => {
   });
 
   it('repairs one structurally invalid provider response through the same selected runtime', async () => {
+    resetAIInspectorForTests();
     const settings = new MutableSettings(
       profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
     );
@@ -54,6 +56,33 @@ describe('DesktopAIOrchestrator', () => {
       'EMIT_EVENTS',
       'PERSIST',
     ]);
+    expect(await sessionAIInspectorGateway.load('ADVANCED')).toMatchObject({
+      generation: { task: 'GENERATE_WORLD', status: 'SUCCEEDED' },
+      provider: { model: 'deepseek-v4-flash' },
+      repair: { attempted: true, status: 'SUCCEEDED' },
+      validation: { status: 'PASSED' },
+    });
+  });
+
+  it('records the failed repair and validation boundary without publishing raw content', async () => {
+    resetAIInspectorForTests();
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    await expect(
+      new DesktopAIOrchestrator(settings, new InvalidThenCapturingProvider(2)).execute(
+        'GENERATE_WORLD',
+        worldInput('结构损坏的世界'),
+        options('failed-repair'),
+      ),
+    ).rejects.toMatchObject({ code: 'INVALID_JSON' });
+
+    expect(await sessionAIInspectorGateway.load('ADVANCED')).toMatchObject({
+      generation: { status: 'FAILED', errorCode: 'INVALID_JSON' },
+      raw: { characters: 1, content: '［原始输出内容已遮罩］' },
+      validation: { status: 'FAILED', code: 'INVALID_JSON' },
+      repair: { attempted: true, status: 'FAILED' },
+    });
   });
 
   it('uses the saved default Provider and Model for the final generation request', async () => {
@@ -151,6 +180,7 @@ describe('DesktopAIOrchestrator', () => {
     'DOMAIN_RULE_REJECTED',
     'LOCAL_STORAGE_UNAVAILABLE',
   ])('does not silently fallback for %s', async (code) => {
+    resetAIInspectorForTests();
     const primary = profile('primary-profile', 'deepseek', 'deepseek-v4-flash');
     const fallback = profile('fallback-profile', 'custom', 'fallback-model');
     const settings = new MutableSettings(primary);
@@ -170,6 +200,12 @@ describe('DesktopAIOrchestrator', () => {
       ),
     ).rejects.toMatchObject({ code });
     expect(provider.calls).toHaveLength(1);
+    expect(await sessionAIInspectorGateway.load('ADVANCED')).toMatchObject({
+      generation: { task: 'GENERATE_WORLD', status: 'FAILED', errorCode: code },
+      provider: { id: 'provider-primary-profile', model: 'deepseek-v4-flash' },
+      raw: null,
+      validation: { status: 'NOT_REACHED' },
+    });
   });
 
   it('keeps production game services behind the shared orchestration facade', async () => {
@@ -249,11 +285,13 @@ class CapturingProvider implements AIProvider {
 }
 
 class InvalidThenCapturingProvider extends CapturingProvider {
-  private invalidPending = true;
+  public constructor(private invalidRemaining = 1) {
+    super();
+  }
 
   public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
-    if (this.invalidPending) {
-      this.invalidPending = false;
+    if (this.invalidRemaining > 0) {
+      this.invalidRemaining -= 1;
       this.calls.push({ request, config });
       return {
         requestId: request.requestId,

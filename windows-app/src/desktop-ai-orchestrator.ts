@@ -23,6 +23,7 @@ import {
   renderStablePromptProfile,
 } from '@ember-tavern/prompts';
 import { recordContextInspection } from './context-inspector-service.js';
+import { recordAIInspectionFailure, recordAIInspectionSuccess } from './ai-inspector-service.js';
 import {
   tauriModelSettingsGateway,
   type ModelProfile,
@@ -106,14 +107,50 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     input: unknown,
     options: DesktopAIExecuteOptions,
   ): Promise<DesktopAIExecution> {
-    const result = await new GeneratorRunner({
-      transaction: NOOP_GENERATOR_TRANSACTION,
-    }).run(
-      new DesktopStructuredGenerator(this.provider),
-      { selection, task, input, options },
-      { executionId: options.requestId, idempotencyKey: options.requestId },
-    );
-    return Object.freeze({ ...result.value, lifecycle: result.audit });
+    const startedAt = Date.now();
+    const lifecycle: GeneratorAuditEntry[] = [];
+    const generator = new DesktopStructuredGenerator(this.provider);
+    try {
+      const result = await new GeneratorRunner({
+        transaction: NOOP_GENERATOR_TRANSACTION,
+        observe(entry) {
+          lifecycle.push(entry);
+        },
+      }).run(
+        generator,
+        { selection, task, input, options },
+        { executionId: options.requestId, idempotencyKey: options.requestId },
+      );
+      const execution = Object.freeze({ ...result.value, lifecycle: result.audit });
+      await recordAIInspectionSuccess({
+        task,
+        providerId: execution.selectedProviderId,
+        providerDisplayName: execution.selectedProviderDisplayName,
+        request: execution.request,
+        response: execution.response,
+        parsed: execution.validatedOutput,
+        cachePrefixHash: execution.cachePrefixHash,
+        latencyMs: Date.now() - startedAt,
+        lifecycle: result.audit,
+      });
+      return execution;
+    } catch (error) {
+      const validation = findValidationFailure(error);
+      const inspection = generator.inspectionState();
+      await recordAIInspectionFailure({
+        task,
+        providerId: selection.profile.providerId,
+        providerDisplayName: selection.profile.providerDisplayName,
+        model: selection.model.name,
+        ...(inspection.request === null ? {} : { request: inspection.request }),
+        ...(inspection.raw === null ? {} : { raw: inspection.raw }),
+        latencyMs: Date.now() - startedAt,
+        errorCode: errorCodeForInspection(error),
+        ...(validation === null ? {} : { validation: validation.validation }),
+        lifecycle,
+      });
+      throw error;
+    }
   }
 }
 
@@ -151,7 +188,17 @@ class DesktopStructuredGenerator implements Generator<
   Omit<DesktopAIExecution, 'lifecycle'>,
   never
 > {
+  private lastRequest: NormalizedAIRequest | null = null;
+  private lastRaw: string | null = null;
+
   public constructor(private readonly provider: AIProvider) {}
+
+  public inspectionState(): Readonly<{
+    request: NormalizedAIRequest | null;
+    raw: string | null;
+  }> {
+    return Object.freeze({ request: this.lastRequest, raw: this.lastRaw });
+  }
 
   public buildContext(input: DesktopGeneratorInput) {
     return input;
@@ -177,6 +224,7 @@ class DesktopStructuredGenerator implements Generator<
       maxOutputTokens: context.options.maxOutputTokens,
       timeoutMs: effectiveTimeoutMs(context.selection.profile, context.options.timeoutMs),
     };
+    this.lastRequest = request;
     return Object.freeze({
       ...context,
       request,
@@ -190,6 +238,7 @@ class DesktopStructuredGenerator implements Generator<
 
   public async generate(prepared: DesktopPreparedPrompt): Promise<DesktopRawGeneration> {
     const response = await this.provider.generate(prepared.request, prepared.providerConfig);
+    this.lastRaw = response.content;
     return Object.freeze({ prepared, request: prepared.request, response });
   }
 
@@ -204,6 +253,7 @@ class DesktopStructuredGenerator implements Generator<
       throw new DesktopOutputValidationError(
         validationFailureCode(validated.error),
         validated.error,
+        parsed.response.content,
       );
     }
     return Object.freeze({ ...parsed, validatedOutput: validated.validatedOutput });
@@ -233,7 +283,9 @@ class DesktopStructuredGenerator implements Generator<
       messages: repair.messages,
       responseFormat: repair.responseFormat,
     };
+    this.lastRequest = request;
     const response = await this.provider.generate(request, prepared.providerConfig);
+    this.lastRaw = response.content;
     return Object.freeze({ prepared, request, response });
   }
 
@@ -363,10 +415,33 @@ class DesktopOutputValidationError extends DesktopAIOrchestrationError {
   public constructor(
     code: string,
     public readonly validation: Parameters<typeof formatOutputRepairPrompt>[3],
+    public readonly raw: string,
   ) {
     super(code);
     this.name = 'DesktopOutputValidationError';
   }
+}
+
+function findValidationFailure(error: unknown): DesktopOutputValidationError | null {
+  let current: unknown = error;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (current instanceof DesktopOutputValidationError) return current;
+    if (typeof current !== 'object' || current === null || !('cause' in current)) return null;
+    current = current.cause;
+  }
+  return null;
+}
+
+function errorCodeForInspection(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return classifyApplicationError(error).code;
 }
 
 function preserveOrchestrationError(
