@@ -105,6 +105,21 @@ export {
   GeneratorRunner,
   NOOP_GENERATOR_TRANSACTION,
 } from './generator.js';
+export {
+  GENERATION_PRIORITIES,
+  GenerationQueue,
+  GenerationQueueError,
+} from './generation-queue.js';
+export type {
+  GenerationPriority,
+  GenerationQueueExecution,
+  GenerationQueueHandle,
+  GenerationQueueJob,
+  GenerationQueueMetric,
+  GenerationQueueOptions,
+  GenerationQueueStatus,
+  GenerationRoute,
+} from './generation-queue.js';
 export type {
   Generator,
   GeneratorAuditEntry,

@@ -2323,3 +2323,26 @@ Generator使用泛型阶段接口与Runner组合，不拥有Provider、Repositor
 - emitEvents失败必须使persist回滚；重放幂等键返回既有值且不重复发事件。框架测试使用可回滚内存端口证明合同，真实SQLite回归仍由现有AITurn测试覆盖。
 - Desktop结果新增不可变lifecycle trace，旧request/response/validatedOutput/model/cache字段不变；fallback仍读取既有稳定错误码。
 - M3-T01不迁移全部生成器、不实现Queue、不改变Prompt业务内容、不新增真实模型调用或数据库schema。
+
+## DEC-113：生成队列预留前台容量并以整体Deadline限制重试
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M3-T02`、`docs/V0.3_SPEC.md` 8.2
+
+### 背景
+
+P0玩家交互、P1即将使用内容和P2后台预生成需要共享有限模型容量。单纯严格优先会让后台永远饥饿；普通FIFO又可能让P2占满槽位阻塞NPC回复。若每次retry重置timeout，失败Provider可无限放大总等待时间；若Queue直接选择厂商或持久化，则会复制现有编排与事实边界。
+
+### 决定与理由
+
+Queue只调度注入的execute回调。P0优先且每四个P0给等待中的低优先级一个有界轮转机会；P1/P2交替。并发大于1时P2最多占`concurrency-1`，保留一个前台槽。队列/运行任务共享cancel handle，timeout覆盖所有attempt的整体deadline。
+
+Retry先在同一路径内按稳定错误策略执行至有界上限，之后才允许一次显式fallback；认证、额度、规则和持久化错误不可fallback。hardResultKey在所有route/attempt保持不变，Queue不拥有D20或游戏状态。
+
+### 影响与边界
+
+- intentKey只做活动任务去重；完成后允许新意图。pending和concurrency均有硬上限，不支持无限后台任务。
+- metric只含任务类别、优先级、终态、route、attempt与时长/安全错误码，不含内容或身份；Queue不自动上传或写SQLite。
+- 取消/超时终止execute并忽略迟到结果；成功结果仍必须经过M3-T01 rules/persist事务，Queue不能直接提交事实。
+- M3-T02不改变现有Provider选择、Prompt、Repository、数据库schema或真实模型授权；消费者按后续任务逐切片接入。

@@ -154,7 +154,7 @@
 
 ## M3-T02 Generation Queue
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-14）
 - **Dependency**：M3-T01。
 - **Deliverable**：P0/P1/P2 队列、并发、取消、超时、重试、fallback、去重和指标。
 - **Acceptance**：P0 不被后台任务饿死；相同意图去重；取消/超时无部分事实；硬结果 retry 不变。

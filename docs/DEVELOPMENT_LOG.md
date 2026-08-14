@@ -3925,3 +3925,23 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 100文件/603项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建215个模块；Generator形成共享依赖且桌面编排保持路由lazy chunk。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、Provider配置或已持久化游戏事实，不merge、不push。
+
+## 2026-08-14 — M3-T02 Generation Queue
+
+### 有界调度与策略
+
+- 新增P0/P1/P2 GenerationQueue，提供1–8全局并发、最大256 active intents、P0四次burst公平轮转、P1/P2轮转及P2保留前台槽策略。
+- 同intent返回相同handle/Promise；queued和running均可取消，attempt使用AbortSignal和单次settle，迟到结果不会改变终态。
+- timeout覆盖所有retry/fallback的整体deadline；retry限制0–3次，达到上限后只有稳定错误合同允许且调用方显式授权时才fallback一次。
+- hardResultKey在PRIMARY/RETRY/FALLBACK保持原值，Queue不创建、修改或持久化硬结果；成功结果仍需进入Generator rules/persist。
+- 指标只记录task/priority/status/route/attempts/queue wait/duration/error code，拒绝内容和身份字段；时长有界且每任务只记录一个终态。
+- 新增`DEC-113`与`docs/V0.3_GENERATION_QUEUE.md`；Queue只依赖execute callback，不建立第二套Provider，不直接写SQLite。
+
+### 验证
+
+- 首轮Queue专项8项中7项通过；并发测试预期错误地要求第二个P2占用专门保留的前台槽，同时fake timer在挂载rejection断言前推进造成handled-late警告。修正测试时序后8/8通过，未削弱P2容量限制。
+- 首次定向ESLint发现Queue entry变量只赋值一次；改为const entry和独立cancelTarget闭包后通过，未禁用prefer-const。
+- 新增硬结果技术retry及配置/容量边界专测后，Queue/Application Error/Generator定向3文件/28项通过，覆盖priority/fairness、concurrency、cancel race、timeout、dedupe、retry/fallback policy、hard result和metrics。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 101文件/613项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建216个模块；Queue保持共享无Provider依赖模块。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、模型凭据、硬结果或已持久化游戏事实，不merge、不push。
