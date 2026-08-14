@@ -163,7 +163,7 @@
 
 ## M3-T03 Structured Entity Schemas
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-14）
 - **Dependency**：M3-T02。
 - **Deliverable**：V0.3 重要实体的版本化输入/输出 Schema 与 registry。
 - **Acceptance**：World Constitution、Career、Trait、Item、Location、Faction、NPC LOD、Quest/Graph、Director action 均非纯长文本；TS/Rust 关键边界一致。

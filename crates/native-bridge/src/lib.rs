@@ -5,6 +5,8 @@
 mod adventure_play;
 mod cache_metrics;
 mod character_creation;
+#[cfg(test)]
+mod entity_schema_contract;
 mod model_settings;
 mod npc_dialogue;
 mod quest_board;

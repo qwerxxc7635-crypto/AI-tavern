@@ -2346,3 +2346,26 @@ Retry先在同一路径内按稳定错误策略执行至有界上限，之后才
 - metric只含任务类别、优先级、终态、route、attempt与时长/安全错误码，不含内容或身份；Queue不自动上传或写SQLite。
 - 取消/超时终止execute并忽略迟到结果；成功结果仍必须经过M3-T01 rules/persist事务，Queue不能直接提交事实。
 - M3-T02不改变现有Provider选择、Prompt、Repository、数据库schema或真实模型授权；消费者按后续任务逐切片接入。
+
+## DEC-114：实体Schema只证明结构可解释，业务合法性继续由规则层裁决
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M3-T03`、`docs/V0.3_SPEC.md` 8.3、9至13节
+
+### 背景
+
+V0.3的World Constitution、Career、Trait、Item、Location、Faction、NPC LOD、Quest Graph和Director Action不能只保存长文本。现有AITask Schema面向V0.1任务响应，无法表达这些新实体的版本、资源上限和演进边界。若把引用存在性、Trait平衡、LOD迁移、Quest状态或Director预算也塞进Zod，结构解析会依赖当前SQLite事实并与Rules Engine重复。
+
+### 决定与理由
+
+新增独立闭集`STRUCTURED_ENTITY_SCHEMAS`，九类实体分别拥有严格的version 1 input/output Schema。版本同时存在于registry和payload；对象拒绝未知字段，枚举、字符串、数组及生成数量都有硬上限。AI输出仍是提案，parse成功只表示有限且可解释。
+
+跨语言边界使用同一JSON fixture：TypeScript执行完整Zod解析，Rust固定实体闭集、version、顶层必需字段和资源上限。Rust不复制整套Zod定义，避免两套字段实现独立漂移；未来原生真正消费某类实体时，再为该持久/命令边界增加对应强类型。
+
+### 影响与边界
+
+- 引用存在性、Constitution revision匹配、LOD延续、Trait/Item平衡、Quest状态迁移、Director预算与冷却必须在Generator rulesCheck或Domain validator执行。
+- 未知版本和字段直接失败，不静默丢弃；破坏性修改必须升级版本并提供显式兼容路径。
+- 资源上限是防止生成放大的结构安全边界，不代表业务允许生成到上限。
+- M3-T03不新增SQLite表、Repository、Provider、Prompt或事实提交入口，也不提前实现M4至M8的领域功能。

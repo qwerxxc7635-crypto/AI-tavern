@@ -1,0 +1,290 @@
+[
+  {
+    "kind": "WORLD_CONSTITUTION",
+    "input": {
+      "schemaVersion": 1,
+      "worldId": "world-1",
+      "revision": 1,
+      "worldConcept": "A low-magic port city",
+      "contentBoundaries": ["no modern weapons"]
+    },
+    "output": {
+      "schemaVersion": 1,
+      "worldType": "Low fantasy",
+      "era": "Sail age",
+      "technology": "Black powder is rare",
+      "magic": "Magic requires costly rites",
+      "peoples": ["Humans", "River folk"],
+      "society": "Merchant guilds dominate public life",
+      "politics": "A council governs the harbor",
+      "economy": "Trade and shipbuilding",
+      "combatScale": "Personal and street-level",
+      "deathRules": "Death is permanent",
+      "careerRules": "Careers follow local institutions",
+      "equipmentRules": "Equipment uses period materials",
+      "npcRules": "NPC motives follow lived conditions",
+      "traitRules": "Benefits require balancing drawbacks",
+      "taboos": ["No resurrection"]
+    }
+  },
+  {
+    "kind": "CAREER",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "A guild port"
+      },
+      "requestedCount": 1,
+      "existingCareerIds": []
+    },
+    "output": {
+      "schemaVersion": 1,
+      "careers": [
+        {
+          "id": "career-pilot",
+          "name": "Shoal Pilot",
+          "rarity": "UNCOMMON",
+          "role": "Guides ships through dangerous shallows",
+          "skills": ["Navigation"],
+          "equipmentTags": ["Charts"],
+          "socialPosition": "Licensed guild specialist",
+          "relationshipHooks": ["Owes the harbor master"],
+          "risks": ["Smuggling accusations"],
+          "requirements": ["Guild sponsorship"]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "TRAIT",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "A dangerous harbor"
+      },
+      "ownerConcept": "An observant courier",
+      "requestedCount": 1,
+      "existingTraitIds": []
+    },
+    "output": {
+      "schemaVersion": 1,
+      "traits": [
+        {
+          "id": "trait-tidewise",
+          "name": "Tidewise",
+          "kind": "MIXED",
+          "description": "Reads water well but fixates on changing currents",
+          "triggers": ["Near tidal water"],
+          "effects": [
+            {
+              "polarity": "BENEFIT",
+              "domain": "EXPLORATION",
+              "description": "Notices dangerous tidal changes",
+              "suggestedPoints": 2
+            },
+            {
+              "polarity": "DRAWBACK",
+              "domain": "SOCIAL",
+              "description": "Appears distracted away from shore",
+              "suggestedPoints": 2
+            }
+          ]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "ITEM",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "A low-magic port"
+      },
+      "purpose": "A clue carried by a missing sailor",
+      "requestedCount": 1,
+      "existingItemIds": []
+    },
+    "output": {
+      "schemaVersion": 1,
+      "items": [
+        {
+          "id": "item-brass-token",
+          "name": "Salt-stained Brass Token",
+          "category": "CLUE",
+          "appearance": "A stamped token with a broken lighthouse",
+          "history": "Issued by a dissolved pilots guild",
+          "origin": "Old eastern quay",
+          "narrativeAbilities": ["Identifies a forbidden dock"],
+          "semanticEffects": ["Recognized by retired pilots"],
+          "balanceTags": ["NON_COMBAT"]
+        }
+      ]
+    }
+  },
+  {
+    "kind": "LOCATION",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "The eastern harbor"
+      },
+      "parentLocationId": "city-ember",
+      "requestedCount": 1,
+      "existingLocationIds": ["city-ember"]
+    },
+    "output": {
+      "schemaVersion": 1,
+      "locations": [
+        {
+          "id": "tavern-cinder",
+          "name": "The Cinder Cup",
+          "kind": "TAVERN",
+          "parentLocationId": "city-ember",
+          "description": "A narrow tavern built into a seawall",
+          "atmosphere": "Warm, crowded, and watchful",
+          "features": ["Tide cellar"],
+          "factionIds": ["faction-pilots"],
+          "connections": ["dock-east"],
+          "currentSituation": "Sailors whisper about a missing beacon keeper"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "FACTION",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "Guilds compete for harbor access"
+      },
+      "requestedCount": 1,
+      "existingFactionIds": []
+    },
+    "output": {
+      "schemaVersion": 1,
+      "factions": [
+        {
+          "id": "faction-pilots",
+          "name": "Lantern Pilots",
+          "goal": "Restore safe passage through the eastern shoals",
+          "resources": ["Charts", "Small boats"],
+          "leadership": ["Master Ilya"],
+          "enemyFactionIds": ["faction-smugglers"],
+          "allyFactionIds": [],
+          "territoryLocationIds": ["dock-east"],
+          "currentAction": "Searching for the missing keeper",
+          "playerRelation": "UNKNOWN"
+        }
+      ]
+    }
+  },
+  {
+    "kind": "NPC_LOD",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "A tavern investigation"
+      },
+      "npcId": "npc-ilya",
+      "currentLod": 1,
+      "targetLod": 2,
+      "preservedFields": { "name": "Ilya" }
+    },
+    "output": {
+      "schemaVersion": 1,
+      "npc": {
+        "npcId": "npc-ilya",
+        "lod": 2,
+        "populationRole": "Harbor guild member",
+        "name": "Ilya",
+        "appearance": "Weathered coat and a brass spyglass",
+        "currentBehavior": "Questions arriving crews",
+        "career": "Master pilot",
+        "personality": "Direct and patient",
+        "goals": ["Find the keeper"],
+        "knowledge": ["The eastern beacon failed at midnight"],
+        "relationshipIds": ["npc-keeper"],
+        "memories": [],
+        "secrets": [],
+        "questIds": ["quest-beacon"],
+        "itemIds": ["item-spyglass"],
+        "experiences": []
+      }
+    }
+  },
+  {
+    "kind": "QUEST_GRAPH",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "The eastern beacon is dark"
+      },
+      "requestedCount": 1,
+      "existingQuestIds": [],
+      "relevantEntityIds": ["npc-ilya", "dock-east"]
+    },
+    "output": {
+      "schemaVersion": 1,
+      "quests": [
+        {
+          "id": "quest-beacon",
+          "title": "The Dark Beacon",
+          "kind": "EMERGENT",
+          "state": "AVAILABLE",
+          "summary": "Investigate why the eastern beacon failed",
+          "objectives": ["Reach the lighthouse"],
+          "entityIds": ["npc-ilya", "lighthouse-east"],
+          "consequenceTags": ["SHIPPING_DELAY"]
+        }
+      ],
+      "edges": []
+    }
+  },
+  {
+    "kind": "DIRECTOR_ACTION",
+    "input": {
+      "schemaVersion": 1,
+      "context": {
+        "worldId": "world-1",
+        "constitutionRevision": 1,
+        "contextSummary": "The player ignored the dark beacon"
+      },
+      "activeQuestIds": [],
+      "availableBudgets": {
+        "newEvents": 1,
+        "highUrgencyEvents": 0,
+        "npcInitiatives": 1,
+        "backgroundChanges": 1
+      }
+    },
+    "output": {
+      "schemaVersion": 1,
+      "actions": [
+        {
+          "id": "action-shipping-delay",
+          "kind": "WORLD_CHANGE",
+          "actorEntityId": "faction-pilots",
+          "targetEntityIds": ["dock-east"],
+          "rationale": "Unsafe shoals delay incoming ships",
+          "proposedEffects": ["Reduce harbor traffic"],
+          "urgency": "MEDIUM",
+          "cooldownKey": "harbor-delay"
+        }
+      ]
+    }
+  }
+]

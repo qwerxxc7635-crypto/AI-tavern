@@ -3945,3 +3945,24 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 101文件/613项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建216个模块；Queue保持共享无Provider依赖模块。
 - 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、模型凭据、硬结果或已持久化游戏事实，不merge、不push。
+
+## 2026-08-14 — M3-T03 Structured Entity Schemas
+
+### 版本化实体合同
+
+- 在ai-core新增九类实体闭集与registry，分别提供World Constitution、Career、Trait、Item、Location、Faction、NPC LOD、Quest Graph和Director Action严格version 1 input/output Zod Schema。
+- payload与registry双重携带schemaVersion；顶层及嵌套对象拒绝未知字段，字符串、列表、请求数量和输出资源均有硬上限，不把长篇文本作为唯一结构。
+- Career覆盖稀有度、role/skills/equipment/social/relationship/risk/requirement；Trait拆分kind、trigger及正负语义效果；Item分离叙事/语义/balance tag，不接受AI数值伤害字段。
+- Location/Faction包含稳定ID和关系引用；NPC LOD以0–3层结构承载逐步详情和preservedFields输入；Quest以node/edge表达闭集状态；Director只输出有界action proposal和cooldown key。
+- Schema刻意允许不存在的引用和LOD降级形状，证明parse不冒充业务验证；后续rulesCheck必须依据SQLite判断引用、revision、平衡、迁移、预算和冷却。
+- 新增`DEC-114`与`docs/V0.3_STRUCTURED_ENTITY_SCHEMAS.md`；不新增数据库、Provider、Prompt或事实写入口。
+
+### 验证
+
+- 首轮Prettier完成TS/JSON格式化；`cargo fmt --check`准确报告新Rust模块和module顺序不符合rustfmt，执行正式`cargo fmt --all`后通过，没有跳过格式门禁。
+- TypeScript实体专项14项通过，覆盖registry/fixture完整性、有效、缺失、未知版本、越界、资源上限、未知字段拒绝及结构/业务分层。
+- Rust跨语言专项3项通过，共读同一fixture并验证九类闭集、version、必需输出边界、资源上限和strict envelope。
+- 定向ESLint与全仓TypeScript strict typecheck通过。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 102文件/627项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建217个模块；实体Schema作为共享结构合同进入现有bundle，不新增运行时Provider或数据库依赖。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、已保存事实或模型配置，不merge、不push。
