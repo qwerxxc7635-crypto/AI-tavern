@@ -2438,3 +2438,26 @@ Seed在Campaign创建事务内写入，migration 10为旧Campaign一次性回填
 - 已写入SQLite的事实始终优先，不能因Seed重算而改写；reservation推进只说明程序随机已被消费。
 - LLM文本、Provider采样温度和技术retry不承诺由Seed决定；Seed也不暴露为玩家重置或重投功能。
 - M4-T02不提前开发地图、事件池或Director；portable archive加入新V0.3表仍集中留给M10-T05。
+
+## DEC-118：视觉规范沿用既有组件体系并在M10末统一收敛
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`、`docs/V0.3_SPEC.md` 7节、`M2-T01`至`M2-T05`
+
+### 背景
+
+视觉手册在M2基础任务完成后加入。M2已经建立三层Token、14类Primitives、十类Game Components、AIFieldAssist和ActionComposer，但遵循当时任务边界只迁移核心页面；M5至M10还会产生角色、Trait、实体、酒馆、多NPC、Quest、Streaming和恢复UI。立即返工M0至M4-T02页面会中断M4-T03、扩大业务任务并增加状态机与存档回归面，只依赖M12最终审查又会让Legacy迁移过晚且缺少可玩性前门禁。
+
+### 决定与理由
+
+视觉手册成为V0.3+全局UI/UX/CSS规范，实施沿用现有`Design Tokens → UI Primitives → Game Components`体系。M5至M10在新增或自然触及UI时完成Feature级渐进迁移；新增M10-T07在功能与性能收口后统一执行Legacy迁移和视觉一致性审查，M11可玩性以其完成为依赖，M12再独立复核。
+
+所有历史差异登记在`docs/V0.3_VISUAL_MIGRATION.md`。Token最终是颜色、字体、间距、Border、Radius、Shadow和Motion的唯一视觉值来源；共享组件只能迁移和扩展，不创建平行实现。统一方向为黑暗奇幻酒馆、TRPG冒险手册与现代桌面游戏HUD，AI采用命运/世界生成身份并后置于游戏内容。
+
+### 影响与边界
+
+- M0至M4-T02完成状态和历史验收保持不变；M4-T03不因视觉规范返工旧页面或重构Rules Engine。
+- M10-T07加入M10-T06之后并成为M11-T01的新依赖，不改变既有里程碑顺序或其他业务依赖。
+- 视觉迁移不得改变业务语义、状态机、数据合同、SQLite事实、存档兼容性或Provider/Rules权限；发生冲突时功能正确性、数据合同和存档兼容性优先，例外必须显式记录。
+- M12-T01逐页复核Token唯一来源、组件复用、Feature/Legacy完成度、四视口、WCAG AA、焦点、非颜色状态和reduced-motion，不能以换色或背景替代完整验收。

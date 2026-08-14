@@ -4026,3 +4026,19 @@
 - `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 107文件/654项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行102项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建219个模块；Seed基础设施不增加玩家UI或模型调用。
 - 用户已有`.gitignore`修改保持未暂存；本任务不merge、不push，也不提前执行M4-T03。
+
+## 2026-08-14 — 引入《Ember Tavern 视觉风格手册 V1.0》并冻结渐进迁移策略
+
+### 规范持久化与任务影响分析
+
+- 将用户提供的视觉手册逐字持久化为`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`，并在`docs/V0.3_SPEC.md`建立全局引用；视觉方向冻结为“黑暗奇幻酒馆 × TRPG 冒险手册 × 现代桌面游戏 HUD”，AI采用命运/世界生成身份而非技术品牌主角。
+- 审计发现M2-T01～T05已完成Token、Primitives、Game Components、AIFieldAssist和ActionComposer基础，不能修改其历史状态或重做；但原任务只做渐进核心页面迁移，M5～M10新增Feature UI之后缺少统一Legacy迁移与一致性收敛门禁。
+- 在不改变里程碑顺序的前提下新增`M10-T07 Visual System Convergence`，由M10-T06依赖进入，并将M11-T01依赖改为M10-T07；M12-T01增加独立视觉复核标准。未另建第二套UI体系。
+- 新增`docs/V0.3_VISUAL_MIGRATION.md`：记录现有`theme.css`仍有41处非Token raw color、历史页面尚未逐页复核Typography/Color/Spacing/Radius/Border/Shadow/Motion等视觉债务，并冻结Token→Primitive→Game Component→Feature→Legacy→Audit迁移顺序。
+- 从现在起，M5～M10新增或自然触及的UI直接复用现有Token和共享组件并遵循手册；明显扩大当前业务任务的视觉调整留到M10-T07。M0～M4-T02页面不在当前M4-T03返工。
+- 视觉规范不改变Rules Engine、Provider、Generator/Queue、SQLite、Persistence、Save/Resume、World Seed/Constitution、D20或Quest/NPC/Adventure合同；冲突时功能正确性、数据合同和存档兼容性优先，无法兼容项必须记录Decision。
+
+### 当前任务连续性
+
+- 文档追加完成后继续`M4-T03 Rules Engine Expansion`现有属性、D20、装备、金钱、时间、Trait、Quest和事务盘点；未开始M4-T04，也未因视觉规范扩大或重构规则业务范围。
+- 用户已有`.gitignore`修改继续保持未暂存；本次只修改V0.3全局文档与尚未完成任务的标准/依赖，不修改已完成任务历史状态。

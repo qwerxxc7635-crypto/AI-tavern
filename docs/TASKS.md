@@ -139,6 +139,14 @@
 - **Tests**：候选数量、自由输入、切换、重复提交、恢复、NPC/冒险/调查集成。
 - **Do Not**：不把候选做成唯一动作；不赋予候选额外规则权限。
 
+## 未完成 UI 任务的全局视觉实现标准
+
+- **规范来源**：`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`；迁移清单与视觉债务见 `docs/V0.3_VISUAL_MIGRATION.md`。
+- **适用任务**：M5-T02～M5-T05、M6 各实体 UI、M7 酒馆/对话、M8 Quest UI、M10-T03 Streaming/Loading/Provider 状态、M10-T05 恢复 UI、M10-T07 视觉收敛，以及 M11/M12 的可玩性与审查证据。
+- **Implementation**：新增或自然修改到的 UI 必须复用现有 Design Tokens、UI Primitives 和 Game Components；AIFieldAssist、ActionComposer、CharacterCard、NpcCard、QuestCard、Trait、D20、Narrative、Adventure 继续沿用既有合同和组件边界。不得新建平行组件体系，不得重复硬编码近似颜色、字体、间距、Border、Radius、Shadow 或 Motion。
+- **Acceptance**：页面保持“黑暗奇幻酒馆 × TRPG 冒险手册 × 现代桌面游戏 HUD”的信息层级；正文可读、键盘/焦点/减少动态效果符合既有无障碍门禁；不以颜色单独表达状态；AI 身份采用命运/世界生成语言且不抢占游戏内容。
+- **Boundary**：当前业务任务只迁移其新增或自然触及范围。若完整视觉落实会扩大任务，不提前返工已完成页面，登记视觉债务并由 M10-T07 收敛；功能、数据合同、存档兼容性和已验证状态机优先。
+
 ---
 
 # M3 — AI Generation Infrastructure
@@ -504,6 +512,15 @@
 - **Tests**：repeatability、warm/cold、long-save、threshold failure、report generation。
 - **Do Not**：不以单次最快值为结论；不降低门槛掩盖回归。
 
+## M10-T07 Visual System Convergence
+
+- **Status**：TODO
+- **Dependency**：M10-T06。
+- **Deliverable**：按 `Design Tokens → UI Primitives → Game Components → Feature Pages → Legacy UI Migration → Visual Consistency Audit` 完成 V0.3 桌面 UI 收敛，关闭 `docs/V0.3_VISUAL_MIGRATION.md` 中适用视觉债务并形成视觉证据。
+- **Acceptance**：Typography、Color、Spacing、Radius、Border、Shadow、Motion 均由 Design Token 唯一供值；既有共享 primitive/game component 被复用而无第二套体系；Character/NPC/Quest/Trait/D20/Narrative/Adventure/Tavern/Settings 等功能页符合视觉手册、信息层级和 AI 身份；四个既定桌面视口无溢出，WCAG AA、键盘焦点、非颜色状态、reduced-motion 与可跳过 D20 动画通过；逐页视觉一致性审查无未记录差异。
+- **Tests**：raw visual value/token 静态门、组件复用清单、页面/状态矩阵、四视口真实截图、contrast/focus/reduced-motion、loading/streaming/toast/empty/error、视觉债务复算与回归 build。
+- **Do Not**：不改变业务语义、状态机、数据合同或存档；不大规模一次性重写前端；不复制现有组件制造平行体系；不以换色/背景替代完整收敛；不使用大量金边、火焰、Emoji、巨大圆角、聊天气泡或 SaaS Dashboard 布局。
+
 ---
 
 # M11 — Playability
@@ -511,7 +528,7 @@
 ## M11-T01 Three-World Test Harness
 
 - **Status**：TODO
-- **Dependency**：M10-T06。
+- **Dependency**：M10-T07。
 - **Deliverable**：奇幻、调查/COC、Cyberpunk 三世界的隔离测试配置、行为脚本和证据格式。
 - **Acceptance**：三世界 Constitution/职业/装备/Trait/NPC/Quest/扩展字段明显不同；不使用正式用户数据。
 - **Tests**：fixture validity、isolation、reset/replay、secret scan。
@@ -571,8 +588,8 @@
 - **Status**：TODO
 - **Dependency**：M11-T06。
 - **Deliverable**：Architecture、Code、Security、Credential、Provider、AI、Rules、SQLite、Save/Migration、Performance/Cache、UI/UX/A11y、Regression、Playability 的 findings ledger。
-- **Acceptance**：每项含证据、P0–P3、状态、影响、修复建议；不采信 DONE 标签本身。
-- **Tests**：全量静态/动态检查和证据复核。
+- **Acceptance**：每项含证据、P0–P3、状态、影响、修复建议；不采信 DONE 标签本身。UI/UX 审查必须逐页复核视觉手册、Token 唯一来源、共享组件复用、Feature/Legacy 迁移完成度和视觉一致性，不得把“已换色”视为通过。
+- **Tests**：全量静态/动态检查和证据复核；视觉部分复算 M10-T07 页面/状态/视口矩阵并抽查原始视觉值、对比度、焦点与 reduced-motion。
 - **Do Not**：不边审边降低标准；不遗漏外部环境限制。
 
 ## M12-T02 Fix Audit Findings
