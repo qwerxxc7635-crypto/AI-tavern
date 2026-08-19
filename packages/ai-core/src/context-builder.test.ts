@@ -241,6 +241,43 @@ describe('AI context builders', () => {
     expect(JSON.stringify(context)).not.toContain('sealed ledger');
   });
 
+  it('uses an explicit actor-authorized projection without reading the full fact collection', () => {
+    const context = buildNpcDialogueContext(
+      {
+        world,
+        npc: targetNpc,
+        knowledge,
+        relationship,
+        facts: [
+          ...facts,
+          fact(worldFactId('fact-never-authorized'), 'A complete World Truth dump must not leak.'),
+        ],
+        messages: [],
+        memories: [],
+        playerMessage: 'What do you know?',
+        authorizedKnowledge: [
+          {
+            targetKind: 'CLAIM',
+            state: 'SUSPECTED',
+            statement: 'route:sealed is_cursed true',
+          },
+        ],
+      },
+      generousBudget,
+    );
+
+    expect(context.knowledge).toEqual([
+      {
+        targetKind: 'CLAIM',
+        state: 'SUSPECTED',
+        statement: 'route:sealed is_cursed true',
+      },
+    ]);
+    expect(JSON.stringify(context)).not.toContain('World Truth dump');
+    expect(JSON.stringify(context)).not.toContain('cellar door is warm');
+    expect(JSON.stringify(context)).not.toContain('sealed ledger');
+  });
+
   it('fails closed when knowledge promotes another actor false belief or duplicates a fact', () => {
     expect(() =>
       buildNpcDialogueContext({

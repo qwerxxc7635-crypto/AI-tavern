@@ -220,7 +220,7 @@
 
 ## M4-T04 Knowledge Boundary
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M4-T03。
 - **Deliverable**：World/NPC/Player Knowledge 持久模型、provenance、上下文投影和授权规则。
 - **Acceptance**：NPC 不获得无权事实；Player Knowledge 独立；Memory/Claim 不升级 Truth；多 NPC 场景按 Actor 投影。

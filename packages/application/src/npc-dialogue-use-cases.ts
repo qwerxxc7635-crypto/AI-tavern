@@ -39,6 +39,7 @@ import {
   CampaignRepository,
   ConversationRepository,
   GenerationRecordRepository,
+  KnowledgeBoundaryRepository,
   NpcRepository,
   PendingAiRequestRepository,
   WorldRepository,
@@ -91,6 +92,7 @@ export class NpcDialogueUseCases {
   private readonly worlds: WorldRepository;
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
+  private readonly knowledgeBoundary: KnowledgeBoundaryRepository;
 
   public constructor(
     database: TransactionalSqliteDatabase,
@@ -105,6 +107,7 @@ export class NpcDialogueUseCases {
     this.worlds = new WorldRepository(database);
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
+    this.knowledgeBoundary = new KnowledgeBoundaryRepository(database);
   }
 
   public async talkToNpc(command: TalkToNpcCommand): Promise<NpcDialogueResult> {
@@ -137,6 +140,16 @@ export class NpcDialogueUseCases {
     }
     const messages =
       existing === null ? Object.freeze([]) : this.conversations.listMessages(existing.id);
+    const actor = { type: 'NPC' as const, id: npc.id };
+    const actorKnowledge = this.knowledgeBoundary.listActorKnowledge(campaign.id, actor);
+    const authorizedKnowledge =
+      actorKnowledge.length === 0
+        ? undefined
+        : this.knowledgeBoundary.projectActor(campaign.id, actor).entries.map((entry) => ({
+            targetKind: entry.targetKind,
+            state: entry.state,
+            statement: `${entry.subject} ${entry.predicate} ${JSON.stringify(entry.object)}`,
+          }));
     const input = buildNpcDialogueContext(
       {
         world,
@@ -147,6 +160,7 @@ export class NpcDialogueUseCases {
         messages,
         memories: this.npcs.listMemories(npc.id),
         playerMessage: command.playerMessage,
+        ...(authorizedKnowledge === undefined ? {} : { authorizedKnowledge }),
       },
       contextBudgetForTask('NPC_REPLY'),
     );

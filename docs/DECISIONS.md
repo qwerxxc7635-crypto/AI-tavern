@@ -2485,3 +2485,26 @@ Seed在Campaign创建事务内写入，migration 10为旧Campaign一次性回填
 - M4-T03只提供通用Trait修正边界，不提前实现M5的点数、频率或协同平衡，也不提前实现M4-T04知识模型。
 - 本地schema 11可完整关闭重开；portable archive仍为v2，尚不携带规则状态与事件，统一格式迁移保留给M10-T05。
 - 后续Feature必须复用该命令/validator/事务入口，不得创建平行数值写通道；视觉迁移不得改变已验证的规则语义和状态机。
+
+## DEC-120：知识边界由Actor授权行和本地投影共同执行
+
+- 日期：2026-08-19
+- 状态：已采纳
+- 依据：`M4-T04`、`docs/V0.3_SPEC.md` 9.4节
+
+### 背景
+
+V0.2已有`world_facts`、一NPC一行的`npc_knowledge`和Prompt隔离，但没有Player Knowledge通用持久模型，也无法用同一事务表达Truth、Claim、Knowledge和Memory的来源、revision与遗忘。继续把完整事实集合交给Context Builder再依赖Prompt克制，会使缺失授权、跨NPC投影和主观摘要反向升级无法由本地系统证明。
+
+### 决定与理由
+
+schema 12分别持久`world_truths`、`knowledge_claims`、`actor_knowledge`与`knowledge_memories`。Truth authority不包含AI；Claim和Memory永不自动升级Truth。Knowledge以Campaign、Actor和Truth/Claim目标组成不可变授权身份，LEARN、UPDATE和FORGET通过expected revision、幂等operation和`KNOWLEDGE_COMMITTED` ledger在单一事务中演进。
+
+NPC Dialogue和多NPC Adventure只读取Campaign与Actor精确匹配的授权投影；秘密Truth必须有显式授权，`KNOWN Claim`仍是Claim，Player Character使用独立Actor行。数据库trigger复核Actor、目标、Event和Memory来源的Campaign归属，Prompt仅表达行为约束而不承担安全边界。
+
+### 影响与边界
+
+- schema 7/8旧事实与NPC认知在migration 12中保守回填；新Actor尚无通用授权行时保留既有安全投影回退，一旦存在新行就不拼接旧列表，避免双真源泄漏。
+- `SHARED`不自动广播；传播必须由后续显式领域事务为接收Actor创建Knowledge并记录provenance。
+- 本地schema 12支持关闭重开；portable`.emtavern`仍为v2且尚不携带四张通用知识表，完整导入导出升级严格留给M10-T05。
+- M4-T04不改变Provider、Rules Engine、D20、Quest/NPC/Adventure业务合同，也不提前进入M5。

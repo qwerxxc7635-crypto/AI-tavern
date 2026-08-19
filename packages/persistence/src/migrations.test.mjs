@@ -9,6 +9,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { applyMigrations, migrationCount } from './migrations.mjs';
 
 const coreTables = [
+  'actor_knowledge',
   'adventure_turns',
   'adventures',
   'ai_candidates',
@@ -21,6 +22,8 @@ const coreTables = [
   'game_events',
   'generation_records',
   'items',
+  'knowledge_claims',
+  'knowledge_memories',
   'messages',
   'model_profiles',
   'npc_knowledge',
@@ -40,6 +43,7 @@ const coreTables = [
   'world_facts',
   'world_random_streams',
   'world_seeds',
+  'world_truths',
 ];
 
 async function withDatabase(run) {
@@ -237,6 +241,18 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
       INSERT INTO world_facts (
         id, campaign_id, kind, statement, faction_ids_json, detail_json, created_at
       ) VALUES (
+        'fact-known', 'campaign-provenance', 'DEVELOPING_FACT', 'The old key fits the cellar.',
+        '[]', '{}', '2026-08-09T01:02:03.004Z'
+      ), (
+        'fact-suspected', 'campaign-provenance', 'DEVELOPING_FACT', 'The bell rope may be cut.',
+        '[]', '{}', '2026-08-09T01:02:03.004Z'
+      ), (
+        'fact-believed', 'campaign-provenance', 'FALSE_BELIEF', 'The harbor gate is sealed.',
+        '[]', '{"believedByNpcIds":["npc-provenance"]}', '2026-08-09T01:02:03.004Z'
+      ), (
+        'fact-excluded', 'campaign-provenance', 'DEVELOPING_FACT', 'The ledger names the heir.',
+        '[]', '{}', '2026-08-09T01:02:03.004Z'
+      ), (
         'fact-rumor', 'campaign-provenance', 'RUMOR', 'The bell rings below the cellar.',
         '[]', '{"veracity":"UNKNOWN"}', '2026-08-09T01:02:03.004Z'
       );
@@ -301,7 +317,42 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      11,
+      12,
+    );
+    const importedKnowledge = database
+      .prepare(
+        `SELECT target_kind, knowledge_state,
+                COALESCE(truth_id, claim_id) AS target_id
+         FROM actor_knowledge ORDER BY knowledge_state, target_id`,
+      )
+      .all()
+      .map((entry) => ({ ...entry }));
+    assert.deepEqual(importedKnowledge, [
+      { target_kind: 'CLAIM', knowledge_state: 'BELIEVED', target_id: 'claim-fact-believed' },
+      { target_kind: 'CLAIM', knowledge_state: 'KNOWN', target_id: 'claim-fact-rumor' },
+      { target_kind: 'TRUTH', knowledge_state: 'KNOWN', target_id: 'truth-fact-known' },
+      { target_kind: 'TRUTH', knowledge_state: 'SUSPECTED', target_id: 'truth-fact-suspected' },
+    ]);
+    assert.equal(JSON.stringify(importedKnowledge).includes('fact-excluded'), false);
+    assert.equal(
+      database
+        .prepare("SELECT object_json FROM knowledge_claims WHERE id = 'claim-fact-rumor'")
+        .get().object_json,
+      '"The bell rings below the cellar."',
+    );
+    assert.deepEqual(
+      database
+        .prepare(
+          `SELECT aggregate_id, revision, source FROM event_ledger
+           WHERE event_type = 'KNOWLEDGE_COMMITTED' ORDER BY aggregate_id`,
+        )
+        .all()
+        .map((entry) => ({ ...entry })),
+      ['fact-believed', 'fact-known', 'fact-rumor', 'fact-suspected'].map((factId) => ({
+        aggregate_id: `knowledge:npc-provenance:${factId}`,
+        revision: 1,
+        source: 'IMPORT',
+      })),
     );
     const seed = database
       .prepare("SELECT algorithm, seed FROM world_seeds WHERE campaign_id = 'campaign-provenance'")

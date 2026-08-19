@@ -303,6 +303,106 @@ fn load_generation_context(
         return Err(CampaignStoreError::InvalidState);
     }
     let relationship = load_relationship(connection, npc_id)?;
+    let authorized_knowledge = load_actor_knowledge_entries(connection, campaign_id, npc_id)?;
+    let knowledge = if authorized_knowledge.is_empty() {
+        load_legacy_npc_knowledge_entries(connection, campaign_id, npc_id)?
+    } else {
+        authorized_knowledge
+    };
+    let recent_messages = match conversation_id(connection, campaign_id, npc_id)? {
+        Some(id) => load_messages(connection, &id)?
+            .into_iter()
+            .rev()
+            .take(12)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .map(|message| json!({ "role": message.role, "content": message.content }))
+            .collect(),
+        None => Vec::new(),
+    };
+    let memories_value: Value =
+        serde_json::from_str(&npc.memories_json).map_err(|_| CampaignStoreError::InvalidData)?;
+    let memories = memories_value
+        .as_array()
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let mut validated_memories = Vec::with_capacity(memories.len());
+    for memory in memories {
+        let record = memory.as_object().ok_or(CampaignStoreError::InvalidData)?;
+        if record.get("npcId").and_then(Value::as_str) != Some(npc_id) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        let summary = record
+            .get("summary")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::InvalidData)?;
+        validate_text(summary, 4_000)?;
+        validated_memories.push(summary.to_owned());
+    }
+    let authorized_memories = load_actor_memories(connection, campaign_id, npc_id)?;
+    let memory_source = if authorized_memories.is_empty() {
+        validated_memories
+    } else {
+        authorized_memories
+    };
+    let long_term_memories = memory_source
+        .into_iter()
+        .rev()
+        .take(8)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "worldSummary": world_summary,
+        "currentRegion": current_region,
+        "npc": {
+            "id": npc.view.id,
+            "name": npc.view.name,
+            "identity": npc.view.identity,
+            "personality": npc.view.personality,
+            "goal": npc.goal,
+            "currentMood": npc.view.current_mood,
+            "appearance": npc.view.appearance,
+            "secret": npc.secret,
+            "speechStyle": npc.speech_style,
+            "currentStatus": npc.current_status,
+        },
+        "relationship": relationship,
+        "knowledge": knowledge,
+        "recentMessages": recent_messages,
+        "longTermMemories": long_term_memories,
+    }))
+}
+
+fn load_actor_memories(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Vec<String>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT summary FROM knowledge_memories
+         WHERE campaign_id = ?1 AND actor_type = 'NPC' AND actor_id = ?2
+         ORDER BY created_at, id LIMIT 129",
+    )?;
+    let memories = statement
+        .query_map(params![campaign_id, npc_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    if memories.len() > 128
+        || memories
+            .iter()
+            .any(|summary| validate_text(summary, 4_000).is_err())
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(memories)
+}
+
+fn load_legacy_npc_knowledge_entries(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Vec<Value>, CampaignStoreError> {
     let (known, suspected, false_beliefs, excluded, provenance): (
         String,
         String,
@@ -371,64 +471,7 @@ fn load_generation_context(
         "BELIEVED",
         &mut used,
     )?);
-    let recent_messages = match conversation_id(connection, campaign_id, npc_id)? {
-        Some(id) => load_messages(connection, &id)?
-            .into_iter()
-            .rev()
-            .take(12)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .map(|message| json!({ "role": message.role, "content": message.content }))
-            .collect(),
-        None => Vec::new(),
-    };
-    let memories_value: Value =
-        serde_json::from_str(&npc.memories_json).map_err(|_| CampaignStoreError::InvalidData)?;
-    let memories = memories_value
-        .as_array()
-        .ok_or(CampaignStoreError::InvalidData)?;
-    let mut validated_memories = Vec::with_capacity(memories.len());
-    for memory in memories {
-        let record = memory.as_object().ok_or(CampaignStoreError::InvalidData)?;
-        if record.get("npcId").and_then(Value::as_str) != Some(npc_id) {
-            return Err(CampaignStoreError::InvalidData);
-        }
-        let summary = record
-            .get("summary")
-            .and_then(Value::as_str)
-            .ok_or(CampaignStoreError::InvalidData)?;
-        validate_text(summary, 4_000)?;
-        validated_memories.push(summary.to_owned());
-    }
-    let long_term_memories = validated_memories
-        .into_iter()
-        .rev()
-        .take(8)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<Vec<_>>();
-    Ok(json!({
-        "worldSummary": world_summary,
-        "currentRegion": current_region,
-        "npc": {
-            "id": npc.view.id,
-            "name": npc.view.name,
-            "identity": npc.view.identity,
-            "personality": npc.view.personality,
-            "goal": npc.goal,
-            "currentMood": npc.view.current_mood,
-            "appearance": npc.view.appearance,
-            "secret": npc.secret,
-            "speechStyle": npc.speech_style,
-            "currentStatus": npc.current_status,
-        },
-        "relationship": relationship,
-        "knowledge": knowledge,
-        "recentMessages": recent_messages,
-        "longTermMemories": long_term_memories,
-    }))
+    Ok(knowledge)
 }
 
 #[derive(Deserialize)]
@@ -745,6 +788,68 @@ fn knowledge_entries(
     Ok(entries)
 }
 
+fn load_actor_knowledge_entries(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT knowledge.target_kind, knowledge.knowledge_state,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.subject ELSE claims.subject END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.predicate ELSE claims.predicate END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.object_json ELSE claims.object_json END
+         FROM actor_knowledge AS knowledge
+         LEFT JOIN world_truths AS truths
+           ON knowledge.target_kind = 'TRUTH' AND truths.id = knowledge.truth_id
+              AND truths.campaign_id = knowledge.campaign_id
+         LEFT JOIN knowledge_claims AS claims
+           ON knowledge.target_kind = 'CLAIM' AND claims.id = knowledge.claim_id
+              AND claims.campaign_id = knowledge.campaign_id
+         WHERE knowledge.campaign_id = ?1 AND knowledge.actor_type = 'NPC'
+           AND knowledge.actor_id = ?2
+         ORDER BY knowledge.id LIMIT 101",
+    )?;
+    let rows = statement
+        .query_map(params![campaign_id, npc_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if rows.len() > 100 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    rows.into_iter()
+        .map(|(target_kind, state, subject, predicate, object_json)| {
+            if !matches!(target_kind.as_str(), "TRUTH" | "CLAIM")
+                || !matches!(state.as_str(), "KNOWN" | "SUSPECTED" | "BELIEVED")
+            {
+                return Err(CampaignStoreError::InvalidData);
+            }
+            let subject = subject.ok_or(CampaignStoreError::InvalidData)?;
+            let predicate = predicate.ok_or(CampaignStoreError::InvalidData)?;
+            validate_text(&subject, 256)?;
+            validate_text(&predicate, 128)?;
+            let object_json = object_json.ok_or(CampaignStoreError::InvalidData)?;
+            let object: Value =
+                serde_json::from_str(&object_json).map_err(|_| CampaignStoreError::InvalidData)?;
+            let object =
+                serde_json::to_string(&object).map_err(|_| CampaignStoreError::InvalidData)?;
+            let statement = format!("{subject} {predicate} {object}");
+            validate_text(&statement, 4_000)?;
+            Ok(json!({
+                "targetKind": target_kind,
+                "state": state,
+                "statement": statement,
+            }))
+        })
+        .collect()
+}
+
 fn id_list(value: &str) -> Result<Vec<String>, CampaignStoreError> {
     serde_json::from_str(value).map_err(|_| CampaignStoreError::InvalidData)
 }
@@ -1006,6 +1111,57 @@ mod tests {
             .expect("unchanged snapshot");
         assert_eq!(after.messages.len(), 2);
         assert_eq!(after.relationship.trust, 1);
+    }
+
+    #[test]
+    fn generic_actor_projection_replaces_legacy_fact_lists_without_secret_leakage() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_dialogue(&store);
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                "INSERT INTO world_truths (
+                   id, campaign_id, subject, predicate, object_json, authority, visibility,
+                   source_event_id, revision, created_at, updated_at
+                 ) VALUES (
+                   'truth-authorized', 'campaign-dialogue', 'sealed_route', 'opens_at',
+                   '\"moonrise\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'truth-ungranted', 'campaign-dialogue', 'royal_archive', 'contains',
+                   '\"the hidden succession\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO actor_knowledge (
+                   id, campaign_id, actor_type, actor_id, target_kind, truth_id, claim_id,
+                   knowledge_state, visibility, provenance_kind, provenance_source_id,
+                   provenance_event_id, learned_at, confidence, revision, updated_at
+                 ) VALUES (
+                   'knowledge-authorized', 'campaign-dialogue', 'NPC', 'npc-owner',
+                   'TRUTH', 'truth-authorized', NULL, 'KNOWN', 'ACTOR_PRIVATE',
+                   'LOCAL_RULE', 'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
+                   '2026-08-14T12:00:00.000Z'
+                 );",
+            )
+            .expect("seed actor projection");
+        drop(connection);
+
+        let snapshot = store
+            .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
+            .expect("project actor knowledge");
+        assert_eq!(
+            snapshot.generation_context["knowledge"],
+            json!([{
+                "targetKind": "TRUTH",
+                "state": "KNOWN",
+                "statement": "sealed_route opens_at \"moonrise\""
+            }])
+        );
+        let serialized = snapshot.generation_context.to_string();
+        assert!(!serialized.contains("hidden succession"));
+        assert!(!serialized.contains("cellar door is warm"));
     }
 
     #[test]

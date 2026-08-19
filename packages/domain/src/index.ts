@@ -41,6 +41,16 @@ export type {
   RulesEvaluationContext,
 } from './rules-engine.js';
 export {
+  KnowledgeBoundaryError,
+  knowledgeForPrompt,
+  projectActorKnowledge,
+} from './knowledge-boundary.js';
+export type {
+  ActorKnowledgeEntry,
+  ActorKnowledgeProjection,
+  PromptKnowledgeEntry,
+} from './knowledge-boundary.js';
+export {
   WorldConstitutionRuleError,
   assertConstitutionBinding,
   assertWorldConstitutionCompliance,

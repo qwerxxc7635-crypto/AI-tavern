@@ -125,6 +125,20 @@ describe('WorldTruth / Claim / Knowledge / Memory', () => {
 
   it('rejects invalid confidence, revisions, actors and duplicate memory sources', () => {
     expect(() =>
+      createWorldTruth({
+        id: worldTruthId('truth-ai-forbidden'),
+        campaignId: campaign,
+        subject: 'beacon',
+        predicate: 'is_lit',
+        object: true,
+        authority: 'AI' as never,
+        visibility: 'PUBLIC',
+        sourceEventId: null,
+        revision: 1,
+        createdAt: at,
+      }),
+    ).toThrow('authority');
+    expect(() =>
       createClaim({
         id: claimId('claim-invalid'),
         campaignId: campaign,
@@ -167,5 +181,17 @@ describe('WorldTruth / Claim / Knowledge / Memory', () => {
         createdAt: at,
       }),
     ).toThrow('duplicates');
+    expect(() =>
+      createMemory({
+        id: memoryId('memory-too-long'),
+        campaignId: campaign,
+        actor: { type: 'NPC', id: 'npc-keeper' },
+        summary: 'x'.repeat(4_001),
+        sourceKnowledgeIds: [knowledgeId('knowledge-one')],
+        sourceEventIds: [],
+        revision: 1,
+        createdAt: at,
+      }),
+    ).toThrow('summary');
   });
 });

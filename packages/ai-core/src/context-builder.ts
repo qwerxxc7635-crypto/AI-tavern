@@ -126,6 +126,11 @@ export interface NpcDialogueContextSource {
   readonly messages: readonly Message[];
   readonly memories: readonly NpcMemory[];
   readonly playerMessage: string;
+  readonly authorizedKnowledge?: readonly {
+    readonly targetKind: 'TRUTH' | 'CLAIM';
+    readonly state: 'KNOWN' | 'SUSPECTED' | 'BELIEVED';
+    readonly statement: string;
+  }[];
 }
 
 export interface AdventureContextSource {
@@ -206,11 +211,14 @@ export function buildNpcDialogueContext(
         } as const,
       ];
     });
-  const actorKnowledge = [
-    ...knowledgeEntries(source.knowledge.knownFactIds, 'KNOWN'),
-    ...knowledgeEntries(source.knowledge.suspectedFactIds, 'SUSPECTED'),
-    ...knowledgeEntries(source.knowledge.falseBeliefFactIds, 'BELIEVED'),
-  ];
+  const actorKnowledge =
+    source.authorizedKnowledge === undefined
+      ? [
+          ...knowledgeEntries(source.knowledge.knownFactIds, 'KNOWN'),
+          ...knowledgeEntries(source.knowledge.suspectedFactIds, 'SUSPECTED'),
+          ...knowledgeEntries(source.knowledge.falseBeliefFactIds, 'BELIEVED'),
+        ]
+      : source.authorizedKnowledge.map((entry) => ({ ...entry }));
   let recentMessages = takeNewest(
     source.messages
       .filter(

@@ -67,6 +67,13 @@ export { WorldConstitutionRepository } from './world-constitution-repository.js'
 export { WorldSeedRepository } from './world-seed-repository.js';
 export { RulesEngineRepository, RulesIdempotencyConflictError } from './rules-engine-repository.js';
 export type { CommitRulesCommand, RulesCommitResult } from './rules-engine-repository.js';
+export { KnowledgeBoundaryRepository } from './knowledge-boundary-repository.js';
+export type {
+  ForgetKnowledgeOnceInput,
+  KnowledgeCommitReceipt,
+  KnowledgeMutationIdentity,
+  SaveKnowledgeOnceInput,
+} from './knowledge-boundary-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';
 export { exportCampaignSave } from './save-export.js';

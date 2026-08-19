@@ -63,6 +63,11 @@ const migrations = [
     name: 'rules_engine',
     source: new URL('../../../database/migrations/0011_rules_engine.sql', import.meta.url),
   },
+  {
+    version: 12,
+    name: 'knowledge_boundary',
+    source: new URL('../../../database/migrations/0012_knowledge_boundary.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

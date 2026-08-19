@@ -1586,6 +1586,12 @@ fn adventure_npc_knowledge(
         .filter_map(|value| value.as_str().map(str::to_owned))
         .take(12)
     {
+        if let Some(knowledge) =
+            generic_adventure_actor_knowledge(connection, campaign_id, &npc_id)?
+        {
+            result.push(knowledge);
+            continue;
+        }
         let knowledge = connection
             .query_row(
                 "SELECT known_fact_ids_json, suspected_fact_ids_json,
@@ -1630,6 +1636,68 @@ fn adventure_npc_knowledge(
         }
     }
     Ok(result)
+}
+
+fn generic_adventure_actor_knowledge(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Option<Value>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT knowledge.knowledge_state,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.subject ELSE claims.subject END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.predicate ELSE claims.predicate END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.object_json ELSE claims.object_json END
+         FROM actor_knowledge AS knowledge
+         LEFT JOIN world_truths AS truths
+           ON knowledge.target_kind = 'TRUTH' AND truths.id = knowledge.truth_id
+              AND truths.campaign_id = knowledge.campaign_id
+         LEFT JOIN knowledge_claims AS claims
+           ON knowledge.target_kind = 'CLAIM' AND claims.id = knowledge.claim_id
+              AND claims.campaign_id = knowledge.campaign_id
+         WHERE knowledge.campaign_id = ?1 AND knowledge.actor_type = 'NPC'
+           AND knowledge.actor_id = ?2
+         ORDER BY knowledge.id LIMIT 101",
+    )?;
+    let rows = statement
+        .query_map(params![campaign_id, npc_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if rows.is_empty() {
+        return Ok(None);
+    }
+    if rows.len() > 100 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut known = Vec::new();
+    let mut suspected = Vec::new();
+    let mut believed = Vec::new();
+    for (state, subject, predicate, object_json) in rows {
+        let subject = subject.ok_or(CampaignStoreError::InvalidData)?;
+        let predicate = predicate.ok_or(CampaignStoreError::InvalidData)?;
+        let object: Value = from_json(object_json.ok_or(CampaignStoreError::InvalidData)?)?;
+        let object = serde_json::to_string(&object).map_err(|_| CampaignStoreError::InvalidData)?;
+        let value = format!("{subject} {predicate} {object}");
+        validate_text(&value, 4_000)?;
+        match state.as_str() {
+            "KNOWN" => known.push(value),
+            "SUSPECTED" => suspected.push(value),
+            "BELIEVED" => believed.push(value),
+            _ => return Err(CampaignStoreError::InvalidData),
+        }
+    }
+    Ok(Some(json!({
+        "npcId": npc_id,
+        "knownFacts": known,
+        "suspectedFacts": suspected,
+        "falseBeliefs": believed,
+    })))
 }
 
 fn fact_statements(
@@ -2684,6 +2752,80 @@ mod tests {
             raw_response_text: output.to_string(),
             validated_output: output,
         }
+    }
+
+    #[test]
+    fn multi_npc_adventure_projection_is_scoped_per_actor() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_adventure(&store);
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                "INSERT INTO npcs (
+                   id, campaign_id, tavern_id, residency, name, identity, appearance,
+                   personality, goal, secret, speech_style, current_mood, current_status,
+                   visit_json, memories_json, created_at, updated_at
+                 ) VALUES (
+                   'npc-scout', 'campaign-adventure', 'tavern-rest', 'RESIDENT', 'Tomas',
+                   'Scout', 'Gray cloak.', 'Cautious.', 'Map the coast.', 'Reef route.',
+                   'Short replies.', 'Alert', 'ACTIVE', NULL, '[]',
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO world_truths (
+                   id, campaign_id, subject, predicate, object_json, authority, visibility,
+                   source_event_id, revision, created_at, updated_at
+                 ) VALUES (
+                   'truth-owner-only', 'campaign-adventure', 'owner_route', 'opens_at',
+                   '\"moonrise\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'truth-scout-only', 'campaign-adventure', 'scout_route', 'crosses',
+                   '\"black reef\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'truth-ungranted-adventure', 'campaign-adventure', 'director_secret', 'is',
+                   '\"not actor knowledge\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO actor_knowledge (
+                   id, campaign_id, actor_type, actor_id, target_kind, truth_id, claim_id,
+                   knowledge_state, visibility, provenance_kind, provenance_source_id,
+                   provenance_event_id, learned_at, confidence, revision, updated_at
+                 ) VALUES (
+                   'knowledge-owner-only', 'campaign-adventure', 'NPC', 'npc-owner',
+                   'TRUTH', 'truth-owner-only', NULL, 'KNOWN', 'ACTOR_PRIVATE', 'LOCAL_RULE',
+                   'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
+                   '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'knowledge-scout-only', 'campaign-adventure', 'NPC', 'npc-scout',
+                   'TRUTH', 'truth-scout-only', NULL, 'KNOWN', 'ACTOR_PRIVATE', 'LOCAL_RULE',
+                   'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
+                   '2026-08-14T12:00:00.000Z'
+                 );",
+            )
+            .expect("seed multi actor knowledge");
+
+        let projection = adventure_npc_knowledge(
+            &connection,
+            "campaign-adventure",
+            &json!({ "relatedNpcIds": ["npc-owner", "npc-scout"] }),
+        )
+        .expect("project related actors");
+        assert_eq!(projection.len(), 2);
+        assert_eq!(
+            projection[0]["knownFacts"],
+            json!(["owner_route opens_at \"moonrise\""])
+        );
+        assert_eq!(
+            projection[1]["knownFacts"],
+            json!(["scout_route crosses \"black reef\""])
+        );
+        let serialized = serde_json::to_string(&projection).expect("serialize projection");
+        assert!(!serialized.contains("not actor knowledge"));
+        assert!(!projection[0].to_string().contains("black reef"));
+        assert!(!projection[1].to_string().contains("moonrise"));
     }
 
     fn seed_adventure(store: &CampaignStore) {

@@ -6,13 +6,16 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { FakeAIProvider, type ProviderConfig } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
+  aiOperationId,
   campaignId,
   characterTraitId,
   conversationId,
   createCampaign,
+  createKnowledge,
   createNpcKnowledge,
   createNpcRelationship,
   generationRecordId,
+  eventLedgerId,
   idempotencyKey,
   isoTimestamp,
   locationId,
@@ -24,6 +27,8 @@ import {
   tavernId,
   transitionCampaign,
   turnId,
+  worldTruthId,
+  knowledgeId,
   worldFactId,
   type NpcProfile,
   type PlayerCharacter,
@@ -34,6 +39,7 @@ import {
   CampaignRepository,
   ConversationRepository,
   GenerationRecordRepository,
+  KnowledgeBoundaryRepository,
   NpcRepository,
   PlayerCharacterRepository,
   TavernRepository,
@@ -97,6 +103,44 @@ describe('NpcDialogueUseCases', () => {
     const sqlite = adaptDatabase(database);
     try {
       const conversations = new ConversationRepository(sqlite);
+      const boundary = new KnowledgeBoundaryRepository(sqlite);
+      const truth = {
+        kind: 'WORLD_TRUTH' as const,
+        id: worldTruthId('truth-dialogue-cellar'),
+        campaignId: campaignKey,
+        subject: 'cellar',
+        predicate: 'has_door',
+        object: 'The cellar has an old door.',
+        authority: 'IMPORT' as const,
+        visibility: 'GAME_PRIVATE' as const,
+        sourceEventId: null,
+        revision: 1,
+        createdAt: at,
+      };
+      boundary.saveWorldTruth(truth, 0);
+      boundary.saveKnowledgeOnce({
+        knowledge: createKnowledge({
+          id: knowledgeId('knowledge-dialogue-cellar'),
+          campaignId: campaignKey,
+          actor: { type: 'NPC', id: npcKey },
+          target: { kind: 'TRUTH', truthId: truth.id },
+          state: 'KNOWN',
+          visibility: 'ACTOR_PRIVATE',
+          provenance: {
+            kind: 'IMPORT',
+            sourceId: 'dialogue-test-import',
+            eventId: null,
+            learnedAt: at,
+            confidence: 1,
+          },
+          revision: 1,
+        }),
+        expectedRevision: 0,
+        updatedAt: at,
+        operationId: aiOperationId('knowledge-dialogue-import'),
+        ledgerId: eventLedgerId('ledger-dialogue-import'),
+        source: 'IMPORT',
+      });
       for (let sequenceNumber = 3; sequenceNumber <= 62; sequenceNumber += 1) {
         const isPlayer = sequenceNumber % 2 === 1;
         conversations.addMessage({

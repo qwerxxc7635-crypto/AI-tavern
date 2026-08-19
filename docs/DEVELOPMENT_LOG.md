@@ -4062,3 +4062,24 @@
 - Node独立测试28项通过；其中既有`node:sqlite backup()`一致性测试在当前Node 26环境耗时约46秒，但最终正常退出且未被修改、跳过或降低断言。
 - 本地数据库schema已为11并可关闭重开。portable`.emtavern`仍保持v2且暂不包含规则状态/事件，跨语言格式升级严格留给M10-T05；不得将本地恢复能力表述为portable archive已覆盖。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，也不进入M4-T04。
+
+## 2026-08-19 — M4-T04 Knowledge Boundary
+
+### 四层持久模型与本地授权
+
+- 新增schema 12及`world_truths`、`knowledge_claims`、`actor_knowledge`、`knowledge_memories`；Truth只承认本地规则、用户接受、领域事务和导入authority，Claim/Memory不能反向创建Truth。
+- NPC与Player Character使用独立Actor Knowledge行；数据库与Repository共同验证Campaign、Actor、Truth/Claim目标、provenance Event和Memory来源，跨Campaign、跨Actor、缺失来源及revision跳跃均拒绝。
+- LEARN、UPDATE、FORGET使用expected revision、operation ID和event ledger原子提交；重放返回原提交，同operation不同payload或ledger碰撞完整回滚，遗忘保留不可变审计历史。
+- Domain投影按Campaign、Actor type和Actor ID精确筛选，保留Truth/Claim种类与Known/Suspected/Believed状态；秘密Truth只有显式授权才可见，多NPC Adventure逐Actor投影。
+- TypeScript NPC Dialogue和Windows原生NPC/Adventure路径优先使用通用授权投影；存在新授权行时不再拼接旧事实。尚未迁移的Actor只使用既有隔离验证后的`npc_knowledge`兼容回退。
+- migration 12保守转换旧Truth/Rumor/False Belief和NPC认知，不暴露传闻veracity；新增`docs/V0.3_KNOWLEDGE_BOUNDARY.md`与`DEC-120`固定模型、授权和迁移边界。
+
+### 验证与限制
+
+- 合同、Domain、Context Builder、Persistence和Application专项覆盖secret isolation、Claim/Truth区分、NPC/Player独立、learn/update/forget、provenance、幂等/rollback、SQLite重开、Memory及Prompt leakage。
+- 原生Windows专项覆盖通用Actor投影替换旧事实列表，以及多NPC场景不交叉传播Knowledge；本地数据库最新版同步为schema 12。
+- 安全复核补上Knowledge更新时的provenance Event归属检查，以及Memory引用不存在Knowledge的fail-closed约束；专项23项Vitest和10项迁移/启动测试通过。
+- 首次完整门禁仅由`rustfmt --check`发现原生Memory长度条件需要标准换行；执行`cargo fmt --all`后从头重跑。最终`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 112个文件/689项通过，另有1文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 108项通过、0失败，另有1项真实API测试默认忽略；Clippy与TypeScript/Rust archive互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建220个模块；知识授权接线未新增平行Provider、前端状态机或UI重构。
+- portable`.emtavern`仍保持v2且暂不包含四张通用知识表；完整历史fixture、跨语言导入导出及round-trip升级严格留给M10-T05，不把本地重开验收冒充portable save/import完成。
+- 本任务未修改Rules Engine、Provider、D20、Quest/NPC/Adventure业务语义，也未进入M5-T01；用户已有`.gitignore`修改保持未暂存。
