@@ -71,7 +71,9 @@ const RULES_ENGINE_MIGRATION: &str =
     include_str!("../../../database/migrations/0011_rules_engine.sql");
 const KNOWLEDGE_BOUNDARY_MIGRATION: &str =
     include_str!("../../../database/migrations/0012_knowledge_boundary.sql");
-const LATEST_SCHEMA_VERSION: i64 = 12;
+const UNIVERSAL_CHARACTER_MIGRATION: &str =
+    include_str!("../../../database/migrations/0013_universal_character.sql");
+const LATEST_SCHEMA_VERSION: i64 = 13;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -530,6 +532,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (10_i64, "world_seed", WORLD_SEED_MIGRATION),
         (11_i64, "rules_engine", RULES_ENGINE_MIGRATION),
         (12_i64, "knowledge_boundary", KNOWLEDGE_BOUNDARY_MIGRATION),
+        (13_i64, "universal_character", UNIVERSAL_CHARACTER_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

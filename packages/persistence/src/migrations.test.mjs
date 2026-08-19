@@ -15,6 +15,7 @@ const coreTables = [
   'ai_candidates',
   'app_settings',
   'campaigns',
+  'character_extension_definitions',
   'character_rule_states',
   'conversations',
   'credential_cleanup_queue',
@@ -37,6 +38,7 @@ const coreTables = [
   'save_snapshots',
   'scene_frames',
   'taverns',
+  'universal_character_profiles',
   'world_bibles',
   'world_clocks',
   'world_constitutions',
@@ -180,6 +182,78 @@ test('backfills rules state from schema 10 characters and keeps base attributes 
         .prepare('UPDATE character_rule_states SET base_attributes_json = ?')
         .run('{"physique":4,"agility":2,"knowledge":2,"charisma":2}'),
     );
+    const universal = database
+      .prepare(
+        `SELECT schema_version, revision, profile_json
+         FROM universal_character_profiles
+         WHERE player_character_id = 'character-rules-backfill'`,
+      )
+      .get();
+    assert.equal(universal.schema_version, 1);
+    assert.equal(universal.revision, 1);
+    assert.deepEqual(JSON.parse(universal.profile_json), {
+      kind: 'UNIVERSAL_CHARACTER_PROFILE',
+      schemaVersion: 1,
+      revision: 1,
+      id: 'character-rules-backfill',
+      campaignId: 'campaign-rules-backfill',
+      name: 'Hero',
+      nickname: null,
+      gender: null,
+      age: null,
+      identity: 'Test',
+      ancestry: null,
+      birthplace: 'A',
+      socialClass: null,
+      faith: null,
+      appearance: '',
+      personality: '',
+      values: [],
+      goals: ['Verify'],
+      fears: [],
+      secrets: ['D'],
+      family: [],
+      education: [],
+      importantPeople: ['E'],
+      enemies: [],
+      experiences: ['B'],
+      concept: 'Test',
+      storyPreferences: [],
+      contentBoundaries: {
+        allowHorror: true,
+        allowPermanentDeath: false,
+        allowRomance: false,
+        allowBetrayal: true,
+        excludedContent: [],
+      },
+      career: { id: null, displayName: 'Scholar', legacyArchetype: 'SCHOLAR' },
+      attributes: { physique: 3, agility: 2, knowledge: 3, charisma: 2 },
+      derivedAttributes: [],
+      skills: [],
+      proficiencies: [],
+      abilities: [],
+      languages: [],
+      wealth: 0,
+      equipmentIds: [],
+      reputations: [],
+      relationships: [],
+      traits: [
+        { id: 'trait-one', name: 'One', description: 'One' },
+        { id: 'trait-two', name: 'Two', description: 'Two' },
+      ],
+      statuses: [],
+      legacyBackground: {
+        birthplace: 'A',
+        formativeExperience: 'B',
+        adventureMotivation: 'C',
+        secret: 'D',
+        importantPerson: 'E',
+        tavernArrivalReason: 'F',
+      },
+      extensions: [],
+      createdAt: '2026-08-14T00:00:00.000Z',
+      updatedAt: '2026-08-14T00:00:00.000Z',
+    });
     assert.throws(() =>
       database
         .prepare('UPDATE player_characters SET attributes_json = ?')
@@ -317,7 +391,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      12,
+      13,
     );
     const importedKnowledge = database
       .prepare(

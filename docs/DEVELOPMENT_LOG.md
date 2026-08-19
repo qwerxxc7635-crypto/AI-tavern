@@ -4083,3 +4083,25 @@
 - `pnpm --dir windows-app build`通过，Vite production构建220个模块；知识授权接线未新增平行Provider、前端状态机或UI重构。
 - portable`.emtavern`仍保持v2且暂不包含四张通用知识表；完整历史fixture、跨语言导入导出及round-trip升级严格留给M10-T05，不把本地重开验收冒充portable save/import完成。
 - 本任务未修改Rules Engine、Provider、D20、Quest/NPC/Adventure业务语义，也未进入M5-T01；用户已有`.gitignore`修改保持未暂存。
+
+## 2026-08-19 — M5-T01 Universal Character Schema
+
+### 通用合同、世界扩展与兼容迁移
+
+- 新增version 1 `UniversalCharacterProfile`，覆盖规格要求的身份、叙事、职业、属性、技能、熟练、能力、语言、财富、装备、声望、关系、Trait、状态和扩展字段；集合、文本、数字及嵌套资源均有硬上限。
+- 新增version 1 `WorldCharacterExtensionDefinition`，以namespace和TEXT/INTEGER/NUMBER/BOOLEAN/ENUM/TEXT_LIST字段描述世界差异；定义必须绑定同Campaign已锁定Constitution revision。
+- 修仙fixture验证灵根/境界/宗门，调查fixture验证理智/幸运/信用，Cyberpunk fixture验证义体/神经负荷/街头声望；三者都通过同一通用合同，不进入核心硬编码字段。
+- 未知namespace、schema version、字段、required缺失、枚举/数值/文本边界和过量资源明确拒绝；不静默丢弃未知扩展。
+- 新增migration 13、`universal_character_profiles`与`character_extension_definitions`。旧`player_characters`保留并保守回填通用档案；旧写入口同步兼容字段但不覆盖昵称、外貌等V0.3-only内容，可无损投影的Profile更新也在同一事务镜像旧行。
+- 基础属性、技能名、财富与状态继续以M4-T03 `character_rule_states`为authority；Profile写入必须匹配当前规则投影，规则状态更新trigger同步投影并推进Profile revision，不能借通用档案直接改钱或状态。
+- V0.2投影保留旧姓名、概念、偏好、内容边界、职业、属性、两项Trait、目标、背景、装备和时间戳；零/多Trait或无旧原型Career无法无损表示时明确拒绝。
+- 新增`docs/V0.3_UNIVERSAL_CHARACTER_SCHEMA.md`与`DEC-121`，固定合同、Constitution绑定、兼容与阶段边界。
+
+### 验证与限制
+
+- 合同与Repository定向11项通过，覆盖三世界fixture、schema version、资源上限、未知扩展、V0.2投影、revision/rollback、基础属性不可变、双向兼容同步、SQLite重开与round-trip。
+- migration/database startup定向10项通过，schema 10旧角色经11～13连续升级后完整回填；原生`ember-native-bridge` 63项通过，证明schema 13未破坏既有Windows纵向切片。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 114个文件/700项通过，另有1文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 108项通过、0失败，另有1项真实API测试默认忽略；Clippy、rustfmt与TypeScript/Rust archive互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建221个模块；通用角色合同进入共享bundle，但本任务未新增或迁移玩家UI。
+- portable`.emtavern`仍为v2且暂不导出完整通用档案/扩展定义；跨语言格式升级、历史fixture和portable round-trip严格留给M10-T05，不把本地重开冒充portable存档覆盖。
+- 本任务未实现M5-T02及后续UI、AI字段生成、Trait点数或Career Pool；用户已有`.gitignore`修改保持未暂存。

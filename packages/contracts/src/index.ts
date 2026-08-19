@@ -147,6 +147,27 @@ export {
   AttributeAllocationError,
   createPlayerAttributes,
 } from './character.js';
+export {
+  CHARACTER_EXTENSION_FIELD_TYPES,
+  UNIVERSAL_CHARACTER_SCHEMA_VERSION,
+  WORLD_CHARACTER_EXTENSION_SCHEMA_VERSION,
+  UniversalCharacterError,
+  createUniversalCharacterProfile,
+  createWorldCharacterExtensionDefinition,
+  projectUniversalCharacterToV02,
+  validateCharacterExtensionValues,
+} from './universal-character.js';
+export type {
+  CharacterExtensionFieldDefinition,
+  CharacterExtensionFieldType,
+  CharacterExtensionValueSet,
+  CharacterRelationshipSummary,
+  CharacterReputation,
+  NamedCharacterValue,
+  UniversalCharacterCareer,
+  UniversalCharacterProfile,
+  WorldCharacterExtensionDefinition,
+} from './universal-character.js';
 export type {
   CharacterAttributeName,
   CharacterBackground,

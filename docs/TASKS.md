@@ -233,7 +233,7 @@
 
 ## M5-T01 Universal Character Schema
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M4-T04。
 - **Deliverable**：通用角色合同、世界扩展定义、V0.2 兼容投影与存储迁移。
 - **Acceptance**：规格字段可表达；修仙/调查/Cyberpunk 扩展示例可验证；未知扩展安全保留或明确拒绝。

@@ -2508,3 +2508,27 @@ NPC Dialogue和多NPC Adventure只读取Campaign与Actor精确匹配的授权投
 - `SHARED`不自动广播；传播必须由后续显式领域事务为接收Actor创建Knowledge并记录provenance。
 - 本地schema 12支持关闭重开；portable`.emtavern`仍为v2且尚不携带四张通用知识表，完整导入导出升级严格留给M10-T05。
 - M4-T04不改变Provider、Rules Engine、D20、Quest/NPC/Adventure业务合同，也不提前进入M5。
+
+## DEC-121：通用角色以兼容扩展档案演进而不改写V0.2根合同
+
+- 日期：2026-08-19
+- 状态：已采纳
+- 依据：`M5-T01`、`docs/V0.3_SPEC.md` 10.1节
+
+### 背景
+
+V0.2 `PlayerCharacter`已被角色创建、Rules Engine、Quest、NPC Dialogue、Windows原生桥接和portable archive共同依赖，且固定两项Trait与四种职业原型。直接向该接口追加全部V0.3字段会迫使已完成纵向切片同时重构；为修仙、调查和Cyberpunk分别加核心列又会把世界差异固化成不可扩展闭集。只保存任意JSON则无法证明字段版本、资源上限、Constitution约束或未知数据处理。
+
+### 决定与理由
+
+schema 13新增一对一`universal_character_profiles`和Campaign级`character_extension_definitions`。通用档案完整表达角色共有字段，以原`player_characters`身份为根；世界字段由版本1定义声明TEXT、INTEGER、NUMBER、BOOLEAN、ENUM或TEXT_LIST及其边界，并必须绑定同Campaign已锁定的World Constitution revision。
+
+migration保守回填旧角色，旧表继续作为V0.2兼容面。显式投影在两项Trait和旧职业原型可表达时生成原合同；不能无损表示时拒绝，而不截断或伪造。未知namespace、版本、字段、缺失required值和越界数据全部fail closed。
+
+### 影响与边界
+
+- M4-T03继续是属性与数值状态authority；Universal Profile不能修改基础属性，技能名/财富/状态必须与`character_rule_states`投影一致并由规则更新trigger同步，也不从AI内容直接写规则状态。
+- 旧PlayerCharacter写入口由trigger同步兼容字段，同时保留V0.3-only字段；可无损投影的Profile更新也在同一事务镜像旧行，不兼容档案不覆盖旧兼容面。M5-T02后续在此合同上建立草稿/确认流程，不另建角色真相体系。
+- 三类世界fixture证明扩展机制，不代表核心类型只支持这三种世界；新世界复用同一定义合同。
+- 本地schema 13可关闭重开。portable`.emtavern` v2尚不携带完整通用档案与扩展定义，统一格式迁移留给M10-T05。
+- M5-T01不提前实现Quick/Advanced UI、AI Everywhere、Trait点数、Career Pool或后续实体生成。
