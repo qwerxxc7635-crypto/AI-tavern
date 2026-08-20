@@ -1,0 +1,253 @@
+// @vitest-environment jsdom
+
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+
+import {
+  campaignId,
+  characterTraitId,
+  createCharacterCreationSession,
+  createUniversalCharacterDraft,
+  createWorldCharacterExtensionDefinition,
+  generationRecordId,
+  isoTimestamp,
+  playerCharacterId,
+  stageQuickCharacterDraft,
+  type CharacterCreationSession,
+} from '@ember-tavern/contracts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { CharacterCreationPage } from './universal-character-creation-page.js';
+import type { UniversalCharacterCreationSnapshot } from './universal-character-creation-service.js';
+
+const campaignKey = campaignId('campaign-page-v3');
+const characterKey = playerCharacterId('character-page-v3');
+const at = isoTimestamp('2026-08-20T03:00:00.000Z');
+const definition = createWorldCharacterExtensionDefinition({
+  schemaVersion: 1,
+  campaignId: campaignKey,
+  namespace: 'investigation',
+  displayName: '调查世界字段',
+  constitutionRevision: 1,
+  fields: [
+    { key: 'sanity', label: '理智', required: true, type: 'INTEGER', minimum: 0, maximum: 100 },
+  ],
+  revision: 1,
+  createdAt: at,
+  updatedAt: at,
+});
+
+afterEach(() => {
+  cleanup();
+});
+
+describe('Universal Character Creation page', () => {
+  it('starts Quick from one concept and exposes generation without writing formal facts', async () => {
+    const empty = snapshot(null);
+    const active = snapshot(session('QUICK', 'ACTIVE'));
+    const service = actions(empty);
+    service.start.mockResolvedValue(active);
+    renderPage(service);
+
+    expect(await screen.findByText('写下一位会在这个世界里活起来的人。')).toBeDefined();
+    fireEvent.change(screen.getByLabelText('一句话角色概念'), {
+      target: { value: '追查失踪导师的落魄调查员' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: '开始创建' }));
+
+    await waitFor(() => expect(service.start).toHaveBeenCalledOnce());
+    expect(service.start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        campaignId: campaignKey,
+        mode: 'QUICK',
+        conceptInput: '追查失踪导师的落魄调查员',
+      }),
+    );
+    expect(
+      (await screen.findByRole('button', { name: '命运编织完整角色' })).hasAttribute('disabled'),
+    ).toBe(false);
+    expect(screen.getByText(/确认前不会创建正式角色事实/)).toBeDefined();
+  });
+
+  it('renders all universal groups and dynamic fields in Advanced, then saves before preparing', async () => {
+    const activeSession = session('ADVANCED', 'ACTIVE');
+    const savedSession = { ...activeSession, revision: 2 };
+    const active = snapshot(activeSession);
+    const saved = snapshot(savedSession);
+    const ready = snapshot({ ...savedSession, status: 'READY_TO_CONFIRM', revision: 3 });
+    const service = actions(active);
+    service.saveDraft.mockResolvedValue(saved);
+    service.prepareAdvanced.mockResolvedValue(ready);
+    renderPage(service);
+
+    expect(await screen.findByText('每一项都仍是可恢复的草稿。')).toBeDefined();
+    for (const field of [
+      'name',
+      'identity',
+      'appearance',
+      'personality',
+      'values',
+      'goals',
+      'fears',
+      'family',
+      'education',
+      'importantPeople',
+      'enemies',
+      'experiences',
+      'career.legacyArchetype',
+      'attributes.physique',
+      'proficiencies',
+      'abilities',
+      'languages',
+      'traits.0',
+      'legacyBackground.formativeExperience',
+      'contentBoundaries',
+      'extensions.investigation.sanity',
+    ]) {
+      expect(document.querySelector(`[data-character-field="${field}"]`)).not.toBeNull();
+    }
+    fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '米拉·维尔' } });
+    fireEvent.click(screen.getByRole('button', { name: '校验完整车卡' }));
+
+    await waitFor(() => expect(service.saveDraft).toHaveBeenCalledOnce());
+    expect(service.saveDraft.mock.calls[0]?.[1]).toMatchObject({ name: '米拉·维尔' });
+    expect(service.prepareAdvanced).toHaveBeenCalledWith(saved);
+    expect(await screen.findByText('角色已通过本地完整性校验。')).toBeDefined();
+    expect(screen.getByRole('button', { name: '确认角色' }).hasAttribute('disabled')).toBe(false);
+
+    fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '尚未保存的新名字' } });
+    expect(screen.getByRole('button', { name: '确认角色' }).hasAttribute('disabled')).toBe(true);
+    expect(service.confirm).not.toHaveBeenCalled();
+  });
+});
+
+function renderPage(service: ReturnType<typeof actions>) {
+  return render(
+    <MemoryRouter initialEntries={[`/character/create?campaignId=${campaignKey}`]}>
+      <Routes>
+        <Route path="/character/create" element={<CharacterCreationPage service={service} />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+function actions(initial: UniversalCharacterCreationSnapshot) {
+  return {
+    load: vi.fn().mockResolvedValue(initial),
+    start: vi.fn(),
+    saveDraft: vi.fn(),
+    switchMode: vi.fn(),
+    prepareAdvanced: vi.fn(),
+    generateQuick: vi.fn(),
+    cancel: vi.fn(),
+    resume: vi.fn(),
+    confirm: vi.fn(),
+  };
+}
+
+function snapshot(
+  sessionValue: CharacterCreationSession | null,
+): UniversalCharacterCreationSnapshot {
+  return {
+    campaignState: 'CREATING_CHARACTER',
+    constitution: {},
+    extensionDefinitions: [definition],
+    session: sessionValue,
+  };
+}
+
+function session(mode: 'QUICK' | 'ADVANCED', status: 'ACTIVE' | 'READY_TO_CONFIRM') {
+  const draft = completeDraft();
+  const created = createCharacterCreationSession(
+    {
+      id: `session-page-${mode.toLowerCase()}`,
+      campaignId: campaignKey,
+      characterId: characterKey,
+      constitutionRevision: 1,
+      mode,
+      conceptInput: mode === 'QUICK' ? '追查失踪导师的调查员' : null,
+      draft,
+      createdAt: at,
+    },
+    [definition],
+  );
+  return status === 'ACTIVE'
+    ? created
+    : stageQuickCharacterDraft(
+        { ...created, mode: 'QUICK', conceptInput: '追查失踪导师的调查员' },
+        draft,
+        generationRecordId('generation-page-v3'),
+        [definition],
+        isoTimestamp('2026-08-20T03:01:00.000Z'),
+      );
+}
+
+function completeDraft() {
+  return createUniversalCharacterDraft({
+    schemaVersion: 1,
+    id: characterKey,
+    campaignId: campaignKey,
+    name: 'Mira Vale',
+    nickname: null,
+    gender: null,
+    age: 27,
+    identity: 'A disgraced investigator.',
+    ancestry: 'Human',
+    birthplace: 'Ash Harbor',
+    socialClass: 'Former guild member',
+    faith: null,
+    appearance: 'A dark travel coat and a brass compass.',
+    personality: 'Patient and unable to ignore contradictions.',
+    values: ['Truth'],
+    goals: ['Find the missing mentor'],
+    fears: ['Following another false trail'],
+    secrets: ['The compass answers to her blood'],
+    family: ['The Vale household'],
+    education: ['Harbor Academy'],
+    importantPeople: ['Professor Aven'],
+    enemies: ['The Ash Cartographer'],
+    experiences: ['Survived a skyquake'],
+    concept: 'A world-walking investigator.',
+    storyPreferences: ['Mystery'],
+    contentBoundaries: {
+      allowHorror: true,
+      allowPermanentDeath: false,
+      allowRomance: true,
+      allowBetrayal: true,
+      excludedContent: [],
+    },
+    career: { id: null, displayName: 'World Walker', legacyArchetype: 'SCHOLAR' },
+    attributes: { physique: 1, agility: 3, knowledge: 4, charisma: 2 },
+    derivedAttributes: [],
+    skills: [],
+    proficiencies: ['Cartography'],
+    abilities: ['Read the road'],
+    languages: ['Common'],
+    wealth: 0,
+    equipmentIds: [],
+    reputations: [],
+    relationships: [],
+    traits: [
+      {
+        id: characterTraitId('trait-page-observant'),
+        name: 'Observant',
+        description: 'Notices small inconsistencies.',
+      },
+      {
+        id: characterTraitId('trait-page-restless'),
+        name: 'Restless',
+        description: 'Cannot leave a mystery alone.',
+      },
+    ],
+    statuses: [],
+    legacyBackground: {
+      birthplace: 'Ash Harbor',
+      formativeExperience: 'Survived a skyquake while mapping the north road.',
+      adventureMotivation: 'Find the missing mentor.',
+      secret: 'The compass answers to her blood.',
+      importantPerson: 'Professor Aven',
+      tavernArrivalReason: 'The compass points beneath Ember Rest.',
+    },
+    extensions: [{ namespace: 'investigation', schemaVersion: 1, values: { sanity: 63 } }],
+  });
+}

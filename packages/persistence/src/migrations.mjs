@@ -73,6 +73,14 @@ const migrations = [
     name: 'universal_character',
     source: new URL('../../../database/migrations/0013_universal_character.sql', import.meta.url),
   },
+  {
+    version: 14,
+    name: 'character_creation_sessions',
+    source: new URL(
+      '../../../database/migrations/0014_character_creation_sessions.sql',
+      import.meta.url,
+    ),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

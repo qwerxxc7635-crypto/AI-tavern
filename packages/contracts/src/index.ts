@@ -155,7 +155,9 @@ export {
   createUniversalCharacterProfile,
   createWorldCharacterExtensionDefinition,
   projectUniversalCharacterToV02,
+  validateCharacterExtensionDraftValues,
   validateCharacterExtensionValues,
+  validateCompleteCharacterExtensionValues,
 } from './universal-character.js';
 export type {
   CharacterExtensionFieldDefinition,
@@ -168,6 +170,34 @@ export type {
   UniversalCharacterProfile,
   WorldCharacterExtensionDefinition,
 } from './universal-character.js';
+export {
+  CHARACTER_CREATION_MODES,
+  CHARACTER_CREATION_SESSION_SCHEMA_VERSION,
+  CHARACTER_CREATION_STATUSES,
+  CharacterCreationSessionError,
+  cancelCharacterCreationSession,
+  createCharacterCreationSession,
+  createUniversalCharacterDraft,
+  markCharacterCreationConfirmed,
+  materializeUniversalCharacterProfile,
+  parseCharacterCreationSession,
+  parseUniversalCharacterDraft,
+  prepareAdvancedCharacterDraft,
+  restoreCharacterCreationSession,
+  resumeCharacterCreationSession,
+  saveCharacterCreationDraft,
+  stageQuickCharacterDraft,
+  switchCharacterCreationMode,
+  validateCharacterLockedFields,
+  UNIVERSAL_CHARACTER_DRAFT_KEYS,
+} from './character-creation-session.js';
+export type {
+  CharacterCreationMode,
+  CharacterCreationSession,
+  CharacterCreationStatus,
+  CreateCharacterCreationSessionInput,
+  UniversalCharacterDraft,
+} from './character-creation-session.js';
 export type {
   CharacterAttributeName,
   CharacterBackground,

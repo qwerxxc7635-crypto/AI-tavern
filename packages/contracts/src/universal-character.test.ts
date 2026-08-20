@@ -10,6 +10,7 @@ import {
   playerCharacterId,
   projectUniversalCharacterToV02,
   validateCharacterExtensionValues,
+  validateCompleteCharacterExtensionValues,
   type CharacterExtensionFieldDefinition,
   type JsonValue,
   type UniversalCharacterProfile,
@@ -90,6 +91,20 @@ describe('Universal Character Schema', () => {
       initialEquipment: [{ itemId: 'item-lantern' }],
     });
     expect(projected.traits).toHaveLength(2);
+  });
+
+  it('keeps legacy profiles readable while requiring declared extensions for new confirmation', () => {
+    const campaign = campaignId('campaign-extension-compatibility');
+    const definition = extension(campaign, worldFixtures[1]);
+    const profile = createUniversalCharacterProfile({
+      ...character(campaign, 'investigation', { sanity: 70, luck: 50, credit: 25 }),
+      extensions: [],
+    });
+
+    expect(() => validateCharacterExtensionValues(profile, [definition])).not.toThrow();
+    expect(() => validateCompleteCharacterExtensionValues(profile, [definition])).toThrow(
+      'Missing field investigation.sanity',
+    );
   });
 
   it('rejects unknown extension namespaces, versions, fields and values outside definitions', () => {

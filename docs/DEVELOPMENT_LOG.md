@@ -4105,3 +4105,26 @@
 - `pnpm --dir windows-app build`通过，Vite production构建221个模块；通用角色合同进入共享bundle，但本任务未新增或迁移玩家UI。
 - portable`.emtavern`仍为v2且暂不导出完整通用档案/扩展定义；跨语言格式升级、历史fixture和portable round-trip严格留给M10-T05，不把本地重开冒充portable存档覆盖。
 - 本任务未实现M5-T02及后续UI、AI字段生成、Trait点数或Career Pool；用户已有`.gitignore`修改保持未暂存。
+
+## 2026-08-20 — M5-T02 Quick / Advanced Creation
+
+### 共享草稿、两种模式与正式事实门禁
+
+- 新增version 1 `CharacterCreationSession`与`UniversalCharacterDraft`，以`ACTIVE`、`READY_TO_CONFIRM`、`CANCELLED`、`CONFIRMED`状态统一Quick/Advanced、锁定字段、取消恢复、revision和确认语义；草稿和页面状态都不是正式角色事实。
+- schema 14新增`character_creation_sessions`及Campaign/Character/Constitution绑定、revision、状态迁移、已确认不可变和恢复保留trigger。Native普通保存使用服务端时间戳且不能伪造Quick generation provenance。
+- Quick通过统一`GENERATE_QUICK_CHARACTER`任务读取一句概念、故事偏好、内容边界、锁定Constitution和世界扩展定义；Provider只返回叙事字段、唯一属性优先级、两项当前阶段叙事特质和扩展值。属性4/3/2/1、Trait ID、财富/状态/装备等规则初值全部由本地建立。
+- Advanced呈现通用叙事字段、当前兼容职业/属性、内容边界和动态扩展字段；Rules/entity-owned初始字段只读。完整性校验要求叙事、目标、当前两项Trait、职业映射、属性总和及required扩展合法，不从文本反解析数值。
+- 模式切换、保存和Quick重生保持已锁字段；取消后SQLite保留草稿，重开可恢复。已通过校验的候选发生未保存页面编辑时禁用确认，不能误写旧持久版本。
+- 确认以单一SQLite事务写V0.2兼容角色、既有trigger建立的规则初态和V0.3-only通用档案字段，随后确认会话并推进Campaign到`GENERATING_TAVERN`；失败完整回滚，匹配revision的重复确认幂等。
+- 新Windows页面复用既有角色创建布局、Design Token和交互类，AI以“命运编织”表达；锁定控件和字段输入拆分独立可访问标签。未创建第二套Primitive/Game Component，也未提前迁移Legacy UI。
+- 新增`docs/V0.3_CHARACTER_CREATION.md`与`DEC-122`。本任务只保留当前两项叙事Trait和V0.2职业映射，不实现M5-T03字段AI、M5-T04点数、M5-T05平衡或M6实体生成。
+
+### 回归、自审与限制
+
+- 定向合同、AI schema/prompt、页面/服务、Repository和Native测试覆盖Quick、Advanced、mode switch、locked preservation、required扩展、invalid output、cancel/resume、save/reopen、revision/provenance伪造、确认rollback/幂等与未保存编辑门禁。
+- 完整门禁首次发现格式、玩家可见英语和新增required namespace校验对既有档案兼容读取的回归；分别修正格式/中文文案，并拆分“既有档案兼容校验”与“新角色确认完整校验”，未放宽新角色required要求。随后从头复验通过。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 118个文件/717项通过，另有1文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 110项通过、0失败，另有1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建221个模块；新增角色创建页面独立lazy chunk成功产出。
+- 本地数据库最新版为schema 14并支持关闭重开。portable`.emtavern`仍为v2且尚不包含完整通用档案、扩展定义或创建会话；跨语言格式升级、历史fixture与portable round-trip严格留给M10-T05。
+- 已复核视觉手册附件与`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`内容及SHA-256完全一致；规格、任务、决策、视觉债务和M10-T07收敛门禁均已持久化，无需重复建立UI重构体系。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，也不进入M5-T03。

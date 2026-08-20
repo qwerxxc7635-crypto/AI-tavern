@@ -50,6 +50,11 @@ export const TASK_PROMPTS = Object.freeze({
     'Complete a grounded character background that connects the existing concept, goal, and traits without changing them. Also provide one to four narrative initial equipment names and descriptions; the program assigns all mechanical effects.',
     2,
   ),
+  GENERATE_QUICK_CHARACTER: define(
+    'GENERATE_QUICK_CHARACTER',
+    'WORLD_DESIGNER',
+    'Turn the single player concept into one complete editable character that obeys the locked World Constitution, player boundaries, and every supplied extension definition. Return narrative content and a unique attribute priority only; never assign money, status, derived values, equipment IDs, or mechanical bonuses. Use exactly two distinct narrative Traits for the current compatibility stage, fill every required extension field, and do not invent extension namespaces or keys.',
+  ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
     'WORLD_DESIGNER',

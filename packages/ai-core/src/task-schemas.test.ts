@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AI_TASKS, AI_TASK_SCHEMAS, type AITask } from './index.js';
+import { AI_TASKS, AI_TASK_SCHEMAS, FAKE_TASK_OUTPUTS, type AITask } from './index.js';
 
 const boundaries = {
   allowHorror: true,
@@ -158,6 +158,16 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
         { name: 'Trail Compass', description: 'A compass marked with caravan routes.' },
       ],
     },
+  },
+  GENERATE_QUICK_CHARACTER: {
+    input: {
+      concept: 'A world-walking scholar.',
+      storyPreferences: ['Exploration'],
+      contentBoundaries: boundaries,
+      constitution,
+      extensionDefinitions: [],
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_QUICK_CHARACTER,
   },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },

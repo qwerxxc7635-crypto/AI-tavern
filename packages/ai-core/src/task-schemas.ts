@@ -281,6 +281,136 @@ export const CompleteCharacterBackgroundOutputSchema = z
   })
   .strict();
 
+const quickExtensionField = z.discriminatedUnion('type', [
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('TEXT'),
+      maxLength: z.number().int().min(1).max(4_000),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.enum(['INTEGER', 'NUMBER']),
+      minimum: z.number().finite(),
+      maximum: z.number().finite(),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('BOOLEAN'),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('ENUM'),
+      options: z.array(shortText).min(2).max(64),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('TEXT_LIST'),
+      maxItems: z.number().int().min(1).max(128),
+      itemMaxLength: z.number().int().min(1).max(4_000),
+    })
+    .strict(),
+]);
+
+export const GenerateQuickCharacterInputSchema = z
+  .object({
+    concept: text,
+    storyPreferences: stringList,
+    contentBoundaries,
+    constitution: WorldConstitutionOutputSchema,
+    extensionDefinitions: z
+      .array(
+        z
+          .object({
+            namespace: identifier,
+            displayName: shortText,
+            schemaVersion: z.literal(1),
+            fields: z.array(quickExtensionField).min(1).max(32),
+          })
+          .strict(),
+      )
+      .max(16),
+  })
+  .strict();
+
+export const GenerateQuickCharacterOutputSchema = z
+  .object({
+    name: shortText,
+    nickname: shortText.nullable(),
+    gender: shortText.nullable(),
+    age: z.number().int().min(0).max(10_000).nullable(),
+    identity: text,
+    ancestry: shortText.nullable(),
+    birthplace: shortText.nullable(),
+    socialClass: shortText.nullable(),
+    faith: shortText.nullable(),
+    appearance: text,
+    personality: text,
+    values: stringList,
+    goals: stringList.min(1),
+    fears: stringList,
+    secrets: stringList,
+    family: stringList,
+    education: stringList,
+    importantPeople: stringList,
+    enemies: stringList,
+    experiences: stringList,
+    career: z
+      .object({
+        displayName: shortText,
+        legacyArchetype: z.enum(['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT']),
+      })
+      .strict(),
+    attributePriority: z
+      .array(attribute)
+      .length(4)
+      .refine((values) => new Set(values).size === 4, 'Attribute priority must be unique'),
+    proficiencies: stringList,
+    abilities: stringList,
+    languages: stringList,
+    traits: z.tuple([traitDraft, traitDraft]),
+    legacyBackground: z
+      .object({
+        birthplace: text,
+        formativeExperience: text,
+        adventureMotivation: text,
+        secret: text,
+        importantPerson: text,
+        tavernArrivalReason: text,
+      })
+      .strict(),
+    extensions: z
+      .array(
+        z
+          .object({
+            namespace: identifier,
+            schemaVersion: z.literal(1),
+            values: z.record(z.string(), jsonValueSchema),
+          })
+          .strict(),
+      )
+      .max(16),
+  })
+  .strict();
+
 export const GenerateTavernInputSchema = z
   .object({ world: worldContext, playerConcept: text, desiredPosition: shortText.nullable() })
   .strict();

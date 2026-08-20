@@ -6,3 +6,4 @@ Versioned SQLite migrations live in this directory and are applied in numeric or
 - `0011_rules_engine.sql`: versioned character rule state plus immutable, idempotent rules audit events.
 - `0012_knowledge_boundary.sql`: separate World Truth, Claim, actor-scoped Knowledge, provenance, and subjective Memory records.
 - `0013_universal_character.sql`: versioned universal character profiles and Constitution-bound world extension definitions with V0.2 row compatibility.
+- `0014_character_creation_sessions.sql`: durable Quick/Advanced drafts, field locks, cancellation/resume, and confirmation audit state.

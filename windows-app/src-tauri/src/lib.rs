@@ -20,8 +20,10 @@ use ember_native_bridge::{
     ModelCapabilitiesRegistration, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
     NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
     RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
-    TavernGenerationCommit, TavernSnapshot, WorldCreationSnapshot, WorldGenerationCommit,
-    WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
+    TavernGenerationCommit, TavernSnapshot, UniversalCharacterCreationConfirm,
+    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
+    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
+    WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1025,6 +1027,56 @@ fn character_candidate_confirm(
 }
 
 #[tauri::command]
+fn universal_character_creation_get(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .universal_character_creation_snapshot(&id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_creation_start(
+    command: UniversalCharacterCreationStart,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .start_universal_character_creation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_creation_save(
+    command: UniversalCharacterCreationSave,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .save_universal_character_creation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_quick_commit(
+    command: UniversalCharacterQuickCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .commit_universal_quick_character(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_creation_confirm(
+    command: UniversalCharacterCreationConfirm,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .confirm_universal_character_creation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn tavern_get(id: String, store: State<'_, CampaignStore>) -> Result<TavernSnapshot, CommandError> {
     store.tavern_snapshot(&id).map_err(Into::into)
 }
@@ -1266,6 +1318,11 @@ pub fn run() {
             character_traits_commit,
             character_completion_commit,
             character_candidate_confirm,
+            universal_character_creation_get,
+            universal_character_creation_start,
+            universal_character_creation_save,
+            universal_character_quick_commit,
+            universal_character_creation_confirm,
             tavern_get,
             tavern_generation_commit,
             tavern_npcs_commit,

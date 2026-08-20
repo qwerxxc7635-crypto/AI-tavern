@@ -197,7 +197,7 @@ impl CampaignStore {
         command: CharacterTraitGenerationCommit,
     ) -> Result<CharacterCreationSnapshot, CampaignStoreError> {
         validate_character_draft(&command.character, &command.campaign_id)?;
-        validate_generation_audit(&command.generation, "GENERATE_CHARACTER_TRAITS")?;
+        validate_character_generation_audit(&command.generation, "GENERATE_CHARACTER_TRAITS")?;
         validate_trait_generation_context(&command)?;
         let output: TraitOutput =
             serde_json::from_value(command.generation.validated_output.clone())
@@ -243,7 +243,7 @@ impl CampaignStore {
         command: CharacterCompletionCommit,
     ) -> Result<CharacterCreationSnapshot, CampaignStoreError> {
         validate_character_draft(&command.character, &command.campaign_id)?;
-        validate_generation_audit(&command.generation, "COMPLETE_CHARACTER_BACKGROUND")?;
+        validate_character_generation_audit(&command.generation, "COMPLETE_CHARACTER_BACKGROUND")?;
         validate_background_generation_context(&command)?;
         validate_id(&command.trait_generation_record_id)?;
         let output: BackgroundOutput =
@@ -408,7 +408,7 @@ fn validate_character_draft(
     Ok(())
 }
 
-fn validate_generation_audit(
+pub(crate) fn validate_character_generation_audit(
     audit: &CharacterGenerationAudit,
     expected_task: &str,
 ) -> Result<(), CampaignStoreError> {
@@ -824,7 +824,7 @@ fn replayed(
     }
 }
 
-fn insert_generation(
+pub(crate) fn insert_character_generation(
     transaction: &Transaction<'_>,
     campaign_id: &str,
     task: &str,
@@ -923,16 +923,16 @@ fn commit_candidate_generations(
         .trait_generation
         .as_ref()
         .ok_or(CampaignStoreError::InvalidData)?;
-    validate_generation_audit(trait_generation, "GENERATE_CHARACTER_TRAITS")?;
-    validate_generation_audit(&stored.generation, "COMPLETE_CHARACTER_BACKGROUND")?;
-    insert_generation(
+    validate_character_generation_audit(trait_generation, "GENERATE_CHARACTER_TRAITS")?;
+    validate_character_generation_audit(&stored.generation, "COMPLETE_CHARACTER_BACKGROUND")?;
+    insert_character_generation(
         transaction,
         &stored.view.draft.campaign_id,
         "GENERATE_CHARACTER_TRAITS",
         trait_generation,
         at,
     )?;
-    insert_generation(
+    insert_character_generation(
         transaction,
         &stored.view.draft.campaign_id,
         "COMPLETE_CHARACTER_BACKGROUND",

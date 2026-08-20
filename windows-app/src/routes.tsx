@@ -22,7 +22,7 @@ const WorldCreationPage = lazy(() =>
   import('./world-creation-page.js').then(({ WorldCreationPage: page }) => ({ default: page })),
 );
 const CharacterCreationPage = lazy(() =>
-  import('./character-creation-page.js').then(({ CharacterCreationPage: page }) => ({
+  import('./universal-character-creation-page.js').then(({ CharacterCreationPage: page }) => ({
     default: page,
   })),
 );

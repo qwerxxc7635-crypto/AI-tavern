@@ -16,6 +16,7 @@ mod rules_engine;
 mod save_archive;
 mod settlement;
 mod tavern_initialization;
+mod universal_character_creation;
 #[cfg(test)]
 mod windows_e2e;
 mod world_creation;
@@ -31,6 +32,7 @@ pub use rules_engine::*;
 pub use save_archive::*;
 pub use settlement::*;
 pub use tavern_initialization::*;
+pub use universal_character_creation::*;
 pub use world_creation::*;
 pub use world_seed::*;
 
@@ -73,7 +75,9 @@ const KNOWLEDGE_BOUNDARY_MIGRATION: &str =
     include_str!("../../../database/migrations/0012_knowledge_boundary.sql");
 const UNIVERSAL_CHARACTER_MIGRATION: &str =
     include_str!("../../../database/migrations/0013_universal_character.sql");
-const LATEST_SCHEMA_VERSION: i64 = 13;
+const CHARACTER_CREATION_SESSIONS_MIGRATION: &str =
+    include_str!("../../../database/migrations/0014_character_creation_sessions.sql");
+const LATEST_SCHEMA_VERSION: i64 = 14;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -533,6 +537,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (11_i64, "rules_engine", RULES_ENGINE_MIGRATION),
         (12_i64, "knowledge_boundary", KNOWLEDGE_BOUNDARY_MIGRATION),
         (13_i64, "universal_character", UNIVERSAL_CHARACTER_MIGRATION),
+        (
+            14_i64,
+            "character_creation_sessions",
+            CHARACTER_CREATION_SESSIONS_MIGRATION,
+        ),
     ] {
         let applied_name = connection
             .query_row(

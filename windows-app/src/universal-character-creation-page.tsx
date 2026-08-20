@@ -1,0 +1,818 @@
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+
+import type {
+  CharacterAttributeName,
+  CharacterCreationMode,
+  UniversalCharacterDraft,
+} from '@ember-tavern/contracts';
+import { characterTraitId } from '@ember-tavern/contracts';
+
+import { AIErrorNotice } from './ai-error-notice.js';
+import { APP_PATHS, campaignRoute } from './navigation.js';
+import {
+  universalCharacterCreationService,
+  type UniversalCharacterCreationService,
+  type UniversalCharacterCreationSnapshot,
+} from './universal-character-creation-service.js';
+
+type CreationActions = Pick<
+  UniversalCharacterCreationService,
+  | 'load'
+  | 'start'
+  | 'saveDraft'
+  | 'switchMode'
+  | 'prepareAdvanced'
+  | 'generateQuick'
+  | 'cancel'
+  | 'resume'
+  | 'confirm'
+>;
+
+interface CharacterCreationPageProps {
+  readonly service?: CreationActions;
+}
+
+const DEFAULT_BOUNDARIES = {
+  allowHorror: true,
+  allowPermanentDeath: false,
+  allowRomance: true,
+  allowBetrayal: true,
+  excludedContent: [],
+} as const;
+
+const TEXT_FIELDS = [
+  ['name', '姓名'],
+  ['identity', '身份'],
+  ['concept', '角色概念'],
+  ['appearance', '外貌'],
+  ['personality', '性格'],
+] as const;
+const OPTIONAL_TEXT_FIELDS = [
+  ['nickname', '昵称'],
+  ['gender', '性别'],
+  ['ancestry', '种族 / 族群'],
+  ['birthplace', '出生地'],
+  ['socialClass', '阶层'],
+  ['faith', '信仰'],
+] as const;
+const LIST_FIELDS = [
+  ['values', '价值观'],
+  ['goals', '目标'],
+  ['fears', '恐惧'],
+  ['secrets', '秘密'],
+  ['family', '家庭'],
+  ['education', '教育'],
+  ['importantPeople', '重要人物'],
+  ['enemies', '敌人'],
+  ['experiences', '经历'],
+  ['storyPreferences', '故事偏好'],
+  ['proficiencies', '熟练'],
+  ['abilities', '能力'],
+  ['languages', '语言'],
+] as const;
+const BACKGROUND_FIELDS = [
+  ['birthplace', '兼容出生地'],
+  ['formativeExperience', '成长经历'],
+  ['adventureMotivation', '冒险动机'],
+  ['secret', '背景秘密'],
+  ['importantPerson', '背景重要人物'],
+  ['tavernArrivalReason', '来到酒馆的原因'],
+] as const;
+const ATTRIBUTE_LABELS: Readonly<Record<CharacterAttributeName, string>> = {
+  physique: '体魄',
+  agility: '敏捷',
+  knowledge: '学识',
+  charisma: '魅力',
+};
+const BOUNDARY_FIELDS = [
+  ['allowHorror', '允许恐怖'],
+  ['allowPermanentDeath', '允许永久死亡'],
+  ['allowRomance', '允许浪漫'],
+  ['allowBetrayal', '允许背叛'],
+] as const;
+
+export function CharacterCreationPage({
+  service = universalCharacterCreationService,
+}: CharacterCreationPageProps) {
+  const [search] = useSearchParams();
+  const navigate = useNavigate();
+  const campaignId = search.get('campaignId');
+  const [snapshot, setSnapshot] = useState<UniversalCharacterCreationSnapshot | null>(null);
+  const [draft, setDraft] = useState<UniversalCharacterDraft | null>(null);
+  const [startMode, setStartMode] = useState<CharacterCreationMode>('QUICK');
+  const [concept, setConcept] = useState('');
+  const [lockedFields, setLockedFields] = useState<readonly string[]>([]);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<unknown | null>(null);
+
+  useEffect(() => {
+    if (campaignId === null) return;
+    let active = true;
+    void service
+      .load(campaignId)
+      .then((loaded) => {
+        if (!active) return;
+        setSnapshot(loaded);
+        setDraft(loaded.session?.draft ?? null);
+        setConcept(loaded.session?.conceptInput ?? '');
+        setLockedFields(loaded.session?.lockedFields ?? []);
+        setDirty(false);
+      })
+      .catch((cause: unknown) => {
+        if (active) setError(cause);
+      });
+    return () => {
+      active = false;
+    };
+  }, [campaignId, service]);
+
+  async function perform(run: () => Promise<UniversalCharacterCreationSnapshot>) {
+    setBusy(true);
+    setError(null);
+    try {
+      const next = await run();
+      setSnapshot(next);
+      setDraft(next.session?.draft ?? null);
+      setConcept(next.session?.conceptInput ?? '');
+      setLockedFields(next.session?.lockedFields ?? []);
+      setDirty(false);
+    } catch (cause) {
+      setError(cause);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function editDraft(next: UniversalCharacterDraft) {
+    setDraft(next);
+    setDirty(true);
+  }
+
+  function editLocks(field: string, locks: readonly string[]) {
+    setLockedFields(toggleField(field, locks));
+    setDirty(true);
+  }
+
+  if (campaignId === null) return <Message title="先选择一个存档。" />;
+  if (snapshot === null) {
+    return error === null ? (
+      <Message title="正在铺开通用车卡…" busy />
+    ) : (
+      <Message title="无法读取车卡进度。" />
+    );
+  }
+  const session = snapshot.session;
+  if (session === null) {
+    return (
+      <main className="character-studio">
+        <Header step="01 · 选择创建方式" />
+        <section className="character-intro">
+          <p className="eyebrow">角色创建 2.0</p>
+          <h1>写下一位会在这个世界里活起来的人。</h1>
+          <p>快速创建用一句概念生成完整候选；进阶创建从空白通用车卡开始。确认前都只是本地草稿。</p>
+        </section>
+        <div className="character-form">
+          <section>
+            <h2>创建模式</h2>
+            <div className="creation-mode-switch" role="group" aria-label="创建模式">
+              <ModeButton mode="QUICK" current={startMode} onSelect={setStartMode} />
+              <ModeButton mode="ADVANCED" current={startMode} onSelect={setStartMode} />
+            </div>
+            {startMode === 'QUICK' ? (
+              <label>
+                一句话角色概念
+                <textarea value={concept} onChange={(event) => setConcept(event.target.value)} />
+              </label>
+            ) : null}
+            <button
+              className="primary-action character-next"
+              disabled={busy || (startMode === 'QUICK' && concept.trim().length === 0)}
+              type="button"
+              onClick={() =>
+                void perform(() =>
+                  service.start({
+                    campaignId,
+                    mode: startMode,
+                    conceptInput: startMode === 'QUICK' ? concept.trim() : null,
+                    storyPreferences: [],
+                    contentBoundaries: DEFAULT_BOUNDARIES,
+                  }),
+                )
+              }
+            >
+              开始创建
+            </button>
+          </section>
+        </div>
+      </main>
+    );
+  }
+  if (session.status === 'CANCELLED') {
+    return (
+      <main className="character-studio">
+        <Header step="已暂停" />
+        <section className="character-intro">
+          <p className="eyebrow">草稿仍在本地</p>
+          <h1>这张车卡没有被丢弃。</h1>
+          <p>恢复后会回到取消前的模式、字段和锁定状态。</p>
+          <button
+            className="primary-action"
+            disabled={busy}
+            onClick={() => void perform(() => service.resume(snapshot))}
+          >
+            恢复创建
+          </button>
+        </section>
+      </main>
+    );
+  }
+  if (session.status === 'CONFIRMED') {
+    return (
+      <main className="character-studio">
+        <Header step="03 · 已确认" />
+        <section className="character-intro">
+          <p className="eyebrow">角色事实已写入 SQLite</p>
+          <h1>{session.draft.name}</h1>
+          <p>
+            {session.draft.career.displayName} · {session.draft.concept}
+          </p>
+          <button
+            className="primary-action"
+            onClick={() => navigate(campaignRoute(APP_PATHS.tavern, campaignId))}
+          >
+            进入酒馆生成流程
+          </button>
+        </section>
+      </main>
+    );
+  }
+  if (draft === null) return <Message title="车卡草稿不完整。" />;
+
+  const locks = lockedFields;
+  const ready = session.status === 'READY_TO_CONFIRM';
+  return (
+    <main className="character-studio">
+      <Header step={ready ? '03 · 确认候选' : '02 · 编辑草稿'} />
+      <section className="character-intro">
+        <p className="eyebrow">{session.mode === 'QUICK' ? '快速创建' : '进阶创建'}</p>
+        <h1>{ready ? '角色已通过本地完整性校验。' : '每一项都仍是可恢复的草稿。'}</h1>
+        <p>锁定字段会在模式切换和后续生成中保持不变；确认前不会创建正式角色事实。</p>
+        <div className="creation-mode-switch" role="group" aria-label="当前创建模式">
+          <ModeButton
+            mode="QUICK"
+            current={session.mode}
+            onSelect={() =>
+              void perform(() =>
+                service.switchMode(
+                  snapshot,
+                  'QUICK',
+                  concept.trim() || draft.concept || '待完善的角色',
+                ),
+              )
+            }
+          />
+          <ModeButton
+            mode="ADVANCED"
+            current={session.mode}
+            onSelect={() => void perform(() => service.switchMode(snapshot, 'ADVANCED', null))}
+          />
+        </div>
+        {session.mode === 'QUICK' ? (
+          <label>
+            一句话角色概念
+            <textarea
+              value={concept}
+              onChange={(event) => {
+                setConcept(event.target.value);
+                setDirty(true);
+              }}
+            />
+          </label>
+        ) : null}
+      </section>
+      {error === null ? null : <AIErrorNotice error={error} />}
+      <div className="character-form" aria-busy={busy}>
+        <section className="character-form__identity">
+          <h2>身份与形象</h2>
+          {TEXT_FIELDS.map(([key, label]) => (
+            <LockedTextField
+              key={key}
+              field={key}
+              label={label}
+              value={draft[key]}
+              locks={locks}
+              onLock={(field) => editLocks(field, locks)}
+              onChange={(value) => editDraft({ ...draft, [key]: value })}
+            />
+          ))}
+          {OPTIONAL_TEXT_FIELDS.map(([key, label]) => (
+            <LockedTextField
+              key={key}
+              field={key}
+              label={label}
+              value={draft[key] ?? ''}
+              locks={locks}
+              onLock={(field) => editLocks(field, locks)}
+              onChange={(value) =>
+                editDraft({ ...draft, [key]: value.trim().length === 0 ? null : value })
+              }
+            />
+          ))}
+          <label data-character-field="age">
+            年龄
+            <input
+              type="number"
+              min="0"
+              max="10000"
+              value={draft.age ?? ''}
+              onChange={(event) =>
+                editDraft({
+                  ...draft,
+                  age: event.target.value === '' ? null : Number(event.target.value),
+                })
+              }
+            />
+          </label>
+        </section>
+
+        <section>
+          <h2>经历、关系与内心</h2>
+          {LIST_FIELDS.map(([key, label]) => (
+            <LockedListField
+              key={key}
+              field={key}
+              label={label}
+              values={draft[key]}
+              locks={locks}
+              onLock={(field) => editLocks(field, locks)}
+              onChange={(values) => editDraft({ ...draft, [key]: values })}
+            />
+          ))}
+        </section>
+
+        <section>
+          <h2>职业与本地属性</h2>
+          <LockedTextField
+            field="career"
+            label="职业显示名"
+            value={draft.career.displayName}
+            locks={locks}
+            onLock={(field) => editLocks(field, locks)}
+            onChange={(value) =>
+              editDraft({ ...draft, career: { ...draft.career, displayName: value } })
+            }
+          />
+          <label data-character-field="career.legacyArchetype">
+            当前兼容职业类型
+            <select
+              value={draft.career.legacyArchetype ?? 'WARRIOR'}
+              onChange={(event) =>
+                editDraft({
+                  ...draft,
+                  career: {
+                    ...draft.career,
+                    legacyArchetype: event.target.value as NonNullable<
+                      typeof draft.career.legacyArchetype
+                    >,
+                  },
+                })
+              }
+            >
+              <option value="WARRIOR">战士</option>
+              <option value="ROGUE">游荡者</option>
+              <option value="SCHOLAR">学者</option>
+              <option value="DIPLOMAT">交涉者</option>
+            </select>
+          </label>
+          {Object.entries(ATTRIBUTE_LABELS).map(([key, label]) => (
+            <label key={key} data-character-field={`attributes.${key}`}>
+              {label}
+              <input
+                type="number"
+                min="1"
+                max="5"
+                value={draft.attributes[key as CharacterAttributeName]}
+                onChange={(event) =>
+                  editDraft({
+                    ...draft,
+                    attributes: { ...draft.attributes, [key]: Number(event.target.value) },
+                  })
+                }
+              />
+            </label>
+          ))}
+          <p>
+            四项属性必须各为 1–5 且总和严格等于 10。财富、技能数值、派生属性和状态由本地规则引擎
+            初始化。
+          </p>
+          <dl className="character-sheet__attributes" aria-label="规则控制字段">
+            <div>
+              <dt>财富</dt>
+              <dd>{draft.wealth}</dd>
+            </div>
+            <div>
+              <dt>技能</dt>
+              <dd>{draft.skills.length}</dd>
+            </div>
+            <div>
+              <dt>状态</dt>
+              <dd>{draft.statuses.length}</dd>
+            </div>
+            <div>
+              <dt>装备</dt>
+              <dd>{draft.equipmentIds.length}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section>
+          <h2>当前阶段特质</h2>
+          <p>当前提供两项叙事特质；特质点数和平衡会在后续车卡步骤开放。</p>
+          {[0, 1].map((index) => {
+            const trait = draft.traits[index] ?? {
+              id: characterTraitId(`draft-trait-${session.characterId}-${index + 1}`),
+              name: '',
+              description: '',
+            };
+            return (
+              <div key={trait.id} data-character-field={`traits.${index}`}>
+                <label>
+                  特质 {index + 1} 名称
+                  <input
+                    value={trait.name}
+                    onChange={(event) =>
+                      editDraft({
+                        ...draft,
+                        traits: replaceTrait(draft.traits, index, {
+                          ...trait,
+                          name: event.target.value,
+                        }),
+                      })
+                    }
+                  />
+                </label>
+                <label>
+                  特质 {index + 1} 描述
+                  <textarea
+                    value={trait.description}
+                    onChange={(event) =>
+                      editDraft({
+                        ...draft,
+                        traits: replaceTrait(draft.traits, index, {
+                          ...trait,
+                          description: event.target.value,
+                        }),
+                      })
+                    }
+                  />
+                </label>
+              </div>
+            );
+          })}
+        </section>
+
+        <section>
+          <h2>兼容背景</h2>
+          {BACKGROUND_FIELDS.map(([key, label]) => (
+            <label key={key} data-character-field={`legacyBackground.${key}`}>
+              {label}
+              <textarea
+                value={draft.legacyBackground[key]}
+                onChange={(event) =>
+                  editDraft({
+                    ...draft,
+                    legacyBackground: { ...draft.legacyBackground, [key]: event.target.value },
+                  })
+                }
+              />
+            </label>
+          ))}
+        </section>
+
+        <fieldset className="character-boundaries">
+          <legend>内容边界</legend>
+          {BOUNDARY_FIELDS.map(([key, label]) => (
+            <label key={key}>
+              <input
+                type="checkbox"
+                checked={draft.contentBoundaries[key]}
+                onChange={(event) =>
+                  editDraft({
+                    ...draft,
+                    contentBoundaries: { ...draft.contentBoundaries, [key]: event.target.checked },
+                  })
+                }
+              />
+              {label}
+            </label>
+          ))}
+          <LockedListField
+            field="contentBoundaries"
+            label="排除内容"
+            values={draft.contentBoundaries.excludedContent}
+            locks={locks}
+            onLock={(field) => editLocks(field, locks)}
+            onChange={(values) =>
+              editDraft({
+                ...draft,
+                contentBoundaries: { ...draft.contentBoundaries, excludedContent: values },
+              })
+            }
+          />
+        </fieldset>
+
+        {snapshot.extensionDefinitions.map((definition) => (
+          <section key={definition.namespace}>
+            <h2>{definition.displayName}</h2>
+            {definition.fields.map((field) => (
+              <ExtensionEditor
+                key={field.key}
+                definition={definition.namespace}
+                field={field}
+                draft={draft}
+                locks={locks}
+                onLock={(path) => editLocks(path, locks)}
+                onChange={editDraft}
+              />
+            ))}
+          </section>
+        ))}
+
+        <section className="character-sheet__ai-controls">
+          <div>
+            <p className="eyebrow">确认边界</p>
+            <h2>{ready ? '候选可以写入正式事实' : '先保存并完成本地验证'}</h2>
+            <p>
+              关系、声望、装备实体、状态和派生值会在对应业务阶段由本地合同建立，不接受描述反解析。
+            </p>
+          </div>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void perform(() => service.saveDraft(snapshot, draft, locks))}
+          >
+            保存草稿
+          </button>
+          {session.mode === 'QUICK' ? (
+            <button
+              className="primary-action"
+              type="button"
+              disabled={busy || concept.trim().length === 0}
+              onClick={() =>
+                void perform(async () => {
+                  const current =
+                    concept.trim() === session.conceptInput
+                      ? snapshot
+                      : await service.switchMode(snapshot, 'QUICK', concept.trim());
+                  return service.generateQuick(current);
+                })
+              }
+            >
+              命运编织完整角色
+            </button>
+          ) : (
+            <button
+              className="primary-action"
+              type="button"
+              disabled={busy}
+              onClick={() =>
+                void perform(async () => {
+                  const saved = await service.saveDraft(snapshot, draft, locks);
+                  return service.prepareAdvanced(saved);
+                })
+              }
+            >
+              校验完整车卡
+            </button>
+          )}
+          <button
+            className="primary-action"
+            type="button"
+            disabled={busy || !ready || dirty}
+            onClick={() => void perform(() => service.confirm(snapshot))}
+          >
+            确认角色
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void perform(() => service.cancel(snapshot))}
+          >
+            暂停并返回
+          </button>
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function ModeButton({
+  mode,
+  current,
+  onSelect,
+}: {
+  mode: CharacterCreationMode;
+  current: CharacterCreationMode;
+  onSelect(mode: CharacterCreationMode): void;
+}) {
+  return (
+    <button type="button" aria-pressed={mode === current} onClick={() => onSelect(mode)}>
+      {mode === 'QUICK' ? '快速 · 一句话生成' : '进阶 · 全字段编辑'}
+    </button>
+  );
+}
+
+function LockedTextField({
+  field,
+  label,
+  value,
+  locks,
+  onLock,
+  onChange,
+}: {
+  field: string;
+  label: string;
+  value: string;
+  locks: readonly string[];
+  onLock(field: string): void;
+  onChange(value: string): void;
+}) {
+  return (
+    <div data-character-field={field}>
+      <label>
+        {label}
+        <textarea value={value} onChange={(event) => onChange(event.target.value)} />
+      </label>
+      <label>
+        <input type="checkbox" checked={locks.includes(field)} onChange={() => onLock(field)} />
+        锁定
+      </label>
+    </div>
+  );
+}
+
+function LockedListField({
+  field,
+  label,
+  values,
+  locks,
+  onLock,
+  onChange,
+}: {
+  field: string;
+  label: string;
+  values: readonly string[];
+  locks: readonly string[];
+  onLock(field: string): void;
+  onChange(values: readonly string[]): void;
+}) {
+  return (
+    <div data-character-field={field}>
+      <label>
+        {label}
+        <textarea
+          value={values.join('\n')}
+          onChange={(event) => onChange(lines(event.target.value))}
+        />
+      </label>
+      <label>
+        <input type="checkbox" checked={locks.includes(field)} onChange={() => onLock(field)} />
+        锁定
+      </label>
+    </div>
+  );
+}
+
+function ExtensionEditor({
+  definition,
+  field,
+  draft,
+  locks,
+  onLock,
+  onChange,
+}: {
+  definition: string;
+  field: UniversalCharacterCreationSnapshot['extensionDefinitions'][number]['fields'][number];
+  draft: UniversalCharacterDraft;
+  locks: readonly string[];
+  onLock(path: string): void;
+  onChange(draft: UniversalCharacterDraft): void;
+}) {
+  const path = `extensions.${definition}.${field.key}`;
+  const set = draft.extensions.find((entry) => entry.namespace === definition);
+  const value = set?.values[field.key];
+  const update = (next: Value) =>
+    onChange({ ...draft, extensions: updateExtension(draft, definition, field.key, next) });
+  type Value = string | number | boolean | readonly string[];
+  let control;
+  if (field.type === 'BOOLEAN')
+    control = (
+      <input
+        type="checkbox"
+        checked={value === true}
+        onChange={(event) => update(event.target.checked)}
+      />
+    );
+  else if (field.type === 'ENUM')
+    control = (
+      <select
+        value={typeof value === 'string' ? value : ''}
+        onChange={(event) => update(event.target.value)}
+      >
+        <option value="">请选择</option>
+        {field.options.map((option) => (
+          <option key={option}>{option}</option>
+        ))}
+      </select>
+    );
+  else if (field.type === 'INTEGER' || field.type === 'NUMBER')
+    control = (
+      <input
+        type="number"
+        min={field.minimum}
+        max={field.maximum}
+        value={typeof value === 'number' ? value : ''}
+        onChange={(event) => update(Number(event.target.value))}
+      />
+    );
+  else if (field.type === 'TEXT_LIST')
+    control = (
+      <textarea
+        value={Array.isArray(value) ? value.join('\n') : ''}
+        onChange={(event) => update(lines(event.target.value))}
+      />
+    );
+  else
+    control = (
+      <textarea
+        value={typeof value === 'string' ? value : ''}
+        onChange={(event) => update(event.target.value)}
+      />
+    );
+  return (
+    <div data-character-field={path}>
+      <label>
+        {field.label}
+        {field.required ? '（必填）' : ''}
+        {control}
+      </label>
+      <label>
+        <input type="checkbox" checked={locks.includes(path)} onChange={() => onLock(path)} />
+        锁定
+      </label>
+    </div>
+  );
+}
+
+function updateExtension(
+  draft: UniversalCharacterDraft,
+  namespace: string,
+  key: string,
+  value: string | number | boolean | readonly string[],
+) {
+  const current = draft.extensions.find((entry) => entry.namespace === namespace);
+  const next = {
+    namespace,
+    schemaVersion: 1 as const,
+    values: { ...(current?.values ?? {}), [key]: value },
+  };
+  return [...draft.extensions.filter((entry) => entry.namespace !== namespace), next];
+}
+
+function replaceTrait(
+  traits: UniversalCharacterDraft['traits'],
+  index: number,
+  trait: UniversalCharacterDraft['traits'][number],
+) {
+  const next = [...traits];
+  next[index] = trait;
+  return next.slice(0, 2);
+}
+
+function lines(value: string) {
+  return value
+    .split('\n')
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+}
+function toggleField(field: string, locks: readonly string[]) {
+  return locks.includes(field) ? locks.filter((entry) => entry !== field) : [...locks, field];
+}
+
+function Header({ step }: { step: string }) {
+  return (
+    <header className="character-studio__topline">
+      <p>Ember Tavern · {step}</p>
+      <strong>通用角色档案</strong>
+    </header>
+  );
+}
+function Message({ title, busy = false }: { title: string; busy?: boolean }) {
+  return (
+    <main className="character-studio character-studio--message" aria-busy={busy}>
+      <h1>{title}</h1>
+    </main>
+  );
+}

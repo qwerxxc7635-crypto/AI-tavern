@@ -258,6 +258,28 @@ export function validateCharacterExtensionValues(
   profile: UniversalCharacterProfile,
   definitions: readonly WorldCharacterExtensionDefinition[],
 ): void {
+  validateExtensionValues(profile, definitions, false);
+}
+
+export function validateCompleteCharacterExtensionValues(
+  profile: UniversalCharacterProfile,
+  definitions: readonly WorldCharacterExtensionDefinition[],
+): void {
+  validateExtensionValues(profile, definitions, true);
+}
+
+export function validateCharacterExtensionDraftValues(
+  profile: Pick<UniversalCharacterProfile, 'campaignId' | 'extensions'>,
+  definitions: readonly WorldCharacterExtensionDefinition[],
+): void {
+  validateExtensionValues(profile, definitions, false);
+}
+
+function validateExtensionValues(
+  profile: Pick<UniversalCharacterProfile, 'campaignId' | 'extensions'>,
+  definitions: readonly WorldCharacterExtensionDefinition[],
+  requireComplete: boolean,
+): void {
   const byNamespace = new Map(definitions.map((definition) => [definition.namespace, definition]));
   for (const extension of profile.extensions) {
     const definition = byNamespace.get(extension.namespace);
@@ -285,6 +307,16 @@ export function validateCharacterExtensionValues(
         continue;
       }
       validateFieldValue(field, value, extension.namespace);
+    }
+  }
+  if (!requireComplete) return;
+  const supplied = new Set(profile.extensions.map(({ namespace }) => namespace));
+  for (const definition of definitions) {
+    if (!supplied.has(definition.namespace)) {
+      const required = definition.fields.find(({ required }) => required);
+      if (required !== undefined) {
+        throw new UniversalCharacterError(`Missing field ${definition.namespace}.${required.key}`);
+      }
     }
   }
 }

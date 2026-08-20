@@ -2532,3 +2532,27 @@ migration保守回填旧角色，旧表继续作为V0.2兼容面。显式投影�
 - 三类世界fixture证明扩展机制，不代表核心类型只支持这三种世界；新世界复用同一定义合同。
 - 本地schema 13可关闭重开。portable`.emtavern` v2尚不携带完整通用档案与扩展定义，统一格式迁移留给M10-T05。
 - M5-T01不提前实现Quick/Advanced UI、AI Everywhere、Trait点数、Career Pool或后续实体生成。
+
+## DEC-122：角色创建以持久草稿会话隔离候选与正式事实
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T02`、`docs/V0.3_SPEC.md` 10.2节
+
+### 背景
+
+Quick需要从一句概念产生完整候选，Advanced需要编辑相同通用字段，两种模式还必须切换、锁定、取消和恢复。若只把草稿保存在React状态，关闭应用后会丢失；若每次编辑直接更新`player_characters`，未确认内容就会成为SQLite正式事实。让Provider直接返回属性值、财富或状态又会绕过M4-T03 Rules Engine authority。
+
+### 决定与理由
+
+schema 14新增唯一Campaign级`character_creation_sessions`，以revision化`UniversalCharacterDraft`承载两种模式。会话绑定已锁定Constitution revision，锁定路径和草稿持久化；`ACTIVE`、`READY_TO_CONFIRM`、`CANCELLED`、`CONFIRMED`是唯一状态。普通保存使用expected revision和Native服务端时间戳，不能伪造Quick generation provenance。
+
+Quick只使用统一`GENERATE_QUICK_CHARACTER`任务生成叙事字段、属性优先级和世界扩展；属性4/3/2/1、Trait ID、规则/entity-owned空初值均由本地建立。Advanced和Quick都必须经本地完整性校验进入`READY_TO_CONFIRM`。只有显式确认事务才写V0.2兼容角色、规则初态和V0.3档案，并推进Campaign；失败完整回滚，重复确认幂等。
+
+### 影响与边界
+
+- 页面草稿和AI输出不是真相；SQLite会话是可恢复创建进度，正式角色仍只由确认事务产生。
+- 模式切换与Quick重生保持已锁字段；未保存页面改动会禁用确认，不能误确认旧持久版本。
+- M5-T02只保留当前两项叙事Trait和旧职业映射，不实现M5-T03字段AI、M5-T04点数或M5-T05平衡。
+- 新UI复用现有Token和角色创建布局，完整Legacy视觉迁移仍由M10-T07执行；视觉调整不改变Rules、Provider、Generator、SQLite或存档合同。
+- 本地schema 14支持关闭重开；portable archive新增表与历史fixture迁移仍统一留给M10-T05。

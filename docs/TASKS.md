@@ -242,7 +242,7 @@
 
 ## M5-T02 Quick / Advanced Creation
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M5-T01。
 - **Deliverable**：两种车卡流程和共享草稿/锁定/确认状态机。
 - **Acceptance**：Quick 一句生成完整合法卡；Advanced 全字段可编辑；切换模式不丢已锁内容；只有确认后写正式事实。
