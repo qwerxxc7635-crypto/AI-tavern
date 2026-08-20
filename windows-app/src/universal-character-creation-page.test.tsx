@@ -18,6 +18,7 @@ import {
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { CharacterCreationPage } from './universal-character-creation-page.js';
+import { UNIVERSAL_CHARACTER_AI_FIELDS } from './universal-character-ai.js';
 import type { UniversalCharacterCreationSnapshot } from './universal-character-creation-service.js';
 
 const campaignKey = campaignId('campaign-page-v3');
@@ -30,6 +31,7 @@ const definition = createWorldCharacterExtensionDefinition({
   displayName: '调查世界字段',
   constitutionRevision: 1,
   fields: [
+    { key: 'calling', label: '执念', required: false, type: 'TEXT', maxLength: 200 },
     { key: 'sanity', label: '理智', required: true, type: 'INTEGER', minimum: 0, maximum: 100 },
   ],
   revision: 1,
@@ -101,11 +103,21 @@ describe('Universal Character Creation page', () => {
       'languages',
       'traits.0',
       'legacyBackground.formativeExperience',
-      'contentBoundaries',
+      'contentBoundaries.excludedContent',
       'extensions.investigation.sanity',
     ]) {
       expect(document.querySelector(`[data-character-field="${field}"]`)).not.toBeNull();
     }
+    for (const { path } of UNIVERSAL_CHARACTER_AI_FIELDS) {
+      expect(document.querySelector(`[data-ai-field="character:${path}"]`)).not.toBeNull();
+    }
+    expect(
+      document.querySelector('[data-ai-field="character:extensions.investigation.calling"]'),
+    ).not.toBeNull();
+    expect(document.querySelector('[data-ai-field="character:age"]')).toBeNull();
+    expect(
+      document.querySelector('[data-ai-field="character:extensions.investigation.sanity"]'),
+    ).toBeNull();
     fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '米拉·维尔' } });
     fireEvent.click(screen.getByRole('button', { name: '校验完整车卡' }));
 
@@ -118,6 +130,29 @@ describe('Universal Character Creation page', () => {
     fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '尚未保存的新名字' } });
     expect(screen.getByRole('button', { name: '确认角色' }).hasAttribute('disabled')).toBe(true);
     expect(service.confirm).not.toHaveBeenCalled();
+  });
+
+  it('keeps whole-draft generation provisional and supports undo after adoption', async () => {
+    const active = snapshot(session('ADVANCED', 'ACTIVE'));
+    const original = active.session?.draft;
+    if (original === undefined) throw new Error('Fixture draft missing');
+    const service = actions(active);
+    service.generateDraftPreview.mockResolvedValue({
+      draft: { ...original, name: '命运改写的米拉' },
+      changedPaths: ['name'],
+    });
+    renderPage(service);
+
+    await screen.findByText('每一项都仍是可恢复的草稿。');
+    fireEvent.click(screen.getByRole('button', { name: '协调整张车卡' }));
+    await waitFor(() => expect(service.generateDraftPreview).toHaveBeenCalledOnce());
+    expect(await screen.findByRole('button', { name: '采用整批候选' })).toBeDefined();
+    expect((screen.getByLabelText('姓名') as HTMLTextAreaElement).value).toBe('Mira Vale');
+
+    fireEvent.click(screen.getByRole('button', { name: '采用整批候选' }));
+    expect((screen.getByLabelText('姓名') as HTMLTextAreaElement).value).toBe('命运改写的米拉');
+    fireEvent.click(screen.getByRole('button', { name: '撤销整批采用' }));
+    expect((screen.getByLabelText('姓名') as HTMLTextAreaElement).value).toBe('Mira Vale');
   });
 });
 
@@ -142,6 +177,8 @@ function actions(initial: UniversalCharacterCreationSnapshot) {
     cancel: vi.fn(),
     resume: vi.fn(),
     confirm: vi.fn(),
+    assistField: vi.fn(),
+    generateDraftPreview: vi.fn(),
   };
 }
 

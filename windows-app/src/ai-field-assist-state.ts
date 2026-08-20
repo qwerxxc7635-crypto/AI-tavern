@@ -23,6 +23,7 @@ export interface FieldAssistState {
 }
 
 export type FieldAssistEvent =
+  | { readonly type: 'SYNC'; readonly value: string }
   | { readonly type: 'EDIT'; readonly value: string }
   | { readonly type: 'START'; readonly operation: FieldAssistOperation; readonly requestId: string }
   | { readonly type: 'RESOLVE'; readonly requestId: string; readonly candidates: readonly string[] }
@@ -55,6 +56,17 @@ export function reduceFieldAssist(
   event: FieldAssistEvent,
 ): FieldAssistState {
   switch (event.type) {
+    case 'SYNC':
+      if (event.value === state.value) return state;
+      return next(state, {
+        phase: state.locked ? 'LOCKED' : 'IDLE',
+        value: validateDraft(event.value),
+        candidates: [],
+        selectedCandidate: null,
+        previousValue: null,
+        activeRequestId: null,
+        errorCode: null,
+      });
     case 'EDIT':
       assertEditable(state);
       if (state.activeRequestId !== null) throw new FieldAssistStateError('FIELD_BUSY');

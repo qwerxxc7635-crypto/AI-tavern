@@ -411,7 +411,7 @@ export function AIFieldAssist({
       ) : null}
       {state === 'CANDIDATE' ? (
         <fieldset>
-          <legend>AI 候选</legend>
+          <legend>命运候选</legend>
           {visibleCandidates.map((entry, index) => (
             <label key={`${index}:${entry}`}>
               <input
@@ -429,12 +429,12 @@ export function AIFieldAssist({
         {state === 'IDLE' ? (
           <>
             <Button onClick={() => (onOperation ? onOperation('GENERATE') : onGenerate?.())}>
-              AI 生成
+              命运生成
             </Button>
             {onOperation === undefined ? null : (
               <>
                 <Button variant="secondary" onClick={() => onOperation('IMPROVE')}>
-                  AI 完善
+                  命运完善
                 </Button>
                 <Button variant="secondary" onClick={() => onOperation('OPTIONS')}>
                   多个候选

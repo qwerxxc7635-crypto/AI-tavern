@@ -10,6 +10,7 @@ import {
   playerCharacterId,
   projectUniversalCharacterToV02,
   validateCharacterExtensionValues,
+  validateCharacterExtensionDraftValues,
   validateCompleteCharacterExtensionValues,
   type CharacterExtensionFieldDefinition,
   type JsonValue,
@@ -105,6 +106,15 @@ describe('Universal Character Schema', () => {
     expect(() => validateCompleteCharacterExtensionValues(profile, [definition])).toThrow(
       'Missing field investigation.sanity',
     );
+  });
+
+  it('allows an in-progress extension draft to populate one field at a time', () => {
+    const campaign = campaignId('campaign-extension-draft');
+    const definition = extension(campaign, worldFixtures[1]);
+    const partial = character(campaign, 'investigation', { sanity: 70 });
+
+    expect(() => validateCharacterExtensionDraftValues(partial, [definition])).not.toThrow();
+    expect(() => validateCharacterExtensionValues(partial, [definition])).toThrow('Missing field');
   });
 
   it('rejects unknown extension namespaces, versions, fields and values outside definitions', () => {

@@ -411,6 +411,84 @@ export const GenerateQuickCharacterOutputSchema = z
   })
   .strict();
 
+const characterDraftAIPath = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_-]+)*$/);
+const characterDraftAIValue = z.union([text, stringList]);
+
+export const EditCharacterDraftInputSchema = z
+  .object({
+    scope: z.enum(['FIELD', 'FILL_EMPTY', 'SECTION', 'WHOLE', 'REGENERATE_UNLOCKED']),
+    fieldOperation: z.enum(['GENERATE', 'IMPROVE', 'OPTIONS', 'EXPAND', 'SHORTEN']).nullable(),
+    section: z
+      .enum([
+        'IDENTITY',
+        'INNER_LIFE',
+        'CAREER',
+        'TRAITS',
+        'BACKGROUND',
+        'BOUNDARIES',
+        'EXTENSIONS',
+      ])
+      .nullable(),
+    fieldPath: characterDraftAIPath.nullable(),
+    targetPaths: z.array(characterDraftAIPath).min(1).max(64),
+    fieldKinds: z.record(characterDraftAIPath, z.enum(['TEXT', 'TEXT_LIST'])),
+    draft: z.record(z.string(), jsonValueSchema),
+    lockedFields: z.array(characterDraftAIPath).max(128),
+    constitution: jsonValueSchema,
+    extensionDefinitions: z.array(jsonValueSchema).max(16),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    const fieldScope = input.scope === 'FIELD';
+    if (
+      fieldScope !== (input.fieldPath !== null) ||
+      fieldScope !== (input.fieldOperation !== null) ||
+      (input.scope === 'SECTION') !== (input.section !== null) ||
+      new Set(input.targetPaths).size !== input.targetPaths.length ||
+      Object.keys(input.fieldKinds).length !== input.targetPaths.length ||
+      input.targetPaths.some((path) => input.fieldKinds[path] === undefined) ||
+      (fieldScope && (input.targetPaths.length !== 1 || input.targetPaths[0] !== input.fieldPath))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['scope'],
+        message: 'Character edit scope is invalid',
+      });
+    }
+  });
+
+export const EditCharacterDraftOutputSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('FIELD_CANDIDATES'),
+      fieldPath: characterDraftAIPath,
+      candidates: z
+        .array(characterDraftAIValue)
+        .length(3)
+        .refine((values) => new Set(values.map((value) => JSON.stringify(value))).size === 3, {
+          message: 'Character field candidates must be distinct',
+        }),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('DRAFT_PATCH'),
+      updates: z
+        .array(z.object({ path: characterDraftAIPath, value: characterDraftAIValue }).strict())
+        .min(1)
+        .max(64)
+        .refine((updates) => new Set(updates.map(({ path }) => path)).size === updates.length, {
+          message: 'Character draft patch paths must be unique',
+        }),
+    })
+    .strict(),
+]);
+
 export const GenerateTavernInputSchema = z
   .object({ world: worldContext, playerConcept: text, desiredPosition: shortText.nullable() })
   .strict();
@@ -968,7 +1046,7 @@ export const CheckConsistencyInputSchema = z
     world: worldContext,
     lockedRules: stringList.max(30),
     knownFacts: stringList.max(30),
-    proposedContent: text,
+    proposedContent: sceneText,
   })
   .strict();
 export const CheckConsistencyOutputSchema = z

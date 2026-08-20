@@ -190,11 +190,11 @@ describe('shared game components', () => {
     const lock = vi.fn();
     const unlock = vi.fn();
     const { rerender } = render(<AIFieldAssist state="IDLE" onGenerate={generate} />);
-    fireEvent.click(screen.getByRole('button', { name: 'AI 生成' }));
+    fireEvent.click(screen.getByRole('button', { name: '命运生成' }));
     expect(generate).toHaveBeenCalledOnce();
 
     rerender(<AIFieldAssist state="IDLE" onOperation={operation} onLock={lock} />);
-    fireEvent.click(screen.getByRole('button', { name: 'AI 完善' }));
+    fireEvent.click(screen.getByRole('button', { name: '命运完善' }));
     fireEvent.click(screen.getByRole('button', { name: '多个候选' }));
     fireEvent.click(screen.getByRole('button', { name: '扩写' }));
     fireEvent.click(screen.getByRole('button', { name: '缩写' }));

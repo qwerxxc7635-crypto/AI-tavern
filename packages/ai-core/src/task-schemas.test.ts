@@ -169,6 +169,21 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     },
     output: FAKE_TASK_OUTPUTS.GENERATE_QUICK_CHARACTER,
   },
+  EDIT_CHARACTER_DRAFT: {
+    input: {
+      scope: 'FIELD',
+      fieldOperation: 'GENERATE',
+      section: null,
+      fieldPath: 'identity',
+      targetPaths: ['identity'],
+      fieldKinds: { identity: 'TEXT' },
+      draft: { kind: 'UNIVERSAL_CHARACTER_DRAFT', identity: '' },
+      lockedFields: [],
+      constitution,
+      extensionDefinitions: [],
+    },
+    output: FAKE_TASK_OUTPUTS.EDIT_CHARACTER_DRAFT,
+  },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },
     output: {

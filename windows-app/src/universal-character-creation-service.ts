@@ -1,6 +1,9 @@
 import { invoke } from '@tauri-apps/api/core';
 
 import {
+  CheckConsistencyOutputSchema,
+  EditCharacterDraftInputSchema,
+  EditCharacterDraftOutputSchema,
   GenerateQuickCharacterInputSchema,
   GenerateQuickCharacterOutputSchema,
 } from '@ember-tavern/ai-core';
@@ -20,6 +23,7 @@ import {
   saveCharacterCreationDraft,
   stageQuickCharacterDraft,
   switchCharacterCreationMode,
+  validateCharacterLockedFields,
   type CharacterAttributeName,
   type CharacterCreationMode,
   type CharacterCreationSession,
@@ -41,6 +45,18 @@ import {
   tauriRandomnessTemperatureSource,
   type RandomnessTemperatureSource,
 } from './randomness-settings-service.js';
+import type { FieldAssistOperation } from './ai-field-assist-state.js';
+import {
+  CharacterDraftAIError,
+  applyCharacterAIUpdates,
+  characterAIFields,
+  characterAIValue,
+  isCharacterAIFieldEmpty,
+  isCharacterAIFieldLocked,
+  requireCharacterAIField,
+  type CharacterAIFieldDefinition,
+  type CharacterAISection,
+} from './universal-character-ai.js';
 
 export interface UniversalCharacterCreationSnapshot {
   readonly campaignState: string;
@@ -60,6 +76,15 @@ export interface StartUniversalCharacterCreation {
 export interface UniversalCharacterGenerationObserver {
   onValidationStarted(): void;
 }
+
+export interface CharacterDraftAIPreview {
+  readonly draft: UniversalCharacterDraft;
+  readonly changedPaths: readonly string[];
+}
+
+export type CharacterDraftAIBulkCommand =
+  | { readonly scope: 'FILL_EMPTY' | 'WHOLE' | 'REGENERATE_UNLOCKED' }
+  | { readonly scope: 'SECTION'; readonly section: CharacterAISection };
 
 interface GenerationAudit {
   readonly requestId: string;
@@ -306,6 +331,165 @@ export class UniversalCharacterCreationService {
     });
   }
 
+  public async assistField(
+    snapshot: UniversalCharacterCreationSnapshot,
+    draft: UniversalCharacterDraft,
+    lockedFields: readonly string[],
+    path: string,
+    operation: FieldAssistOperation,
+    signal: AbortSignal,
+  ): Promise<readonly string[]> {
+    requireEditableSession(snapshot);
+    const locks = validateCharacterLockedFields(lockedFields, snapshot.extensionDefinitions);
+    const field = requireCharacterAIField(snapshot.extensionDefinitions, path);
+    if (isCharacterAIFieldLocked(path, locks)) {
+      throw new CharacterDraftAIError('FIELD_LOCKED');
+    }
+    assertNotAborted(signal);
+    const input = buildCharacterEditInput(snapshot, draft, locks, {
+      scope: 'FIELD',
+      fieldOperation: operation,
+      section: null,
+      fieldPath: path,
+      fields: [field],
+    });
+    const identity = this.createIdentity();
+    const output = await this.executeCharacterEdit(input, identity.requestId);
+    assertNotAborted(signal);
+    if (operation === 'OPTIONS') {
+      if (output.kind !== 'FIELD_CANDIDATES' || output.fieldPath !== path) {
+        throw new CharacterDraftAIError('CANDIDATE_OUTPUT_INVALID');
+      }
+      const candidates = output.candidates.map((candidate) => {
+        applyCharacterAIUpdates(
+          draft,
+          [{ path, value: candidate }],
+          snapshot.extensionDefinitions,
+          locks,
+        );
+        return displayFieldValue(candidate);
+      });
+      await this.requireCharacterConsistency(
+        snapshot,
+        draft,
+        locks,
+        { path, candidates },
+        identity.requestId,
+      );
+      assertNotAborted(signal);
+      return Object.freeze(candidates);
+    }
+    if (
+      output.kind !== 'DRAFT_PATCH' ||
+      output.updates.length !== 1 ||
+      output.updates[0]?.path !== path
+    ) {
+      throw new CharacterDraftAIError('FIELD_PATCH_INVALID');
+    }
+    const update = output.updates[0];
+    const next = applyCharacterAIUpdates(draft, [update], snapshot.extensionDefinitions, locks);
+    await this.requireCharacterConsistency(snapshot, next, locks, output, identity.requestId);
+    assertNotAborted(signal);
+    return Object.freeze([displayFieldValue(update.value)]);
+  }
+
+  public async generateDraftPreview(
+    snapshot: UniversalCharacterCreationSnapshot,
+    draft: UniversalCharacterDraft,
+    lockedFields: readonly string[],
+    command: CharacterDraftAIBulkCommand,
+    signal: AbortSignal,
+  ): Promise<CharacterDraftAIPreview> {
+    requireEditableSession(snapshot);
+    const locks = validateCharacterLockedFields(lockedFields, snapshot.extensionDefinitions);
+    const available = characterAIFields(snapshot.extensionDefinitions).filter(
+      ({ path }) => !isCharacterAIFieldLocked(path, locks),
+    );
+    const targets = available.filter((field) => {
+      if (command.scope === 'FILL_EMPTY') return isCharacterAIFieldEmpty(draft, field);
+      if (command.scope === 'SECTION') return field.section === command.section;
+      return true;
+    });
+    if (targets.length === 0) throw new CharacterDraftAIError('NO_TARGET_FIELDS');
+    assertNotAborted(signal);
+    const input = buildCharacterEditInput(snapshot, draft, locks, {
+      scope: command.scope,
+      fieldOperation: null,
+      section: command.scope === 'SECTION' ? command.section : null,
+      fieldPath: null,
+      fields: targets,
+    });
+    const identity = this.createIdentity();
+    const output = await this.executeCharacterEdit(input, identity.requestId);
+    assertNotAborted(signal);
+    if (output.kind !== 'DRAFT_PATCH') throw new CharacterDraftAIError('BULK_PATCH_INVALID');
+    const expected = new Set(targets.map(({ path }) => path));
+    if (
+      output.updates.length !== expected.size ||
+      output.updates.some(({ path }) => !expected.has(path))
+    ) {
+      throw new CharacterDraftAIError('BULK_PATCH_INVALID');
+    }
+    const next = applyCharacterAIUpdates(
+      draft,
+      output.updates,
+      snapshot.extensionDefinitions,
+      locks,
+    );
+    await this.requireCharacterConsistency(snapshot, next, locks, output, identity.requestId);
+    assertNotAborted(signal);
+    return Object.freeze({ draft: next, changedPaths: Object.freeze([...expected]) });
+  }
+
+  private async executeCharacterEdit(input: unknown, requestId: string) {
+    const temperature = await this.randomness.resolveTemperature();
+    const generated = await this.ai.execute('EDIT_CHARACTER_DRAFT', input, {
+      requestId,
+      temperature,
+      maxOutputTokens: 8_000,
+      timeoutMs: 8_000,
+    });
+    return EditCharacterDraftOutputSchema.parse(generated.validatedOutput);
+  }
+
+  private async requireCharacterConsistency(
+    snapshot: UniversalCharacterCreationSnapshot,
+    draft: UniversalCharacterDraft,
+    lockedFields: readonly string[],
+    proposedContent: unknown,
+    sourceRequestId: string,
+  ): Promise<void> {
+    requireEditableSession(snapshot);
+    const generated = await this.ai.execute(
+      'CHECK_CONSISTENCY',
+      {
+        world: constitutionWorldContext(snapshot.constitution),
+        lockedRules: chunkFacts(constitutionRules(snapshot.constitution)),
+        knownFacts: chunkFacts(
+          lockedFields.map((path) => {
+            const field = characterAIFields(snapshot.extensionDefinitions).find(
+              (candidate) => candidate.path === path || candidate.path.startsWith(`${path}.`),
+            );
+            return field === undefined
+              ? `Locked field: ${path}`
+              : `${field.path}: ${JSON.stringify(characterAIValue(draft, field))}`;
+          }),
+        ),
+        proposedContent: JSON.stringify(proposedContent),
+      },
+      {
+        requestId: `${sourceRequestId}-consistency`,
+        temperature: 0,
+        maxOutputTokens: 2_000,
+        timeoutMs: 8_000,
+      },
+    );
+    const result = CheckConsistencyOutputSchema.parse(generated.validatedOutput);
+    if (!result.consistent) {
+      throw new CharacterDraftAIError('CHARACTER_CONTRADICTION');
+    }
+  }
+
   public confirm(
     snapshot: UniversalCharacterCreationSnapshot,
   ): Promise<UniversalCharacterCreationSnapshot> {
@@ -450,6 +634,112 @@ function requireSession(snapshot: UniversalCharacterCreationSnapshot): Character
     throw new UniversalCharacterCreationServiceError('SESSION_NOT_FOUND');
   }
   return snapshot.session;
+}
+
+function requireEditableSession(
+  snapshot: UniversalCharacterCreationSnapshot,
+): CharacterCreationSession {
+  const session = requireSession(snapshot);
+  if (session.status === 'CANCELLED' || session.status === 'CONFIRMED') {
+    throw new CharacterDraftAIError('SESSION_NOT_EDITABLE');
+  }
+  return session;
+}
+
+function buildCharacterEditInput(
+  snapshot: UniversalCharacterCreationSnapshot,
+  draft: UniversalCharacterDraft,
+  lockedFields: readonly string[],
+  command: {
+    readonly scope: 'FIELD' | 'FILL_EMPTY' | 'SECTION' | 'WHOLE' | 'REGENERATE_UNLOCKED';
+    readonly fieldOperation: FieldAssistOperation | null;
+    readonly section: CharacterAISection | null;
+    readonly fieldPath: string | null;
+    readonly fields: readonly CharacterAIFieldDefinition[];
+  },
+) {
+  requireEditableSession(snapshot);
+  return EditCharacterDraftInputSchema.parse({
+    scope: command.scope,
+    fieldOperation: command.fieldOperation,
+    section: command.section,
+    fieldPath: command.fieldPath,
+    targetPaths: command.fields.map(({ path }) => path),
+    fieldKinds: Object.fromEntries(command.fields.map(({ path, kind }) => [path, kind])),
+    draft,
+    lockedFields,
+    constitution: snapshot.constitution,
+    extensionDefinitions: snapshot.extensionDefinitions,
+  });
+}
+
+function displayFieldValue(value: string | readonly string[]): string {
+  return typeof value === 'string' ? value : value.join('\n');
+}
+
+function assertNotAborted(signal: AbortSignal): void {
+  if (signal.aborted) throw new CharacterDraftAIError('GENERATION_CANCELLED');
+}
+
+function constitutionWorldContext(value: unknown) {
+  const constitution = requireRecord(value, 'constitution');
+  return {
+    name: constitutionText(constitution, 'worldType'),
+    currentRegion: constitutionText(constitution, 'era'),
+    summary: constitutionText(constitution, 'society'),
+    coreConflict: constitutionText(constitution, 'politics'),
+    technologyLevel: constitutionText(constitution, 'technology'),
+    powerRules: [
+      constitutionText(constitution, 'magic'),
+      constitutionText(constitution, 'deathRules'),
+      constitutionText(constitution, 'careerRules'),
+      constitutionText(constitution, 'traitRules'),
+    ],
+  };
+}
+
+function constitutionRules(value: unknown): readonly string[] {
+  const constitution = requireRecord(value, 'constitution');
+  return [
+    'worldType',
+    'era',
+    'technology',
+    'magic',
+    'society',
+    'politics',
+    'economy',
+    'combatScale',
+    'deathRules',
+    'careerRules',
+    'equipmentRules',
+    'npcRules',
+    'traitRules',
+  ].map((key) => `${key}: ${constitutionText(constitution, key)}`);
+}
+
+function constitutionText(value: Record<string, unknown>, key: string): string {
+  const text = value[key];
+  if (typeof text !== 'string' || text.trim().length === 0 || text.length > 4_000) {
+    throw new CharacterDraftAIError('CONSTITUTION_INVALID');
+  }
+  return text;
+}
+
+function chunkFacts(facts: readonly string[]): readonly string[] {
+  const chunks: string[] = [];
+  let active = '';
+  for (const fact of facts) {
+    if (fact.length > 3_800) throw new CharacterDraftAIError('CONSISTENCY_CONTEXT_TOO_LARGE');
+    const candidate = active.length === 0 ? fact : `${active}\n${fact}`;
+    if (candidate.length <= 3_800) active = candidate;
+    else {
+      chunks.push(active);
+      active = fact;
+    }
+  }
+  if (active.length > 0) chunks.push(active);
+  if (chunks.length > 30) throw new CharacterDraftAIError('CONSISTENCY_CONTEXT_TOO_LARGE');
+  return Object.freeze(chunks);
 }
 
 function defaultIdentity(): RequestIdentity {

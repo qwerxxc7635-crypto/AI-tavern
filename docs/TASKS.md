@@ -251,7 +251,7 @@
 
 ## M5-T03 Character AI Everywhere
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M5-T02。
 - **Deliverable**：单字段、3 候选、补空、区域、整卡、未锁重生能力。
 - **Acceptance**：每个自然语言字段均接入统一 AIFieldAssist；生成读取锁定上下文并通过角色一致性校验。

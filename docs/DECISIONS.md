@@ -2556,3 +2556,27 @@ Quick只使用统一`GENERATE_QUICK_CHARACTER`任务生成叙事字段、属性�
 - M5-T02只保留当前两项叙事Trait和旧职业映射，不实现M5-T03字段AI、M5-T04点数或M5-T05平衡。
 - 新UI复用现有Token和角色创建布局，完整Legacy视觉迁移仍由M10-T07执行；视觉调整不改变Rules、Provider、Generator、SQLite或存档合同。
 - 本地schema 14支持关闭重开；portable archive新增表与历史fixture迁移仍统一留给M10-T05。
+
+## DEC-123：角色全字段AI复用候选状态机并由本地白名单收口
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T03`、`docs/V0.3_SPEC.md` 7.3节和10.2节
+
+### 背景
+
+M2已提供`AIFieldAssist`、可撤销候选和并发/迟到响应隔离，M5-T02则建立了通用角色草稿、锁定路径和确认门禁。若为角色字段再建第二套候选状态机，会产生两种采用、撤销和取消语义；若把整张草稿直接交给Provider回写，又会让数值、实体引用与规则状态绕过本地authority。
+
+### 决定与理由
+
+新增统一`EDIT_CHARACTER_DRAFT`任务，只接受本地计算的精确`targetPaths`、字段类型、当前草稿、当前未保存锁定集、锁定Constitution和世界扩展定义。单字段`OPTIONS`必须返回三个不同候选；其他单字段、补空、区域、整卡和未锁重生必须精确覆盖请求目标。输出先经本地路径/类型/资源/锁定校验，再复用`CHECK_CONSISTENCY`检查角色与世界矛盾。
+
+页面字段复用既有`AIFieldAssist`及hook；候选不自动写草稿，整卡类操作先生成预览，显式采用后仍可整批撤销。输入时的当前草稿与锁定集始终由页面显式传入，而不只读取上次已保存会话。
+
+### 影响与边界
+
+- 只有文本、文本列表和叙事Trait叶子进入生成白名单；年龄、属性、派生值、规则技能、财富、装备ID、声望、关系、状态、布尔边界和非叙事扩展类型不可生成。
+- 应用patch后逐项对比Rules/entity-owned投影，任一变化均fail closed；AI不获得SQLite、Rules Engine或正式角色写权。
+- 世界扩展草稿允许逐字段编辑，但已存档Profile与确认阶段仍严格要求已提供namespace的required字段完整，不放宽正式事实门禁。
+- 界面只使用现有Token、布局与共享Game Component，并将AI文案收敛为“命运”身份；不在M5-T03提前开始M10-T07整体视觉迁移。
+- M5-T03不实现Trait点数、平衡或Career Pool，不改变M5-T04及后续依赖。

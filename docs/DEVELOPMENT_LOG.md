@@ -4128,3 +4128,23 @@
 - 本地数据库最新版为schema 14并支持关闭重开。portable`.emtavern`仍为v2且尚不包含完整通用档案、扩展定义或创建会话；跨语言格式升级、历史fixture与portable round-trip严格留给M10-T05。
 - 已复核视觉手册附件与`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`内容及SHA-256完全一致；规格、任务、决策、视觉债务和M10-T07收敛门禁均已持久化，无需重复建立UI重构体系。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，也不进入M5-T03。
+
+## 2026-08-20 — M5-T03 Character AI Everywhere
+
+### 全叙事字段命运辅助
+
+- 新增统一`EDIT_CHARACTER_DRAFT`任务、严格input/output schema、Prompt、Context Budget和Fake Provider。单字段支持生成/完善/3候选/扩写/缩写，整体支持补空、区域、整卡与未锁重生；非3候选、重复路径、缺少/额外目标和类型错误均拒绝。
+- 建立通用角色叙事字段白名单，覆盖身份、内心/关系、职业表达、两项当前叙事Trait、兼容背景、排除内容和TEXT/TEXT_LIST世界扩展。年龄、属性、派生值、财富、装备ID、声望、关系、状态、布尔规则和数值/枚举扩展均不可生成；本地patch后再对比全部Rules/entity-owned投影。
+- 所有字段复用M2`AIFieldAssist`和`useAIFieldAssist`，补上外部草稿同步；保留显式采用/撤销、取消、错误重试、同字段并发拒绝和迟到响应隔离。整卡类操作只产生预览，显式采用后可整批撤销。
+- 生成请求显式携带当前页面草稿、尚未保存的锁定集、锁定Constitution和世界扩展定义；同一锁定集用于目标过滤、本地patch和`CHECK_CONSISTENCY`语义校验，不仅依赖上次保存的session。
+- 世界扩展校验区分“草稿逐字段编辑”与“已提供Profile/确认完整性”：草稿可先填一个文本扩展，正式档案和确认仍拒绝required缺失，未放宽正式事实门禁。
+- UI继续复用现有Token、角色布局和Game Component，将玩家可见的“AI候选/生成/完善”收敛为“命运”身份；没有开启M10-T07 Legacy视觉迁移，也没有改动Rules Engine、SQLite或正式角色写入合同。
+- 新增`DEC-123`固定候选复用、白名单、锁定上下文与本地authority边界；`docs/TASKS.md`仅将M5-T03标记DONE，未修改已完成历史、依赖或M5-T04范围。
+
+### 回归、自审与限制
+
+- 专项测试覆盖静态及动态字段盘点、3候选、当前未保存锁定保留、Rules-owned不变、矛盾拒绝、一次schema repair、并发拒绝、迟到响应、候选/整批撤销和非叙事扩展排除。
+- 页面定向测试首次暴露批量请求会被每次重渲染的effect cleanup立即取消；改为只在页面卸载时中止。后续自审又发现未保存新锁未进入Prompt，改为页面显式传递并增加请求内容回归；两处均未以放宽断言规避。
+- 首次完整共享门禁仅发现一处新增测试格式偏差；用Prettier修正后从头重跑。最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 119个文件/729项通过，另1个文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 110项通过、0失败，另1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建225个模块，通用角色创建页独立lazy chunk成功产出。本任务不需要schema/SQLite迁移，portable`.emtavern`仍保持v2，未声称本任务扩大存档范围。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M5-T04。

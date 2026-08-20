@@ -1,3 +1,5 @@
+import { UNIVERSAL_CHARACTER_AI_FIELDS } from './universal-character-ai.js';
+
 export const NATURAL_LANGUAGE_FIELDS = [
   ['world-options-concept', 'world-creation-page.tsx', 'WORLD_DRAFT'],
   ['world-options-excluded-content', 'world-creation-page.tsx', 'WORLD_DRAFT'],
@@ -11,13 +13,10 @@ export const NATURAL_LANGUAGE_FIELDS = [
   ['world-forbidden-elements', 'world-creation-page.tsx', 'WORLD_LOCKABLE'],
   ['world-tavern-reason', 'world-creation-page.tsx', 'WORLD_LOCKABLE'],
   ['world-revision', 'world-creation-page.tsx', 'WORLD_REVISION'],
-  ['character-name', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
-  ['character-gender', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
-  ['character-concept', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
-  ['character-class-name', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
-  ['character-personal-goal', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
-  ['character-story-preferences', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
-  ['character-excluded-content', 'character-creation-page.tsx', 'CHARACTER_DRAFT'],
+  ...UNIVERSAL_CHARACTER_AI_FIELDS.map(
+    ({ path }) =>
+      [`character:${path}`, 'universal-character-creation-page.tsx', 'CHARACTER_DRAFT'] as const,
+  ),
   ['npc-dialogue-free-input', 'npc-dialogue-page.tsx', 'ACTION_COMPOSER'],
   ['adventure-free-input', 'adventure-page.tsx', 'ACTION_COMPOSER'],
 ] as const;

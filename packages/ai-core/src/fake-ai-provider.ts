@@ -88,6 +88,40 @@ export class FakeAIProvider implements AIProvider {
 
 function fakeOutput(request: NormalizedAIRequest): unknown {
   const base = FAKE_TASK_OUTPUTS[request.task];
+  if (request.task === 'EDIT_CHARACTER_DRAFT') {
+    const input = taskInput(request);
+    if (input === undefined) return base;
+    const targetPaths = Array.isArray(input?.['targetPaths']) ? input['targetPaths'] : [];
+    const fieldKinds = isRecord(input?.['fieldKinds']) ? input['fieldKinds'] : {};
+    const fieldPath = typeof input?.['fieldPath'] === 'string' ? input['fieldPath'] : 'identity';
+    if (input?.['fieldOperation'] === 'OPTIONS') {
+      return {
+        kind: 'FIELD_CANDIDATES',
+        fieldPath,
+        candidates: [
+          `命运候选一：${fieldPath}`,
+          `命运候选二：${fieldPath}`,
+          `命运候选三：${fieldPath}`,
+        ],
+      };
+    }
+    return {
+      kind: 'DRAFT_PATCH',
+      updates: targetPaths.flatMap((path) =>
+        typeof path !== 'string'
+          ? []
+          : [
+              {
+                path,
+                value:
+                  fieldKinds[path] === 'TEXT_LIST'
+                    ? [`由命运补全的${path}`]
+                    : `由命运补全的${path}`,
+              },
+            ],
+      ),
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;

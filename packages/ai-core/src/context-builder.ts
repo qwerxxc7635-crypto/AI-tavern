@@ -71,12 +71,22 @@ const ADVENTURE_CONTEXT_BUDGET = Object.freeze({
   historicalSummaryMaxCharacters: 4_000,
 }) satisfies ContextBudget;
 
+const CHARACTER_EDIT_CONTEXT_BUDGET = Object.freeze({
+  maxCharacters: 48_000,
+  recentMessageLimit: 0,
+  longTermMemoryLimit: 0,
+  recentTurnLimit: 0,
+  recentEventLimit: 0,
+  historicalSummaryMaxCharacters: 0,
+}) satisfies ContextBudget;
+
 export const TASK_CONTEXT_BUDGETS: Readonly<Record<AITask, ContextBudget>> = Object.freeze({
   GENERATE_WORLD: COMPACT_CONTEXT_BUDGET,
   REFINE_WORLD: COMPACT_CONTEXT_BUDGET,
   GENERATE_CHARACTER_TRAITS: COMPACT_CONTEXT_BUDGET,
   COMPLETE_CHARACTER_BACKGROUND: COMPACT_CONTEXT_BUDGET,
   GENERATE_QUICK_CHARACTER: COMPACT_CONTEXT_BUDGET,
+  EDIT_CHARACTER_DRAFT: CHARACTER_EDIT_CONTEXT_BUDGET,
   GENERATE_TAVERN: COMPACT_CONTEXT_BUDGET,
   GENERATE_NPCS: COMPACT_CONTEXT_BUDGET,
   NPC_REPLY: DIALOGUE_CONTEXT_BUDGET,

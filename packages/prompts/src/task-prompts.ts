@@ -55,6 +55,11 @@ export const TASK_PROMPTS = Object.freeze({
     'WORLD_DESIGNER',
     'Turn the single player concept into one complete editable character that obeys the locked World Constitution, player boundaries, and every supplied extension definition. Return narrative content and a unique attribute priority only; never assign money, status, derived values, equipment IDs, or mechanical bonuses. Use exactly two distinct narrative Traits for the current compatibility stage, fill every required extension field, and do not invent extension namespaces or keys.',
   ),
+  EDIT_CHARACTER_DRAFT: define(
+    'EDIT_CHARACTER_DRAFT',
+    'WORLD_DESIGNER',
+    'Edit only the exact targetPaths of the supplied universal character draft. Obey the locked World Constitution, content boundaries, extension definitions, and every locked field. FIELD with OPTIONS returns exactly three distinct candidates and no patch; every other operation returns a patch covering exactly the requested targets. Preserve value kinds, never invent paths, and never change age, attributes, derived values, skill numbers, wealth, equipment IDs, reputation, relationships, status, mechanical bonuses, or any non-target field.',
+  ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
     'WORLD_DESIGNER',

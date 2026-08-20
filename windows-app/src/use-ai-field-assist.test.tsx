@@ -80,4 +80,26 @@ describe('useAIFieldAssist', () => {
     expect(result.current.state).toMatchObject({ phase: 'ERROR', errorCode: 'GENERATION_FAILED' });
     expect(JSON.stringify(result.current.state)).not.toContain('secret provider detail');
   });
+
+  it('synchronizes an external bulk edit and isolates the superseded request', async () => {
+    const pending = deferred<readonly string[]>();
+    const { result, rerender } = renderHook(
+      ({ value }) =>
+        useAIFieldAssist({
+          initialValue: value,
+          generate: () => pending.promise,
+          onValueChange: vi.fn(),
+        }),
+      { initialProps: { value: '旧值' } },
+    );
+    let work!: Promise<void>;
+    act(() => {
+      work = result.current.start('GENERATE');
+    });
+    rerender({ value: '外部更新' });
+    expect(result.current.state).toMatchObject({ phase: 'IDLE', value: '外部更新' });
+    pending.resolve(['迟到候选']);
+    await work;
+    expect(result.current.state).toMatchObject({ phase: 'IDLE', value: '外部更新' });
+  });
 });

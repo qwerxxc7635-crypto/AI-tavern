@@ -5,7 +5,7 @@ import { NATURAL_LANGUAGE_FIELDS } from './ai-field-inventory.js';
 
 const sourceFiles = [
   'world-creation-page.tsx',
-  'character-creation-page.tsx',
+  'universal-character-creation-page.tsx',
   'npc-dialogue-page.tsx',
   'adventure-page.tsx',
 ] as const;
@@ -13,13 +13,20 @@ const sourceFiles = [
 describe('natural-language field inventory', () => {
   it('has unique ownership and exactly one source marker per field', () => {
     const ids = NATURAL_LANGUAGE_FIELDS.map(([id]) => id);
-    expect(ids).toHaveLength(21);
+    expect(ids.length).toBeGreaterThan(21);
     expect(new Set(ids).size).toBe(ids.length);
 
-    for (const [id, owner] of NATURAL_LANGUAGE_FIELDS) {
+    for (const [id, owner] of NATURAL_LANGUAGE_FIELDS.filter(
+      ([, , ownership]) => ownership !== 'CHARACTER_DRAFT',
+    )) {
       const source = readFileSync(new URL(`./${owner}`, import.meta.url), 'utf8');
       expect(source.match(new RegExp(`["']${id}["']`, 'g'))).toHaveLength(1);
     }
+    const characterSource = readFileSync(
+      new URL('./universal-character-ai-field.tsx', import.meta.url),
+      'utf8',
+    );
+    expect(characterSource).toContain('data-ai-field={`character:${path}`}');
   });
 
   it('accounts for every literal data-ai-field marker with no omissions', () => {
@@ -33,6 +40,9 @@ describe('natural-language field inventory', () => {
     expect(marked.length).toBeGreaterThan(0);
     expect(new Set(marked).size).toBe(marked.length);
     expect(marked.every((id) => inventory.has(id))).toBe(true);
+    expect(
+      NATURAL_LANGUAGE_FIELDS.filter(([, , owner]) => owner === 'CHARACTER_DRAFT').length,
+    ).toBeGreaterThan(30);
   });
 
   it('routes free-action fields to ActionComposer and post-draft facts to lockable ownership', () => {

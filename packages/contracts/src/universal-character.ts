@@ -258,27 +258,28 @@ export function validateCharacterExtensionValues(
   profile: UniversalCharacterProfile,
   definitions: readonly WorldCharacterExtensionDefinition[],
 ): void {
-  validateExtensionValues(profile, definitions, false);
+  validateExtensionValues(profile, definitions, false, true);
 }
 
 export function validateCompleteCharacterExtensionValues(
   profile: UniversalCharacterProfile,
   definitions: readonly WorldCharacterExtensionDefinition[],
 ): void {
-  validateExtensionValues(profile, definitions, true);
+  validateExtensionValues(profile, definitions, true, true);
 }
 
 export function validateCharacterExtensionDraftValues(
   profile: Pick<UniversalCharacterProfile, 'campaignId' | 'extensions'>,
   definitions: readonly WorldCharacterExtensionDefinition[],
 ): void {
-  validateExtensionValues(profile, definitions, false);
+  validateExtensionValues(profile, definitions, false, false);
 }
 
 function validateExtensionValues(
   profile: Pick<UniversalCharacterProfile, 'campaignId' | 'extensions'>,
   definitions: readonly WorldCharacterExtensionDefinition[],
   requireComplete: boolean,
+  requireSuppliedFields: boolean,
 ): void {
   const byNamespace = new Map(definitions.map((definition) => [definition.namespace, definition]));
   for (const extension of profile.extensions) {
@@ -301,7 +302,7 @@ function validateExtensionValues(
     for (const field of definition.fields) {
       const value = extension.values[field.key];
       if (value === undefined) {
-        if (field.required) {
+        if (field.required && requireSuppliedFields) {
           throw new UniversalCharacterError(`Missing field ${extension.namespace}.${field.key}`);
         }
         continue;

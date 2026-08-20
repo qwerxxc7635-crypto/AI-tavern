@@ -132,6 +132,10 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     },
     extensions: [],
   },
+  EDIT_CHARACTER_DRAFT: {
+    kind: 'DRAFT_PATCH',
+    updates: [{ path: 'identity', value: 'A patient investigator of ember-lit roads.' }],
+  },
   GENERATE_TAVERN: {
     name: 'Ember Rest',
     position: 'The harbor crossroads',

@@ -122,6 +122,14 @@ export function useAIFieldAssist({
     [],
   );
 
+  useEffect(() => {
+    if (initialValue !== stateRef.current.value) {
+      abortRef.current?.abort();
+      abortRef.current = null;
+    }
+    transition({ type: 'SYNC', value: initialValue });
+  }, [initialValue, transition]);
+
   return { state, start, cancel, select, apply, undo, retry, edit, lock, unlock };
 }
 

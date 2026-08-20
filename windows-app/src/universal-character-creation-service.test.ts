@@ -1,4 +1,9 @@
-import { FakeAIProvider } from '@ember-tavern/ai-core';
+import {
+  FakeAIProvider,
+  type AIProvider,
+  type NormalizedAIRequest,
+  type ProviderConfig,
+} from '@ember-tavern/ai-core';
 import {
   aiRequestId,
   campaignId,
@@ -86,7 +91,142 @@ describe('UniversalCharacterCreationService', () => {
     await expect(service.prepareAdvanced(gateway.snapshot)).rejects.toThrow(/bounded text/);
     expect(gateway.saves).toHaveLength(0);
   });
+
+  it('returns exactly three provisional field candidates and validates them for consistency', async () => {
+    const gateway = new FakeGateway(advancedSnapshot());
+    const service = serviceWith(gateway);
+    const session = gateway.snapshot.session;
+    if (session === null) throw new Error('Fixture session missing');
+
+    const candidates = await service.assistField(
+      gateway.snapshot,
+      session.draft,
+      session.lockedFields,
+      'identity',
+      'OPTIONS',
+      new AbortController().signal,
+    );
+
+    expect(candidates).toEqual([
+      '命运候选一：identity',
+      '命运候选二：identity',
+      '命运候选三：identity',
+    ]);
+    expect(gateway.snapshot.session?.draft.identity).toBe('');
+  });
+
+  it('fills every empty unlocked narrative field without changing rules-owned state', async () => {
+    const gateway = new FakeGateway(advancedSnapshot());
+    const provider = new CapturingCharacterProvider();
+    const service = serviceWith(gateway, provider);
+    const session = gateway.snapshot.session;
+    if (session === null) throw new Error('Fixture session missing');
+
+    const preview = await service.generateDraftPreview(
+      gateway.snapshot,
+      session.draft,
+      ['nickname'],
+      { scope: 'FILL_EMPTY' },
+      new AbortController().signal,
+    );
+
+    expect(preview.draft).toMatchObject({
+      nickname: null,
+      identity: '由命运补全的identity',
+      attributes: session.draft.attributes,
+      wealth: 0,
+      skills: [],
+    });
+    expect(preview.changedPaths).not.toContain('nickname');
+    expect(preview.changedPaths).not.toContain('attributes.knowledge');
+    expect(
+      provider.requests.find(({ task }) => task === 'EDIT_CHARACTER_DRAFT')?.messages.at(-1)
+        ?.content,
+    ).toContain('"lockedFields":["nickname"]');
+  });
+
+  it('repairs malformed field output once and rejects a semantic contradiction', async () => {
+    const repairGateway = new FakeGateway(advancedSnapshot());
+    const repairService = serviceWith(repairGateway, new InvalidCharacterEditOnceProvider());
+    const repairSession = repairGateway.snapshot.session;
+    if (repairSession === null) throw new Error('Fixture session missing');
+    await expect(
+      repairService.assistField(
+        repairGateway.snapshot,
+        repairSession.draft,
+        repairSession.lockedFields,
+        'identity',
+        'GENERATE',
+        new AbortController().signal,
+      ),
+    ).resolves.toEqual(['修复后的调查员身份']);
+
+    const contradictionGateway = new FakeGateway(advancedSnapshot());
+    const contradictionService = serviceWith(
+      contradictionGateway,
+      new ContradictingCharacterProvider(),
+    );
+    const contradictionSession = contradictionGateway.snapshot.session;
+    if (contradictionSession === null) throw new Error('Fixture session missing');
+    await expect(
+      contradictionService.assistField(
+        contradictionGateway.snapshot,
+        contradictionSession.draft,
+        contradictionSession.lockedFields,
+        'identity',
+        'GENERATE',
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ code: 'CHARACTER_CONTRADICTION' });
+  });
 });
+
+class InvalidCharacterEditOnceProvider extends FakeAIProvider {
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    if (request.task === 'EDIT_CHARACTER_DRAFT' && !request.requestId.endsWith('-repair')) {
+      const response = await super.generate(request, config);
+      return { ...response, content: '{}' };
+    }
+    if (request.task === 'EDIT_CHARACTER_DRAFT') {
+      const response = await super.generate({ ...request, task: 'CHECK_CONSISTENCY' }, config);
+      return {
+        ...response,
+        requestId: request.requestId,
+        content: JSON.stringify({
+          kind: 'DRAFT_PATCH',
+          updates: [{ path: 'identity', value: '修复后的调查员身份' }],
+        }),
+      };
+    }
+    return super.generate(request, config);
+  }
+}
+
+class CapturingCharacterProvider extends FakeAIProvider {
+  public readonly requests: NormalizedAIRequest[] = [];
+
+  public override generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    this.requests.push(request);
+    return super.generate(request, config);
+  }
+}
+
+class ContradictingCharacterProvider extends FakeAIProvider {
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    const response = await super.generate(request, config);
+    return request.task === 'CHECK_CONSISTENCY'
+      ? {
+          ...response,
+          content: JSON.stringify({
+            consistent: false,
+            issues: [
+              { severity: 'ERROR', path: 'identity', message: 'Conflicts with a locked rule.' },
+            ],
+          }),
+        }
+      : response;
+  }
+}
 
 class FakeGateway implements UniversalCharacterCreationGateway {
   public readonly saves: Array<{ expectedRevision: number; session: CharacterCreationSession }> =
@@ -148,10 +288,10 @@ class FakeGateway implements UniversalCharacterCreationGateway {
   }
 }
 
-function serviceWith(gateway: FakeGateway) {
+function serviceWith(gateway: FakeGateway, provider: AIProvider = new FakeAIProvider()) {
   return new UniversalCharacterCreationService(
     gateway,
-    new FakeAIProvider(),
+    provider,
     () => ({
       requestId: aiRequestId('character-quick-request-fixed'),
       generationRecordId: generationRecordId('character-quick-generation-fixed'),

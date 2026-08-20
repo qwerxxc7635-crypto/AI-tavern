@@ -4,6 +4,8 @@ import type { AITask } from './protocol.js';
 import {
   CheckConsistencyInputSchema,
   CheckConsistencyOutputSchema,
+  EditCharacterDraftInputSchema,
+  EditCharacterDraftOutputSchema,
   CompleteCharacterBackgroundInputSchema,
   CompleteCharacterBackgroundOutputSchema,
   ExtractMemoriesInputSchema,
@@ -65,6 +67,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
     GenerateQuickCharacterInputSchema,
     GenerateQuickCharacterOutputSchema,
   ),
+  EDIT_CHARACTER_DRAFT: definition(EditCharacterDraftInputSchema, EditCharacterDraftOutputSchema),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),
