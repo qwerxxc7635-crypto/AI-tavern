@@ -20,6 +20,7 @@ import {
   stageQuickCharacterDraft,
   switchCharacterCreationMode,
 } from './character-creation-session.js';
+import { DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION } from './trait-balance.js';
 import { createWorldCharacterExtensionDefinition } from './universal-character.js';
 
 const campaignKey = campaignId('campaign-creation-v3');
@@ -258,6 +259,101 @@ describe('character creation session', () => {
     );
     expect(() => prepareAdvancedCharacterDraft(unbalanced, definitions, at2)).toThrow(
       /exactly zero/,
+    );
+  });
+
+  it('keeps a strict-zero mechanical draft active until ten-dimension evidence is complete', () => {
+    const source = completeDraft();
+    const [first, second] = source.traits;
+    if (first === undefined || second === undefined) {
+      throw new Error('fixture must include two Traits');
+    }
+    const mechanicalTraits = [
+      {
+        ...first,
+        pointProfile: {
+          type: 'BUFF' as const,
+          positiveEffect: '能辨认隐藏的踪迹。',
+          negativeEffect: null,
+          buffPoints: -1,
+          debuffPoints: 0,
+        },
+      },
+      {
+        ...second,
+        pointProfile: {
+          type: 'DEBUFF' as const,
+          positiveEffect: null,
+          negativeEffect: '无法放弃尚未追完的踪迹。',
+          buffPoints: 0,
+          debuffPoints: 1,
+        },
+      },
+    ];
+    const [buffTrait, debuffTrait] = mechanicalTraits;
+    if (buffTrait?.pointProfile === undefined || debuffTrait?.pointProfile === undefined) {
+      throw new Error('mechanical fixtures must include point profiles');
+    }
+    const missing = createCharacterCreationSession(
+      {
+        id: 'creation-session-missing-trait-balance',
+        campaignId: campaignKey,
+        characterId: characterKey,
+        constitutionRevision: 3,
+        mode: 'ADVANCED',
+        conceptInput: null,
+        draft: { ...source, traits: mechanicalTraits },
+        createdAt: at1,
+      },
+      definitions,
+    );
+    expect(() => prepareAdvancedCharacterDraft(missing, definitions, at2)).toThrow(
+      /explainable issue/,
+    );
+
+    const assessed = createCharacterCreationSession(
+      {
+        id: 'creation-session-assessed-trait-balance',
+        campaignId: campaignKey,
+        characterId: characterKey,
+        constitutionRevision: 3,
+        mode: 'ADVANCED',
+        conceptInput: null,
+        draft: {
+          ...source,
+          traits: [
+            {
+              ...buffTrait,
+              pointProfile: {
+                ...buffTrait.pointProfile,
+                positiveBalance: {
+                  ...DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+                  mechanicTags: ['追踪'],
+                  requiresTags: ['踪迹'],
+                },
+                negativeBalance: null,
+              },
+            },
+            {
+              ...debuffTrait,
+              pointProfile: {
+                ...debuffTrait.pointProfile,
+                positiveBalance: null,
+                negativeBalance: {
+                  ...DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+                  mechanicTags: ['执念'],
+                  requiresTags: ['未解之谜'],
+                },
+              },
+            },
+          ],
+        },
+        createdAt: at1,
+      },
+      definitions,
+    );
+    expect(prepareAdvancedCharacterDraft(assessed, definitions, at2).status).toBe(
+      'READY_TO_CONFIRM',
     );
   });
 });

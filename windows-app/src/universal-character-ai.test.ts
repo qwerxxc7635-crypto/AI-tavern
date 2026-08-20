@@ -106,6 +106,14 @@ describe('universal character AI patch boundary', () => {
         [],
       ),
     ).toThrow(/FIELD_NOT_EDITABLE/);
+    expect(() =>
+      applyCharacterAIUpdates(
+        mixed,
+        [{ path: 'traits.0.pointProfile.positiveBalance.frequency', value: 'CONSTANT' }],
+        [definition],
+        [],
+      ),
+    ).toThrow(/FIELD_NOT_EDITABLE/);
   });
 
   it('applies narrative updates while preserving every Rules-owned value', () => {

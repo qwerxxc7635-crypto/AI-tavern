@@ -2604,3 +2604,27 @@ M5-T04要求Buff、Debuff、Mixed和Narrative四类Trait、-5至+5点数与严�
 - Trait点数不会自动成为M4-T03检定修正，也不改变Rules事务、D20、Quest、Provider、SQLite真相或存档状态机。
 - M5-T04不判断效果强度、频率、条件或组合套利；`TraitBalanceValidator`与`TraitSynergyValidator`严格留给M5-T05。
 - portable `.emtavern` v2仍未覆盖完整通用档案；跨语言格式升级继续由M10-T05集中处理。
+
+## DEC-125：Trait 平衡采用显式十维证据和结构化协同裁决
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T05`、`docs/V0.3_SPEC.md` 10.3节、`DEC-124`
+
+### 背景
+
+M5-T04只能证明点数结构与总和，无法仅凭“看清黑暗”或“无法拒绝求助”等自然语言，可靠判断触发频率、适用环境、四类影响、永久性、可规避性、稀有度和条件。让LLM直接给出最终分值不可重复审计；只比较正负点总和又允许高强度优势用名义弱点换点，或通过另一优势直接消除弱点和触发条件。
+
+### 决定与理由
+
+策略版本1要求每个机械正负效果分别声明十维0至3序数，并声明机制、授予、所需和抵消标签。十维总分以公开区间`0–5/6–11/12–17/18–23/24–30`映射到1至5点；至少一个战斗、社交、剧情或经济影响非零，非无条件效果必须有显式条件标签。`TraitBalanceValidator`逐维输出breakdown、总分、建议点、Trait和字段路径，不从文本推导。
+
+`TraitSynergyValidator`拒绝正面效果抵消计点弱点、正面集合自供且实际造成低档折扣的条件，以及正面效果间的自维持触发闭环；普通主题/机制重叠和不改变点数档位的条件协作不自动失败。报告绑定锁定Constitution身份与策略版本；`TraitGenerationFeedback`组合稳定issue供生成修复，但接受权仍只属于本地规则。
+
+### 影响与边界
+
+- M5-T04缺少声明的旧机械Profile保持可读、可编辑和可恢复，但不能重新进入`READY_TO_CONFIRM`；Narrative 0与空集合继续合法，不伪造迁移数据。
+- 页面实时展示十维声明、本地建议档位和中文解释；不匹配或套利只禁用准备/确认，不阻止保存未完成草稿。
+- TypeScript合同、Domain和Rust Native镜像策略版本1的枚举、边界、分档与确认门禁；声明嵌入既有JSON，不新增SQLite migration。
+- AI可接收结构化反馈或建议修改，但不能改Trait类型、点值、平衡声明或最终accepted状态；M4-T03 `TraitRuleModifier`、D20和其他Rules事务不变。
+- 本任务不实现M6 Career Pool、动态实体生成或从Constitution自然语言自动推断世界权重；同Campaign和Constitution revision是当前不可变世界规则身份。

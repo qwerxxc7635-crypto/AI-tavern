@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { DatabaseSync, type StatementSync } from 'node:sqlite';
 
 import {
+  DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
   campaignId,
   characterTraitId,
   createCampaign,
@@ -93,8 +94,24 @@ describe('CharacterCreationSessionRepository', () => {
         name: '沈烬',
         extensions: [{ namespace: 'cultivation', values: { spiritRoot: '火' } }],
         traits: [
-          { pointProfile: { type: 'BUFF', buffPoints: -2, debuffPoints: 0 } },
-          { pointProfile: { type: 'DEBUFF', buffPoints: 0, debuffPoints: 2 } },
+          {
+            pointProfile: {
+              type: 'BUFF',
+              buffPoints: -2,
+              debuffPoints: 0,
+              positiveBalance: { mechanicTags: ['寻路'], frequency: 'CONSTANT' },
+              negativeBalance: null,
+            },
+          },
+          {
+            pointProfile: {
+              type: 'DEBUFF',
+              buffPoints: 0,
+              debuffPoints: 2,
+              positiveBalance: null,
+              negativeBalance: { mechanicTags: ['救援冲动'], frequency: 'CONSTANT' },
+            },
+          },
         ],
       });
       expect(new UniversalCharacterRepository(durableDb).requireProfile(fixture.character)).toEqual(
@@ -342,6 +359,14 @@ function balancedPointDraft(
           negativeEffect: null,
           buffPoints: -2,
           debuffPoints: 0,
+          positiveBalance: {
+            ...DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+            frequency: 'CONSTANT',
+            environment: 'BROAD',
+            mechanicTags: ['寻路'],
+            requiresTags: ['烟尘'],
+          },
+          negativeBalance: null,
         },
       },
       {
@@ -352,6 +377,14 @@ function balancedPointDraft(
           negativeEffect: '无法忽视被困在烟火中的陌生人。',
           buffPoints: 0,
           debuffPoints: 2,
+          positiveBalance: null,
+          negativeBalance: {
+            ...DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+            frequency: 'CONSTANT',
+            environment: 'BROAD',
+            mechanicTags: ['救援冲动'],
+            requiresTags: ['受困者'],
+          },
         },
       },
     ],

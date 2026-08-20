@@ -192,6 +192,42 @@ describe('Universal Character Creation page', () => {
     expect(screen.getByText('本地重算：0（可开始）')).toBeDefined();
     expect(screen.getByRole('button', { name: '添加特质' })).toBeDefined();
   });
+
+  it('edits all balance evidence, follows the transparent tier and rejects synergy arbitrage', async () => {
+    const active = snapshot(session('ADVANCED', 'ACTIVE'));
+    renderPage(actions(active));
+    await screen.findByText('本地重算：0（可开始）');
+
+    const [firstType, secondType] = screen.getAllByLabelText('特质类型');
+    if (firstType === undefined || secondType === undefined) {
+      throw new Error('page must render two Trait type selectors');
+    }
+    fireEvent.change(firstType, { target: { value: 'BUFF' } });
+    fireEvent.change(secondType, { target: { value: 'DEBUFF' } });
+    expect(screen.getByText('十维平衡与协同：已通过')).toBeDefined();
+    expect(screen.getByText('正面效果十维评估 · 本地建议 1 点')).toBeDefined();
+    expect(screen.getByText('负面效果十维评估 · 本地建议 1 点')).toBeDefined();
+
+    const frequencies = screen.getAllByLabelText('触发频率');
+    const environments = screen.getAllByLabelText('环境范围');
+    for (const select of frequencies) fireEvent.change(select, { target: { value: 'CONSTANT' } });
+    for (const select of environments) fireEvent.change(select, { target: { value: 'BROAD' } });
+    expect(screen.getAllByText(/本地建议 2 点/)).toHaveLength(2);
+    expect(screen.getByText('点数必须与十维评估计算出的本地建议档位一致。')).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText('增益消耗'), { target: { value: '-2' } });
+    fireEvent.change(screen.getByLabelText('弱点提供'), { target: { value: '2' } });
+    expect(screen.getByText('十维平衡与协同：已通过')).toBeDefined();
+
+    const neutralizers = screen.getAllByLabelText('抵消标签（逗号分隔）');
+    const positiveNeutralizer = neutralizers[0];
+    if (positiveNeutralizer === undefined) throw new Error('positive balance editor is missing');
+    fireEvent.change(positiveNeutralizer, { target: { value: '通用' } });
+    expect(screen.getByText('正面效果不能直接抵消用于换取点数的弱点。')).toBeDefined();
+    expect(
+      (screen.getByRole('button', { name: '校验完整车卡' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+  });
 });
 
 function renderPage(service: ReturnType<typeof actions>) {

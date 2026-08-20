@@ -378,19 +378,33 @@ function assertTraitPointAuthorityPreserved(
   const ruleProfile = (trait: UniversalCharacterDraft['traits'][number]) => {
     const profile = trait.pointProfile;
     if (profile === undefined) {
-      return { type: 'NARRATIVE', buffPoints: 0, debuffPoints: 0 };
+      return {
+        type: 'NARRATIVE',
+        buffPoints: 0,
+        debuffPoints: 0,
+        positiveBalance: null,
+        negativeBalance: null,
+      };
     }
     return {
       type: profile.type,
       buffPoints: profile.buffPoints,
       debuffPoints: profile.debuffPoints,
+      positiveBalance: profile.positiveBalance ?? null,
+      negativeBalance: profile.negativeBalance ?? null,
     };
   };
   for (const trait of after.traits) {
     const previous = before.traits.find(({ id }) => id === trait.id);
     const expected =
       previous === undefined
-        ? { type: 'NARRATIVE', buffPoints: 0, debuffPoints: 0 }
+        ? {
+            type: 'NARRATIVE',
+            buffPoints: 0,
+            debuffPoints: 0,
+            positiveBalance: null,
+            negativeBalance: null,
+          }
         : ruleProfile(previous);
     if (JSON.stringify(ruleProfile(trait)) !== JSON.stringify(expected)) {
       throw new CharacterDraftAIError('RULE_AUTHORITY_CHANGED');

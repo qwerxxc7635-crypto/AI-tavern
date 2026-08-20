@@ -3,18 +3,29 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
   CHARACTER_TRAIT_TYPES,
+  DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
   NARRATIVE_TRAIT_POINT_PROFILE,
+  TRAIT_AVOIDABILITY_LEVELS,
+  TRAIT_CONDITION_SCOPES,
+  TRAIT_EFFECT_RARITIES,
+  TRAIT_ENVIRONMENT_SCOPES,
+  TRAIT_FREQUENCIES,
+  TRAIT_IMPACT_LEVELS,
+  TRAIT_PERMANENCE_LEVELS,
+  TraitBalanceError,
   TraitPointError,
   characterTraitId,
   createTraitPointProfile,
+  recommendedTraitPoints,
   type CharacterTrait,
   type CharacterAttributeName,
   type CharacterCreationMode,
   type CharacterTraitType,
+  type TraitEffectBalanceDeclaration,
   type TraitPointProfile,
   type UniversalCharacterDraft,
 } from '@ember-tavern/contracts';
-import { evaluateCharacterTraitPoints } from '@ember-tavern/domain';
+import { evaluateCharacterTraitPoints, traitGenerationFeedback } from '@ember-tavern/domain';
 
 import { AIErrorNotice } from './ai-error-notice.js';
 import { APP_PATHS, campaignRoute } from './navigation.js';
@@ -107,6 +118,80 @@ const BOUNDARY_FIELDS = [
   ['allowRomance', '允许浪漫'],
   ['allowBetrayal', '允许背叛'],
 ] as const;
+
+type BalanceScalarField =
+  | 'frequency'
+  | 'environment'
+  | 'combat'
+  | 'social'
+  | 'narrative'
+  | 'economy'
+  | 'permanence'
+  | 'avoidability'
+  | 'rarity'
+  | 'condition';
+
+const BALANCE_SELECT_FIELDS = [
+  {
+    key: 'frequency',
+    label: '触发频率',
+    options: balanceOptions(TRAIT_FREQUENCIES, ['罕见', '偶尔', '常见', '持续']),
+  },
+  {
+    key: 'environment',
+    label: '环境范围',
+    options: balanceOptions(TRAIT_ENVIRONMENT_SCOPES, [
+      '单一场景',
+      '有限环境',
+      '广泛环境',
+      '任何环境',
+    ]),
+  },
+  {
+    key: 'combat',
+    label: '战斗影响',
+    options: balanceOptions(TRAIT_IMPACT_LEVELS, ['无', '轻微', '显著', '主导']),
+  },
+  {
+    key: 'social',
+    label: '社交影响',
+    options: balanceOptions(TRAIT_IMPACT_LEVELS, ['无', '轻微', '显著', '主导']),
+  },
+  {
+    key: 'narrative',
+    label: '剧情影响',
+    options: balanceOptions(TRAIT_IMPACT_LEVELS, ['无', '轻微', '显著', '主导']),
+  },
+  {
+    key: 'economy',
+    label: '经济影响',
+    options: balanceOptions(TRAIT_IMPACT_LEVELS, ['无', '轻微', '显著', '主导']),
+  },
+  {
+    key: 'permanence',
+    label: '持续时间',
+    options: balanceOptions(TRAIT_PERMANENCE_LEVELS, ['瞬时', '本场景', '持续', '永久']),
+  },
+  {
+    key: 'avoidability',
+    label: '可规避性',
+    options: balanceOptions(TRAIT_AVOIDABILITY_LEVELS, ['容易', '有代价', '困难', '无法规避']),
+  },
+  {
+    key: 'rarity',
+    label: '效果稀有度',
+    options: balanceOptions(TRAIT_EFFECT_RARITIES, ['常见', '少见', '稀有', '独特']),
+  },
+  {
+    key: 'condition',
+    label: '触发条件',
+    options: balanceOptions(TRAIT_CONDITION_SCOPES, ['严格', '特定', '宽泛', '无条件']),
+  },
+] as const satisfies readonly {
+  readonly key: BalanceScalarField;
+  readonly label: string;
+  readonly options: readonly { readonly value: string; readonly label: string }[];
+}[];
 
 export function CharacterCreationPage({
   service = universalCharacterCreationService,
@@ -330,7 +415,11 @@ export function CharacterCreationPage({
 
   const locks = lockedFields;
   const ready = session.status === 'READY_TO_CONFIRM';
-  const traitBudget = draftTraitBudget(draft.traits);
+  const traitRules = draftTraitRules(
+    draft.traits,
+    session.campaignId,
+    session.constitutionRevision,
+  );
   return (
     <main className="character-studio">
       <Header step={ready ? '03 · 确认候选' : '02 · 编辑草稿'} />
@@ -592,9 +681,17 @@ export function CharacterCreationPage({
               0。
             </p>
             <p role="status">
-              本地重算：{traitBudget.valid ? traitBudget.net : '配置不完整'}
-              {traitBudget.valid && traitBudget.net === 0 ? '（可开始）' : '（禁止开始）'}
+              本地重算：{traitRules.pointValid ? traitRules.net : '配置不完整'}
+              {traitRules.valid ? '（可开始）' : '（禁止开始）'}
             </p>
+            <p role="status">十维平衡与协同：{traitRules.valid ? '已通过' : '待完善'}</p>
+            {traitRules.messages.length === 0 ? null : (
+              <ul>
+                {traitRules.messages.map((message) => (
+                  <li key={message}>{message}</li>
+                ))}
+              </ul>
+            )}
             {draft.traits.map((trait, index) => {
               const pointProfile = draftTraitPointProfile(trait);
               return (
@@ -686,6 +783,27 @@ export function CharacterCreationPage({
                           })
                         }
                       />
+                      <TraitBalanceEditor
+                        label="正面效果十维评估"
+                        value={
+                          pointProfile.positiveBalance ?? DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION
+                        }
+                        missing={pointProfile.positiveBalance == null}
+                        disabled={isLocked('traits', locks)}
+                        onChange={(positiveBalance) =>
+                          editDraft({
+                            ...draft,
+                            traits: replaceTrait(draft.traits, index, {
+                              ...trait,
+                              pointProfile: {
+                                ...pointProfile,
+                                positiveBalance,
+                                negativeBalance: pointProfile.negativeBalance ?? null,
+                              },
+                            }),
+                          })
+                        }
+                      />
                     </>
                   ) : null}
                   {pointProfile.type === 'DEBUFF' || pointProfile.type === 'MIXED' ? (
@@ -718,6 +836,27 @@ export function CharacterCreationPage({
                             traits: replaceTrait(draft.traits, index, {
                               ...trait,
                               pointProfile: { ...pointProfile, debuffPoints },
+                            }),
+                          })
+                        }
+                      />
+                      <TraitBalanceEditor
+                        label="负面效果十维评估"
+                        value={
+                          pointProfile.negativeBalance ?? DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION
+                        }
+                        missing={pointProfile.negativeBalance == null}
+                        disabled={isLocked('traits', locks)}
+                        onChange={(negativeBalance) =>
+                          editDraft({
+                            ...draft,
+                            traits: replaceTrait(draft.traits, index, {
+                              ...trait,
+                              pointProfile: {
+                                ...pointProfile,
+                                positiveBalance: pointProfile.positiveBalance ?? null,
+                                negativeBalance,
+                              },
                             }),
                           })
                         }
@@ -876,7 +1015,7 @@ export function CharacterCreationPage({
               <button
                 className="primary-action"
                 type="button"
-                disabled={busy || !traitBudget.valid || traitBudget.net !== 0}
+                disabled={busy || !traitRules.valid}
                 onClick={() =>
                   void perform(async () => {
                     const saved = await service.saveDraft(snapshot, draft, locks);
@@ -890,7 +1029,7 @@ export function CharacterCreationPage({
             <button
               className="primary-action"
               type="button"
-              disabled={busy || !ready || dirty || !traitBudget.valid || traitBudget.net !== 0}
+              disabled={busy || !ready || dirty || !traitRules.valid}
               onClick={() => void perform(() => service.confirm(snapshot))}
             >
               确认角色
@@ -1014,6 +1153,109 @@ function TraitPointSelect({
   );
 }
 
+function TraitBalanceEditor({
+  label,
+  value,
+  missing,
+  disabled,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: TraitEffectBalanceDeclaration;
+  readonly missing: boolean;
+  readonly disabled: boolean;
+  readonly onChange: (value: TraitEffectBalanceDeclaration) => void;
+}) {
+  const recommendation = draftBalanceRecommendation(value);
+  const updateScalar = (key: BalanceScalarField, next: string) => {
+    const conditionPatch =
+      key === 'condition'
+        ? {
+            condition: next as TraitEffectBalanceDeclaration['condition'],
+            requiresTags: next === 'UNCONDITIONAL' ? [] : value.requiresTags,
+          }
+        : {};
+    onChange({ ...value, ...conditionPatch, [key]: next } as TraitEffectBalanceDeclaration);
+  };
+  return (
+    <details>
+      <summary>
+        {label} · 本地建议 {recommendation ?? '配置不完整'} 点
+      </summary>
+      {missing ? (
+        <button type="button" disabled={disabled} onClick={() => onChange(value)}>
+          采用当前评估
+        </button>
+      ) : null}
+      {BALANCE_SELECT_FIELDS.map(({ key, label: fieldLabel, options }) => (
+        <label key={key}>
+          {fieldLabel}
+          <select
+            value={value[key]}
+            disabled={disabled}
+            onChange={(event) => updateScalar(key, event.target.value)}
+          >
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+      <BalanceTagField
+        label="机制标签"
+        value={value.mechanicTags}
+        disabled={disabled}
+        onChange={(mechanicTags) => onChange({ ...value, mechanicTags })}
+      />
+      <BalanceTagField
+        label="授予标签"
+        value={value.grantsTags}
+        disabled={disabled}
+        onChange={(grantsTags) => onChange({ ...value, grantsTags })}
+      />
+      {value.condition === 'UNCONDITIONAL' ? null : (
+        <BalanceTagField
+          label="所需条件标签"
+          value={value.requiresTags}
+          disabled={disabled}
+          onChange={(requiresTags) => onChange({ ...value, requiresTags })}
+        />
+      )}
+      <BalanceTagField
+        label="抵消标签"
+        value={value.neutralizesTags}
+        disabled={disabled}
+        onChange={(neutralizesTags) => onChange({ ...value, neutralizesTags })}
+      />
+    </details>
+  );
+}
+
+function BalanceTagField({
+  label,
+  value,
+  disabled,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: readonly string[];
+  readonly disabled: boolean;
+  readonly onChange: (value: readonly string[]) => void;
+}) {
+  return (
+    <label>
+      {label}（逗号分隔）
+      <input
+        value={value.join('，')}
+        disabled={disabled}
+        onChange={(event) => onChange(parseBalanceTags(event.target.value))}
+      />
+    </label>
+  );
+}
+
 function draftTraitPointProfile(trait: CharacterTrait): TraitPointProfile {
   try {
     return createTraitPointProfile(trait.pointProfile);
@@ -1023,15 +1265,35 @@ function draftTraitPointProfile(trait: CharacterTrait): TraitPointProfile {
   }
 }
 
-function draftTraitBudget(traits: readonly CharacterTrait[]): {
+function draftTraitRules(
+  traits: readonly CharacterTrait[],
+  scope: string,
+  revision: number,
+): {
   readonly valid: boolean;
+  readonly pointValid: boolean;
   readonly net: number;
+  readonly messages: readonly string[];
 } {
   try {
-    return { valid: true, net: evaluateCharacterTraitPoints(traits).netPoints };
+    const points = evaluateCharacterTraitPoints(traits);
+    const worldRules = { scope, revision };
+    const feedback = traitGenerationFeedback(traits, worldRules);
+    const messages = feedback.issues.map(traitIssueMessage);
+    return {
+      valid: points.netPoints === 0 && feedback.accepted,
+      pointValid: true,
+      net: points.netPoints,
+      messages: Object.freeze([...new Set(messages)]),
+    };
   } catch (cause) {
-    if (!(cause instanceof TraitPointError)) throw cause;
-    return { valid: false, net: 0 };
+    if (!(cause instanceof TraitPointError || cause instanceof TraitBalanceError)) throw cause;
+    return {
+      valid: false,
+      pointValid: false,
+      net: 0,
+      messages: Object.freeze(['特质评估配置不完整或格式无效。']),
+    };
   }
 }
 
@@ -1048,6 +1310,8 @@ function changeTraitPointType(type: CharacterTraitType, trait: CharacterTrait): 
         negativeEffect: null,
         buffPoints: current.buffPoints < 0 ? current.buffPoints : -1,
         debuffPoints: 0,
+        positiveBalance: current.positiveBalance ?? DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+        negativeBalance: null,
       };
     case 'DEBUFF':
       return {
@@ -1056,6 +1320,8 @@ function changeTraitPointType(type: CharacterTraitType, trait: CharacterTrait): 
         negativeEffect,
         buffPoints: 0,
         debuffPoints: current.debuffPoints > 0 ? current.debuffPoints : 1,
+        positiveBalance: null,
+        negativeBalance: current.negativeBalance ?? DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
       };
     case 'MIXED':
       return {
@@ -1064,10 +1330,56 @@ function changeTraitPointType(type: CharacterTraitType, trait: CharacterTrait): 
         negativeEffect,
         buffPoints: current.buffPoints < 0 ? current.buffPoints : -1,
         debuffPoints: current.debuffPoints > 0 ? current.debuffPoints : 1,
+        positiveBalance: current.positiveBalance ?? DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+        negativeBalance: current.negativeBalance ?? DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
       };
     case 'NARRATIVE':
       return NARRATIVE_TRAIT_POINT_PROFILE;
   }
+}
+
+function draftBalanceRecommendation(value: TraitEffectBalanceDeclaration): number | null {
+  try {
+    return recommendedTraitPoints(value);
+  } catch (cause) {
+    if (!(cause instanceof TraitBalanceError)) throw cause;
+    return null;
+  }
+}
+
+function traitIssueMessage(issue: { readonly code: string }): string {
+  switch (issue.code) {
+    case 'BALANCE_DECLARATION_MISSING':
+      return '机械特质需要补全十维评估。';
+    case 'POINT_TIER_MISMATCH':
+      return '点数必须与十维评估计算出的本地建议档位一致。';
+    case 'DRAWBACK_NEUTRALIZED':
+      return '正面效果不能直接抵消用于换取点数的弱点。';
+    case 'CONDITION_BYPASS':
+      return '正面效果不能通过自行提供条件来维持较低点数档位。';
+    case 'POSITIVE_FEEDBACK_LOOP':
+      return '正面效果之间不能形成自我维持的触发循环。';
+    default:
+      return '特质未通过本地平衡规则。';
+  }
+}
+
+function parseBalanceTags(value: string): readonly string[] {
+  return Object.freeze(
+    value
+      .split(/[,，]/u)
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.length > 0),
+  );
+}
+
+function balanceOptions<const Values extends readonly string[]>(
+  values: Values,
+  labels: { readonly [Index in keyof Values]: string },
+): readonly { readonly value: Values[number]; readonly label: string }[] {
+  return Object.freeze(
+    values.map((value, index) => Object.freeze({ value, label: labels[index] ?? value })),
+  );
 }
 
 function traitTypeLabel(type: CharacterTraitType): string {

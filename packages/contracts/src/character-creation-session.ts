@@ -1,5 +1,10 @@
 import type { GenerationRecordId, IsoTimestamp } from './foundation.js';
-import { TraitPointError, assertBalancedCharacterTraitPoints } from './trait-points.js';
+import { TraitBalanceError, createTraitWorldRuleKey } from './trait-balance.js';
+import {
+  TraitPointError,
+  assertBalancedCharacterTraitPoints,
+  assertCharacterTraitBalanceAndSynergy,
+} from './trait-points.js';
 import {
   UniversalCharacterError,
   createUniversalCharacterProfile,
@@ -251,6 +256,7 @@ export function restoreCharacterCreationSession(
       {
         campaignId: input.campaignId,
         characterId: input.characterId,
+        constitutionRevision: input.constitutionRevision,
         createdAt: input.createdAt,
         draft,
       },
@@ -293,7 +299,8 @@ export function saveCharacterCreationDraft(
       if (!(
         error instanceof UniversalCharacterError ||
         error instanceof CharacterCreationSessionError ||
-        error instanceof TraitPointError
+        error instanceof TraitPointError ||
+        error instanceof TraitBalanceError
       )) {
         throw error;
       }
@@ -384,7 +391,8 @@ export function resumeCharacterCreationSession(
     if (!(
       error instanceof UniversalCharacterError ||
       error instanceof CharacterCreationSessionError ||
-      error instanceof TraitPointError
+      error instanceof TraitPointError ||
+      error instanceof TraitBalanceError
     )) {
       throw error;
     }
@@ -405,7 +413,10 @@ export function markCharacterCreationConfirmed(
 }
 
 export function materializeUniversalCharacterProfile(
-  session: Pick<CharacterCreationSession, 'campaignId' | 'characterId' | 'draft' | 'createdAt'>,
+  session: Pick<
+    CharacterCreationSession,
+    'campaignId' | 'characterId' | 'constitutionRevision' | 'draft' | 'createdAt'
+  >,
   definitions: readonly WorldCharacterExtensionDefinition[],
   confirmedAt: IsoTimestamp,
 ): UniversalCharacterProfile {
@@ -419,6 +430,10 @@ export function materializeUniversalCharacterProfile(
   validateCompleteCharacterExtensionValues(profile, definitions);
   requireCompleteNarrative(profile);
   assertBalancedCharacterTraitPoints(profile.traits);
+  assertCharacterTraitBalanceAndSynergy(
+    profile.traits,
+    createTraitWorldRuleKey(profile.campaignId, session.constitutionRevision),
+  );
   if (
     profile.derivedAttributes.length !== 0 ||
     profile.skills.length !== 0 ||

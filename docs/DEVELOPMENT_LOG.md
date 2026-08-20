@@ -4168,3 +4168,22 @@
 - 本任务不把点数转换为M4-T03 `TraitRuleModifier`，不判断强度、频率、条件或协同，也不进入M5-T05。portable`.emtavern`仍为v2，完整通用档案迁移保持在M10-T05。
 - 已持久化的视觉手册、全局引用、视觉债务与M10-T07收敛门禁保持有效；本轮仅让自然修改到的角色Trait UI遵循既有体系，没有返工M0至M4页面。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M5-T05。
+
+## 2026-08-20 — M5-T05 Trait Balance & Synergy
+
+### 十维透明分档与协同套利门禁
+
+- 新增策略版本1`TraitEffectBalanceDeclaration`，显式覆盖频率、环境、战斗、社交、剧情、经济、永久性、可规避性、效果稀有度和条件十项0至3维度；至少一个游戏影响非零，条件与所需标签必须一致。
+- 十维总分公开映射为1至5点；`TraitBalanceReport`逐效果记录世界规则身份、策略版本、breakdown、总分、建议点、实际点与精确路径。机械Buff/Debuff必须精确匹配档位，Narrative和空集合无需机械声明。
+- 新增`TraitBalanceValidator`和`TraitSynergyValidator`。协同规则拒绝抵消计点弱点、自供并实际造成低档折扣的条件和正面触发闭环；只共享主题/机制标签或不改变档位的条件协作保持合法，避免黑盒相似度造成false positive。
+- 新增`TraitGenerationFeedback`组合accepted与稳定issues，角色页面直接消费该反馈并显示中文解释。AI自然语言辅助仍只能修改效果文本，类型、点值、十维声明和协同标签均位于AI白名单之外。
+- 角色页面为每个机械正负效果提供十维选择及机制/授予/所需/抵消标签，显示本地建议档位。净值、档位、声明或协同任一失败都禁用准备/确认，但仍允许保存和恢复编辑中草稿。
+- M5-T04缺少声明的机械Profile继续可读但在重新确认时明确要求补全；旧Narrative 0和空集合不受影响。TypeScript Repository和Rust Native镜像结构、范围、透明分档与组合门禁；数据嵌入现有JSON，SQLite schema保持14。
+- 新增`DEC-125`并扩充`docs/V0.3_TRAIT_POINT_SYSTEM.md`，固定策略、兼容、生成反馈和后续边界；视觉实现复用现有角色布局、Token和AIFieldAssist，没有创建平行组件体系或提前执行M10-T07。
+
+### 验证、自审与限制
+
+- 定向合同、Domain、会话、持久化、AI权限与页面测试42项通过；协同false-positive规则收窄后的核心回归子集21项再次通过。覆盖公平/不公平、条件、永久、环境、十维结构、三世界、稳定审计、序列化、旧数据补全、组合套利和false-positive baseline。
+- Rust Native角色创建专项4项通过，覆盖十维最低/环境/最高档、条件矛盾、平衡组合接受、协同套利拒绝、非零拒绝及空集合确认。最终`pnpm check:shared`完整通过：Vitest 123个文件通过、1个跳过，759项通过、1项跳过；Node 28项通过；Rust 112项通过、1项显式授权真实模型测试忽略；rustfmt、Clippy与TS↔Rust存档互操作门禁通过。`pnpm --dir windows-app build`生产构建通过，Vite转换237个模块。
+- 本任务不解析Trait效果文本、不自动创建M4-T03数值修正、不引入世界特定权重，也不进入M6-T01。portable`.emtavern`仍为v2，完整V0.3 Profile迁移继续属于M10-T05。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6。

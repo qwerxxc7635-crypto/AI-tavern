@@ -43,6 +43,12 @@ export type {
 export { confirmCharacterTraitPoints, evaluateCharacterTraitPoints } from './trait-point-system.js';
 export type { TraitPointBreakdown, TraitPointEvaluation } from './trait-point-system.js';
 export {
+  TraitBalanceValidator,
+  TraitSynergyValidator,
+  traitGenerationFeedback,
+} from './trait-balance-validator.js';
+export type { TraitValidationWorldRules } from './trait-balance-validator.js';
+export {
   KnowledgeBoundaryError,
   knowledgeForPrompt,
   projectActorKnowledge,

@@ -143,6 +143,29 @@ pub struct TraitPointProfile {
     pub negative_effect: Option<String>,
     pub buff_points: i64,
     pub debuff_points: i64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub positive_balance: Option<TraitEffectBalanceDeclaration>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub negative_balance: Option<TraitEffectBalanceDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TraitEffectBalanceDeclaration {
+    pub frequency: String,
+    pub environment: String,
+    pub combat: String,
+    pub social: String,
+    pub narrative: String,
+    pub economy: String,
+    pub permanence: String,
+    pub avoidability: String,
+    pub rarity: String,
+    pub condition: String,
+    pub mechanic_tags: Vec<String>,
+    pub grants_tags: Vec<String>,
+    pub requires_tags: Vec<String>,
+    pub neutralizes_tags: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -880,7 +903,7 @@ fn validate_draft(
         if !trait_ids.insert(&value.id) {
             return Err(CampaignStoreError::InvalidData);
         }
-        trait_point_net += validate_trait_point_profile(value.point_profile.as_ref())?;
+        trait_point_net += validate_trait_point_profile(value.point_profile.as_ref(), complete)?;
     }
     for value in [
         &draft.legacy_background.birthplace,
@@ -893,6 +916,9 @@ fn validate_draft(
         validate_draft_text(value, 4_000, !complete)?;
     }
     validate_extension_values(draft, definitions, complete)?;
+    if complete {
+        validate_trait_synergy(&draft.traits)?;
+    }
     if complete
         && (draft.goals.is_empty()
             || trait_point_net != 0
@@ -1598,11 +1624,14 @@ fn narrative_trait_point_profile() -> TraitPointProfile {
         negative_effect: None,
         buff_points: 0,
         debuff_points: 0,
+        positive_balance: None,
+        negative_balance: None,
     }
 }
 
 fn validate_trait_point_profile(
     value: Option<&TraitPointProfile>,
+    complete: bool,
 ) -> Result<i64, CampaignStoreError> {
     let narrative = narrative_trait_point_profile();
     let profile = value.unwrap_or(&narrative);
@@ -1614,12 +1643,14 @@ fn validate_trait_point_profile(
                 && profile.negative_effect.is_none()
                 && (-5..=-1).contains(&profile.buff_points)
                 && profile.debuff_points == 0
+                && profile.negative_balance.is_none()
         }
         "DEBUFF" => {
             profile.positive_effect.is_none()
                 && profile.negative_effect.is_some()
                 && profile.buff_points == 0
                 && (1..=5).contains(&profile.debuff_points)
+                && profile.positive_balance.is_none()
         }
         "MIXED" => {
             profile.positive_effect.is_some()
@@ -1632,13 +1663,158 @@ fn validate_trait_point_profile(
                 && profile.negative_effect.is_none()
                 && profile.buff_points == 0
                 && profile.debuff_points == 0
+                && profile.positive_balance.is_none()
+                && profile.negative_balance.is_none()
         }
         _ => false,
     };
     if !valid {
         return Err(CampaignStoreError::InvalidData);
     }
+    if let Some(balance) = profile.positive_balance.as_ref() {
+        let recommended = validate_trait_balance_declaration(balance)?;
+        if complete && -profile.buff_points != recommended {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    } else if complete && matches!(profile.trait_type.as_str(), "BUFF" | "MIXED") {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    if let Some(balance) = profile.negative_balance.as_ref() {
+        let recommended = validate_trait_balance_declaration(balance)?;
+        if complete && profile.debuff_points != recommended {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    } else if complete && matches!(profile.trait_type.as_str(), "DEBUFF" | "MIXED") {
+        return Err(CampaignStoreError::InvalidData);
+    }
     Ok(profile.buff_points + profile.debuff_points)
+}
+
+fn validate_trait_balance_declaration(
+    value: &TraitEffectBalanceDeclaration,
+) -> Result<i64, CampaignStoreError> {
+    let scores = [
+        enum_index(
+            &value.frequency,
+            &["RARE", "OCCASIONAL", "COMMON", "CONSTANT"],
+        )?,
+        enum_index(
+            &value.environment,
+            &["SINGLE_SCENE", "LIMITED", "BROAD", "UNIVERSAL"],
+        )?,
+        enum_index(&value.combat, &["NONE", "MINOR", "MAJOR", "DOMINANT"])?,
+        enum_index(&value.social, &["NONE", "MINOR", "MAJOR", "DOMINANT"])?,
+        enum_index(&value.narrative, &["NONE", "MINOR", "MAJOR", "DOMINANT"])?,
+        enum_index(&value.economy, &["NONE", "MINOR", "MAJOR", "DOMINANT"])?,
+        enum_index(
+            &value.permanence,
+            &["MOMENTARY", "SCENE", "PERSISTENT", "PERMANENT"],
+        )?,
+        enum_index(
+            &value.avoidability,
+            &["EASY", "COSTLY", "HARD", "IMPOSSIBLE"],
+        )?,
+        enum_index(&value.rarity, &["COMMON", "UNCOMMON", "RARE", "UNIQUE"])?,
+        enum_index(
+            &value.condition,
+            &["STRICT", "SPECIFIC", "BROAD", "UNCONDITIONAL"],
+        )?,
+    ];
+    if scores[2..=5].iter().all(|score| *score == 0) {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    validate_trait_tags(&value.mechanic_tags, false)?;
+    validate_trait_tags(&value.grants_tags, true)?;
+    validate_trait_tags(&value.requires_tags, true)?;
+    validate_trait_tags(&value.neutralizes_tags, true)?;
+    if (value.condition == "UNCONDITIONAL") != value.requires_tags.is_empty() {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok((scores.iter().sum::<i64>() / 6 + 1).min(5))
+}
+
+fn validate_trait_tags(values: &[String], allow_empty: bool) -> Result<(), CampaignStoreError> {
+    if values.len() > 8 || (!allow_empty && values.is_empty()) {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut unique = HashSet::new();
+    for value in values {
+        if value.trim() != value
+            || value.is_empty()
+            || value.chars().count() > 48
+            || !value
+                .chars()
+                .all(|character| character.is_alphanumeric() || matches!(character, '_' | '-'))
+            || !unique.insert(value)
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    Ok(())
+}
+
+fn enum_index(value: &str, values: &[&str]) -> Result<i64, CampaignStoreError> {
+    values
+        .iter()
+        .position(|candidate| *candidate == value)
+        .map(|index| index as i64)
+        .ok_or(CampaignStoreError::InvalidData)
+}
+
+fn validate_trait_synergy(traits: &[UniversalCharacterTrait]) -> Result<(), CampaignStoreError> {
+    let positives = traits
+        .iter()
+        .filter_map(|value| value.point_profile.as_ref()?.positive_balance.as_ref())
+        .collect::<Vec<_>>();
+    let negatives = traits
+        .iter()
+        .filter_map(|value| value.point_profile.as_ref()?.negative_balance.as_ref())
+        .collect::<Vec<_>>();
+    for positive in &positives {
+        for negative in &negatives {
+            if intersects(&positive.neutralizes_tags, &negative.mechanic_tags) {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    let granted = positives
+        .iter()
+        .flat_map(|value| value.grants_tags.iter().map(String::as_str))
+        .collect::<HashSet<_>>();
+    for value in &positives {
+        let bypassed = value
+            .requires_tags
+            .iter()
+            .any(|tag| granted.contains(tag.as_str()));
+        if bypassed {
+            let current = validate_trait_balance_declaration(value)?;
+            let mut unconditional = (*value).clone();
+            unconditional.condition = "UNCONDITIONAL".to_owned();
+            unconditional.requires_tags.clear();
+            if validate_trait_balance_declaration(&unconditional)? > current {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    for left in 0..positives.len() {
+        for right in (left + 1)..positives.len() {
+            if intersects(
+                &positives[left].grants_tags,
+                &positives[right].requires_tags,
+            ) && intersects(
+                &positives[right].grants_tags,
+                &positives[left].requires_tags,
+            ) {
+                return Err(CampaignStoreError::InvalidData);
+            }
+        }
+    }
+    Ok(())
+}
+
+fn intersects(left: &[String], right: &[String]) -> bool {
+    let right = right.iter().collect::<HashSet<_>>();
+    left.iter().any(|value| right.contains(value))
 }
 
 fn validate_draft_text(
@@ -1859,6 +2035,8 @@ mod tests {
             negative_effect: None,
             buff_points: -1,
             debuff_points: 0,
+            positive_balance: Some(minimal_trait_balance("侦察", "昏暗")),
+            negative_balance: None,
         });
         unbalanced.revision += 1;
         assert!(matches!(
@@ -1870,7 +2048,56 @@ mod tests {
             Err(CampaignStoreError::InvalidData)
         ));
 
-        let mut empty = ready;
+        let mut balanced = ready;
+        balanced.draft.traits[0].point_profile = Some(TraitPointProfile {
+            trait_type: "BUFF".to_owned(),
+            positive_effect: Some("看清黑暗中的道路。".to_owned()),
+            negative_effect: None,
+            buff_points: -1,
+            debuff_points: 0,
+            positive_balance: Some(minimal_trait_balance("侦察", "昏暗")),
+            negative_balance: None,
+        });
+        balanced.draft.traits[1].point_profile = Some(TraitPointProfile {
+            trait_type: "DEBUFF".to_owned(),
+            positive_effect: None,
+            negative_effect: Some("无法忽视求助。".to_owned()),
+            buff_points: 0,
+            debuff_points: 1,
+            positive_balance: None,
+            negative_balance: Some(minimal_trait_balance("救援冲动", "求助")),
+        });
+        balanced.revision += 1;
+        let saved_balanced = store
+            .save_universal_character_creation(UniversalCharacterCreationSave {
+                campaign_id: balanced.campaign_id.clone(),
+                expected_revision: balanced.revision - 1,
+                session: balanced,
+            })
+            .expect("save balanced dimensions")
+            .session
+            .expect("balanced session");
+
+        let mut exploit = saved_balanced.clone();
+        exploit
+            .draft
+            .traits
+            .first_mut()
+            .and_then(|value| value.point_profile.as_mut())
+            .and_then(|value| value.positive_balance.as_mut())
+            .expect("positive balance")
+            .neutralizes_tags = vec!["救援冲动".to_owned()];
+        exploit.revision += 1;
+        assert!(matches!(
+            store.save_universal_character_creation(UniversalCharacterCreationSave {
+                campaign_id: exploit.campaign_id.clone(),
+                expected_revision: saved_balanced.revision,
+                session: exploit,
+            }),
+            Err(CampaignStoreError::InvalidData)
+        ));
+
+        let mut empty = saved_balanced;
         let expected_revision = empty.revision;
         empty.draft.traits.clear();
         empty.revision += 1;
@@ -1897,6 +2124,65 @@ mod tests {
                 .traits
                 .is_empty()
         );
+    }
+
+    #[test]
+    fn trait_balance_tiers_cover_all_dimensions_with_transparent_boundaries() {
+        let low = minimal_trait_balance("线索", "昏暗");
+        assert_eq!(
+            validate_trait_balance_declaration(&low).expect("low tier"),
+            1
+        );
+
+        let mut environment = low.clone();
+        environment.frequency = "CONSTANT".to_owned();
+        environment.environment = "BROAD".to_owned();
+        assert_eq!(
+            validate_trait_balance_declaration(&environment).expect("environment tier"),
+            2
+        );
+
+        let mut maximum = low;
+        maximum.frequency = "CONSTANT".to_owned();
+        maximum.environment = "UNIVERSAL".to_owned();
+        maximum.combat = "DOMINANT".to_owned();
+        maximum.social = "DOMINANT".to_owned();
+        maximum.narrative = "DOMINANT".to_owned();
+        maximum.economy = "DOMINANT".to_owned();
+        maximum.permanence = "PERMANENT".to_owned();
+        maximum.avoidability = "IMPOSSIBLE".to_owned();
+        maximum.rarity = "UNIQUE".to_owned();
+        maximum.condition = "UNCONDITIONAL".to_owned();
+        maximum.requires_tags.clear();
+        assert_eq!(
+            validate_trait_balance_declaration(&maximum).expect("maximum tier"),
+            5
+        );
+
+        maximum.requires_tags.push("不应存在".to_owned());
+        assert!(matches!(
+            validate_trait_balance_declaration(&maximum),
+            Err(CampaignStoreError::InvalidData)
+        ));
+    }
+
+    fn minimal_trait_balance(tag: &str, requirement: &str) -> TraitEffectBalanceDeclaration {
+        TraitEffectBalanceDeclaration {
+            frequency: "RARE".to_owned(),
+            environment: "SINGLE_SCENE".to_owned(),
+            combat: "MINOR".to_owned(),
+            social: "NONE".to_owned(),
+            narrative: "NONE".to_owned(),
+            economy: "NONE".to_owned(),
+            permanence: "MOMENTARY".to_owned(),
+            avoidability: "EASY".to_owned(),
+            rarity: "COMMON".to_owned(),
+            condition: "STRICT".to_owned(),
+            mechanic_tags: vec![tag.to_owned()],
+            grants_tags: Vec::new(),
+            requires_tags: vec![requirement.to_owned()],
+            neutralizes_tags: Vec::new(),
+        }
     }
 
     fn seed_campaign(store: &CampaignStore, id: &str) {

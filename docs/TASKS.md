@@ -269,7 +269,7 @@
 
 ## M5-T05 Trait Balance & Synergy
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M5-T04。
 - **Deliverable**：`TraitBalanceValidator`、`TraitSynergyValidator`、解释性错误和生成反馈。
 - **Acceptance**：覆盖十项平衡维度并能拒绝明显组合套利；相同世界规则下结果可重复审计。
