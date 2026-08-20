@@ -260,7 +260,7 @@
 
 ## M5-T04 Trait Point System
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M5-T03。
 - **Deliverable**：Buff/Debuff/Mixed/Narrative Trait 合同、点数计算、规则 UI。
 - **Acceptance**：空集合和严格净 0 可开始；非零禁止；点值只由本地规则确认。

@@ -58,7 +58,7 @@ export const TASK_PROMPTS = Object.freeze({
   EDIT_CHARACTER_DRAFT: define(
     'EDIT_CHARACTER_DRAFT',
     'WORLD_DESIGNER',
-    'Edit only the exact targetPaths of the supplied universal character draft. Obey the locked World Constitution, content boundaries, extension definitions, and every locked field. FIELD with OPTIONS returns exactly three distinct candidates and no patch; every other operation returns a patch covering exactly the requested targets. Preserve value kinds, never invent paths, and never change age, attributes, derived values, skill numbers, wealth, equipment IDs, reputation, relationships, status, mechanical bonuses, or any non-target field.',
+    'Edit only the exact targetPaths of the supplied universal character draft. Obey the locked World Constitution, content boundaries, extension definitions, and every locked field. FIELD with OPTIONS returns exactly three distinct candidates and no patch; every other operation returns a patch covering exactly the requested targets. Preserve value kinds, never invent paths, and never change age, attributes, derived values, skill numbers, wealth, equipment IDs, reputation, relationships, status, Trait type, Trait point values, mechanical bonuses, or any non-target field.',
   ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',

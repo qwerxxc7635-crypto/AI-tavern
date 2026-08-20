@@ -107,6 +107,9 @@ importers:
       '@ember-tavern/contracts':
         specifier: workspace:*
         version: link:../packages/contracts
+      '@ember-tavern/domain':
+        specifier: workspace:*
+        version: link:../packages/domain
       '@ember-tavern/prompts':
         specifier: workspace:*
         version: link:../packages/prompts

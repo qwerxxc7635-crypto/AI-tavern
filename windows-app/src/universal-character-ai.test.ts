@@ -1,5 +1,6 @@
 import {
   campaignId,
+  characterTraitId,
   createUniversalCharacterDraft,
   createWorldCharacterExtensionDefinition,
   isoTimestamp,
@@ -41,6 +42,70 @@ describe('universal character AI patch boundary', () => {
     expect(paths).not.toContain('attributes.knowledge');
     expect(paths).not.toContain('extensions.investigation.sanity');
     expect(new Set(paths).size).toBe(paths.length);
+  });
+
+  it('exposes only active Trait effect text while keeping type and points outside AI authority', () => {
+    const base = fixture();
+    const mixed = {
+      ...base,
+      traits: [
+        {
+          id: characterTraitId('trait-mixed-character-ai'),
+          name: '烬痕辨读者',
+          description: '能读懂烬痕，也会留下踪迹。',
+          pointProfile: {
+            type: 'MIXED' as const,
+            positiveEffect: '能读懂古老烬痕。',
+            negativeEffect: '辨读会留下可追踪的魔法气息。',
+            buffPoints: -2,
+            debuffPoints: 2,
+          },
+        },
+      ],
+    };
+    const paths = characterAIFields([definition], mixed).map(({ path }) => path);
+    expect(paths).toContain('traits.0.pointProfile.positiveEffect');
+    expect(paths).toContain('traits.0.pointProfile.negativeEffect');
+    expect(paths).not.toContain('traits.1.pointProfile.positiveEffect');
+
+    const edited = applyCharacterAIUpdates(
+      mixed,
+      [{ path: 'traits.0.pointProfile.positiveEffect', value: '可以看见被遮蔽的烬痕。' }],
+      [definition],
+      [],
+    );
+    expect(edited.traits[0]?.pointProfile).toMatchObject({
+      positiveEffect: '可以看见被遮蔽的烬痕。',
+      buffPoints: -2,
+      debuffPoints: 2,
+    });
+    const mixedTrait = mixed.traits[0];
+    if (mixedTrait === undefined) throw new Error('fixture must include one Trait');
+    const incompleteEffect = {
+      ...mixed,
+      traits: [
+        {
+          ...mixedTrait,
+          pointProfile: { ...mixedTrait.pointProfile, positiveEffect: '' },
+        },
+      ],
+    };
+    expect(
+      applyCharacterAIUpdates(
+        incompleteEffect,
+        [{ path: 'traits.0.pointProfile.positiveEffect', value: '命运补全的正面效果。' }],
+        [definition],
+        [],
+      ).traits[0]?.pointProfile?.positiveEffect,
+    ).toBe('命运补全的正面效果。');
+    expect(() =>
+      applyCharacterAIUpdates(
+        mixed,
+        [{ path: 'traits.0.pointProfile.buffPoints', value: '-1' }],
+        [definition],
+        [],
+      ),
+    ).toThrow(/FIELD_NOT_EDITABLE/);
   });
 
   it('applies narrative updates while preserving every Rules-owned value', () => {

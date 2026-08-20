@@ -2580,3 +2580,27 @@ M2已提供`AIFieldAssist`、可撤销候选和并发/迟到响应隔离，M5-T0
 - 世界扩展草稿允许逐字段编辑，但已存档Profile与确认阶段仍严格要求已提供namespace的required字段完整，不放宽正式事实门禁。
 - 界面只使用现有Token、布局与共享Game Component，并将AI文案收敛为“命运”身份；不在M5-T03提前开始M10-T07整体视觉迁移。
 - M5-T03不实现Trait点数、平衡或Career Pool，不改变M5-T04及后续依赖。
+
+## DEC-124：Trait 点数只由本地重算并以可选档案兼容演进
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T04`、`docs/V0.3_SPEC.md` 10.3节、`DEC-121`至`DEC-123`
+
+### 背景
+
+M5-T04要求Buff、Debuff、Mixed和Narrative四类Trait、-5至+5点数与严格净0门禁，并明确空集合可开始。既有M5-T01兼容根固定两项Trait，M5-T02 Quick默认生成两项叙事Trait，M5-T03又只允许AI修改自然语言字段。若把净点数存为可信字段或让AI自评点值，会产生第二个Rules authority；若继续要求恰好两项，则无法满足空集合验收并会把当前UI切片误当领域规则。
+
+### 决定与理由
+
+`CharacterTrait`增加可选`pointProfile`，统一保存type、正负效果与各自点数；旧记录缺失时只按Narrative 0解释。合同严格拒绝未知字段、错误符号、越界和效果/类型矛盾，不持久化net。Domain每次从点值生成逐Trait审计明细和角色总点数，准备与确认都独立要求严格等于0；空数组按数学空和合法。
+
+`PlayerCharacter.traits`由固定二元组兼容演进为有界数组，旧两项JSON不变，V0.3 Profile投影到旧根时只写id/name/description，完整点数仍留在Profile JSON。当前页面沿用现有切片最多编辑两项，但该上限不进入共享规则。`pointProfile`嵌入既有JSON，因此不新增SQLite migration；TypeScript Repository和Rust Native边界镜像校验。
+
+### 影响与边界
+
+- AI只可修改当前类型要求的正面/负面效果文本；类型、Buff点和Debuff点不进入生成白名单，应用patch后还会再次比较规则字段。
+- 非零草稿可以保存并恢复，但保持`ACTIVE`；准备、确认和开始门禁必须本地重算为0，UI显示值不具authority。
+- Trait点数不会自动成为M4-T03检定修正，也不改变Rules事务、D20、Quest、Provider、SQLite真相或存档状态机。
+- M5-T04不判断效果强度、频率、条件或组合套利；`TraitBalanceValidator`与`TraitSynergyValidator`严格留给M5-T05。
+- portable `.emtavern` v2仍未覆盖完整通用档案；跨语言格式升级继续由M10-T05集中处理。

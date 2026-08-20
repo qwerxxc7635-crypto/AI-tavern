@@ -1,4 +1,7 @@
-import { UNIVERSAL_CHARACTER_AI_FIELDS } from './universal-character-ai.js';
+import {
+  UNIVERSAL_CHARACTER_AI_FIELDS,
+  UNIVERSAL_CHARACTER_TRAIT_EFFECT_AI_FIELDS,
+} from './universal-character-ai.js';
 
 export const NATURAL_LANGUAGE_FIELDS = [
   ['world-options-concept', 'world-creation-page.tsx', 'WORLD_DRAFT'],
@@ -14,6 +17,10 @@ export const NATURAL_LANGUAGE_FIELDS = [
   ['world-tavern-reason', 'world-creation-page.tsx', 'WORLD_LOCKABLE'],
   ['world-revision', 'world-creation-page.tsx', 'WORLD_REVISION'],
   ...UNIVERSAL_CHARACTER_AI_FIELDS.map(
+    ({ path }) =>
+      [`character:${path}`, 'universal-character-creation-page.tsx', 'CHARACTER_DRAFT'] as const,
+  ),
+  ...UNIVERSAL_CHARACTER_TRAIT_EFFECT_AI_FIELDS.map(
     ({ path }) =>
       [`character:${path}`, 'universal-character-creation-page.tsx', 'CHARACTER_DRAFT'] as const,
   ),

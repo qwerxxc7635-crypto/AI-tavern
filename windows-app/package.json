@@ -12,6 +12,7 @@
   "dependencies": {
     "@ember-tavern/ai-core": "workspace:*",
     "@ember-tavern/contracts": "workspace:*",
+    "@ember-tavern/domain": "workspace:*",
     "@ember-tavern/prompts": "workspace:*",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "2.7.2",

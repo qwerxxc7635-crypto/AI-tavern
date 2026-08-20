@@ -10,6 +10,7 @@ import {
 } from './character.js';
 import type { CampaignId, IsoTimestamp, ItemId, PlayerCharacterId } from './foundation.js';
 import type { JsonValue } from './pending-ai-request.js';
+import { createTraitPointProfile } from './trait-points.js';
 
 export const UNIVERSAL_CHARACTER_SCHEMA_VERSION = 1 as const;
 export const WORLD_CHARACTER_EXTENSION_SCHEMA_VERSION = 1 as const;
@@ -205,6 +206,7 @@ export function createUniversalCharacterProfile(
       id: trait.id,
       name: requireText(trait.name, `traits[${index}].name`, 120),
       description: requireText(trait.description, `traits[${index}].description`, 4_000),
+      pointProfile: createTraitPointProfile(trait.pointProfile),
     }),
   );
   if (traits.length > 32) throw new UniversalCharacterError('traits exceed the limit');
@@ -326,14 +328,7 @@ export function projectUniversalCharacterToV02(
   profile: UniversalCharacterProfile,
 ): PlayerCharacter {
   const archetype = profile.career.legacyArchetype;
-  const firstTrait = profile.traits[0];
-  const secondTrait = profile.traits[1];
-  if (
-    archetype === null ||
-    profile.traits.length !== 2 ||
-    firstTrait === undefined ||
-    secondTrait === undefined
-  ) {
+  if (archetype === null) {
     throw new UniversalCharacterError('Character cannot be represented by the V0.2 schema');
   }
   return Object.freeze({
@@ -348,7 +343,9 @@ export function projectUniversalCharacterToV02(
     classArchetype: archetype,
     classDisplayName: profile.career.displayName,
     attributes: profile.attributes,
-    traits: Object.freeze([firstTrait, secondTrait] as const),
+    traits: Object.freeze(
+      profile.traits.map(({ id, name, description }) => Object.freeze({ id, name, description })),
+    ),
     personalGoal: profile.goals[0] ?? profile.concept,
     background: profile.legacyBackground,
     initialEquipment: Object.freeze(

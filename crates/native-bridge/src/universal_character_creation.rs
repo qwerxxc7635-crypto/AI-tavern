@@ -130,6 +130,19 @@ pub struct UniversalCharacterTrait {
     pub id: String,
     pub name: String,
     pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub point_profile: Option<TraitPointProfile>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TraitPointProfile {
+    #[serde(rename = "type")]
+    pub trait_type: String,
+    pub positive_effect: Option<String>,
+    pub negative_effect: Option<String>,
+    pub buff_points: i64,
+    pub debuff_points: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -694,6 +707,7 @@ fn build_quick_draft(
                 id: format!("quick-trait-{generation_id}-{}", index + 1),
                 name: value.name,
                 description: value.description,
+                point_profile: Some(narrative_trait_point_profile()),
             })
             .collect(),
         statuses: Vec::new(),
@@ -858,6 +872,7 @@ fn validate_draft(
         return Err(CampaignStoreError::InvalidData);
     }
     let mut trait_ids = HashSet::new();
+    let mut trait_point_net = 0_i64;
     for value in &draft.traits {
         validate_id(&value.id)?;
         validate_draft_text(&value.name, 120, false)?;
@@ -865,6 +880,7 @@ fn validate_draft(
         if !trait_ids.insert(&value.id) {
             return Err(CampaignStoreError::InvalidData);
         }
+        trait_point_net += validate_trait_point_profile(value.point_profile.as_ref())?;
     }
     for value in [
         &draft.legacy_background.birthplace,
@@ -879,7 +895,7 @@ fn validate_draft(
     validate_extension_values(draft, definitions, complete)?;
     if complete
         && (draft.goals.is_empty()
-            || draft.traits.len() != 2
+            || trait_point_net != 0
             || !["WARRIOR", "ROGUE", "SCHOLAR", "DIPLOMAT"]
                 .contains(&draft.career.legacy_archetype.as_deref().unwrap_or_default())
             || !draft.derived_attributes.is_empty()
@@ -1575,6 +1591,56 @@ fn validate_boundaries(value: &UniversalCharacterBoundaries) -> Result<(), Campa
     validate_text_list(&value.excluded_content, 128, 4_000, false)
 }
 
+fn narrative_trait_point_profile() -> TraitPointProfile {
+    TraitPointProfile {
+        trait_type: "NARRATIVE".to_owned(),
+        positive_effect: None,
+        negative_effect: None,
+        buff_points: 0,
+        debuff_points: 0,
+    }
+}
+
+fn validate_trait_point_profile(
+    value: Option<&TraitPointProfile>,
+) -> Result<i64, CampaignStoreError> {
+    let narrative = narrative_trait_point_profile();
+    let profile = value.unwrap_or(&narrative);
+    validate_optional_text(profile.positive_effect.as_deref(), 4_000)?;
+    validate_optional_text(profile.negative_effect.as_deref(), 4_000)?;
+    let valid = match profile.trait_type.as_str() {
+        "BUFF" => {
+            profile.positive_effect.is_some()
+                && profile.negative_effect.is_none()
+                && (-5..=-1).contains(&profile.buff_points)
+                && profile.debuff_points == 0
+        }
+        "DEBUFF" => {
+            profile.positive_effect.is_none()
+                && profile.negative_effect.is_some()
+                && profile.buff_points == 0
+                && (1..=5).contains(&profile.debuff_points)
+        }
+        "MIXED" => {
+            profile.positive_effect.is_some()
+                && profile.negative_effect.is_some()
+                && (-5..=-1).contains(&profile.buff_points)
+                && (1..=5).contains(&profile.debuff_points)
+        }
+        "NARRATIVE" => {
+            profile.positive_effect.is_none()
+                && profile.negative_effect.is_none()
+                && profile.buff_points == 0
+                && profile.debuff_points == 0
+        }
+        _ => false,
+    };
+    if !valid {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(profile.buff_points + profile.debuff_points)
+}
+
 fn validate_draft_text(
     value: &str,
     maximum: usize,
@@ -1760,6 +1826,77 @@ mod tests {
             .expect("session");
         assert_eq!(restored.draft.name, "Mira");
         assert_eq!(restored.revision, expected);
+    }
+
+    #[test]
+    fn trait_points_reject_non_zero_and_allow_an_empty_confirmed_collection() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("trait-points.sqlite")).expect("open");
+        seed_campaign(&store, "campaign-trait-points");
+        let started = store
+            .start_universal_character_creation(start_command(
+                "campaign-trait-points",
+                "QUICK",
+                Some("A balanced wanderer."),
+            ))
+            .expect("start");
+        let session = started.session.expect("session");
+        let ready = store
+            .commit_universal_quick_character(UniversalCharacterQuickCommit {
+                campaign_id: session.campaign_id.clone(),
+                expected_revision: session.revision,
+                generation: quick_audit(&session, &started.constitution),
+            })
+            .expect("generate")
+            .session
+            .expect("ready session");
+
+        let mut unbalanced = ready.clone();
+        unbalanced.draft.traits[0].point_profile = Some(TraitPointProfile {
+            trait_type: "BUFF".to_owned(),
+            positive_effect: Some("看清黑暗中的道路。".to_owned()),
+            negative_effect: None,
+            buff_points: -1,
+            debuff_points: 0,
+        });
+        unbalanced.revision += 1;
+        assert!(matches!(
+            store.save_universal_character_creation(UniversalCharacterCreationSave {
+                campaign_id: unbalanced.campaign_id.clone(),
+                expected_revision: ready.revision,
+                session: unbalanced,
+            }),
+            Err(CampaignStoreError::InvalidData)
+        ));
+
+        let mut empty = ready;
+        let expected_revision = empty.revision;
+        empty.draft.traits.clear();
+        empty.revision += 1;
+        let saved = store
+            .save_universal_character_creation(UniversalCharacterCreationSave {
+                campaign_id: empty.campaign_id.clone(),
+                expected_revision,
+                session: empty,
+            })
+            .expect("save empty")
+            .session
+            .expect("saved empty");
+        let confirmed = store
+            .confirm_universal_character_creation(UniversalCharacterCreationConfirm {
+                campaign_id: saved.campaign_id,
+                expected_revision: saved.revision,
+            })
+            .expect("confirm empty");
+        assert!(
+            confirmed
+                .session
+                .expect("confirmed session")
+                .draft
+                .traits
+                .is_empty()
+        );
     }
 
     fn seed_campaign(store: &CampaignStore, id: &str) {

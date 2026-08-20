@@ -1,4 +1,5 @@
 import {
+  characterTraitPointNet,
   characterTraitId,
   validateCharacterExtensionDraftValues,
   type UniversalCharacterDraft,
@@ -86,8 +87,18 @@ export const UNIVERSAL_CHARACTER_AI_FIELDS = Object.freeze([
   ...fields('BOUNDARIES', 'TEXT_LIST', [['contentBoundaries.excludedContent', '排除内容']]),
 ]);
 
+export const UNIVERSAL_CHARACTER_TRAIT_EFFECT_AI_FIELDS = Object.freeze(
+  fields('TRAITS', 'TEXT', [
+    ['traits.0.pointProfile.positiveEffect', '特质 1 正面效果'],
+    ['traits.0.pointProfile.negativeEffect', '特质 1 负面效果'],
+    ['traits.1.pointProfile.positiveEffect', '特质 2 正面效果'],
+    ['traits.1.pointProfile.negativeEffect', '特质 2 负面效果'],
+  ]),
+);
+
 export function characterAIFields(
   definitions: readonly WorldCharacterExtensionDefinition[],
+  draft?: UniversalCharacterDraft,
 ): readonly CharacterAIFieldDefinition[] {
   const dynamic = definitions.flatMap((definition) =>
     definition.fields.flatMap((field) =>
@@ -103,14 +114,25 @@ export function characterAIFields(
         : [],
     ),
   );
-  return Object.freeze([...UNIVERSAL_CHARACTER_AI_FIELDS, ...dynamic]);
+  const traitEffects = UNIVERSAL_CHARACTER_TRAIT_EFFECT_AI_FIELDS.filter(({ path }) => {
+    if (draft === undefined) return true;
+    const [, indexValue, , effect] = path.split('.');
+    const trait = draft.traits[Number(indexValue)];
+    if (trait === undefined) return false;
+    const type = trait.pointProfile?.type ?? 'NARRATIVE';
+    return effect === 'positiveEffect'
+      ? type === 'BUFF' || type === 'MIXED'
+      : type === 'DEBUFF' || type === 'MIXED';
+  });
+  return Object.freeze([...UNIVERSAL_CHARACTER_AI_FIELDS, ...traitEffects, ...dynamic]);
 }
 
 export function requireCharacterAIField(
   definitions: readonly WorldCharacterExtensionDefinition[],
   path: string,
+  draft?: UniversalCharacterDraft,
 ): CharacterAIFieldDefinition {
-  const field = characterAIFields(definitions).find((candidate) => candidate.path === path);
+  const field = characterAIFields(definitions, draft).find((candidate) => candidate.path === path);
   if (field === undefined) throw new CharacterDraftAIError('FIELD_NOT_EDITABLE');
   return field;
 }
@@ -158,7 +180,7 @@ export function applyCharacterAIUpdates(
   }
   const mutable = cloneRecord(draft);
   for (const update of updates) {
-    const field = requireCharacterAIField(definitions, update.path);
+    const field = requireCharacterAIField(definitions, update.path, draft);
     if (isCharacterAIFieldLocked(update.path, lockedFields)) {
       throw new CharacterDraftAIError('LOCKED_FIELD_CHANGED');
     }
@@ -172,6 +194,7 @@ export function applyCharacterAIUpdates(
       ...mutable,
     }) as unknown as UniversalCharacterDraft;
     validateCharacterExtensionDraftValues(next, definitions);
+    characterTraitPointNet(next.traits);
   } catch (cause) {
     throw new CharacterDraftAIError('PATCH_INVALID', { cause });
   }
@@ -266,7 +289,12 @@ function writePath(
   if (segments[0] === 'traits') {
     const index = Number(segments[1]);
     const key = segments[2];
-    if (![0, 1].includes(index) || !['name', 'description'].includes(key ?? '')) {
+    const pointEffect = key === 'pointProfile' ? segments[3] : undefined;
+    if (
+      ![0, 1].includes(index) ||
+      (!['name', 'description'].includes(key ?? '') &&
+        !['positiveEffect', 'negativeEffect'].includes(pointEffect ?? ''))
+    ) {
       throw new CharacterDraftAIError('PATH_INVALID');
     }
     const traits = Array.isArray(draft['traits']) ? draft['traits'] : [];
@@ -280,7 +308,13 @@ function writePath(
     }
     const trait = traits[index];
     if (!isRecord(trait) || key === undefined) throw new CharacterDraftAIError('PATH_INVALID');
-    trait[key] = value;
+    if (key === 'pointProfile') {
+      const pointProfile = trait['pointProfile'];
+      if (!isRecord(pointProfile) || pointEffect === undefined) {
+        throw new CharacterDraftAIError('PATH_INVALID');
+      }
+      pointProfile[pointEffect] = value;
+    } else trait[key] = value;
     draft['traits'] = traits.slice(0, 2);
     return;
   }
@@ -333,6 +367,34 @@ function assertRuleAuthorityPreserved(
   });
   if (JSON.stringify(protectedValues(before)) !== JSON.stringify(protectedValues(after))) {
     throw new CharacterDraftAIError('RULE_AUTHORITY_CHANGED');
+  }
+  assertTraitPointAuthorityPreserved(before, after);
+}
+
+function assertTraitPointAuthorityPreserved(
+  before: UniversalCharacterDraft,
+  after: UniversalCharacterDraft,
+): void {
+  const ruleProfile = (trait: UniversalCharacterDraft['traits'][number]) => {
+    const profile = trait.pointProfile;
+    if (profile === undefined) {
+      return { type: 'NARRATIVE', buffPoints: 0, debuffPoints: 0 };
+    }
+    return {
+      type: profile.type,
+      buffPoints: profile.buffPoints,
+      debuffPoints: profile.debuffPoints,
+    };
+  };
+  for (const trait of after.traits) {
+    const previous = before.traits.find(({ id }) => id === trait.id);
+    const expected =
+      previous === undefined
+        ? { type: 'NARRATIVE', buffPoints: 0, debuffPoints: 0 }
+        : ruleProfile(previous);
+    if (JSON.stringify(ruleProfile(trait)) !== JSON.stringify(expected)) {
+      throw new CharacterDraftAIError('RULE_AUTHORITY_CHANGED');
+    }
   }
 }
 

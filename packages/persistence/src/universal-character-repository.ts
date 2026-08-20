@@ -3,6 +3,7 @@ import {
   UniversalCharacterError,
   campaignId,
   characterTraitId,
+  createTraitPointProfile,
   createUniversalCharacterProfile,
   createWorldCharacterExtensionDefinition,
   isoTimestamp,
@@ -490,6 +491,7 @@ function mapTraits(value: unknown) {
       id: characterTraitId(requireString(row['id'], 'trait.id')),
       name: requireString(row['name'], 'trait.name'),
       description: requireString(row['description'], 'trait.description'),
+      pointProfile: createTraitPointProfile(row['pointProfile']),
     };
   });
 }

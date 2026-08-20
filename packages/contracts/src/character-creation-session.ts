@@ -1,4 +1,5 @@
 import type { GenerationRecordId, IsoTimestamp } from './foundation.js';
+import { TraitPointError, assertBalancedCharacterTraitPoints } from './trait-points.js';
 import {
   UniversalCharacterError,
   createUniversalCharacterProfile,
@@ -290,7 +291,9 @@ export function saveCharacterCreationDraft(
       status = 'READY_TO_CONFIRM';
     } catch (error) {
       if (!(
-        error instanceof UniversalCharacterError || error instanceof CharacterCreationSessionError
+        error instanceof UniversalCharacterError ||
+        error instanceof CharacterCreationSessionError ||
+        error instanceof TraitPointError
       )) {
         throw error;
       }
@@ -379,7 +382,9 @@ export function resumeCharacterCreationSession(
     status = 'READY_TO_CONFIRM';
   } catch (error) {
     if (!(
-      error instanceof UniversalCharacterError || error instanceof CharacterCreationSessionError
+      error instanceof UniversalCharacterError ||
+      error instanceof CharacterCreationSessionError ||
+      error instanceof TraitPointError
     )) {
       throw error;
     }
@@ -413,6 +418,7 @@ export function materializeUniversalCharacterProfile(
   });
   validateCompleteCharacterExtensionValues(profile, definitions);
   requireCompleteNarrative(profile);
+  assertBalancedCharacterTraitPoints(profile.traits);
   if (
     profile.derivedAttributes.length !== 0 ||
     profile.skills.length !== 0 ||

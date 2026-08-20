@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
-import type {
-  CharacterAttributeName,
-  CharacterCreationMode,
-  UniversalCharacterDraft,
+import {
+  CHARACTER_TRAIT_TYPES,
+  NARRATIVE_TRAIT_POINT_PROFILE,
+  TraitPointError,
+  characterTraitId,
+  createTraitPointProfile,
+  type CharacterTrait,
+  type CharacterAttributeName,
+  type CharacterCreationMode,
+  type CharacterTraitType,
+  type TraitPointProfile,
+  type UniversalCharacterDraft,
 } from '@ember-tavern/contracts';
-import { characterTraitId } from '@ember-tavern/contracts';
+import { evaluateCharacterTraitPoints } from '@ember-tavern/domain';
 
 import { AIErrorNotice } from './ai-error-notice.js';
 import { APP_PATHS, campaignRoute } from './navigation.js';
@@ -322,6 +330,7 @@ export function CharacterCreationPage({
 
   const locks = lockedFields;
   const ready = session.status === 'READY_TO_CONFIRM';
+  const traitBudget = draftTraitBudget(draft.traits);
   return (
     <main className="character-studio">
       <Header step={ready ? '03 · 确认候选' : '02 · 编辑草稿'} />
@@ -577,14 +586,17 @@ export function CharacterCreationPage({
           </section>
 
           <section>
-            <h2>当前阶段特质</h2>
-            <p>当前提供两项叙事特质；特质点数和平衡会在后续车卡步骤开放。</p>
-            {[0, 1].map((index) => {
-              const trait = draft.traits[index] ?? {
-                id: characterTraitId(`draft-trait-${session.characterId}-${index + 1}`),
-                name: '',
-                description: '',
-              };
+            <h2>特质点数</h2>
+            <p>
+              增益消耗负点，弱点提供正点，混合特质分别记录两者；叙事特质不产生规则收益。无特质合法，开始前净点数必须严格为
+              0。
+            </p>
+            <p role="status">
+              本地重算：{traitBudget.valid ? traitBudget.net : '配置不完整'}
+              {traitBudget.valid && traitBudget.net === 0 ? '（可开始）' : '（禁止开始）'}
+            </p>
+            {draft.traits.map((trait, index) => {
+              const pointProfile = draftTraitPointProfile(trait);
               return (
                 <div key={trait.id} data-character-field={`traits.${index}`}>
                   <LockedTextField
@@ -615,9 +627,143 @@ export function CharacterCreationPage({
                       })
                     }
                   />
+                  <label data-character-field={`traits.${index}.pointProfile.type`}>
+                    特质类型
+                    <select
+                      value={pointProfile.type}
+                      disabled={isLocked('traits', locks)}
+                      onChange={(event) =>
+                        editDraft({
+                          ...draft,
+                          traits: replaceTrait(draft.traits, index, {
+                            ...trait,
+                            pointProfile: changeTraitPointType(
+                              event.target.value as CharacterTraitType,
+                              trait,
+                            ),
+                          }),
+                        })
+                      }
+                    >
+                      {CHARACTER_TRAIT_TYPES.map((type) => (
+                        <option key={type} value={type}>
+                          {traitTypeLabel(type)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  {pointProfile.type === 'BUFF' || pointProfile.type === 'MIXED' ? (
+                    <>
+                      <LockedTextField
+                        field={`traits.${index}.pointProfile.positiveEffect`}
+                        lockField="traits"
+                        label="正面效果"
+                        value={pointProfile.positiveEffect ?? ''}
+                        locks={locks}
+                        onLock={(field) => editLocks(field, locks)}
+                        onChange={(positiveEffect) =>
+                          editDraft({
+                            ...draft,
+                            traits: replaceTrait(draft.traits, index, {
+                              ...trait,
+                              pointProfile: { ...pointProfile, positiveEffect },
+                            }),
+                          })
+                        }
+                      />
+                      <TraitPointSelect
+                        label="增益消耗"
+                        value={pointProfile.buffPoints}
+                        values={[-1, -2, -3, -4, -5]}
+                        disabled={isLocked('traits', locks)}
+                        onChange={(buffPoints) =>
+                          editDraft({
+                            ...draft,
+                            traits: replaceTrait(draft.traits, index, {
+                              ...trait,
+                              pointProfile: { ...pointProfile, buffPoints },
+                            }),
+                          })
+                        }
+                      />
+                    </>
+                  ) : null}
+                  {pointProfile.type === 'DEBUFF' || pointProfile.type === 'MIXED' ? (
+                    <>
+                      <LockedTextField
+                        field={`traits.${index}.pointProfile.negativeEffect`}
+                        lockField="traits"
+                        label="负面效果"
+                        value={pointProfile.negativeEffect ?? ''}
+                        locks={locks}
+                        onLock={(field) => editLocks(field, locks)}
+                        onChange={(negativeEffect) =>
+                          editDraft({
+                            ...draft,
+                            traits: replaceTrait(draft.traits, index, {
+                              ...trait,
+                              pointProfile: { ...pointProfile, negativeEffect },
+                            }),
+                          })
+                        }
+                      />
+                      <TraitPointSelect
+                        label="弱点提供"
+                        value={pointProfile.debuffPoints}
+                        values={[1, 2, 3, 4, 5]}
+                        disabled={isLocked('traits', locks)}
+                        onChange={(debuffPoints) =>
+                          editDraft({
+                            ...draft,
+                            traits: replaceTrait(draft.traits, index, {
+                              ...trait,
+                              pointProfile: { ...pointProfile, debuffPoints },
+                            }),
+                          })
+                        }
+                      />
+                    </>
+                  ) : null}
+                  <p>本特质净点数：{pointProfile.buffPoints + pointProfile.debuffPoints}</p>
+                  <button
+                    type="button"
+                    disabled={isLocked('traits', locks)}
+                    onClick={() =>
+                      editDraft({
+                        ...draft,
+                        traits: draft.traits.filter(({ id }) => id !== trait.id),
+                      })
+                    }
+                  >
+                    移除特质 {index + 1}
+                  </button>
                 </div>
               );
             })}
+            {draft.traits.length >= 2 ? null : (
+              <button
+                type="button"
+                disabled={isLocked('traits', locks)}
+                onClick={() =>
+                  editDraft({
+                    ...draft,
+                    traits: [
+                      ...draft.traits,
+                      {
+                        id: characterTraitId(
+                          `draft-trait-${session.characterId}-${draft.traits.length + 1}`,
+                        ),
+                        name: '',
+                        description: '',
+                        pointProfile: NARRATIVE_TRAIT_POINT_PROFILE,
+                      },
+                    ],
+                  })
+                }
+              >
+                添加特质
+              </button>
+            )}
           </section>
 
           <section>
@@ -730,7 +876,7 @@ export function CharacterCreationPage({
               <button
                 className="primary-action"
                 type="button"
-                disabled={busy}
+                disabled={busy || !traitBudget.valid || traitBudget.net !== 0}
                 onClick={() =>
                   void perform(async () => {
                     const saved = await service.saveDraft(snapshot, draft, locks);
@@ -744,7 +890,7 @@ export function CharacterCreationPage({
             <button
               className="primary-action"
               type="button"
-              disabled={busy || !ready || dirty}
+              disabled={busy || !ready || dirty || !traitBudget.valid || traitBudget.net !== 0}
               onClick={() => void perform(() => service.confirm(snapshot))}
             >
               确认角色
@@ -835,6 +981,106 @@ function LockedListField({
       onLock={() => onLock(lockField)}
     />
   );
+}
+
+function TraitPointSelect({
+  label,
+  value,
+  values,
+  disabled,
+  onChange,
+}: {
+  readonly label: string;
+  readonly value: number;
+  readonly values: readonly number[];
+  readonly disabled: boolean;
+  readonly onChange: (value: number) => void;
+}) {
+  return (
+    <label>
+      {label}
+      <select
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(Number(event.target.value))}
+      >
+        {values.map((option) => (
+          <option key={option} value={option}>
+            {option > 0 ? `+${option}` : option}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function draftTraitPointProfile(trait: CharacterTrait): TraitPointProfile {
+  try {
+    return createTraitPointProfile(trait.pointProfile);
+  } catch (cause) {
+    if (!(cause instanceof TraitPointError)) throw cause;
+    return trait.pointProfile ?? NARRATIVE_TRAIT_POINT_PROFILE;
+  }
+}
+
+function draftTraitBudget(traits: readonly CharacterTrait[]): {
+  readonly valid: boolean;
+  readonly net: number;
+} {
+  try {
+    return { valid: true, net: evaluateCharacterTraitPoints(traits).netPoints };
+  } catch (cause) {
+    if (!(cause instanceof TraitPointError)) throw cause;
+    return { valid: false, net: 0 };
+  }
+}
+
+function changeTraitPointType(type: CharacterTraitType, trait: CharacterTrait): TraitPointProfile {
+  const current = draftTraitPointProfile(trait);
+  const description = trait.description.trim();
+  const positiveEffect = current.positiveEffect ?? description;
+  const negativeEffect = current.negativeEffect ?? description;
+  switch (type) {
+    case 'BUFF':
+      return {
+        type,
+        positiveEffect,
+        negativeEffect: null,
+        buffPoints: current.buffPoints < 0 ? current.buffPoints : -1,
+        debuffPoints: 0,
+      };
+    case 'DEBUFF':
+      return {
+        type,
+        positiveEffect: null,
+        negativeEffect,
+        buffPoints: 0,
+        debuffPoints: current.debuffPoints > 0 ? current.debuffPoints : 1,
+      };
+    case 'MIXED':
+      return {
+        type,
+        positiveEffect,
+        negativeEffect,
+        buffPoints: current.buffPoints < 0 ? current.buffPoints : -1,
+        debuffPoints: current.debuffPoints > 0 ? current.debuffPoints : 1,
+      };
+    case 'NARRATIVE':
+      return NARRATIVE_TRAIT_POINT_PROFILE;
+  }
+}
+
+function traitTypeLabel(type: CharacterTraitType): string {
+  switch (type) {
+    case 'BUFF':
+      return '增益 · 消耗点数';
+    case 'DEBUFF':
+      return '弱点 · 提供点数';
+    case 'MIXED':
+      return '混合 · 正负并存';
+    case 'NARRATIVE':
+      return '叙事 · 0 点';
+  }
 }
 
 function ExtensionEditor({

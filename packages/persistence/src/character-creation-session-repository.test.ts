@@ -59,7 +59,7 @@ describe('CharacterCreationSessionRepository', () => {
           constitutionRevision: 1,
           mode: 'ADVANCED',
           conceptInput: null,
-          draft: completeDraft(fixture.campaign, fixture.character),
+          draft: balancedPointDraft(fixture.campaign, fixture.character),
           createdAt: at1,
         },
         fixture.definitions,
@@ -92,6 +92,10 @@ describe('CharacterCreationSessionRepository', () => {
         nickname: '小烬',
         name: '沈烬',
         extensions: [{ namespace: 'cultivation', values: { spiritRoot: '火' } }],
+        traits: [
+          { pointProfile: { type: 'BUFF', buffPoints: -2, debuffPoints: 0 } },
+          { pointProfile: { type: 'DEBUFF', buffPoints: 0, debuffPoints: 2 } },
+        ],
       });
       expect(new UniversalCharacterRepository(durableDb).requireProfile(fixture.character)).toEqual(
         result.character,
@@ -315,6 +319,42 @@ function completeDraft(
       tavernArrivalReason: '追踪一封匿名信来到余烬酒馆。',
     },
     extensions: [{ namespace: 'cultivation', schemaVersion: 1, values: { spiritRoot: '火' } }],
+  });
+}
+
+function balancedPointDraft(
+  campaign: ReturnType<typeof campaignId>,
+  character: ReturnType<typeof playerCharacterId>,
+) {
+  const draft = completeDraft(campaign, character);
+  const [firstTrait, secondTrait] = draft.traits;
+  if (firstTrait === undefined || secondTrait === undefined) {
+    throw new Error('fixture must include two Traits');
+  }
+  return createUniversalCharacterDraft({
+    ...draft,
+    traits: [
+      {
+        ...firstTrait,
+        pointProfile: {
+          type: 'BUFF',
+          positiveEffect: '能在烟尘中辨认道路。',
+          negativeEffect: null,
+          buffPoints: -2,
+          debuffPoints: 0,
+        },
+      },
+      {
+        ...secondTrait,
+        pointProfile: {
+          type: 'DEBUFF',
+          positiveEffect: null,
+          negativeEffect: '无法忽视被困在烟火中的陌生人。',
+          buffPoints: 0,
+          debuffPoints: 2,
+        },
+      },
+    ],
   });
 }
 

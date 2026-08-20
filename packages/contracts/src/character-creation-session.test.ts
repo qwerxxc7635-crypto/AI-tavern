@@ -210,6 +210,56 @@ describe('character creation session', () => {
       /Missing field cultivation.spiritRoot/,
     );
   });
+
+  it('accepts an empty Trait collection but rejects any non-zero locally recomputed budget', () => {
+    const empty = createCharacterCreationSession(
+      {
+        id: 'creation-session-empty-traits',
+        campaignId: campaignKey,
+        characterId: characterKey,
+        constitutionRevision: 3,
+        mode: 'ADVANCED',
+        conceptInput: null,
+        draft: { ...completeDraft(), traits: [] },
+        createdAt: at1,
+      },
+      definitions,
+    );
+    expect(prepareAdvancedCharacterDraft(empty, definitions, at2).status).toBe('READY_TO_CONFIRM');
+
+    const sourceTrait = completeDraft().traits[0];
+    if (sourceTrait === undefined) throw new Error('fixture must include one Trait');
+    const unbalanced = createCharacterCreationSession(
+      {
+        id: 'creation-session-unbalanced-traits',
+        campaignId: campaignKey,
+        characterId: characterKey,
+        constitutionRevision: 3,
+        mode: 'ADVANCED',
+        conceptInput: null,
+        draft: {
+          ...completeDraft(),
+          traits: [
+            {
+              ...sourceTrait,
+              pointProfile: {
+                type: 'BUFF',
+                positiveEffect: '在黑暗中看清道路。',
+                negativeEffect: null,
+                buffPoints: -2,
+                debuffPoints: 0,
+              },
+            },
+          ],
+        },
+        createdAt: at1,
+      },
+      definitions,
+    );
+    expect(() => prepareAdvancedCharacterDraft(unbalanced, definitions, at2)).toThrow(
+      /exactly zero/,
+    );
+  });
 });
 
 function blankDraft() {

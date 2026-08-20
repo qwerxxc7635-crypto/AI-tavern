@@ -40,6 +40,8 @@ export type {
   RulesErrorCode,
   RulesEvaluationContext,
 } from './rules-engine.js';
+export { confirmCharacterTraitPoints, evaluateCharacterTraitPoints } from './trait-point-system.js';
+export type { TraitPointBreakdown, TraitPointEvaluation } from './trait-point-system.js';
 export {
   KnowledgeBoundaryError,
   knowledgeForPrompt,

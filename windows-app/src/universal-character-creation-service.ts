@@ -341,7 +341,7 @@ export class UniversalCharacterCreationService {
   ): Promise<readonly string[]> {
     requireEditableSession(snapshot);
     const locks = validateCharacterLockedFields(lockedFields, snapshot.extensionDefinitions);
-    const field = requireCharacterAIField(snapshot.extensionDefinitions, path);
+    const field = requireCharacterAIField(snapshot.extensionDefinitions, path, draft);
     if (isCharacterAIFieldLocked(path, locks)) {
       throw new CharacterDraftAIError('FIELD_LOCKED');
     }
@@ -402,7 +402,7 @@ export class UniversalCharacterCreationService {
   ): Promise<CharacterDraftAIPreview> {
     requireEditableSession(snapshot);
     const locks = validateCharacterLockedFields(lockedFields, snapshot.extensionDefinitions);
-    const available = characterAIFields(snapshot.extensionDefinitions).filter(
+    const available = characterAIFields(snapshot.extensionDefinitions, draft).filter(
       ({ path }) => !isCharacterAIFieldLocked(path, locks),
     );
     const targets = available.filter((field) => {
@@ -467,7 +467,7 @@ export class UniversalCharacterCreationService {
         lockedRules: chunkFacts(constitutionRules(snapshot.constitution)),
         knownFacts: chunkFacts(
           lockedFields.map((path) => {
-            const field = characterAIFields(snapshot.extensionDefinitions).find(
+            const field = characterAIFields(snapshot.extensionDefinitions, draft).find(
               (candidate) => candidate.path === path || candidate.path.startsWith(`${path}.`),
             );
             return field === undefined

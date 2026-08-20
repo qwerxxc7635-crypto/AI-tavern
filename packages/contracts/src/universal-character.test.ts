@@ -156,7 +156,7 @@ describe('Universal Character Schema', () => {
     ).toThrow('schema version is unsupported');
   });
 
-  it('enforces collection, field and V0.2 projection resource boundaries', () => {
+  it('enforces collection and field boundaries while allowing an empty V0.3 Trait projection', () => {
     const campaign = campaignId('campaign-character-limits');
     const profile = character(campaign, 'investigation', { sanity: 70, luck: 50, credit: 25 });
     expect(() =>
@@ -171,9 +171,10 @@ describe('Universal Character Schema', () => {
         fields: Array.from({ length: 33 }, (_, index) => textField(`field${index}`, 'Field')),
       }),
     ).toThrow('1 to 32');
-    expect(() =>
-      projectUniversalCharacterToV02(createUniversalCharacterProfile({ ...profile, traits: [] })),
-    ).toThrow('cannot be represented');
+    expect(
+      projectUniversalCharacterToV02(createUniversalCharacterProfile({ ...profile, traits: [] }))
+        .traits,
+    ).toEqual([]);
   });
 });
 

@@ -4148,3 +4148,23 @@
 - 首次完整共享门禁仅发现一处新增测试格式偏差；用Prettier修正后从头重跑。最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 119个文件/729项通过，另1个文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 110项通过、0失败，另1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
 - `pnpm --dir windows-app build`通过，Vite production构建225个模块，通用角色创建页独立lazy chunk成功产出。本任务不需要schema/SQLite迁移，portable`.emtavern`仍保持v2，未声称本任务扩大存档范围。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M5-T04。
+
+## 2026-08-20 — M5-T04 Trait Point System
+
+### 本地点数合同、确认门禁与规则 UI
+
+- 新增Buff、Debuff、Mixed、Narrative统一`TraitPointProfile`：Buff为-1至-5、Debuff为+1至+5、Mixed分别记录两边、Narrative严格为0；未知字段、错误符号、越界、空效果和类型矛盾全部拒绝。
+- 净点数不持久化。Domain按每项Trait生成可审计breakdown并计算角色总点数；空集合定义为0。Advanced准备、会话恢复与正式确认均由本地合同严格要求净0，非零草稿仍可保存但保持`ACTIVE`。
+- 角色创建页直接消费Domain重算结果，显示本地净点数并禁用非零/非法配置的准备与确认；支持移除到空集合，当前纵向切片最多两项。UI复用现有角色布局、Token和`AIFieldAssist`，未新建平行组件或提前迁移Legacy页面。
+- 正面/负面效果作为自然语言字段接入M5-T03白名单，但仅在当前类型需要时出现。Trait类型、Buff/Debuff点值始终位于AI权限外，patch应用后再次验证类型和点值未变；Prompt也明确禁止AI分配点数。
+- `CharacterTrait.pointProfile`采用可选兼容字段，旧数据缺失时只解释为Narrative 0；`PlayerCharacter.traits`由固定二元组演进为数组以满足空集合验收，旧两项JSON继续可读。Profile到兼容根的投影只保留id/name/description，不把点值伪装成旧字段。
+- TypeScript Repository和Rust Native镜像结构、范围与严格归零校验；点数嵌入既有Profile/会话JSON，无需新增SQLite schema migration。新增`docs/V0.3_TRAIT_POINT_SYSTEM.md`与`DEC-124`固定authority、兼容和阶段边界。
+
+### 验证、自审与限制
+
+- 定向TypeScript类型检查及9个相关测试文件43项通过，覆盖四类Trait、-5/+5边界、Mixed、非法符号/效果/额外字段、empty、strict zero、Domain breakdown、JSON序列化、会话状态、SQLite关闭重开、AI权限与页面门禁。
+- 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 121个文件/741项通过，另1个文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 111项通过、0失败，另1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建235个模块并产出独立通用角色创建chunk。Rust Native专项3项通过，覆盖Quick默认Narrative、非零拒绝及空集合保存/确认。
+- 本任务不把点数转换为M4-T03 `TraitRuleModifier`，不判断强度、频率、条件或协同，也不进入M5-T05。portable`.emtavern`仍为v2，完整通用档案迁移保持在M10-T05。
+- 已持久化的视觉手册、全局引用、视觉债务与M10-T07收敛门禁保持有效；本轮仅让自然修改到的角色Trait UI遵循既有体系，没有返工M0至M4页面。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M5-T05。

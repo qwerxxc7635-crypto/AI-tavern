@@ -28,6 +28,16 @@ export type {
   TraitModifierTarget,
   TraitRuleModifier,
 } from './rules.js';
+export {
+  CHARACTER_TRAIT_TYPES,
+  NARRATIVE_TRAIT_POINT_PROFILE,
+  TraitPointError,
+  assertBalancedCharacterTraitPoints,
+  characterTraitPointNet,
+  createTraitPointProfile,
+  traitPointNet,
+} from './trait-points.js';
+export type { CharacterTraitType, TraitPointProfile } from './trait-points.js';
 export { AI_REQUEST_STATUSES } from './pending-ai-request.js';
 export type {
   AiRequestError,

@@ -154,6 +154,44 @@ describe('Universal Character Creation page', () => {
     fireEvent.click(screen.getByRole('button', { name: '撤销整批采用' }));
     expect((screen.getByLabelText('姓名') as HTMLTextAreaElement).value).toBe('Mira Vale');
   });
+
+  it('recomputes Trait points locally, blocks non-zero start and accepts the empty collection', async () => {
+    const active = snapshot(session('ADVANCED', 'ACTIVE'));
+    const service = actions(active);
+    renderPage(service);
+
+    expect(await screen.findByText('本地重算：0（可开始）')).toBeDefined();
+    const typeSelectors = screen.getAllByLabelText('特质类型');
+    const [firstType, secondType] = typeSelectors;
+    if (firstType === undefined || secondType === undefined) {
+      throw new Error('page must render two Trait type selectors');
+    }
+    fireEvent.change(firstType, { target: { value: 'BUFF' } });
+    expect(screen.getByText('本地重算：-1（禁止开始）')).toBeDefined();
+    expect(
+      (screen.getByRole('button', { name: '校验完整车卡' }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect((screen.getByRole('button', { name: '保存草稿' }) as HTMLButtonElement).disabled).toBe(
+      false,
+    );
+    expect(
+      document.querySelector('[data-ai-field="character:traits.0.pointProfile.positiveEffect"]'),
+    ).not.toBeNull();
+
+    fireEvent.change(secondType, { target: { value: 'DEBUFF' } });
+    expect(screen.getByText('本地重算：0（可开始）')).toBeDefined();
+    expect(
+      (screen.getByRole('button', { name: '校验完整车卡' }) as HTMLButtonElement).disabled,
+    ).toBe(false);
+    expect(
+      document.querySelector('[data-ai-field="character:traits.1.pointProfile.negativeEffect"]'),
+    ).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: '移除特质 1' }));
+    fireEvent.click(screen.getByRole('button', { name: '移除特质 1' }));
+    expect(screen.getByText('本地重算：0（可开始）')).toBeDefined();
+    expect(screen.getByRole('button', { name: '添加特质' })).toBeDefined();
+  });
 });
 
 function renderPage(service: ReturnType<typeof actions>) {
