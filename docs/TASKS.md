@@ -301,12 +301,13 @@
 
 ## M6-T03 NPC LOD
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M6-T02。
 - **Deliverable**：LOD0–3 合同、升级规则、Generator 和持久化。
 - **Acceptance**：世界创建不全量生成 NPC；互动提升细节且延续身份；升级幂等并保留知识边界。
 - **Tests**：each LOD、upgrade/downgrade rejection、concurrency、identity continuity、save/reload。
 - **Do Not**：不生成全世界人口；不让 LOD 升级改写既有事实。
+- **Implementation reference**：[`V0.3_NPC_LOD.md`](V0.3_NPC_LOD.md)。
 
 ## M6-T04 Dynamic Locations
 

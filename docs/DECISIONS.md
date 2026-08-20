@@ -2676,3 +2676,28 @@ V0.3要求装备具有世界相关的名称、历史、来源、剧情能力和Q
 - Unicode规范化ID/名称重复、Constitution伪造、越权绑定、无来源高阶奖励和机械预算超限均fail closed。
 - D20仍只读取角色实际拥有且装备的`effect_json`；语义触发不会自动修改状态，后续消费者必须使用显式事件。
 - UI沿用现有Item/Character/Adventure合同并遵循视觉手册，完整Legacy迁移仍属于M10-T07；M6-T02不进入NPC LOD、地点或势力。
+
+## DEC-128：NPC LOD以独立身份投影渐进具体化并复用既有知识边界
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T03`、`docs/V0.3_SPEC.md` 11.3节、`DEC-120`
+
+### 背景
+
+既有`npcs`合同要求名字、外貌、人格、目标和秘密全部非空，适合已经进入酒馆或对话的完整NPC，却无法诚实表达只有背景角色的LOD0。用占位文本塞入旧表会把“尚未生成”伪装为世界事实；直接放宽旧表又会破坏已通过测试的Tavern、Dialogue、Quest和Archive合同。另一方面，LOD2/3若接受模型自由写知识、秘密和关系，会绕过M5-T01建立的Actor Knowledge authority。
+
+### 决定与理由
+
+schema 16新增`npc_lod_profiles`和append-only`npc_lod_transitions`。低LOD只保存不可变identity anchor、人口角色和按级解锁字段，不创建伪完整`npcs`行；既有完整NPC在迁移和后续insert事务中保守投影为LOD3，旧业务合同保持原样。
+
+晋升固定为`OBSERVED`、`INTERACTED`、`RECURRING`三步，每步只加一LOD和一revision。统一`GENERATE_NPC_LOD`必须重复既有字段与锁定Constitution证据，并只能选择Native按当前Actor Knowledge、Memory、NPC、Quest、语义Item和Event计算的ID白名单。Native重新构造输入、验证raw/validated一致性，在immediate transaction中原子写generation audit、profile与transition；expected revision和idempotency key分别处理竞争与重放。
+
+### 影响与边界
+
+- 世界创建不生成任何人口清单；只有显式seed创建单个LOD0，M7-T01才负责根据酒馆上下文选择和晋升人口。
+- 低LOD身份成为既有Knowledge/Memory/Actor Claim trigger认可的NPC Actor，但跨Campaign、跨Actor及未授权Truth仍被拒绝。
+- 已有非空文本和引用只能延续，不能删除、替换或由LOD升级改写；LOD3不可重新生成。
+- 本地SQLite支持关闭重开；portable archive新增表和历史fixture迁移仍由M10-T05统一处理。
+- UI不在M6-T03逐页返工；后续展示复用既有NPC组件和视觉Token，完整Legacy迁移仍属于M10-T07。
+- 本任务不修改Rules Engine、D20、Provider栈、Career/Equipment、Quest/Adventure语义、World Seed或存档状态机，也不提前实现M6-T04地点与M6-T05势力。

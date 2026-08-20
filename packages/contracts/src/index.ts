@@ -229,6 +229,21 @@ export {
   type SemanticEquipmentContent,
   type SemanticEquipmentDefinition,
 } from './semantic-equipment.js';
+export {
+  NPC_LOD_LEVELS,
+  NPC_LOD_UPGRADE_TRIGGERS,
+  NpcLodContractError,
+  createNpcLodProfile,
+  parseNpcLodProfile,
+} from './npc-lod.js';
+export type {
+  NpcLodCandidate,
+  NpcLodConstitutionEvidence,
+  NpcLodLevel,
+  NpcLodProfile,
+  NpcLodTransition,
+  NpcLodUpgradeTrigger,
+} from './npc-lod.js';
 export type {
   CareerCandidate,
   CareerConstitutionEvidence,

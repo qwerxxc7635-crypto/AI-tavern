@@ -6,6 +6,8 @@ import {
   CareerOutputSchema,
   ItemInputSchema,
   ItemOutputSchema,
+  NpcLodInputSchema,
+  NpcLodOutputSchema,
 } from './entity-schemas.js';
 import {
   CheckConsistencyInputSchema,
@@ -76,6 +78,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   EDIT_CHARACTER_DRAFT: definition(EditCharacterDraftInputSchema, EditCharacterDraftOutputSchema),
   GENERATE_CAREER_POOL: definition(CareerInputSchema, CareerOutputSchema),
   GENERATE_ITEMS: definition(ItemInputSchema, ItemOutputSchema),
+  GENERATE_NPC_LOD: definition(NpcLodInputSchema, NpcLodOutputSchema),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),

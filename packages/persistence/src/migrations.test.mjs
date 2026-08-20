@@ -30,6 +30,8 @@ const coreTables = [
   'messages',
   'model_profiles',
   'npc_knowledge',
+  'npc_lod_profiles',
+  'npc_lod_transitions',
   'npc_relationships',
   'npcs',
   'pending_ai_requests',
@@ -393,7 +395,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      15,
+      16,
     );
     const importedKnowledge = database
       .prepare(

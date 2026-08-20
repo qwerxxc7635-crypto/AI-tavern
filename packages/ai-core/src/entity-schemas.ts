@@ -227,34 +227,53 @@ const faction = z
 
 export const FactionOutputSchema = versioned({ factions: z.array(faction).min(1).max(16) });
 
-export const NpcLodInputSchema = versioned({
-  context: generationContext,
-  npcId: id,
-  currentLod: z.number().int().min(0).max(3),
-  targetLod: z.number().int().min(0).max(3),
-  preservedFields: z.record(z.string().max(120), z.string().max(4_000)),
-});
+const npcLodConstitutionEvidence = z
+  .object({ npcRules: text, society: text, technology: text })
+  .strict();
 
-const npcLod = z
+const npcLodFields = {
+  npcId: id,
+  lod: z.number().int().min(0).max(3),
+  identityAnchor: id,
+  populationRole: name,
+  name: name.nullable(),
+  appearance: text.nullable(),
+  currentBehavior: text.nullable(),
+  career: text.nullable(),
+  personality: text.nullable(),
+  goals: shortList,
+  knowledgeFactIds: idList,
+  relationshipNpcIds: idList,
+  memoryIds: idList,
+  secretFactIds: idList,
+  questIds: idList,
+  itemIds: idList,
+  experienceEventIds: idList,
+  constitutionEvidence: npcLodConstitutionEvidence,
+} satisfies z.ZodRawShape;
+
+const npcLod = z.object(npcLodFields).strict();
+
+const npcLodReferences = z
   .object({
-    npcId: id,
-    lod: z.number().int().min(0).max(3),
-    populationRole: name,
-    name: name.nullable(),
-    appearance: text.nullable(),
-    currentBehavior: text.nullable(),
-    career: text.nullable(),
-    personality: text.nullable(),
-    goals: shortList,
-    knowledge: shortList,
-    relationshipIds: idList,
-    memories: shortList,
-    secrets: shortList,
+    knowledgeFactIds: idList,
+    relationshipNpcIds: idList,
+    memoryIds: idList,
+    secretFactIds: idList,
     questIds: idList,
     itemIds: idList,
-    experiences: shortList,
+    experienceEventIds: idList,
   })
   .strict();
+
+export const NpcLodInputSchema = versioned({
+  context: generationContext,
+  currentProfile: npcLod,
+  targetLod: z.number().int().min(1).max(3),
+  trigger: z.enum(['OBSERVED', 'INTERACTED', 'RECURRING']),
+  allowedReferences: npcLodReferences,
+  constitutionEvidence: npcLodConstitutionEvidence,
+});
 
 export const NpcLodOutputSchema = versioned({ npc: npcLod });
 

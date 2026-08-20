@@ -10,6 +10,7 @@ mod character_creation;
 mod entity_schema_contract;
 mod model_settings;
 mod npc_dialogue;
+mod npc_lod;
 mod quest_board;
 mod randomness_settings;
 mod repetition;
@@ -28,6 +29,7 @@ pub use career_pool::*;
 pub use character_creation::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
+pub use npc_lod::*;
 pub use quest_board::*;
 pub use randomness_settings::*;
 pub use rules_engine::*;
@@ -81,7 +83,8 @@ const CHARACTER_CREATION_SESSIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0014_character_creation_sessions.sql");
 const CAREER_POOLS_MIGRATION: &str =
     include_str!("../../../database/migrations/0015_career_pools.sql");
-const LATEST_SCHEMA_VERSION: i64 = 15;
+const NPC_LOD_MIGRATION: &str = include_str!("../../../database/migrations/0016_npc_lod.sql");
+const LATEST_SCHEMA_VERSION: i64 = 16;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -547,6 +550,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             CHARACTER_CREATION_SESSIONS_MIGRATION,
         ),
         (15_i64, "career_pools", CAREER_POOLS_MIGRATION),
+        (16_i64, "npc_lod", NPC_LOD_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

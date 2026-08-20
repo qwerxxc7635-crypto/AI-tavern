@@ -165,6 +165,48 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       ],
     };
   }
+  if (request.task === 'GENERATE_NPC_LOD') {
+    const input = taskInput(request);
+    const current = isRecord(input?.['currentProfile']) ? input['currentProfile'] : undefined;
+    if (current === undefined) return base;
+    const targetLod = input?.['targetLod'];
+    const evidence = isRecord(input?.['constitutionEvidence'])
+      ? input['constitutionEvidence']
+      : current['constitutionEvidence'];
+    const references = isRecord(input?.['allowedReferences']) ? input['allowedReferences'] : {};
+    const firstReference = (key: string): readonly string[] => {
+      const values = references[key];
+      return Array.isArray(values) && typeof values[0] === 'string' ? [values[0]] : [];
+    };
+    return {
+      schemaVersion: 1,
+      npc: {
+        ...current,
+        lod: targetLod,
+        name: targetLod === 1 ? 'Nera Fen' : current['name'],
+        appearance:
+          targetLod === 1 ? 'A rain-dark cloak and a coil of pale rope.' : current['appearance'],
+        currentBehavior:
+          targetLod === 1
+            ? 'Studies the tide marks beside the tavern door.'
+            : current['currentBehavior'],
+        career: targetLod === 2 ? 'Tide runner' : current['career'],
+        personality: targetLod === 2 ? 'Watchful and quietly helpful.' : current['personality'],
+        goals: targetLod === 2 ? ['Learn who altered the harbor marks'] : current['goals'],
+        knowledgeFactIds:
+          targetLod === 2 ? firstReference('knowledgeFactIds') : current['knowledgeFactIds'],
+        relationshipNpcIds:
+          targetLod === 2 ? firstReference('relationshipNpcIds') : current['relationshipNpcIds'],
+        memoryIds: targetLod === 3 ? firstReference('memoryIds') : current['memoryIds'],
+        secretFactIds: targetLod === 3 ? firstReference('secretFactIds') : current['secretFactIds'],
+        questIds: targetLod === 3 ? firstReference('questIds') : current['questIds'],
+        itemIds: targetLod === 3 ? firstReference('itemIds') : current['itemIds'],
+        experienceEventIds:
+          targetLod === 3 ? firstReference('experienceEventIds') : current['experienceEventIds'],
+        constitutionEvidence: evidence,
+      },
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;

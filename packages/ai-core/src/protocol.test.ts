@@ -89,11 +89,12 @@ describe('vendor-neutral AI protocol', () => {
   });
 
   it('lists all initial AI tasks without defining task schemas', () => {
-    expect(AI_TASKS).toHaveLength(19);
+    expect(AI_TASKS).toHaveLength(20);
     expect(AI_TASKS).toContain('GENERATE_QUICK_CHARACTER');
     expect(AI_TASKS).toContain('EDIT_CHARACTER_DRAFT');
     expect(AI_TASKS).toContain('GENERATE_CAREER_POOL');
     expect(AI_TASKS).toContain('GENERATE_ITEMS');
+    expect(AI_TASKS).toContain('GENERATE_NPC_LOD');
     expect(AI_TASKS).toContain('GENERATE_ADVENTURE_TURN');
     expect(AI_TASKS).toContain('CHECK_CONSISTENCY');
   });

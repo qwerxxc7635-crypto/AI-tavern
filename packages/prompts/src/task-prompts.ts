@@ -70,6 +70,11 @@ export const TASK_PROMPTS = Object.freeze({
     'WORLD_DESIGNER',
     'Generate exactly requestedCount distinct semantic equipment candidates at requestedRarity. Names, descriptions, appearance, history, origin, narrative abilities, semantic effects, and balance tags are narrative only. Repeat the three locked Constitution evidence strings exactly. Use only supplied binding targets and allowed triggers, include at least the Quest and one NPC binding, and do not invent target IDs. Never assign or imply damage, defense, price, check modifiers, recovery values, uses, or any other numeric mechanic; the Rules Engine derives all mechanics locally. Do not duplicate existingItemIds or existingItemNames.',
   ),
+  GENERATE_NPC_LOD: define(
+    'GENERATE_NPC_LOD',
+    'WORLD_DESIGNER',
+    'Upgrade exactly one NPC by one LOD level. Repeat npcId, identityAnchor, populationRole, every existing non-null field, every existing list entry, and the three locked Constitution evidence strings exactly. Add only the fields unlocked by targetLod. Reference only IDs supplied in allowedReferences; references are selections, never new facts, memories, relationships, quests, items, secrets, or events. Do not downgrade, rename, replace, contradict, or rewrite the existing identity. LOD1 adds name, appearance, and current behavior; LOD2 adds career, personality, goals, authorized knowledge and relationships; LOD3 may add authorized memories, secret facts, quests, items, and experiences.',
+  ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
     'WORLD_DESIGNER',

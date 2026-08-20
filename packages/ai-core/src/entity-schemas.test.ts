@@ -126,9 +126,7 @@ describe('structured entity schemas', () => {
     ).toBe(true);
 
     const npcInput = fixtureFor('NPC_LOD').input;
-    expect(NpcLodInputSchema.safeParse({ ...npcInput, currentLod: 3, targetLod: 1 }).success).toBe(
-      true,
-    );
+    expect(NpcLodInputSchema.safeParse({ ...npcInput, targetLod: 4 }).success).toBe(false);
   });
 
   it('makes the fixture envelope itself strict for cross-language consumers', () => {

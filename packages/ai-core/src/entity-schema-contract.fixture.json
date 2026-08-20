@@ -253,16 +253,53 @@
         "constitutionRevision": 1,
         "contextSummary": "A tavern investigation"
       },
-      "npcId": "npc-ilya",
-      "currentLod": 1,
+      "currentProfile": {
+        "npcId": "npc-ilya",
+        "lod": 1,
+        "identityAnchor": "anchor-ilya",
+        "populationRole": "Harbor guild member",
+        "name": "Ilya",
+        "appearance": "Weathered coat and a brass spyglass",
+        "currentBehavior": "Questions arriving crews",
+        "career": null,
+        "personality": null,
+        "goals": [],
+        "knowledgeFactIds": [],
+        "relationshipNpcIds": [],
+        "memoryIds": [],
+        "secretFactIds": [],
+        "questIds": [],
+        "itemIds": [],
+        "experienceEventIds": [],
+        "constitutionEvidence": {
+          "npcRules": "NPC motives follow knowledge and obligations",
+          "society": "Harbor guilds connect isolated settlements",
+          "technology": "Late medieval"
+        }
+      },
       "targetLod": 2,
-      "preservedFields": { "name": "Ilya" }
+      "trigger": "INTERACTED",
+      "allowedReferences": {
+        "knowledgeFactIds": ["fact-beacon"],
+        "relationshipNpcIds": ["npc-keeper"],
+        "memoryIds": [],
+        "secretFactIds": [],
+        "questIds": ["quest-beacon"],
+        "itemIds": ["item-spyglass"],
+        "experienceEventIds": []
+      },
+      "constitutionEvidence": {
+        "npcRules": "NPC motives follow knowledge and obligations",
+        "society": "Harbor guilds connect isolated settlements",
+        "technology": "Late medieval"
+      }
     },
     "output": {
       "schemaVersion": 1,
       "npc": {
         "npcId": "npc-ilya",
         "lod": 2,
+        "identityAnchor": "anchor-ilya",
         "populationRole": "Harbor guild member",
         "name": "Ilya",
         "appearance": "Weathered coat and a brass spyglass",
@@ -270,13 +307,18 @@
         "career": "Master pilot",
         "personality": "Direct and patient",
         "goals": ["Find the keeper"],
-        "knowledge": ["The eastern beacon failed at midnight"],
-        "relationshipIds": ["npc-keeper"],
-        "memories": [],
-        "secrets": [],
+        "knowledgeFactIds": ["fact-beacon"],
+        "relationshipNpcIds": ["npc-keeper"],
+        "memoryIds": [],
+        "secretFactIds": [],
         "questIds": ["quest-beacon"],
         "itemIds": ["item-spyglass"],
-        "experiences": []
+        "experienceEventIds": [],
+        "constitutionEvidence": {
+          "npcRules": "NPC motives follow knowledge and obligations",
+          "society": "Harbor guilds connect isolated settlements",
+          "technology": "Late medieval"
+        }
       }
     }
   },

@@ -4232,3 +4232,27 @@
 - 最终`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 128个文件/811项通过，另1个文件/1项性能runner按设计跳过；Node 28项通过；Rust workspace 114项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TS↔Rust archive interop全部通过。
 - `pnpm --dir windows-app build`生产构建通过，Vite转换241个模块并生成独立settlement service chunk。
 - 本任务不修改Rules Engine/D20硬结果、Provider、Career Pool、Quest/NPC/Adventure状态语义、World Seed或SQLite真相架构，不进入M6-T03。用户已有`.gitignore`修改继续保持未暂存。
+
+## 2026-08-20 — M6-T03 NPC LOD
+
+### LOD合同、知识边界与按需Generator
+
+- 新增严格version 1 `NpcLodProfile`和LOD0–3字段解锁合同。LOD0只保存不可变identity anchor与人口角色；LOD1增加名字/外貌/当前行为，LOD2增加职业/人格/目标/授权知识与关系，LOD3才允许授权记忆、秘密、Quest、装备和经历。
+- Domain把唯一合法晋升固定为`OBSERVED`、`INTERACTED`、`RECURRING`，每次只增加一LOD和一revision；既有文本与ID必须是下一版本的子集，身份、人口角色和Constitution证据必须逐字一致，跳级、降级、改名、删事实和越权引用均fail closed。
+- 新增统一`GENERATE_NPC_LOD`任务、结构schema、Prompt、Context Budget、Fake Provider输出、缓存指标白名单和跨语言entity fixture。模型只选择Native提供的引用ID，不能创建世界事实、记忆、关系、Quest、Item或Event。
+- Windows新增`NpcLodService`和三个Tauri命令；同一Campaign/NPC的并发晋升在服务层合并，最终仍由Native expected revision仲裁。显式seed一次只创建一个背景身份，不扫描或预生成人口。
+
+### SQLite、Native与兼容
+
+- schema 16新增`npc_lod_profiles`和append-only`npc_lod_transitions`，保存canonical JSON、Constitution binding、generation provenance、before/after revision和idempotency key；SQLite trigger禁止身份改写、跳级、无provenance升级和在Campaign存续时删除身份。
+- Native从当前事务重新构造Generator输入与授权引用：LOD知识只来自该Actor的KNOWN Truth，秘密还必须是SECRET Truth，Memory必须属于该Actor，关系/Quest/语义Item/Event必须显式关联同一NPC。generation audit、profile更新和transition在一个`BEGIN IMMEDIATE`事务提交。
+- 既有完整`npcs`在迁移时保守回填为LOD3，后续旧Tavern流程新增完整NPC时由同一insert事务自动投影，不放宽旧表非空合同、不改变Dialogue/Quest/Adventure语义。低LOD身份纳入既有Knowledge、Memory和Actor Claim trigger，但跨Campaign与跨Actor仍拒绝。
+- 新增`docs/V0.3_NPC_LOD.md`与`DEC-128`，并更新V0.3规格、Generator Framework和任务引用。UI没有逐页返工，后续自然展示继续复用视觉Token与既有NPC Game Component，完整Legacy迁移仍由M10-T07处理。
+
+### 验证、自审与限制
+
+- 定向合同、Domain、AI schema/Prompt/Fake Provider、TypeScript Repository、Windows service、migration和Rust Native测试通过，覆盖each LOD、字段提前出现、跳级/错误trigger、identity continuity、知识泄露、幂等重放、并发revision、关闭重开及低LOD Actor trigger。
+- `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 132个文件/828项通过，另1个文件/1项性能runner按设计跳过；Node 28项通过；Rust workspace 116项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TS↔Rust archive interop全部通过。
+- `pnpm --dir windows-app build`生产构建通过，Vite转换243个模块。没有通过删除测试、降低校验或忽略错误完成门禁。
+- portable`.emtavern`仍为v2；新增LOD表的正式跨版本导入导出由M10-T05统一处理。本任务不进入M6-T04，不实现动态地点、势力、酒馆人口投影、多NPC场景或不可变NPC时间线。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。

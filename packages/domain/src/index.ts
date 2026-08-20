@@ -64,6 +64,17 @@ export {
   type EquipmentTriggerEvent,
   type QuestRewardEquipmentInput,
 } from './semantic-equipment-validator.js';
+export {
+  NpcLodRuleError,
+  createNpcLodSeed,
+  requiredNpcLodTrigger,
+  upgradeNpcLod,
+} from './npc-lod-validator.js';
+export type {
+  CreateNpcLodSeedInput,
+  NpcLodReferenceAuthority,
+  UpgradeNpcLodInput,
+} from './npc-lod-validator.js';
 export type { CareerGenerationPolicy } from './career-pool-validator.js';
 export {
   KnowledgeBoundaryError,

@@ -18,7 +18,8 @@ use ember_native_bridge::{
     CharacterCandidateConfirm, CharacterCompletionCommit, CharacterCreationSnapshot,
     CharacterRulesState, CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
     ModelCapabilitiesRegistration, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
-    NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
+    NpcDialogueSnapshot, NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit,
+    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
     RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
     TavernGenerationCommit, TavernSnapshot, UniversalCharacterCreationConfirm,
     UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
@@ -1047,6 +1048,33 @@ fn career_pool_generation_commit(
 }
 
 #[tauri::command]
+fn npc_lod_seed(
+    command: NpcLodSeedCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcLodGenerationSnapshot, CommandError> {
+    store.create_npc_lod_seed(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_lod_get(
+    campaign_id: String,
+    npc_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcLodGenerationSnapshot, CommandError> {
+    store
+        .npc_lod_generation_snapshot(&campaign_id, &npc_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_lod_upgrade_commit(
+    command: NpcLodUpgradeCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcLodGenerationSnapshot, CommandError> {
+    store.commit_npc_lod_upgrade(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1330,6 +1358,9 @@ pub fn run() {
             character_candidate_confirm,
             universal_character_creation_get,
             career_pool_generation_commit,
+            npc_lod_seed,
+            npc_lod_get,
+            npc_lod_upgrade_commit,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,
