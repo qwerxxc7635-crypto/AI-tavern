@@ -311,12 +311,13 @@
 
 ## M6-T04 Dynamic Locations
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M6-T03。
 - **Deliverable**：层级地点、按需具体化、移动和持久化规则。
 - **Acceptance**：多尺度地点可表达；玩家离开预设城市仍可继续；地点事实服从 Constitution。
 - **Tests**：hierarchy、travel、lazy generation、invalid topology、save/reload。
 - **Do Not**：不实现格子地图/战棋；不一次生成完整地图。
+- **Implementation reference**：[`V0.3_DYNAMIC_LOCATIONS.md`](V0.3_DYNAMIC_LOCATIONS.md)。
 
 ## M6-T05 Active Factions
 

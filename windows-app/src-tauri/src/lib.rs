@@ -17,6 +17,8 @@ use ember_native_bridge::{
     CampaignStoreError, CampaignSummary, CapabilitySource, CareerPool, CareerPoolGenerationCommit,
     CharacterCandidateConfirm, CharacterCompletionCommit, CharacterCreationSnapshot,
     CharacterRulesState, CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
+    DynamicLocationGenerationCommit, DynamicLocationGenerationRequest,
+    DynamicLocationGenerationSnapshot, DynamicLocationSnapshot, DynamicLocationTravelCommand,
     ModelCapabilitiesRegistration, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
     NpcDialogueSnapshot, NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit,
     NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
@@ -1075,6 +1077,44 @@ fn npc_lod_upgrade_commit(
 }
 
 #[tauri::command]
+fn dynamic_locations_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationSnapshot, CommandError> {
+    store
+        .dynamic_location_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_generation_get(
+    command: DynamicLocationGenerationRequest,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationGenerationSnapshot, CommandError> {
+    store
+        .dynamic_location_generation_snapshot(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_generation_commit(
+    command: DynamicLocationGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationSnapshot, CommandError> {
+    store
+        .commit_dynamic_location_generation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_travel(
+    command: DynamicLocationTravelCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationSnapshot, CommandError> {
+    store.travel_dynamic_location(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1361,6 +1401,10 @@ pub fn run() {
             npc_lod_seed,
             npc_lod_get,
             npc_lod_upgrade_commit,
+            dynamic_locations_get,
+            dynamic_locations_generation_get,
+            dynamic_locations_generation_commit,
+            dynamic_locations_travel,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,

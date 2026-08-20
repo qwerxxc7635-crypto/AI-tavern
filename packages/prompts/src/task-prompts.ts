@@ -75,6 +75,11 @@ export const TASK_PROMPTS = Object.freeze({
     'WORLD_DESIGNER',
     'Upgrade exactly one NPC by one LOD level. Repeat npcId, identityAnchor, populationRole, every existing non-null field, every existing list entry, and the three locked Constitution evidence strings exactly. Add only the fields unlocked by targetLod. Reference only IDs supplied in allowedReferences; references are selections, never new facts, memories, relationships, quests, items, secrets, or events. Do not downgrade, rename, replace, contradict, or rewrite the existing identity. LOD1 adds name, appearance, and current behavior; LOD2 adds career, personality, goals, authorized knowledge and relationships; LOD3 may add authorized memories, secret facts, quests, items, and experiences.',
   ),
+  GENERATE_LOCATIONS: define(
+    'GENERATE_LOCATIONS',
+    'WORLD_DESIGNER',
+    'Materialize exactly requestedCount locations around the supplied origin without expanding any other part of the world. Repeat the four locked Constitution evidence strings exactly. CHILDREN creates direct children whose parentLocationId is the origin ID. CONNECTED creates peers with the same parentLocationId as the origin and every new location must connect back to the origin. Use only allowed faction IDs and existing or newly returned location IDs in connections. Return distinct IDs and names not present in the existing lists. Every location must be detailed with atmosphere, at least one feature, and a current situation. Never generate a complete country, city, region, dungeon, or world map, and never create NPCs, factions, quests, items, rules, travel outcomes, or hidden facts.',
+  ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
     'WORLD_DESIGNER',

@@ -4256,3 +4256,21 @@
 - `pnpm --dir windows-app build`生产构建通过，Vite转换243个模块。没有通过删除测试、降低校验或忽略错误完成门禁。
 - portable`.emtavern`仍为v2；新增LOD表的正式跨版本导入导出由M10-T05统一处理。本任务不进入M6-T04，不实现动态地点、势力、酒馆人口投影、多NPC场景或不可变NPC时间线。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
+
+## 2026-08-20 — M6-T04 Dynamic Locations
+
+### 稀疏地点图、渐进物化与本地旅行
+
+- 新增严格version 1 `DynamicLocationProfile`，支持十类地点、OUTLINE/DETAILED物化、Constitution证据、稳定层级、Faction引用和generation provenance。Domain拒绝缺失父节点、环、超过八层、稳定ID/规范化名称重复、未知连接、越权Faction及非相邻旅行。
+- 新增统一`GENERATE_LOCATIONS` schema、Prompt、Context Budget、Fake Provider输出和缓存指标白名单。每次只生成一个显式CHILDREN或CONNECTED扩展的一至八个地点；Prompt和校验共同禁止完整地图、坐标、NPC/Faction/Quest副作用与机械数值。
+- schema 17新增`dynamic_locations`、`location_connections`、`campaign_location_states`和append-only`location_travel_events`。Constitution锁定时只把既有WorldBible地点保守投影为OUTLINE；不调用模型、不编造额外事实。
+- TypeScript Repository和Rust Native均验证canonical profile、锁定Constitution、Faction authority、拓扑、generation provenance、旅行邻接及revision。Native从当前事务重新构造输入，把generation audit、地点与连接原子提交；幂等重放必须与原输入、上下文、generation ID和输出完全一致。
+- Windows新增`DynamicLocationService`与四个Tauri命令。同一Campaign、起点、模式和数量的并发扩展意图在服务内合并；移动是独立本地事务，不调用模型。CONNECTED专项证明玩家可以离开预设城市，关闭并重开SQLite后图、当前位置、revision和旅行历史保持一致。
+- 新增`docs/V0.3_DYNAMIC_LOCATIONS.md`与`DEC-129`，并更新V0.3规格、Generator Framework和任务引用。没有新增地图页面或逐页返工；未来地点展示继续复用视觉Token和既有组件，完整Legacy UI迁移仍由M10-T07执行。
+
+### 验证、自审与限制
+
+- 合同、Domain、migration、TypeScript Repository、Windows service和Rust Native定向测试覆盖hierarchy、lazy generation、CONNECTED离城、错误证据/父节点、非相邻/过期旅行、幂等、服务并发合并及save/reload。
+- 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 136个文件/843项通过，另1个文件/1项性能基线按设计跳过；Node 28项通过；Rust workspace 118项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。`pnpm --dir windows-app build`生产构建通过，Vite转换245个模块。
+- portable`.emtavern`仍为v2，schema 17新表的正式跨版本导入导出保留给M10-T05。本任务未实现格子地图、坐标、战棋、寻路、完整地图生成或M6-T05主动势力，也未修改Rules Engine、D20、Quest/NPC/Adventure、Provider、World Seed或存档状态机。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6-T05。

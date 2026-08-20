@@ -6,6 +6,7 @@ mod adventure_play;
 mod cache_metrics;
 mod career_pool;
 mod character_creation;
+mod dynamic_locations;
 #[cfg(test)]
 mod entity_schema_contract;
 mod model_settings;
@@ -27,6 +28,7 @@ pub use adventure_play::*;
 pub use cache_metrics::*;
 pub use career_pool::*;
 pub use character_creation::*;
+pub use dynamic_locations::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
 pub use npc_lod::*;
@@ -84,7 +86,9 @@ const CHARACTER_CREATION_SESSIONS_MIGRATION: &str =
 const CAREER_POOLS_MIGRATION: &str =
     include_str!("../../../database/migrations/0015_career_pools.sql");
 const NPC_LOD_MIGRATION: &str = include_str!("../../../database/migrations/0016_npc_lod.sql");
-const LATEST_SCHEMA_VERSION: i64 = 16;
+const DYNAMIC_LOCATIONS_MIGRATION: &str =
+    include_str!("../../../database/migrations/0017_dynamic_locations.sql");
+const LATEST_SCHEMA_VERSION: i64 = 17;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -551,6 +555,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         ),
         (15_i64, "career_pools", CAREER_POOLS_MIGRATION),
         (16_i64, "npc_lod", NPC_LOD_MIGRATION),
+        (17_i64, "dynamic_locations", DYNAMIC_LOCATIONS_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

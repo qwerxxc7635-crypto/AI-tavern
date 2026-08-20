@@ -192,9 +192,24 @@
         "constitutionRevision": 1,
         "contextSummary": "The eastern harbor"
       },
-      "parentLocationId": "city-ember",
+      "expansionMode": "CHILDREN",
+      "originLocation": {
+        "id": "city-ember",
+        "name": "Ember City",
+        "kind": "CITY",
+        "parentLocationId": null,
+        "description": "A harbor city behind black seawalls"
+      },
       "requestedCount": 1,
-      "existingLocationIds": ["city-ember"]
+      "existingLocationIds": ["city-ember", "dock-east"],
+      "existingLocationNames": ["Ember City", "Eastern Dock"],
+      "allowedFactionIds": ["faction-pilots"],
+      "constitutionEvidence": {
+        "technology": "Late medieval",
+        "magic": "Magic leaves a warm trace",
+        "society": "Harbor guilds connect isolated settlements",
+        "politics": "Local councils negotiate with navigation guilds"
+      }
     },
     "output": {
       "schemaVersion": 1,
@@ -209,7 +224,13 @@
           "features": ["Tide cellar"],
           "factionIds": ["faction-pilots"],
           "connections": ["dock-east"],
-          "currentSituation": "Sailors whisper about a missing beacon keeper"
+          "currentSituation": "Sailors whisper about a missing beacon keeper",
+          "constitutionEvidence": {
+            "technology": "Late medieval",
+            "magic": "Magic leaves a warm trace",
+            "society": "Harbor guilds connect isolated settlements",
+            "politics": "Local councils negotiate with navigation guilds"
+          }
         }
       ]
     }

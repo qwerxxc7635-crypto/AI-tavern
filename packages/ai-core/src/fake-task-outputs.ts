@@ -284,6 +284,29 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
       },
     },
   },
+  GENERATE_LOCATIONS: {
+    schemaVersion: 1,
+    locations: [
+      {
+        id: 'location-cinder-market',
+        name: 'Cinder Market',
+        kind: 'DISTRICT',
+        parentLocationId: 'location-ash-harbor',
+        description: 'A covered market pressed between the seawall and old ropewalks.',
+        atmosphere: 'Salt-damp, crowded, and alert to every arriving ship.',
+        features: ['Bell-marked exchange hall'],
+        factionIds: [],
+        connections: ['location-ash-harbor'],
+        currentSituation: 'Merchants are withholding charts after a beacon failure.',
+        constitutionEvidence: {
+          technology: 'Late medieval',
+          magic: 'Magic always leaves a warm trace.',
+          society: 'Harbor guilds connect isolated settlements',
+          politics: 'Local councils negotiate with navigation guilds',
+        },
+      },
+    ],
+  },
   GENERATE_TAVERN: {
     name: 'Ember Rest',
     position: 'The harbor crossroads',

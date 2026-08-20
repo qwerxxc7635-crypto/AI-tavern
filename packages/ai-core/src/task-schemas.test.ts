@@ -301,6 +301,35 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     },
     output: FAKE_TASK_OUTPUTS.GENERATE_NPC_LOD,
   },
+  GENERATE_LOCATIONS: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-locations',
+        constitutionRevision: 1,
+        contextSummary: 'The road immediately beyond Ash Harbor.',
+      },
+      expansionMode: 'CONNECTED',
+      originLocation: {
+        id: 'location-ash-harbor',
+        name: 'Ash Harbor',
+        kind: 'CITY',
+        parentLocationId: null,
+        description: 'A sheltered port beneath black cliffs.',
+      },
+      requestedCount: 1,
+      existingLocationIds: ['location-ash-harbor'],
+      existingLocationNames: ['Ash Harbor'],
+      allowedFactionIds: [],
+      constitutionEvidence: {
+        technology: constitution.technology,
+        magic: constitution.magic,
+        society: constitution.society,
+        politics: constitution.politics,
+      },
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_LOCATIONS,
+  },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },
     output: {

@@ -2701,3 +2701,29 @@ schema 16新增`npc_lod_profiles`和append-only`npc_lod_transitions`。低LOD只
 - 本地SQLite支持关闭重开；portable archive新增表和历史fixture迁移仍由M10-T05统一处理。
 - UI不在M6-T03逐页返工；后续展示复用既有NPC组件和视觉Token，完整Legacy迁移仍属于M10-T07。
 - 本任务不修改Rules Engine、D20、Provider栈、Career/Equipment、Quest/Adventure语义、World Seed或存档状态机，也不提前实现M6-T04地点与M6-T05势力。
+
+## DEC-129：动态地点采用稀疏事实图与显式渐进物化
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T04`、`docs/V0.3_SPEC.md` 11.4节、`DEC-118`与`DEC-123`
+
+### 背景
+
+既有地点只嵌在`world_bibles.locations_json`，可以恢复初始世界，却不能独立查询层级、连接、玩家当前位置或旅行历史。若在世界创建时生成完整地图，会增加成本并把未被玩家触达的模型输出提前固化；若只把当前位置留在UI状态，则关闭重开后无法可靠继续。把新地点直接并回WorldBible还会让已确认世界合同承担运行时revision和并发写入。
+
+### 决定与理由
+
+schema 17新增`dynamic_locations`、`location_connections`、`campaign_location_states`和append-only`location_travel_events`，形成无坐标的稀疏事实图。Constitution锁定时只把既有WorldBible地点投影为OUTLINE，并建立父子连接；运行时只有显式`CHILDREN`或`CONNECTED`请求才调用`GENERATE_LOCATIONS`物化一至八个DETAILED节点。
+
+候选必须逐字重复锁定Constitution的technology、magic、society和politics，只能引用WorldBible中存在的Faction ID，并通过稳定ID、规范化名称、父节点存在、最大八层、无环及连接存在性校验。Native重新构造输入，在immediate transaction中原子提交generation audit、地点与连接；幂等重放还必须匹配原输入、上下文、generation ID和输出。
+
+移动完全是本地事务，只允许父子或显式相邻节点，以expected revision仲裁竞争，并先追加旅行事件再更新当前位置。没有坐标、距离、寻路或AI移动决定。
+
+### 影响与边界
+
+- 玩家可以通过CONNECTED物化离开预设城市，关闭重开后地点图、当前位置和旅行历史不变。
+- WorldBible、Constitution、Rules Engine、D20、Quest/NPC/Adventure合同和Provider栈保持不变；新投影不成为第二个世界规则来源。
+- portable archive对schema 17表的正式升级仍由M10-T05负责；M6-T04不提前改变`.emtavern`格式。
+- 当前任务不新增地图页面或返工旧UI。后续地点展示复用既有视觉Token与组件，完整Legacy迁移和一致性审查仍属于M10-T07。
+- 本任务不实现M6-T05势力行动、地图网格、战棋、全图生成或坐标寻路。

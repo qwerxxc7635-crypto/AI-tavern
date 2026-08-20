@@ -91,6 +91,11 @@ const migrations = [
     name: 'npc_lod',
     source: new URL('../../../database/migrations/0016_npc_lod.sql', import.meta.url),
   },
+  {
+    version: 17,
+    name: 'dynamic_locations',
+    source: new URL('../../../database/migrations/0017_dynamic_locations.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

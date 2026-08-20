@@ -6,6 +6,8 @@ import {
   CareerOutputSchema,
   ItemInputSchema,
   ItemOutputSchema,
+  LocationInputSchema,
+  LocationOutputSchema,
   NpcLodInputSchema,
   NpcLodOutputSchema,
 } from './entity-schemas.js';
@@ -79,6 +81,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_CAREER_POOL: definition(CareerInputSchema, CareerOutputSchema),
   GENERATE_ITEMS: definition(ItemInputSchema, ItemOutputSchema),
   GENERATE_NPC_LOD: definition(NpcLodInputSchema, NpcLodOutputSchema),
+  GENERATE_LOCATIONS: definition(LocationInputSchema, LocationOutputSchema),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),

@@ -70,6 +70,15 @@ export {
   requiredNpcLodTrigger,
   upgradeNpcLod,
 } from './npc-lod-validator.js';
+export {
+  DynamicLocationRuleError,
+  materializeDynamicLocations,
+  planLocationTravel,
+  validateLocationTopology,
+  type MaterializeDynamicLocationsInput,
+  type MaterializedLocationBatch,
+  type PlanLocationTravelInput,
+} from './dynamic-location-validator.js';
 export type {
   CreateNpcLodSeedInput,
   NpcLodReferenceAuthority,

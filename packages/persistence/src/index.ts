@@ -79,6 +79,12 @@ export { CharacterCreationSessionRepository } from './character-creation-session
 export { CareerPoolRepository } from './career-pool-repository.js';
 export { NpcLodRepository } from './npc-lod-repository.js';
 export type { CommitNpcLodUpgrade } from './npc-lod-repository.js';
+export { DynamicLocationRepository } from './dynamic-location-repository.js';
+export type {
+  CommitLocationMaterialization,
+  CommitLocationTravel,
+  DynamicLocationSnapshot,
+} from './dynamic-location-repository.js';
 export type { CharacterCreationConfirmation } from './character-creation-session-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';

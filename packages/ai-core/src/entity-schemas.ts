@@ -180,18 +180,49 @@ const item = z
 
 export const ItemOutputSchema = versioned({ items: z.array(item).min(1).max(24) });
 
+const locationConstitutionEvidence = z
+  .object({ technology: text, magic: text, society: text, politics: text })
+  .strict();
+
+const locationKind = z.enum([
+  'REGION',
+  'COUNTRY',
+  'CITY',
+  'VILLAGE',
+  'DISTRICT',
+  'TAVERN',
+  'SHOP',
+  'RUIN',
+  'DUNGEON',
+  'SPECIAL',
+]);
+
+const locationContext = z
+  .object({
+    id,
+    name,
+    kind: locationKind,
+    parentLocationId: id.nullable(),
+    description: text,
+  })
+  .strict();
+
 export const LocationInputSchema = versioned({
   context: generationContext,
-  parentLocationId: id.nullable(),
-  requestedCount: z.number().int().min(1).max(32),
+  expansionMode: z.enum(['CHILDREN', 'CONNECTED']),
+  originLocation: locationContext,
+  requestedCount: z.number().int().min(1).max(8),
   existingLocationIds: idList,
+  existingLocationNames: z.array(name).max(64),
+  allowedFactionIds: idList,
+  constitutionEvidence: locationConstitutionEvidence,
 });
 
 const location = z
   .object({
     id,
     name,
-    kind: z.enum(['COUNTRY', 'CITY', 'VILLAGE', 'TAVERN', 'SHOP', 'RUIN', 'DUNGEON', 'SPECIAL']),
+    kind: locationKind,
     parentLocationId: id.nullable(),
     description: text,
     atmosphere: text,
@@ -199,10 +230,11 @@ const location = z
     factionIds: idList,
     connections: idList,
     currentSituation: text,
+    constitutionEvidence: locationConstitutionEvidence,
   })
   .strict();
 
-export const LocationOutputSchema = versioned({ locations: z.array(location).min(1).max(32) });
+export const LocationOutputSchema = versioned({ locations: z.array(location).min(1).max(8) });
 
 export const FactionInputSchema = versioned({
   context: generationContext,

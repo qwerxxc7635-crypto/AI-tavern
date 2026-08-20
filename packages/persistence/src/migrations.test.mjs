@@ -14,6 +14,7 @@ const coreTables = [
   'adventures',
   'ai_candidates',
   'app_settings',
+  'campaign_location_states',
   'campaigns',
   'career_pools',
   'character_creation_sessions',
@@ -21,12 +22,15 @@ const coreTables = [
   'character_rule_states',
   'conversations',
   'credential_cleanup_queue',
+  'dynamic_locations',
   'event_ledger',
   'game_events',
   'generation_records',
   'items',
   'knowledge_claims',
   'knowledge_memories',
+  'location_connections',
+  'location_travel_events',
   'messages',
   'model_profiles',
   'npc_knowledge',
@@ -395,7 +399,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      16,
+      17,
     );
     const importedKnowledge = database
       .prepare(

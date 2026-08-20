@@ -236,6 +236,26 @@ export {
   createNpcLodProfile,
   parseNpcLodProfile,
 } from './npc-lod.js';
+export {
+  DYNAMIC_LOCATION_KINDS,
+  LOCATION_EXPANSION_MODES,
+  LOCATION_MATERIALIZATION_LEVELS,
+  LOCATION_TRAVEL_MODES,
+  DynamicLocationContractError,
+  createDynamicLocationProfile,
+  locationConstitutionEvidence,
+  parseDynamicLocationProfile,
+  type CampaignLocationState,
+  type DynamicLocationCandidate,
+  type DynamicLocationKind,
+  type DynamicLocationProfile,
+  type LocationConnection,
+  type LocationConstitutionEvidence,
+  type LocationExpansionMode,
+  type LocationMaterializationLevel,
+  type LocationTravelEvent,
+  type LocationTravelMode,
+} from './dynamic-location.js';
 export type {
   NpcLodCandidate,
   NpcLodConstitutionEvidence,

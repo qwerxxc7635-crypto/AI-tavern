@@ -207,6 +207,39 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       },
     };
   }
+  if (request.task === 'GENERATE_LOCATIONS') {
+    const input = taskInput(request);
+    const origin = isRecord(input?.['originLocation']) ? input['originLocation'] : undefined;
+    const evidence = isRecord(input?.['constitutionEvidence'])
+      ? input['constitutionEvidence']
+      : undefined;
+    if (origin === undefined || evidence === undefined) return base;
+    const count = typeof input?.['requestedCount'] === 'number' ? input['requestedCount'] : 1;
+    const mode = input?.['expansionMode'];
+    const allowedFactions = Array.isArray(input?.['allowedFactionIds'])
+      ? input['allowedFactionIds']
+      : [];
+    return {
+      schemaVersion: 1,
+      locations: Array.from({ length: count }, (_, index) => {
+        const id = `location-fake-${index + 1}`;
+        return {
+          id,
+          name: `Ember Reach ${index + 1}`,
+          kind: mode === 'CHILDREN' ? 'DISTRICT' : 'VILLAGE',
+          parentLocationId:
+            mode === 'CHILDREN' ? origin['id'] : (origin['parentLocationId'] ?? null),
+          description: 'A newly reached place grounded in the surrounding world.',
+          atmosphere: 'Wind-worn, inhabited, and watchful of the road.',
+          features: ['A marked shelter beside the old route'],
+          factionIds: typeof allowedFactions[0] === 'string' ? [allowedFactions[0]] : [],
+          connections: mode === 'CONNECTED' ? [origin['id']] : [],
+          currentSituation: 'Travelers are adapting to a recent change in the route.',
+          constitutionEvidence: evidence,
+        };
+      }),
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;
