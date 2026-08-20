@@ -96,6 +96,11 @@ const migrations = [
     name: 'dynamic_locations',
     source: new URL('../../../database/migrations/0017_dynamic_locations.sql', import.meta.url),
   },
+  {
+    version: 18,
+    name: 'active_factions',
+    source: new URL('../../../database/migrations/0018_active_factions.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

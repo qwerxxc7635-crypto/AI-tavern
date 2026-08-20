@@ -11,22 +11,24 @@ use std::{
 };
 
 use ember_native_bridge::{
-    AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
-    AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
-    CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
-    CampaignStoreError, CampaignSummary, CapabilitySource, CareerPool, CareerPoolGenerationCommit,
-    CharacterCandidateConfirm, CharacterCompletionCommit, CharacterCreationSnapshot,
-    CharacterRulesState, CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
-    DynamicLocationGenerationCommit, DynamicLocationGenerationRequest,
-    DynamicLocationGenerationSnapshot, DynamicLocationSnapshot, DynamicLocationTravelCommand,
-    ModelCapabilitiesRegistration, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
-    NpcDialogueSnapshot, NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit,
-    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
-    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
-    TavernGenerationCommit, TavernSnapshot, UniversalCharacterCreationConfirm,
-    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
-    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
-    WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
+    ActiveFactionGenerationCommit, ActiveFactionGenerationRequest, ActiveFactionGenerationSnapshot,
+    ActiveFactionSnapshot, AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit,
+    AdventurePlanCommit, AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit,
+    CampaignArchiveExportResult, CampaignArchiveImportMode, CampaignArchiveInspection,
+    CampaignRecoverySnapshot, CampaignStore, CampaignStoreError, CampaignSummary, CapabilitySource,
+    CareerPool, CareerPoolGenerationCommit, CharacterCandidateConfirm, CharacterCompletionCommit,
+    CharacterCreationSnapshot, CharacterRulesState, CharacterTraitGenerationCommit,
+    CredentialAction, CredentialCleanupReason, DynamicLocationGenerationCommit,
+    DynamicLocationGenerationRequest, DynamicLocationGenerationSnapshot, DynamicLocationSnapshot,
+    DynamicLocationTravelCommand, FactionActionCommand, ModelCapabilitiesRegistration,
+    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
+    NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit,
+    QuestBoardSnapshot, QuestGenerationCommit, RandomnessSettingsSnapshot,
+    RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit,
+    TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
+    UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
+    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1115,6 +1117,44 @@ fn dynamic_locations_travel(
 }
 
 #[tauri::command]
+fn active_factions_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionSnapshot, CommandError> {
+    store
+        .active_faction_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_generation_get(
+    command: ActiveFactionGenerationRequest,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionGenerationSnapshot, CommandError> {
+    store
+        .active_faction_generation_snapshot(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_generation_commit(
+    command: ActiveFactionGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionSnapshot, CommandError> {
+    store
+        .commit_active_faction_generation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_action_apply(
+    command: FactionActionCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionSnapshot, CommandError> {
+    store.apply_faction_action(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1405,6 +1445,10 @@ pub fn run() {
             dynamic_locations_generation_get,
             dynamic_locations_generation_commit,
             dynamic_locations_travel,
+            active_factions_get,
+            active_factions_generation_get,
+            active_factions_generation_commit,
+            active_factions_action_apply,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,

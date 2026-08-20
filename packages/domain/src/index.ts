@@ -79,6 +79,18 @@ export {
   type MaterializedLocationBatch,
   type PlanLocationTravelInput,
 } from './dynamic-location-validator.js';
+export {
+  MAX_FACTION_ACTION_POINTS,
+  ActiveFactionRuleError,
+  activateFactions,
+  applyFactionAction,
+} from './active-faction-validator.js';
+export type {
+  ActivateFactionsInput,
+  ApplyFactionActionInput,
+  FactionActionPlan,
+  FactionWorldFactDraft,
+} from './active-faction-validator.js';
 export type {
   CreateNpcLodSeedInput,
   NpcLodReferenceAuthority,

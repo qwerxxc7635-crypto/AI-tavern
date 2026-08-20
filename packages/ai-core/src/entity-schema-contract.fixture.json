@@ -244,8 +244,37 @@
         "constitutionRevision": 1,
         "contextSummary": "Guilds compete for harbor access"
       },
-      "requestedCount": 1,
-      "existingFactionIds": []
+      "requestedFactionIds": ["faction-pilots", "faction-smugglers"],
+      "existingFactions": [
+        {
+          "id": "faction-pilots",
+          "name": "Lantern Pilots",
+          "description": "Pilots maintaining the harbor lights",
+          "goal": "Restore safe passage through the eastern shoals",
+          "enemyFactionIds": [],
+          "allyFactionIds": [],
+          "territoryLocationIds": ["dock-east"],
+          "playerRelation": "UNKNOWN"
+        },
+        {
+          "id": "faction-smugglers",
+          "name": "Reef Runners",
+          "description": "Smugglers using the outer reefs",
+          "goal": "Keep the reef channels beyond council control",
+          "enemyFactionIds": [],
+          "allyFactionIds": [],
+          "territoryLocationIds": ["reef-west"],
+          "playerRelation": "WARY"
+        }
+      ],
+      "allowedFactionIds": ["faction-pilots", "faction-smugglers"],
+      "allowedLocationIds": ["dock-east", "reef-west"],
+      "constitutionEvidence": {
+        "technology": "Black powder is rare",
+        "society": "Merchant guilds dominate public life",
+        "politics": "A council governs the harbor",
+        "economy": "Trade and shipbuilding"
+      }
     },
     "output": {
       "schemaVersion": 1,
@@ -260,7 +289,31 @@
           "allyFactionIds": [],
           "territoryLocationIds": ["dock-east"],
           "currentAction": "Searching for the missing keeper",
-          "playerRelation": "UNKNOWN"
+          "playerRelation": "UNKNOWN",
+          "constitutionEvidence": {
+            "technology": "Black powder is rare",
+            "society": "Merchant guilds dominate public life",
+            "politics": "A council governs the harbor",
+            "economy": "Trade and shipbuilding"
+          }
+        },
+        {
+          "id": "faction-smugglers",
+          "name": "Reef Runners",
+          "goal": "Keep the reef channels beyond council control",
+          "resources": ["Hidden coves"],
+          "leadership": ["The Reef Circle"],
+          "enemyFactionIds": ["faction-pilots"],
+          "allyFactionIds": [],
+          "territoryLocationIds": ["reef-west"],
+          "currentAction": "Moving cargo before the patrols arrive",
+          "playerRelation": "WARY",
+          "constitutionEvidence": {
+            "technology": "Black powder is rare",
+            "society": "Merchant guilds dominate public life",
+            "politics": "A council governs the harbor",
+            "economy": "Trade and shipbuilding"
+          }
         }
       ]
     }

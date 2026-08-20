@@ -2727,3 +2727,29 @@ schema 17新增`dynamic_locations`、`location_connections`、`campaign_location
 - portable archive对schema 17表的正式升级仍由M10-T05负责；M6-T04不提前改变`.emtavern`格式。
 - 当前任务不新增地图页面或返工旧UI。后续地点展示复用既有视觉Token与组件，完整Legacy迁移和一致性审查仍属于M10-T07。
 - 本任务不实现M6-T05势力行动、地图网格、战棋、全图生成或坐标寻路。
+
+## DEC-130：主动势力采用既有身份渐进激活与本地预算行动事务
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T05`、`docs/V0.3_SPEC.md` 11.5节、`DEC-118`、`DEC-123`与`DEC-129`
+
+### 背景
+
+World Bible 已保存 Faction 身份、目标和关系，但缺少独立 revision、资源、领导、领地、当前行动、玩家关系与行动历史。让模型直接更新 Quest、关系或世界事实会绕过 SQLite、Rules 与事务；在 M6 提前实现每日 Director budget 又会破坏 M8-T04/T05 的任务依赖。
+
+### 决定与理由
+
+schema 18 新增 `active_factions` 与 append-only `faction_action_events`。Constitution 锁定时只把既有 WorldBible Faction 投影为 OUTLINE，领地直接从同一 WorldBible Location 所属关系计算；不因触发器顺序丢失事实，也不编造资源、领导或行动。
+
+`GENERATE_FACTIONS` 只能把显式请求的既有身份补全为 ACTIVE，必须逐字延续 name、goal、player relation、既有 territory/relations 和 Constitution evidence，并通过引用与双向关系校验。生成审计和全部档案在一个 immediate transaction 提交。
+
+行动使用固定最高六点的本地成本表，并接受只能收紧上限的调用者 budget envelope。Native 重新验证所需资源、目标语义、双向关系、Quest 状态机和单个 World Fact 限额，把所有受影响实体与 append-only event 原子提交。PLAYER、WORLD_EVENT 和未来 DIRECTOR 共用该入口；M8 再增加持久的每日预算、恢复和 cooldown。
+
+### 影响与边界
+
+- SQLite 是八项 Faction 状态和行动历史的唯一真实来源；AI与Director都只能提出候选。
+- 世界事件接口可提交已预算行动并产生至多一个 Fact，但没有固定势力剧情、自动日程或全世界模拟。
+- Quest 只走既有合法状态迁移；Rules Engine、D20、NPC/Adventure合同、World Seed与Provider保持不变。
+- portable archive对schema 18表的升级仍由M10-T05负责，本任务不提前改变format v2。
+- 本任务不新增势力页面或返工旧UI；后续展示复用既有Token和组件，完整视觉收敛仍属于M10-T07。

@@ -80,6 +80,11 @@ export const TASK_PROMPTS = Object.freeze({
     'WORLD_DESIGNER',
     'Materialize exactly requestedCount locations around the supplied origin without expanding any other part of the world. Repeat the four locked Constitution evidence strings exactly. CHILDREN creates direct children whose parentLocationId is the origin ID. CONNECTED creates peers with the same parentLocationId as the origin and every new location must connect back to the origin. Use only allowed faction IDs and existing or newly returned location IDs in connections. Return distinct IDs and names not present in the existing lists. Every location must be detailed with atmosphere, at least one feature, and a current situation. Never generate a complete country, city, region, dungeon, or world map, and never create NPCs, factions, quests, items, rules, travel outcomes, or hidden facts.',
   ),
+  GENERATE_FACTIONS: define(
+    'GENERATE_FACTIONS',
+    'WORLD_DESIGNER',
+    'Activate exactly the requested existing factions without creating new identities. Repeat each supplied id, name, goal, player relation, established territory, established enemy and ally references, and the four locked Constitution evidence strings exactly. Add concrete resources, leadership, and one current action. Enemy and ally references must use only allowed faction IDs, be disjoint, never self-reference, and be reciprocal when both factions are in this batch. Territory may use only allowed location IDs and must retain every established territory. Do not assign numeric mechanics, change quests, move NPCs, write facts, spend Director budget, or execute faction actions.',
+  ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
     'WORLD_DESIGNER',

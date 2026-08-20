@@ -238,8 +238,29 @@ export const LocationOutputSchema = versioned({ locations: z.array(location).min
 
 export const FactionInputSchema = versioned({
   context: generationContext,
-  requestedCount: z.number().int().min(1).max(16),
-  existingFactionIds: idList,
+  requestedFactionIds: z.array(id).min(1).max(16),
+  existingFactions: z
+    .array(
+      z
+        .object({
+          id,
+          name,
+          description: text,
+          goal: text,
+          enemyFactionIds: idList,
+          allyFactionIds: idList,
+          territoryLocationIds: idList,
+          playerRelation: z.enum(['HOSTILE', 'WARY', 'NEUTRAL', 'FRIENDLY', 'ALLIED', 'UNKNOWN']),
+        })
+        .strict(),
+    )
+    .min(1)
+    .max(16),
+  allowedFactionIds: idList,
+  allowedLocationIds: idList,
+  constitutionEvidence: z
+    .object({ technology: text, society: text, politics: text, economy: text })
+    .strict(),
 });
 
 const faction = z
@@ -254,6 +275,9 @@ const faction = z
     territoryLocationIds: idList,
     currentAction: text,
     playerRelation: z.enum(['HOSTILE', 'WARY', 'NEUTRAL', 'FRIENDLY', 'ALLIED', 'UNKNOWN']),
+    constitutionEvidence: z
+      .object({ technology: text, society: text, politics: text, economy: text })
+      .strict(),
   })
   .strict();
 

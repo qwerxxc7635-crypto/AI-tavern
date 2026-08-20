@@ -307,6 +307,29 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
       },
     ],
   },
+  GENERATE_FACTIONS: {
+    schemaVersion: 1,
+    factions: [
+      {
+        id: 'faction-lantern',
+        name: 'Lantern Guild',
+        goal: 'Restore the Ash Harbor lighthouse.',
+        resources: ['Harbor patrols', 'Beacon stores'],
+        leadership: ['The Lantern Council'],
+        enemyFactionIds: [],
+        allyFactionIds: [],
+        territoryLocationIds: ['location-ash-harbor'],
+        currentAction: 'Reopen the northern beacon road.',
+        playerRelation: 'UNKNOWN',
+        constitutionEvidence: {
+          technology: 'Late medieval',
+          society: 'Harbor guilds connect isolated settlements',
+          politics: 'Local councils negotiate with navigation guilds',
+          economy: 'Fishing, coastal trade, and beacon tolls',
+        },
+      },
+    ],
+  },
   GENERATE_TAVERN: {
     name: 'Ember Rest',
     position: 'The harbor crossroads',

@@ -321,12 +321,13 @@
 
 ## M6-T05 Active Factions
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M6-T04。
 - **Deliverable**：Faction 结构、行动规则、关系和世界事件接口。
 - **Acceptance**：八项字段完整；势力可通过规则验证的行动改变实体/Quest；玩家关系持久化。
 - **Tests**：ally/enemy、territory/resource、action legality、consequence、save/reload。
 - **Do Not**：不让 AI 越过 Director budget；不预写固定势力剧情。
+- **Implementation reference**：[`V0.3_ACTIVE_FACTIONS.md`](V0.3_ACTIVE_FACTIONS.md)。
 
 ---
 

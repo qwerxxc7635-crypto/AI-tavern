@@ -256,6 +256,29 @@ export {
   type LocationTravelEvent,
   type LocationTravelMode,
 } from './dynamic-location.js';
+export {
+  FACTION_ACTION_KINDS,
+  FACTION_ACTION_SOURCES,
+  FACTION_MATERIALIZATION_LEVELS,
+  PLAYER_FACTION_RELATIONS,
+  ActiveFactionContractError,
+  createActiveFactionProfile,
+  factionActionProposal,
+  parseActiveFactionProfile,
+} from './active-faction.js';
+export type {
+  ActiveFactionCandidate,
+  ActiveFactionProfile,
+  FactionActionBudget,
+  FactionActionConsequence,
+  FactionActionEvent,
+  FactionActionKind,
+  FactionActionProposal,
+  FactionActionSource,
+  FactionConstitutionEvidence,
+  FactionMaterializationLevel,
+  PlayerFactionRelation,
+} from './active-faction.js';
 export type {
   NpcLodCandidate,
   NpcLodConstitutionEvidence,

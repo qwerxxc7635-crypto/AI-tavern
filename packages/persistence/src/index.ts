@@ -85,6 +85,12 @@ export type {
   CommitLocationTravel,
   DynamicLocationSnapshot,
 } from './dynamic-location-repository.js';
+export { ActiveFactionRepository } from './active-faction-repository.js';
+export type {
+  ActiveFactionSnapshot,
+  CommitFactionAction,
+  CommitFactionActivation,
+} from './active-faction-repository.js';
 export type { CharacterCreationConfirmation } from './character-creation-session-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';

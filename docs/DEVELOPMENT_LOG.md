@@ -4274,3 +4274,26 @@
 - 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 136个文件/843项通过，另1个文件/1项性能基线按设计跳过；Node 28项通过；Rust workspace 118项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。`pnpm --dir windows-app build`生产构建通过，Vite转换245个模块。
 - portable`.emtavern`仍为v2，schema 17新表的正式跨版本导入导出保留给M10-T05。本任务未实现格子地图、坐标、战棋、寻路、完整地图生成或M6-T05主动势力，也未修改Rules Engine、D20、Quest/NPC/Adventure、Provider、World Seed或存档状态机。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6-T05。
+
+## 2026-08-20 — M6-T05 Active Factions
+
+### 八项合同、渐进激活与预算行动
+
+- 新增严格version 1 `ActiveFactionProfile`，完整保存Goal、Resource、Leadership、Enemy、Ally、Territory、Current Action和Player Relation，并绑定锁定Constitution证据、generation provenance和revision。WorldBible既有身份只投影为OUTLINE，不编造资源、领导或行动。
+- 新增统一`GENERATE_FACTIONS`任务、schema、Prompt、Context Budget、Fake Provider输出、缓存指标白名单和跨语言fixture。每次只激活一至十六个明确请求的既有Faction，必须延续name、goal、player relation、既有territory/relations与四项Constitution证据；Ally/Enemy必须双向一致。
+- Domain与Native共享最高六点的本地成本语义；调用者budget envelope只能收紧action、Quest和World Fact上限。PLAYER、WORLD_EVENT和未来DIRECTOR共用结构化proposal，但Native总会重新核对所需资源、目标、引用、关系对称、Quest合法迁移和成本。
+- 行动可原子增删resource/territory、双向改变relation、更新player relation、迁移一个Quest并创建一个Developing Fact。没有固定势力剧情、自动日程或全世界模拟；M8-T04/T05才负责World Director的每日调度、持久预算恢复与cooldown。
+
+### SQLite、Native、桌面与兼容
+
+- schema 18新增`active_factions`和append-only`faction_action_events`。初始Territory直接从同一WorldBible的Location所属关系投影，消除多个Constitution锁定触发器执行顺序造成的丢失风险；更新严格revision加一，Campaign存续时禁止删除身份和行动历史。
+- TypeScript Repository与Rust Native在`BEGIN IMMEDIATE`中提交generation audit、全部激活档案或行动的所有Faction/Quest/Fact/event变化；相同generation和operation只允许完全一致的幂等重放，竞争revision和budget decision冲突fail closed。
+- Windows新增`ActiveFactionService`及四个Tauri命令。相同Campaign与Faction集合的并发激活意图在服务层合并；本地Faction action不调用AI。关闭并重开SQLite后ACTIVE档案、双向关系、玩家关系和行动历史保持一致。
+- 新增`docs/V0.3_ACTIVE_FACTIONS.md`与`DEC-130`，并更新V0.3规格、Generator Framework和任务引用。本任务没有新增Faction页面或逐页返工；后续展示继续复用视觉Token与既有组件，完整Legacy视觉迁移仍由M10-T07处理。
+
+### 验证、自审与限制
+
+- 合同、Domain、AI schema/Prompt/Fake Provider、migration、TypeScript Repository、Windows service和Rust Native专项覆盖八项字段、ally/enemy、territory/resource、身份延续、预算/行动合法性、Quest后果、幂等、事务与save/reload。
+- 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 140个文件/856项通过，另1个文件/1项性能基线按设计跳过；Node 28项通过；Rust workspace 119项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。`pnpm --dir windows-app build`生产构建通过，Vite转换247个模块。
+- portable`.emtavern`仍为v2，schema 18新表的正式跨版本导入导出保留给M10-T05。本任务未修改Rules Engine、D20硬结果、NPC/Quest/Adventure核心语义、Provider、World Seed或存档状态机，也未进入M7。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M7-T01。

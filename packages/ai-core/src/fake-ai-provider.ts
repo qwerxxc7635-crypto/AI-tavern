@@ -240,6 +240,32 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       }),
     };
   }
+  if (request.task === 'GENERATE_FACTIONS') {
+    const input = taskInput(request);
+    const existing = Array.isArray(input?.['existingFactions']) ? input['existingFactions'] : [];
+    const requested = Array.isArray(input?.['requestedFactionIds'])
+      ? new Set(input['requestedFactionIds'])
+      : new Set<unknown>();
+    const evidence = input?.['constitutionEvidence'];
+    const factions = existing.filter((value) => isRecord(value) && requested.has(value['id']));
+    if (!isRecord(evidence) || factions.length === 0) return base;
+    return {
+      schemaVersion: 1,
+      factions: factions.map((value) => ({
+        id: value['id'],
+        name: value['name'],
+        goal: value['goal'],
+        resources: ['Harbor patrols', 'Beacon stores'],
+        leadership: [`${String(value['name'])} council`],
+        enemyFactionIds: value['enemyFactionIds'],
+        allyFactionIds: value['allyFactionIds'],
+        territoryLocationIds: value['territoryLocationIds'],
+        currentAction: 'Secure the roads affected by the latest world event.',
+        playerRelation: value['playerRelation'],
+        constitutionEvidence: evidence,
+      })),
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;

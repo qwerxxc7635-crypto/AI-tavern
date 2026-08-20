@@ -4,6 +4,8 @@ import type { AITask } from './protocol.js';
 import {
   CareerInputSchema,
   CareerOutputSchema,
+  FactionInputSchema,
+  FactionOutputSchema,
   ItemInputSchema,
   ItemOutputSchema,
   LocationInputSchema,
@@ -82,6 +84,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_ITEMS: definition(ItemInputSchema, ItemOutputSchema),
   GENERATE_NPC_LOD: definition(NpcLodInputSchema, NpcLodOutputSchema),
   GENERATE_LOCATIONS: definition(LocationInputSchema, LocationOutputSchema),
+  GENERATE_FACTIONS: definition(FactionInputSchema, FactionOutputSchema),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),

@@ -330,6 +330,38 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     },
     output: FAKE_TASK_OUTPUTS.GENERATE_LOCATIONS,
   },
+  GENERATE_FACTIONS: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-factions',
+        constitutionRevision: 1,
+        contextSummary: 'Activate the established Lantern Guild.',
+      },
+      requestedFactionIds: ['faction-lantern'],
+      existingFactions: [
+        {
+          id: 'faction-lantern',
+          name: 'Lantern Guild',
+          description: 'Navigators who maintain the coast beacons.',
+          goal: 'Restore the Ash Harbor lighthouse.',
+          enemyFactionIds: [],
+          allyFactionIds: [],
+          territoryLocationIds: ['location-ash-harbor'],
+          playerRelation: 'UNKNOWN',
+        },
+      ],
+      allowedFactionIds: ['faction-lantern'],
+      allowedLocationIds: ['location-ash-harbor'],
+      constitutionEvidence: {
+        technology: constitution.technology,
+        society: constitution.society,
+        politics: constitution.politics,
+        economy: constitution.economy,
+      },
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_FACTIONS,
+  },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },
     output: {

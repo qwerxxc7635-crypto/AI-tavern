@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod active_factions;
 mod adventure_play;
 mod cache_metrics;
 mod career_pool;
@@ -24,6 +25,7 @@ mod universal_character_creation;
 mod windows_e2e;
 mod world_creation;
 mod world_seed;
+pub use active_factions::*;
 pub use adventure_play::*;
 pub use cache_metrics::*;
 pub use career_pool::*;
@@ -88,7 +90,9 @@ const CAREER_POOLS_MIGRATION: &str =
 const NPC_LOD_MIGRATION: &str = include_str!("../../../database/migrations/0016_npc_lod.sql");
 const DYNAMIC_LOCATIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0017_dynamic_locations.sql");
-const LATEST_SCHEMA_VERSION: i64 = 17;
+const ACTIVE_FACTIONS_MIGRATION: &str =
+    include_str!("../../../database/migrations/0018_active_factions.sql");
+const LATEST_SCHEMA_VERSION: i64 = 18;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -556,6 +560,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (15_i64, "career_pools", CAREER_POOLS_MIGRATION),
         (16_i64, "npc_lod", NPC_LOD_MIGRATION),
         (17_i64, "dynamic_locations", DYNAMIC_LOCATIONS_MIGRATION),
+        (18_i64, "active_factions", ACTIVE_FACTIONS_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(
