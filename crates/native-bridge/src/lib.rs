@@ -4,6 +4,7 @@
 
 mod adventure_play;
 mod cache_metrics;
+mod career_pool;
 mod character_creation;
 #[cfg(test)]
 mod entity_schema_contract;
@@ -23,6 +24,7 @@ mod world_creation;
 mod world_seed;
 pub use adventure_play::*;
 pub use cache_metrics::*;
+pub use career_pool::*;
 pub use character_creation::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
@@ -77,7 +79,9 @@ const UNIVERSAL_CHARACTER_MIGRATION: &str =
     include_str!("../../../database/migrations/0013_universal_character.sql");
 const CHARACTER_CREATION_SESSIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0014_character_creation_sessions.sql");
-const LATEST_SCHEMA_VERSION: i64 = 14;
+const CAREER_POOLS_MIGRATION: &str =
+    include_str!("../../../database/migrations/0015_career_pools.sql");
+const LATEST_SCHEMA_VERSION: i64 = 15;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -542,6 +546,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             "character_creation_sessions",
             CHARACTER_CREATION_SESSIONS_MIGRATION,
         ),
+        (15_i64, "career_pools", CAREER_POOLS_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

@@ -25,8 +25,10 @@ import {
   type UniversalCharacterProfile,
   type WorldCharacterExtensionDefinition,
 } from '@ember-tavern/contracts';
+import { requireCareerFromPool } from '@ember-tavern/domain';
 
 import { PersistenceDataError } from './campaign-repository.js';
+import { CareerPoolRepository } from './career-pool-repository.js';
 import {
   parseJson,
   requireArray,
@@ -173,6 +175,18 @@ export class UniversalCharacterRepository {
         }
       }
       this.requireRulesProjection(canonical);
+      if (canonical.career.id !== null) {
+        try {
+          requireCareerFromPool(
+            new CareerPoolRepository(this.database).get(canonical.campaignId),
+            canonical.career,
+          );
+        } catch (error) {
+          throw new PersistenceDataError('Universal character career is not in the Career Pool', {
+            cause: error,
+          });
+        }
+      }
       if (current === null) {
         this.database
           .prepare(

@@ -14,9 +14,9 @@ use ember_native_bridge::{
     AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
     AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
     CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
-    CampaignStoreError, CampaignSummary, CapabilitySource, CharacterCandidateConfirm,
-    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterRulesState,
-    CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
+    CampaignStoreError, CampaignSummary, CapabilitySource, CareerPool, CareerPoolGenerationCommit,
+    CharacterCandidateConfirm, CharacterCompletionCommit, CharacterCreationSnapshot,
+    CharacterRulesState, CharacterTraitGenerationCommit, CredentialAction, CredentialCleanupReason,
     ModelCapabilitiesRegistration, ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit,
     NpcDialogueSnapshot, NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
     RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
@@ -1037,6 +1037,16 @@ fn universal_character_creation_get(
 }
 
 #[tauri::command]
+fn career_pool_generation_commit(
+    command: CareerPoolGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<CareerPool, CommandError> {
+    store
+        .commit_career_pool_generation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1319,6 +1329,7 @@ pub fn run() {
             character_completion_commit,
             character_candidate_confirm,
             universal_character_creation_get,
+            career_pool_generation_commit,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,

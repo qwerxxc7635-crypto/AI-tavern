@@ -76,6 +76,7 @@ export type {
 } from './knowledge-boundary-repository.js';
 export { UniversalCharacterRepository } from './universal-character-repository.js';
 export { CharacterCreationSessionRepository } from './character-creation-session-repository.js';
+export { CareerPoolRepository } from './career-pool-repository.js';
 export type { CharacterCreationConfirmation } from './character-creation-session-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';

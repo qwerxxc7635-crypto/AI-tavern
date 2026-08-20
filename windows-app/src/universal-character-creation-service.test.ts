@@ -7,6 +7,10 @@ import {
 import {
   aiRequestId,
   campaignId,
+  careerEvidenceFor,
+  careerId,
+  createCareerDefinition,
+  createCareerPool,
   createCharacterCreationSession,
   createUniversalCharacterDraft,
   generationRecordId,
@@ -15,6 +19,8 @@ import {
   playerCharacterId,
   stageQuickCharacterDraft,
   type CharacterCreationSession,
+  type CareerPool,
+  type CareerCandidate,
 } from '@ember-tavern/contracts';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -30,6 +36,31 @@ const characterKey = playerCharacterId('character-windows-creation-v3');
 const at = isoTimestamp('2026-08-20T02:00:00.000Z');
 
 describe('UniversalCharacterCreationService', () => {
+  it('generates and commits an initial four-tier Career Pool before character creation', async () => {
+    const gateway = new FakeGateway({ ...advancedSnapshot(), careerPool: null, session: null });
+    const service = serviceWith(gateway, new CareerPoolProvider());
+
+    const result = await service.generateInitialCareerPool(gateway.snapshot);
+
+    expect(result.careerPool?.careers.map(({ rarity }) => rarity)).toEqual([
+      'COMMON',
+      'UNCOMMON',
+      'RARE',
+      'SPECIAL',
+    ]);
+    expect(gateway.careerCommits).toHaveLength(1);
+    expect(gateway.careerCommits[0]).toMatchObject({
+      expectedRevision: 0,
+      generation: {
+        context: {
+          campaignId: campaignKey,
+          constitutionRevision: 1,
+          expectedPoolRevision: 0,
+        },
+      },
+    });
+  });
+
   it('turns one Quick concept into a complete locally bounded candidate', async () => {
     const gateway = new FakeGateway(quickSnapshot());
     const service = serviceWith(gateway);
@@ -228,6 +259,17 @@ class ContradictingCharacterProvider extends FakeAIProvider {
   }
 }
 
+class CareerPoolProvider extends FakeAIProvider {
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    const response = await super.generate(request, config);
+    if (request.task !== 'GENERATE_CAREER_POOL') return response;
+    return {
+      ...response,
+      content: JSON.stringify({ schemaVersion: 1, careers: generatedCareerCandidates() }),
+    };
+  }
+}
+
 class FakeGateway implements UniversalCharacterCreationGateway {
   public readonly saves: Array<{ expectedRevision: number; session: CharacterCreationSession }> =
     [];
@@ -238,6 +280,10 @@ class FakeGateway implements UniversalCharacterCreationGateway {
       validatedOutput: unknown;
       context: unknown;
     };
+  }> = [];
+  public readonly careerCommits: Array<{
+    expectedRevision: number;
+    generation: { generationRecordId: string; validatedOutput: unknown; context: unknown };
   }> = [];
 
   public constructor(public snapshot: UniversalCharacterCreationSnapshot) {}
@@ -285,6 +331,39 @@ class FakeGateway implements UniversalCharacterCreationGateway {
 
   public async confirm(): Promise<UniversalCharacterCreationSnapshot> {
     return this.snapshot;
+  }
+
+  public async commitCareerPool(command: {
+    expectedRevision: number;
+    generation: { generationRecordId: string; validatedOutput: unknown; context: unknown };
+  }): Promise<CareerPool> {
+    this.careerCommits.push(command);
+    if (this.snapshot.careerPool !== null) return this.snapshot.careerPool;
+    const output = command.generation.validatedOutput as {
+      readonly careers: readonly CareerCandidate[];
+    };
+    const careers = output.careers.map((candidate) =>
+      createCareerDefinition({
+        ...candidate,
+        schemaVersion: 1,
+        campaignId: campaignKey,
+        constitutionRevision: 1,
+        source: 'INITIAL_GENERATION',
+        generationRecordId: generationRecordId(command.generation.generationRecordId),
+        createdAt: at,
+      }),
+    );
+    const pool = createCareerPool({
+      schemaVersion: 1,
+      campaignId: campaignKey,
+      constitutionRevision: 1,
+      careers,
+      revision: 1,
+      createdAt: at,
+      updatedAt: at,
+    });
+    this.snapshot = { ...this.snapshot, careerPool: pool };
+    return pool;
   }
 }
 
@@ -357,7 +436,11 @@ function advancedSnapshot(): UniversalCharacterCreationSnapshot {
       allowBetrayal: true,
       excludedContent: [],
     },
-    career: { id: null, displayName: '', legacyArchetype: 'WARRIOR' },
+    career: {
+      id: careerId('career-lantern-warden'),
+      displayName: 'Lantern Warden',
+      legacyArchetype: 'WARRIOR',
+    },
     attributes: { physique: 3, agility: 3, knowledge: 2, charisma: 2 },
     derivedAttributes: [],
     skills: [],
@@ -381,9 +464,12 @@ function advancedSnapshot(): UniversalCharacterCreationSnapshot {
     extensions: [],
   });
   return {
+    campaignId: campaignKey,
     campaignState: 'CREATING_CHARACTER',
+    constitutionRevision: 1,
     constitution: constitution(),
     extensionDefinitions: [],
+    careerPool: careerPool(),
     session: createCharacterCreationSession(
       {
         id: 'session-windows-advanced',
@@ -398,6 +484,59 @@ function advancedSnapshot(): UniversalCharacterCreationSnapshot {
       [],
     ),
   };
+}
+
+function careerPool(): CareerPool {
+  const content = constitution();
+  return createCareerPool({
+    schemaVersion: 1,
+    campaignId: campaignKey,
+    constitutionRevision: 1,
+    careers: [
+      createCareerDefinition({
+        schemaVersion: 1,
+        id: careerId('career-lantern-warden'),
+        campaignId: campaignKey,
+        constitutionRevision: 1,
+        name: 'Lantern Warden',
+        rarity: 'COMMON',
+        role: 'Maintains beacon roads.',
+        skills: ['Route keeping'],
+        equipmentTags: ['Beacon lantern'],
+        socialPosition: 'Licensed guild member',
+        relationshipHooks: ['Answers to the Lantern Guild'],
+        risks: ['Must answer when a beacon fails'],
+        requirements: ['Guild apprenticeship'],
+        constitutionEvidence: careerEvidenceFor(content),
+        legacyArchetype: 'WARRIOR',
+        source: 'INITIAL_GENERATION',
+        generationRecordId: generationRecordId('generation-career-pool'),
+        createdAt: at,
+      }),
+    ],
+    revision: 1,
+    createdAt: at,
+    updatedAt: at,
+  });
+}
+
+function generatedCareerCandidates(): readonly CareerCandidate[] {
+  const content = constitution();
+  return (['COMMON', 'UNCOMMON', 'RARE', 'SPECIAL'] as const).map((rarity, index) => ({
+    id: `career-generated-${index}`,
+    name: `Generated Career ${index}`,
+    rarity,
+    role: `World role ${index}`,
+    skills: [`Skill ${index}`],
+    equipmentTags: [`Tool ${index}`],
+    socialPosition: `Position ${index}`,
+    relationshipHooks: [`Hook ${index}`],
+    risks: [`Risk ${index}`],
+    requirements: [`Requirement ${index}`],
+    constitutionEvidence: careerEvidenceFor(content),
+    legacyArchetype: ['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT'][index] as
+      'WARRIOR' | 'ROGUE' | 'SCHOLAR' | 'DIPLOMAT',
+  }));
 }
 
 function constitution() {

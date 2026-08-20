@@ -46,9 +46,24 @@ export const WorldConstitutionOutputSchema = versioned({
 
 export const CareerInputSchema = versioned({
   context: generationContext,
+  generationMode: z.enum(['INITIAL', 'RUNTIME_DISCOVERY']),
   requestedCount: z.number().int().min(1).max(24),
+  requestedRarities: z
+    .array(z.enum(['COMMON', 'UNCOMMON', 'RARE', 'SPECIAL']))
+    .min(1)
+    .max(24),
   existingCareerIds: idList,
+  existingCareerNames: z.array(name).max(64),
 });
+
+const careerConstitutionEvidence = z
+  .object({
+    careerRules: text,
+    society: text,
+    technology: text,
+    economy: text,
+  })
+  .strict();
 
 const career = z
   .object({
@@ -62,6 +77,8 @@ const career = z
     relationshipHooks: shortList,
     risks: shortList,
     requirements: shortList,
+    constitutionEvidence: careerConstitutionEvidence,
+    legacyArchetype: z.enum(['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT']),
   })
   .strict();
 

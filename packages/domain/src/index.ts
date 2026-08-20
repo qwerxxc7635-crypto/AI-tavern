@@ -49,6 +49,14 @@ export {
 } from './trait-balance-validator.js';
 export type { TraitValidationWorldRules } from './trait-balance-validator.js';
 export {
+  CareerPoolRuleError,
+  careerPoolCampaign,
+  createInitialCareerPool,
+  createRuntimeCareers,
+  requireCareerFromPool,
+} from './career-pool-validator.js';
+export type { CareerGenerationPolicy } from './career-pool-validator.js';
+export {
   KnowledgeBoundaryError,
   knowledgeForPrompt,
   projectActorKnowledge,

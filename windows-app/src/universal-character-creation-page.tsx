@@ -44,6 +44,7 @@ import {
 type CreationActions = Pick<
   UniversalCharacterCreationService,
   | 'load'
+  | 'generateInitialCareerPool'
   | 'start'
   | 'saveDraft'
   | 'switchMode'
@@ -318,6 +319,13 @@ export function CharacterCreationPage({
     [],
   );
 
+  useEffect(() => {
+    if (snapshot === null || snapshot.careerPool !== null || busy || error !== null) {
+      return;
+    }
+    void perform(() => service.generateInitialCareerPool(snapshot));
+  }, [snapshot, busy, error, service]);
+
   if (campaignId === null) return <Message title="先选择一个存档。" />;
   if (snapshot === null) {
     return error === null ? (
@@ -327,6 +335,26 @@ export function CharacterCreationPage({
     );
   }
   const session = snapshot.session;
+  if (snapshot.careerPool === null) {
+    return (
+      <main className="character-studio">
+        <Header step="01 · 构筑职业池" />
+        <section className="character-intro" aria-busy={busy}>
+          <p className="eyebrow">世界职业</p>
+          <h1>{busy ? '命运正在梳理这个世界的生计与身份……' : '职业池尚未形成。'}</h1>
+          <p>职业将依照锁定的世界规则生成常见、少见、稀有与特殊层级，并作为持久世界事实保存。</p>
+          {error === null ? null : <AIErrorNotice error={error} />}
+          <button
+            className="primary-action"
+            disabled={busy}
+            onClick={() => void perform(() => service.generateInitialCareerPool(snapshot))}
+          >
+            ✦ 重新构筑职业池
+          </button>
+        </section>
+      </main>
+    );
+  }
   if (session === null) {
     return (
       <main className="character-studio">
@@ -478,7 +506,6 @@ export function CharacterCreationPage({
           >
             <option value="IDENTITY">身份与形象</option>
             <option value="INNER_LIFE">经历与内心</option>
-            <option value="CAREER">职业表达</option>
             <option value="TRAITS">叙事特质</option>
             <option value="BACKGROUND">背景</option>
             <option value="BOUNDARIES">内容边界</option>
@@ -600,39 +627,45 @@ export function CharacterCreationPage({
 
           <section>
             <h2>职业与本地属性</h2>
-            <LockedTextField
-              field="career.displayName"
-              lockField="career"
-              label="职业显示名"
-              value={draft.career.displayName}
-              locks={locks}
-              onLock={(field) => editLocks(field, locks)}
-              onChange={(value) =>
-                editDraft({ ...draft, career: { ...draft.career, displayName: value } })
-              }
-            />
-            <label data-character-field="career.legacyArchetype">
-              当前兼容职业类型
+            <label data-character-field="career.id">
+              世界职业
               <select
-                value={draft.career.legacyArchetype ?? 'WARRIOR'}
-                onChange={(event) =>
+                value={draft.career.id ?? ''}
+                onChange={(event) => {
+                  const selected = snapshot.careerPool?.careers.find(
+                    ({ id }) => id === event.target.value,
+                  );
+                  if (selected === undefined) return;
                   editDraft({
                     ...draft,
                     career: {
-                      ...draft.career,
-                      legacyArchetype: event.target.value as NonNullable<
-                        typeof draft.career.legacyArchetype
-                      >,
+                      id: selected.id,
+                      displayName: selected.name,
+                      legacyArchetype: selected.legacyArchetype,
                     },
-                  })
-                }
+                  });
+                }}
               >
-                <option value="WARRIOR">战士</option>
-                <option value="ROGUE">游荡者</option>
-                <option value="SCHOLAR">学者</option>
-                <option value="DIPLOMAT">交涉者</option>
+                <option value="">选择符合世界规则的职业</option>
+                {snapshot.careerPool.careers.map((career) => (
+                  <option key={career.id} value={career.id}>
+                    {career.name} · {careerRarityLabel(career.rarity)}
+                  </option>
+                ))}
               </select>
             </label>
+            {snapshot.careerPool.careers
+              .filter(({ id }) => id === draft.career.id)
+              .map((career) => (
+                <article className="game-card" key={career.id}>
+                  <p className="eyebrow">{careerRarityLabel(career.rarity)}</p>
+                  <h3>{career.name}</h3>
+                  <p>{career.role}</p>
+                  <p>社会位置：{career.socialPosition}</p>
+                  <p>入行条件：{career.requirements.join('；')}</p>
+                  <p>风险：{career.risks.join('；')}</p>
+                </article>
+              ))}
             {Object.entries(ATTRIBUTE_LABELS).map(([key, label]) => (
               <label key={key} data-character-field={`attributes.${key}`}>
                 {label}
@@ -1540,4 +1573,13 @@ function Message({ title, busy = false }: { title: string; busy?: boolean }) {
       <h1>{title}</h1>
     </main>
   );
+}
+
+function careerRarityLabel(rarity: 'COMMON' | 'UNCOMMON' | 'RARE' | 'SPECIAL'): string {
+  return {
+    COMMON: '常见职业',
+    UNCOMMON: '少见职业',
+    RARE: '稀有职业',
+    SPECIAL: '特殊职业',
+  }[rarity];
 }

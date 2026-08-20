@@ -2628,3 +2628,26 @@ M5-T04只能证明点数结构与总和，无法仅凭“看清黑暗”或“�
 - TypeScript合同、Domain和Rust Native镜像策略版本1的枚举、边界、分档与确认门禁；声明嵌入既有JSON，不新增SQLite migration。
 - AI可接收结构化反馈或建议修改，但不能改Trait类型、点值、平衡声明或最终accepted状态；M4-T03 `TraitRuleModifier`、D20和其他Rules事务不变。
 - 本任务不实现M6 Career Pool、动态实体生成或从Constitution自然语言自动推断世界权重；同Campaign和Constitution revision是当前不可变世界规则身份。
+
+## DEC-126：职业池是 Constitution 绑定的世界事实并以显式旧原型投影兼容
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T01`、`docs/V0.3_SPEC.md` 8.2与11.1节、`DEC-121`至`DEC-122`
+
+### 背景
+
+V0.2角色合同只有四个固定职业原型，而V0.3要求每个世界产生符合Constitution、具rarity和社会结构差异的动态职业。若继续把四原型作为玩家选择，世界差异无法成立；若让AI直接写自由文本职业，角色引用无法稳定恢复、去重或验证。把职业叙事映射为数值又会绕过M4 Rules Engine。
+
+### 决定与理由
+
+schema 15新增每Campaign唯一、revision化的`CareerPool`，职业绑定锁定Constitution revision，并逐项保存career rules、society、technology和economy精确证据。统一`GENERATE_CAREER_POOL`提出候选，Domain验证requested rarity、结构、世界证据与规范化去重，Native再以generation audit和expected revision在单一事务提交。初始池固定覆盖COMMON、UNCOMMON、RARE、SPECIAL各一项；运行时发现只能追加合法新项。
+
+职业生成使用既有Generation Queue P2通道；取消或超时后在事实提交前再次检查signal。角色只保存池内精确ID、显示名和显式`legacyArchetype`；四原型不再玩家可见，只作为V0.2投影。职业合同不含数值修正，不从名称、技能或描述反解析属性、财富、装备或D20效果。
+
+### 影响与边界
+
+- TypeScript Repository与Rust Native在读取时都重新核对锁定Constitution证据，持久JSON篡改会fail closed；SQLite禁止在Campaign存在时删除池并要求更新revision严格加一。
+- Quick输入携带当前池且输出必须精确选择其中职业；Advanced保存、准备和确认复核同一引用。旧`career.id = null`档案继续可读，动态职业通过显式旧原型映射投影。
+- 本地SQLite支持初始生成、运行时追加、幂等重放和关闭重开；portable archive携带职业池及历史迁移仍由M10-T05统一处理。
+- UI复用现有Token和角色组件，不建立第二套视觉/组件体系，也不提前执行M10-T07；M6-T01不实现装备、NPC、地点或势力。

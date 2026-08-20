@@ -1,6 +1,7 @@
 import type { z } from 'zod';
 
 import type { AITask } from './protocol.js';
+import { CareerInputSchema, CareerOutputSchema } from './entity-schemas.js';
 import {
   CheckConsistencyInputSchema,
   CheckConsistencyOutputSchema,
@@ -68,6 +69,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
     GenerateQuickCharacterOutputSchema,
   ),
   EDIT_CHARACTER_DRAFT: definition(EditCharacterDraftInputSchema, EditCharacterDraftOutputSchema),
+  GENERATE_CAREER_POOL: definition(CareerInputSchema, CareerOutputSchema),
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),

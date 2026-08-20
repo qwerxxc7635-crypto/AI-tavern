@@ -53,12 +53,17 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_QUICK_CHARACTER: define(
     'GENERATE_QUICK_CHARACTER',
     'WORLD_DESIGNER',
-    'Turn the single player concept into one complete editable character that obeys the locked World Constitution, player boundaries, and every supplied extension definition. Return narrative content and a unique attribute priority only; never assign money, status, derived values, equipment IDs, or mechanical bonuses. Use exactly two distinct narrative Traits for the current compatibility stage, fill every required extension field, and do not invent extension namespaces or keys.',
+    'Turn the single player concept into one complete editable character that obeys the locked World Constitution, player boundaries, and every supplied extension definition. Select career.id, displayName, and legacyArchetype exactly from one supplied Career Pool entry; never invent or rename a career. Return narrative content and a unique attribute priority only; never assign money, status, derived values, equipment IDs, or mechanical bonuses. Use exactly two distinct narrative Traits for the current compatibility stage, fill every required extension field, and do not invent extension namespaces or keys.',
   ),
   EDIT_CHARACTER_DRAFT: define(
     'EDIT_CHARACTER_DRAFT',
     'WORLD_DESIGNER',
     'Edit only the exact targetPaths of the supplied universal character draft. Obey the locked World Constitution, content boundaries, extension definitions, and every locked field. FIELD with OPTIONS returns exactly three distinct candidates and no patch; every other operation returns a patch covering exactly the requested targets. Preserve value kinds, never invent paths, and never change age, attributes, derived values, skill numbers, wealth, equipment IDs, reputation, relationships, status, Trait type, Trait point values, mechanical bonuses, or any non-target field.',
+  ),
+  GENERATE_CAREER_POOL: define(
+    'GENERATE_CAREER_POOL',
+    'WORLD_DESIGNER',
+    'Generate exactly requestedCount distinct careers for the requested rarity multiset. Every career must arise from the supplied locked Constitution, repeat its four exact Constitution evidence strings, include every structured field, and choose one legacyArchetype only as a compatibility projection. Never add attribute modifiers, numeric bonuses, money, damage, defense, or equipment instances. INITIAL creates the visible world Career Pool; RUNTIME_DISCOVERY adds only careers not present in existingCareerIds or existingCareerNames.',
   ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',

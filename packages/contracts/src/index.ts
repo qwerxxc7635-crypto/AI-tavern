@@ -198,6 +198,25 @@ export {
   createPlayerAttributes,
 } from './character.js';
 export {
+  CAREER_RARITIES,
+  CAREER_SOURCES,
+  CareerContractError,
+  appendCareerPool,
+  careerEvidenceFor,
+  createCareerDefinition,
+  createCareerPool,
+  normalizeCareerName,
+  parseCareerPool,
+} from './career.js';
+export type {
+  CareerCandidate,
+  CareerConstitutionEvidence,
+  CareerDefinition,
+  CareerPool,
+  CareerRarity,
+  CareerSource,
+} from './career.js';
+export {
   CHARACTER_EXTENSION_FIELD_TYPES,
   UNIVERSAL_CHARACTER_SCHEMA_VERSION,
   WORLD_CHARACTER_EXTENSION_SCHEMA_VERSION,
@@ -328,6 +347,7 @@ export {
   generationRecordId,
   idempotencyKey,
   characterTraitId,
+  careerId,
   isoTimestamp,
   locationId,
   messageId,
@@ -370,6 +390,7 @@ export type {
   GenerationRecordId,
   IdempotencyKey,
   CharacterTraitId,
+  CareerId,
   IsoTimestamp,
   LocationId,
   MessageId,

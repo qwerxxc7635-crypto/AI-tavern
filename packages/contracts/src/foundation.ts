@@ -18,6 +18,7 @@ export type KnowledgeId = Branded<string, 'KnowledgeId'>;
 export type MemoryId = Branded<string, 'MemoryId'>;
 export type PlayerCharacterId = Branded<string, 'PlayerCharacterId'>;
 export type CharacterTraitId = Branded<string, 'CharacterTraitId'>;
+export type CareerId = Branded<string, 'CareerId'>;
 export type ItemId = Branded<string, 'ItemId'>;
 export type TavernId = Branded<string, 'TavernId'>;
 export type TavernChangeId = Branded<string, 'TavernChangeId'>;
@@ -70,6 +71,7 @@ export const playerCharacterId = (value: string): PlayerCharacterId =>
   createId(value, 'PlayerCharacterId');
 export const characterTraitId = (value: string): CharacterTraitId =>
   createId(value, 'CharacterTraitId');
+export const careerId = (value: string): CareerId => createId(value, 'CareerId');
 export const itemId = (value: string): ItemId => createId(value, 'ItemId');
 export const tavernId = (value: string): TavernId => createId(value, 'TavernId');
 export const tavernChangeId = (value: string): TavernChangeId => createId(value, 'TavernChangeId');

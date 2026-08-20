@@ -5,8 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 
 import {
   campaignId,
+  careerEvidenceFor,
+  careerId,
   characterTraitId,
   createCharacterCreationSession,
+  createCareerDefinition,
+  createCareerPool,
   createUniversalCharacterDraft,
   createWorldCharacterExtensionDefinition,
   generationRecordId,
@@ -14,6 +18,7 @@ import {
   playerCharacterId,
   stageQuickCharacterDraft,
   type CharacterCreationSession,
+  type CareerPool,
 } from '@ember-tavern/contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -39,11 +44,77 @@ const definition = createWorldCharacterExtensionDefinition({
   updatedAt: at,
 });
 
+function constitution() {
+  return {
+    schemaVersion: 1 as const,
+    worldType: 'Investigation fantasy',
+    era: 'Sail age',
+    technology: 'Late medieval',
+    magic: 'Magic leaves evidence',
+    peoples: ['Harbor folk'],
+    society: 'Guild towns',
+    politics: 'Harbor council',
+    economy: 'Trade and tolls',
+    combatScale: 'Personal',
+    deathRules: 'Death is permanent',
+    careerRules: 'Careers arise from local institutions',
+    equipmentRules: 'Equipment follows craft',
+    npcRules: 'Knowledge is bounded',
+    traitRules: 'Traits require tradeoffs',
+    taboos: [],
+  };
+}
+
+function pageCareerPool(): CareerPool {
+  return createCareerPool({
+    schemaVersion: 1,
+    campaignId: campaignKey,
+    constitutionRevision: 1,
+    careers: [
+      createCareerDefinition({
+        schemaVersion: 1,
+        id: careerId('career-world-walker'),
+        campaignId: campaignKey,
+        constitutionRevision: 1,
+        name: 'World Walker',
+        rarity: 'RARE',
+        role: 'Investigates roads that should not exist.',
+        skills: ['Cartography'],
+        equipmentTags: ['Compass'],
+        socialPosition: 'Independent licensed investigator',
+        relationshipHooks: ['Owes the academy'],
+        risks: ['Accused of trespass'],
+        requirements: ['Academy training'],
+        constitutionEvidence: careerEvidenceFor(constitution()),
+        legacyArchetype: 'SCHOLAR',
+        source: 'INITIAL_GENERATION',
+        generationRecordId: generationRecordId('generation-page-careers'),
+        createdAt: at,
+      }),
+    ],
+    revision: 1,
+    createdAt: at,
+    updatedAt: at,
+  });
+}
+
 afterEach(() => {
   cleanup();
 });
 
 describe('Universal Character Creation page', () => {
+  it('builds the missing Career Pool before exposing character modes', async () => {
+    const generated = snapshot(null);
+    const missing = { ...generated, careerPool: null };
+    const service = actions(missing);
+    service.generateInitialCareerPool.mockResolvedValue(generated);
+
+    renderPage(service);
+
+    await waitFor(() => expect(service.generateInitialCareerPool).toHaveBeenCalledOnce());
+    expect(await screen.findByText('写下一位会在这个世界里活起来的人。')).toBeDefined();
+  });
+
   it('starts Quick from one concept and exposes generation without writing formal facts', async () => {
     const empty = snapshot(null);
     const active = snapshot(session('QUICK', 'ACTIVE'));
@@ -96,7 +167,7 @@ describe('Universal Character Creation page', () => {
       'importantPeople',
       'enemies',
       'experiences',
-      'career.legacyArchetype',
+      'career.id',
       'attributes.physique',
       'proficiencies',
       'abilities',
@@ -118,6 +189,8 @@ describe('Universal Character Creation page', () => {
     expect(
       document.querySelector('[data-ai-field="character:extensions.investigation.sanity"]'),
     ).toBeNull();
+    expect(screen.getByLabelText('世界职业').textContent).toContain('World Walker · 稀有职业');
+    expect(screen.queryByRole('option', { name: '战士' })).toBeNull();
     fireEvent.change(screen.getByLabelText('姓名'), { target: { value: '米拉·维尔' } });
     fireEvent.click(screen.getByRole('button', { name: '校验完整车卡' }));
 
@@ -243,6 +316,7 @@ function renderPage(service: ReturnType<typeof actions>) {
 function actions(initial: UniversalCharacterCreationSnapshot) {
   return {
     load: vi.fn().mockResolvedValue(initial),
+    generateInitialCareerPool: vi.fn().mockResolvedValue(initial),
     start: vi.fn(),
     saveDraft: vi.fn(),
     switchMode: vi.fn(),
@@ -260,9 +334,12 @@ function snapshot(
   sessionValue: CharacterCreationSession | null,
 ): UniversalCharacterCreationSnapshot {
   return {
+    campaignId: campaignKey,
     campaignState: 'CREATING_CHARACTER',
-    constitution: {},
+    constitutionRevision: 1,
+    constitution: constitution(),
     extensionDefinitions: [definition],
+    careerPool: pageCareerPool(),
     session: sessionValue,
   };
 }
@@ -327,7 +404,11 @@ function completeDraft() {
       allowBetrayal: true,
       excludedContent: [],
     },
-    career: { id: null, displayName: 'World Walker', legacyArchetype: 'SCHOLAR' },
+    career: {
+      id: careerId('career-world-walker'),
+      displayName: 'World Walker',
+      legacyArchetype: 'SCHOLAR',
+    },
     attributes: { physique: 1, agility: 3, knowledge: 4, charisma: 2 },
     derivedAttributes: [],
     skills: [],

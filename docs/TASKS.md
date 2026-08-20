@@ -282,7 +282,7 @@
 
 ## M6-T01 Dynamic Career Pool
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M5-T05。
 - **Deliverable**：Career schema/generator/pool/repository/character integration。
 - **Acceptance**：按 Constitution 生成 rarity 分层和结构字段；运行中新职业合法持久化；三世界明显不同。

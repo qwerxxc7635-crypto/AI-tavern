@@ -5,8 +5,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::{
-    CampaignStore, CampaignStoreError, CharacterGenerationAudit, current_timestamp,
-    insert_character_generation, validate_character_generation_audit, validate_id,
+    CampaignStore, CampaignStoreError, CharacterGenerationAudit, career_pool_generation_context,
+    current_timestamp, insert_character_generation, load_career_pool_value,
+    validate_character_career_reference, validate_character_generation_audit, validate_id,
     validate_timestamp,
 };
 
@@ -212,9 +213,12 @@ pub struct CharacterCreationSessionView {
 #[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct UniversalCharacterCreationSnapshot {
+    pub campaign_id: String,
     pub campaign_state: String,
+    pub constitution_revision: i64,
     pub constitution: Value,
     pub extension_definitions: Vec<Value>,
+    pub career_pool: Option<Value>,
     pub session: Option<CharacterCreationSessionView>,
 }
 
@@ -289,6 +293,7 @@ struct QuickCharacterOutput {
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 struct QuickCareer {
+    id: String,
     display_name: String,
     legacy_archetype: String,
 }
@@ -393,6 +398,9 @@ impl CampaignStore {
             return self.universal_character_creation_snapshot(&command.campaign_id);
         }
         require_creation_campaign(&transaction, &command.campaign_id)?;
+        if load_career_pool_value(&transaction, &command.campaign_id)?.is_none() {
+            return Err(CampaignStoreError::InvalidState);
+        }
         if character_exists(&transaction, &command.campaign_id)? {
             return Err(CampaignStoreError::InvalidState);
         }
@@ -480,6 +488,13 @@ impl CampaignStore {
             return Err(CampaignStoreError::InvalidState);
         }
         validate_quick_generation_context(&transaction, &current, &command.generation)?;
+        validate_character_career_reference(
+            &transaction,
+            &current.campaign_id,
+            Some(&output.career.id),
+            &output.career.display_name,
+            Some(&output.career.legacy_archetype),
+        )?;
         let mut draft =
             build_quick_draft(&current, output, &command.generation.generation_record_id)?;
         preserve_locked_values(&current.draft, &mut draft, &current.locked_fields)?;
@@ -569,9 +584,12 @@ fn creation_snapshot(
         .optional()?
         .ok_or(CampaignStoreError::NotFound)?;
     Ok(UniversalCharacterCreationSnapshot {
+        campaign_id: campaign_id.to_owned(),
         campaign_state,
+        constitution_revision: locked_constitution_revision(connection, campaign_id)?,
         constitution: load_constitution_context(connection, campaign_id)?,
         extension_definitions: load_definition_values(connection, campaign_id)?,
+        career_pool: load_career_pool_value(connection, campaign_id)?,
         session: load_session(connection, campaign_id)?,
     })
 }
@@ -703,7 +721,7 @@ fn build_quick_draft(
         story_preferences: session.draft.story_preferences.clone(),
         content_boundaries: session.draft.content_boundaries.clone(),
         career: UniversalCharacterCareer {
-            id: None,
+            id: Some(output.career.id),
             display_name: output.career.display_name,
             legacy_archetype: Some(output.career.legacy_archetype),
         },
@@ -823,7 +841,17 @@ fn validate_session(
     }
     let definitions = load_definitions(connection, &session.campaign_id)?;
     validate_locked_fields(&session.locked_fields, &definitions)?;
-    validate_draft(&session.draft, &definitions, require_complete)
+    validate_draft(&session.draft, &definitions, require_complete)?;
+    if require_complete {
+        validate_character_career_reference(
+            connection,
+            &session.campaign_id,
+            session.draft.career.id.as_deref(),
+            &session.draft.career.display_name,
+            session.draft.career.legacy_archetype.as_deref(),
+        )?;
+    }
+    Ok(())
 }
 
 fn validate_draft(
@@ -1203,6 +1231,7 @@ fn validate_quick_generation_context(
         "contentBoundaries": session.draft.content_boundaries,
         "constitution": load_constitution_context(connection, &session.campaign_id)?,
         "extensionDefinitions": definition_context,
+        "careerPool": career_pool_generation_context(connection, &session.campaign_id)?,
     });
     if audit.input != expected {
         return Err(CampaignStoreError::InvalidData);
@@ -2214,6 +2243,50 @@ mod tests {
                 [id],
             )
             .expect("advance campaign");
+        let pool = json!({
+            "kind": "CAREER_POOL",
+            "schemaVersion": 1,
+            "campaignId": id,
+            "constitutionRevision": 1,
+            "careers": [{
+                "kind": "CAREER_DEFINITION",
+                "schemaVersion": 1,
+                "id": "career-world-walker",
+                "campaignId": id,
+                "constitutionRevision": 1,
+                "name": "World Walker",
+                "rarity": "RARE",
+                "role": "Maps roads that should not exist.",
+                "skills": ["Cartography"],
+                "equipmentTags": ["Compass"],
+                "socialPosition": "Independent guild scholar",
+                "relationshipHooks": ["Owes the harbor academy"],
+                "risks": ["Accused of trespass"],
+                "requirements": ["Academy training"],
+                "constitutionEvidence": {
+                    "careerRules": "Careers arise from local guilds.",
+                    "society": "Harbor guilds connect isolated settlements.",
+                    "technology": "Late medieval",
+                    "economy": "Fishing, coastal trade, and beacon tolls."
+                },
+                "legacyArchetype": "SCHOLAR",
+                "source": "INITIAL_GENERATION",
+                "generationRecordId": "generation-career-world-walker",
+                "createdAt": "2026-08-20T02:00:00.000Z"
+            }],
+            "revision": 1,
+            "createdAt": "2026-08-20T02:00:00.000Z",
+            "updatedAt": "2026-08-20T02:00:00.000Z"
+        });
+        connection
+            .execute(
+                "INSERT INTO career_pools (
+                   campaign_id, schema_version, constitution_revision, pool_json,
+                   revision, created_at, updated_at
+                 ) VALUES (?1, 1, 1, ?2, 1, ?3, ?3)",
+                params![id, pool.to_string(), "2026-08-20T02:00:00.000Z"],
+            )
+            .expect("career pool");
     }
 
     fn start_command(
@@ -2254,6 +2327,14 @@ mod tests {
                 "contentBoundaries": session.draft.content_boundaries,
                 "constitution": constitution,
                 "extensionDefinitions": [],
+                "careerPool": [{
+                    "id": "career-world-walker",
+                    "name": "World Walker",
+                    "rarity": "RARE",
+                    "role": "Maps roads that should not exist.",
+                    "requirements": ["Academy training"],
+                    "legacyArchetype": "SCHOLAR"
+                }],
             }),
             context: json!({
                 "sessionId": session.id,
@@ -2292,7 +2373,11 @@ mod tests {
             "importantPeople": ["Professor Aven"],
             "enemies": ["The Ash Cartographer"],
             "experiences": ["Survived a skyquake"],
-            "career": {"displayName": "World Walker", "legacyArchetype": "SCHOLAR"},
+            "career": {
+                "id": "career-world-walker",
+                "displayName": "World Walker",
+                "legacyArchetype": "SCHOLAR"
+            },
             "attributePriority": ["knowledge", "agility", "charisma", "physique"],
             "proficiencies": ["Cartography"],
             "abilities": ["Read the road"],

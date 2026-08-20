@@ -8,11 +8,7 @@ import {
 } from '@ember-tavern/contracts';
 import { describe, expect, it } from 'vitest';
 
-import {
-  applyCharacterAIUpdates,
-  characterAIFields,
-  isCharacterAIFieldLocked,
-} from './universal-character-ai.js';
+import { applyCharacterAIUpdates, characterAIFields } from './universal-character-ai.js';
 
 const campaign = campaignId('campaign-character-ai');
 const character = playerCharacterId('character-character-ai');
@@ -147,7 +143,6 @@ describe('universal character AI patch boundary', () => {
 
   it('rejects locked, unknown, duplicate and rule-owned patch attempts', () => {
     const draft = fixture();
-    expect(isCharacterAIFieldLocked('career.displayName', ['career'])).toBe(true);
     expect(() =>
       applyCharacterAIUpdates(
         draft,
@@ -155,7 +150,7 @@ describe('universal character AI patch boundary', () => {
         [definition],
         ['career'],
       ),
-    ).toThrow(/LOCKED_FIELD_CHANGED/);
+    ).toThrow(/FIELD_NOT_EDITABLE/);
     expect(() =>
       applyCharacterAIUpdates(
         draft,

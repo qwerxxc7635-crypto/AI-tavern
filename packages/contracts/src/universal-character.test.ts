@@ -94,6 +94,23 @@ describe('Universal Character Schema', () => {
     expect(projected.traits).toHaveLength(2);
   });
 
+  it('projects a dynamic career through its explicit V0.2 compatibility mapping', () => {
+    const campaign = campaignId('campaign-v02-dynamic-career');
+    const profile = createUniversalCharacterProfile({
+      ...character(campaign, 'investigation', { sanity: 70, luck: 50, credit: 25 }),
+      career: {
+        id: 'career-ember-cartographer',
+        displayName: 'Ember Cartographer',
+        legacyArchetype: 'SCHOLAR',
+      },
+    });
+
+    expect(projectUniversalCharacterToV02(profile)).toMatchObject({
+      classArchetype: 'SCHOLAR',
+      classDisplayName: 'Ember Cartographer',
+    });
+  });
+
   it('keeps legacy profiles readable while requiring declared extensions for new confirmation', () => {
     const campaign = campaignId('campaign-extension-compatibility');
     const definition = extension(campaign, worldFixtures[1]);

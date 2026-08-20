@@ -2,14 +2,20 @@ import { invoke } from '@tauri-apps/api/core';
 
 import {
   CheckConsistencyOutputSchema,
+  CareerInputSchema,
+  CareerOutputSchema,
   EditCharacterDraftInputSchema,
   EditCharacterDraftOutputSchema,
+  GenerationQueue,
+  GenerationQueueError,
   GenerateQuickCharacterInputSchema,
   GenerateQuickCharacterOutputSchema,
+  WorldConstitutionOutputSchema,
 } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
   campaignId,
+  appendCareerPool,
   cancelCharacterCreationSession,
   characterTraitId,
   createUniversalCharacterDraft,
@@ -17,7 +23,9 @@ import {
   generationRecordId,
   idempotencyKey,
   parseCharacterCreationSession,
+  parseCareerPool,
   playerCharacterId,
+  schemaVersion,
   prepareAdvancedCharacterDraft,
   resumeCharacterCreationSession,
   saveCharacterCreationDraft,
@@ -27,13 +35,21 @@ import {
   type CharacterAttributeName,
   type CharacterCreationMode,
   type CharacterCreationSession,
+  type CareerPool,
+  type CareerRarity,
   type ContentBoundaries,
   type AiRequestId,
   type GenerationRecordId,
   type IdempotencyKey,
   type UniversalCharacterDraft,
   type WorldCharacterExtensionDefinition,
+  type WorldConstitution,
 } from '@ember-tavern/contracts';
+import {
+  createInitialCareerPool,
+  createRuntimeCareers,
+  requireCareerFromPool,
+} from '@ember-tavern/domain';
 
 import {
   desktopAIEngine,
@@ -59,9 +75,12 @@ import {
 } from './universal-character-ai.js';
 
 export interface UniversalCharacterCreationSnapshot {
+  readonly campaignId: string;
   readonly campaignState: string;
   readonly constitution: unknown;
+  readonly constitutionRevision: number;
   readonly extensionDefinitions: readonly WorldCharacterExtensionDefinition[];
+  readonly careerPool: CareerPool | null;
   readonly session: CharacterCreationSession | null;
 }
 
@@ -123,6 +142,11 @@ interface UniversalCharacterCreationGateway {
     readonly campaignId: string;
     readonly expectedRevision: number;
   }): Promise<UniversalCharacterCreationSnapshot>;
+  commitCareerPool(command: {
+    readonly campaignId: string;
+    readonly expectedRevision: number;
+    readonly generation: GenerationAudit;
+  }): Promise<CareerPool>;
 }
 
 interface RequestIdentity {
@@ -130,6 +154,14 @@ interface RequestIdentity {
   readonly generationRecordId: GenerationRecordId;
   readonly idempotencyKey: IdempotencyKey;
 }
+
+interface PreparedCareerGeneration {
+  readonly campaignId: string;
+  readonly expectedRevision: number;
+  readonly generation: GenerationAudit;
+}
+
+const careerGenerationQueue = new GenerationQueue({ concurrency: 2, maxPending: 32 });
 
 export const tauriUniversalCharacterCreationGateway: UniversalCharacterCreationGateway = {
   async load(id) {
@@ -159,6 +191,9 @@ export const tauriUniversalCharacterCreationGateway: UniversalCharacterCreationG
       command.campaignId,
     );
   },
+  async commitCareerPool(command) {
+    return parseCareerPool(await invoke<unknown>('career_pool_generation_commit', { command }));
+  },
 };
 
 export class UniversalCharacterCreationService {
@@ -167,8 +202,11 @@ export class UniversalCharacterCreationService {
   public constructor(
     private readonly gateway: UniversalCharacterCreationGateway = tauriUniversalCharacterCreationGateway,
     provider?: Parameters<typeof desktopAIEngine>[0],
-    private readonly createIdentity: () => RequestIdentity = defaultIdentity,
+    private readonly createIdentity: (
+      kind?: 'QUICK' | 'CAREER',
+    ) => RequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
+    private readonly generationQueue: GenerationQueue = careerGenerationQueue,
   ) {
     this.ai = desktopAIEngine(provider);
   }
@@ -191,11 +229,31 @@ export class UniversalCharacterCreationService {
     });
   }
 
+  public async generateInitialCareerPool(
+    snapshot: UniversalCharacterCreationSnapshot,
+  ): Promise<UniversalCharacterCreationSnapshot> {
+    if (snapshot.careerPool !== null) return snapshot;
+    return this.generateCareers(snapshot, 'INITIAL', ['COMMON', 'UNCOMMON', 'RARE', 'SPECIAL']);
+  }
+
+  public async discoverCareers(
+    snapshot: UniversalCharacterCreationSnapshot,
+    requestedRarities: readonly CareerRarity[],
+  ): Promise<UniversalCharacterCreationSnapshot> {
+    if (snapshot.careerPool === null) {
+      throw new UniversalCharacterCreationServiceError('CAREER_POOL_REQUIRED');
+    }
+    return this.generateCareers(snapshot, 'RUNTIME_DISCOVERY', requestedRarities);
+  }
+
   public async saveDraft(
     snapshot: UniversalCharacterCreationSnapshot,
     draft: UniversalCharacterDraft,
     lockedFields: readonly string[],
   ): Promise<UniversalCharacterCreationSnapshot> {
+    if (draft.career.id !== null) {
+      requireCareerFromPool(snapshot.careerPool, draft.career);
+    }
     const session = requireSession(snapshot);
     const next = saveCharacterCreationDraft(
       session,
@@ -229,6 +287,7 @@ export class UniversalCharacterCreationService {
     snapshot: UniversalCharacterCreationSnapshot,
   ): Promise<UniversalCharacterCreationSnapshot> {
     const session = requireSession(snapshot);
+    requireCareerFromPool(snapshot.careerPool, session.draft.career);
     const next = prepareAdvancedCharacterDraft(
       session,
       snapshot.extensionDefinitions,
@@ -288,6 +347,14 @@ export class UniversalCharacterCreationService {
         schemaVersion: definition.schemaVersion,
         fields: definition.fields,
       })),
+      careerPool: requireCareerPool(snapshot).careers.map((career) => ({
+        id: career.id,
+        name: career.name,
+        rarity: career.rarity,
+        role: career.role,
+        requirements: career.requirements,
+        legacyArchetype: career.legacyArchetype,
+      })),
     });
     const identity = this.createIdentity();
     const temperature = await this.randomness.resolveTemperature();
@@ -299,6 +366,16 @@ export class UniversalCharacterCreationService {
     });
     observer?.onValidationStarted();
     const output = GenerateQuickCharacterOutputSchema.parse(generated.validatedOutput);
+    const selectedCareer = requireCareerPool(snapshot).careers.find(
+      ({ id }) => id === output.career.id,
+    );
+    if (
+      selectedCareer === undefined ||
+      selectedCareer.name !== output.career.displayName ||
+      selectedCareer.legacyArchetype !== output.career.legacyArchetype
+    ) {
+      throw new UniversalCharacterCreationServiceError('CAREER_REFERENCE_INVALID');
+    }
     const expectedDraft = buildQuickDraft(session, output, identity.generationRecordId);
     // Local validation proves the provider output can become a complete candidate before crossing IPC.
     const expected = stageQuickCharacterDraft(
@@ -499,6 +576,115 @@ export class UniversalCharacterCreationService {
       expectedRevision: session.revision,
     });
   }
+
+  private async generateCareers(
+    snapshot: UniversalCharacterCreationSnapshot,
+    mode: 'INITIAL' | 'RUNTIME_DISCOVERY',
+    requestedRarities: readonly CareerRarity[],
+  ): Promise<UniversalCharacterCreationSnapshot> {
+    if (requestedRarities.length === 0) {
+      throw new UniversalCharacterCreationServiceError('CAREER_COUNT_INVALID');
+    }
+    const poolRevision = snapshot.careerPool?.revision ?? 0;
+    const intentKey = [
+      'career-pool',
+      snapshot.campaignId,
+      mode,
+      snapshot.constitutionRevision,
+      poolRevision,
+      requestedRarities.join('-'),
+    ].join(':');
+    const prepared = await this.generationQueue.submit({
+      id: `career-pool-${crypto.randomUUID()}`,
+      intentKey,
+      task: 'GENERATE_CAREER_POOL',
+      priority: 'P2',
+      timeoutMs: 12_000,
+      maxRetries: 0,
+      allowFallback: false,
+      execute: ({ signal }) =>
+        this.prepareCareerGeneration(snapshot, mode, requestedRarities, signal),
+    }).promise;
+    const careerPool = await this.gateway.commitCareerPool(prepared);
+    return Object.freeze({ ...snapshot, careerPool });
+  }
+
+  private async prepareCareerGeneration(
+    snapshot: UniversalCharacterCreationSnapshot,
+    mode: 'INITIAL' | 'RUNTIME_DISCOVERY',
+    requestedRarities: readonly CareerRarity[],
+    signal: AbortSignal,
+  ): Promise<PreparedCareerGeneration> {
+    requireCareerGenerationActive(signal);
+    const current = snapshot.careerPool;
+    const input = CareerInputSchema.parse({
+      schemaVersion: 1,
+      context: {
+        worldId: snapshot.campaignId,
+        constitutionRevision: snapshot.constitutionRevision,
+        contextSummary: JSON.stringify(snapshot.constitution),
+      },
+      generationMode: mode,
+      requestedCount: requestedRarities.length,
+      requestedRarities,
+      existingCareerIds: current?.careers.map(({ id }) => id) ?? [],
+      existingCareerNames: current?.careers.map(({ name }) => name) ?? [],
+    });
+    const identity = this.createIdentity('CAREER');
+    const temperature = await this.randomness.resolveTemperature();
+    const generated = await this.ai.execute('GENERATE_CAREER_POOL', input, {
+      requestId: identity.requestId,
+      temperature,
+      maxOutputTokens: 8_000,
+      timeoutMs: 8_000,
+    });
+    const output = CareerOutputSchema.parse(generated.validatedOutput);
+    requireCareerGenerationActive(signal);
+    const at = clientTimestamp();
+    const constitution = careerConstitution(snapshot, at);
+    if (current === null) {
+      createInitialCareerPool({
+        constitution,
+        candidates: output.careers,
+        policy: { mode: 'INITIAL', requestedRarities },
+        generationRecordId: identity.generationRecordId,
+        at,
+      });
+    } else {
+      const additions = createRuntimeCareers({
+        constitution,
+        pool: current,
+        candidates: output.careers,
+        policy: { mode: 'RUNTIME_DISCOVERY', requestedRarities },
+        generationRecordId: identity.generationRecordId,
+        at,
+      });
+      appendCareerPool(current, additions, at);
+    }
+    requireCareerGenerationActive(signal);
+    const campaign = input.context.worldId;
+    return Object.freeze({
+      campaignId: campaign,
+      expectedRevision: current?.revision ?? 0,
+      generation: {
+        ...identity,
+        promptVersion: generated.request.promptVersion,
+        input,
+        context: {
+          campaignId: campaign,
+          constitutionRevision: snapshot.constitutionRevision,
+          expectedPoolRevision: current?.revision ?? 0,
+        },
+        request: generated.request,
+        rawResponseText: generated.response.content,
+        validatedOutput: output,
+      },
+    });
+  }
+}
+
+function requireCareerGenerationActive(signal: AbortSignal): void {
+  if (signal.aborted) throw new GenerationQueueError('CANCELLED');
 }
 
 export const universalCharacterCreationService = new UniversalCharacterCreationService(
@@ -561,7 +747,7 @@ export function buildQuickDraft(
     concept: session.conceptInput ?? session.draft.concept,
     storyPreferences: session.draft.storyPreferences,
     contentBoundaries: session.draft.contentBoundaries,
-    career: { id: null, ...output.career },
+    career: output.career,
     attributes,
     derivedAttributes: [],
     skills: [],
@@ -596,13 +782,30 @@ function parseSnapshot(
     throw new UniversalCharacterCreationServiceError('CAMPAIGN_MISMATCH');
   }
   const campaignState = requireString(record['campaignState'], 'campaignState');
+  const campaign = requireString(record['campaignId'], 'campaignId');
+  const constitutionRevision = requirePositiveInteger(
+    record['constitutionRevision'],
+    'constitutionRevision',
+  );
+  const careerPool = record['careerPool'] === null ? null : parseCareerPool(record['careerPool']);
+  if (
+    campaign !== expectedCampaignId ||
+    (careerPool !== null &&
+      (careerPool.campaignId !== campaign ||
+        careerPool.constitutionRevision !== constitutionRevision))
+  ) {
+    throw new UniversalCharacterCreationServiceError('CAMPAIGN_MISMATCH');
+  }
   if (campaignState.length === 0) {
     throw new UniversalCharacterCreationServiceError('SNAPSHOT_INVALID');
   }
   return Object.freeze({
+    campaignId: campaign,
     campaignState,
+    constitutionRevision,
     constitution: requireRecord(record['constitution'], 'constitution'),
     extensionDefinitions: Object.freeze(definitions),
+    careerPool,
     session,
   });
 }
@@ -634,6 +837,30 @@ function requireSession(snapshot: UniversalCharacterCreationSnapshot): Character
     throw new UniversalCharacterCreationServiceError('SESSION_NOT_FOUND');
   }
   return snapshot.session;
+}
+
+function requireCareerPool(snapshot: UniversalCharacterCreationSnapshot): CareerPool {
+  if (snapshot.careerPool === null) {
+    throw new UniversalCharacterCreationServiceError('CAREER_POOL_REQUIRED');
+  }
+  return snapshot.careerPool;
+}
+
+function careerConstitution(
+  snapshot: UniversalCharacterCreationSnapshot,
+  at: CharacterCreationSession['updatedAt'],
+): WorldConstitution {
+  const content = WorldConstitutionOutputSchema.parse(snapshot.constitution);
+  return Object.freeze({
+    ...content,
+    campaignId: campaignId(snapshot.campaignId),
+    schemaVersion: schemaVersion(1),
+    revision: snapshot.constitutionRevision,
+    status: 'LOCKED',
+    createdAt: at,
+    updatedAt: at,
+    lockedAt: at,
+  });
 }
 
 function requireEditableSession(
@@ -742,12 +969,13 @@ function chunkFacts(facts: readonly string[]): readonly string[] {
   return Object.freeze(chunks);
 }
 
-function defaultIdentity(): RequestIdentity {
+function defaultIdentity(kind: 'QUICK' | 'CAREER' = 'QUICK'): RequestIdentity {
   const suffix = crypto.randomUUID();
+  const prefix = kind === 'CAREER' ? 'career-pool' : 'character-quick';
   return {
-    requestId: aiRequestId(`character-quick-request-${suffix}`),
-    generationRecordId: generationRecordId(`character-quick-generation-${suffix}`),
-    idempotencyKey: idempotencyKey(`character:quick:${suffix}`),
+    requestId: aiRequestId(`${prefix}-request-${suffix}`),
+    generationRecordId: generationRecordId(`${prefix}-generation-${suffix}`),
+    idempotencyKey: idempotencyKey(`${prefix}:${suffix}`),
   };
 }
 
@@ -780,6 +1008,15 @@ function requireString(value: unknown, label: string): string {
     });
   }
   return value;
+}
+
+function requirePositiveInteger(value: unknown, label: string): number {
+  if (!Number.isSafeInteger(value) || (value as number) < 1) {
+    throw new UniversalCharacterCreationServiceError('SNAPSHOT_INVALID', {
+      cause: new TypeError(`${label} must be a positive integer`),
+    });
+  }
+  return value as number;
 }
 
 export type { UniversalCharacterCreationGateway };

@@ -36,8 +36,11 @@
         "constitutionRevision": 1,
         "contextSummary": "A guild port"
       },
+      "generationMode": "INITIAL",
       "requestedCount": 1,
-      "existingCareerIds": []
+      "requestedRarities": ["UNCOMMON"],
+      "existingCareerIds": [],
+      "existingCareerNames": []
     },
     "output": {
       "schemaVersion": 1,
@@ -52,7 +55,14 @@
           "socialPosition": "Licensed guild specialist",
           "relationshipHooks": ["Owes the harbor master"],
           "risks": ["Smuggling accusations"],
-          "requirements": ["Guild sponsorship"]
+          "requirements": ["Guild sponsorship"],
+          "constitutionEvidence": {
+            "careerRules": "Careers follow local institutions",
+            "society": "Merchant guilds dominate public life",
+            "technology": "Black powder is rare",
+            "economy": "Trade and shipbuilding"
+          },
+          "legacyArchetype": "SCHOLAR"
         }
       ]
     }

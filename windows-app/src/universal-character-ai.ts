@@ -64,7 +64,6 @@ export const UNIVERSAL_CHARACTER_AI_FIELDS = Object.freeze([
     ['experiences', '经历'],
     ['storyPreferences', '故事偏好'],
   ]),
-  ...fields('CAREER', 'TEXT', [['career.displayName', '职业显示名']]),
   ...fields('CAREER', 'TEXT_LIST', [
     ['proficiencies', '熟练'],
     ['abilities', '能力'],

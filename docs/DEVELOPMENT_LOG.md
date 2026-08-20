@@ -4187,3 +4187,23 @@
 - Rust Native角色创建专项4项通过，覆盖十维最低/环境/最高档、条件矛盾、平衡组合接受、协同套利拒绝、非零拒绝及空集合确认。最终`pnpm check:shared`完整通过：Vitest 123个文件通过、1个跳过，759项通过、1项跳过；Node 28项通过；Rust 112项通过、1项显式授权真实模型测试忽略；rustfmt、Clippy与TS↔Rust存档互操作门禁通过。`pnpm --dir windows-app build`生产构建通过，Vite转换237个模块。
 - 本任务不解析Trait效果文本、不自动创建M4-T03数值修正、不引入世界特定权重，也不进入M6-T01。portable`.emtavern`仍为v2，完整V0.3 Profile迁移继续属于M10-T05。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6。
+
+## 2026-08-20 — M6-T01 Dynamic Career Pool
+
+### Constitution 职业事实、生成与角色集成
+
+- 新增version 1 `CareerDefinition`/`CareerPool`合同和Domain validator，覆盖COMMON、UNCOMMON、RARE、SPECIAL、完整叙事/社会字段、显式V0.2原型映射、generation provenance及全角/空白/大小写统一规范化去重；职业不携带任何数值加成。
+- 初始池严格要求四种rarity各一项，运行时发现按请求rarity追加；候选必须逐项精确引用锁定Constitution的career rules、society、technology和economy。三世界fixture通过同一合同产生不同职业，不在核心schema硬编码世界类型。
+- 新增统一`GENERATE_CAREER_POOL` schema、Prompt、Context Budget、Fake输出和任务注册，复用既有Provider与Generator Runner；Windows服务进入既有Generation Queue P2通道，并在超时/取消后阻止迟到Native提交。
+- schema 15新增Campaign唯一的`career_pools`及身份、revision、锁定Constitution和保留trigger。TypeScript Repository与Rust Native均在写入和每次读取时核对canonical JSON、列及Constitution证据；generation record和池在Native immediate transaction原子提交，幂等重放不重复追加。
+- Universal Character Repository、Native创建流程、Quick schema/Prompt与Windows页面统一验证池内精确职业引用。角色创建页只展示动态职业及rarity、职责、社会位置、要求和风险；固定四职业与自由文本入口已移除，旧原型只作V0.2兼容投影。
+- 新增`docs/V0.3_DYNAMIC_CAREER_POOL.md`与`DEC-126`，并更新V0.3规格、角色创建、Generator Framework和任务引用。自然修改的UI复用既有Design Token与Game Component；没有提前进入Legacy UI迁移或建立平行设计体系。
+
+### 验证、自审与限制
+
+- 合同、Domain、AI schema/Prompt、Repository、角色服务和页面定向测试通过，覆盖Constitution compliance、四级rarity、requirements、三世界差异、运行时追加、Unicode规范化去重、P2生成集成、保存/重开、篡改拒绝、Quick精确选择及V0.2动态职业映射。
+- Native职业专项覆盖初始/运行时提交、幂等重放、关闭重开、角色引用、错误rarity、错误证据和规范化重复；角色创建专项继续通过，证明动态池没有改变Trait/角色状态机语义。
+- 完整门禁先后发现并修正新增文件格式/lint、启动迁移schema 15期望、Tauri命令类型导入及portable archive本地schema门禁遗漏；没有放宽断言或提前扩展archive格式。最终`pnpm check:shared`从头通过：Vitest 126个文件/784项通过，另1个文件/1项性能基线按设计跳过；Node 28项、Rust workspace 114项通过，另1项真实API测试按授权策略忽略；Prettier、玩家简体中文、ESLint、TypeScript、rustfmt、Clippy及TS↔Rust存档互操作全部通过。
+- `pnpm --dir windows-app build`通过，Vite生产构建转换239个模块并产出独立通用角色创建chunk。
+- portable`.emtavern`仍为v2；完整职业池导入导出和历史fixture迁移保留给M10-T05。本任务未实现M6-T02装备或后续NPC/地点/势力，也未修改Rules Engine、D20、Quest、Adventure、Provider或存档状态机。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6-T02。

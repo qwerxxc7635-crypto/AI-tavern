@@ -348,6 +348,21 @@ export const GenerateQuickCharacterInputSchema = z
           .strict(),
       )
       .max(16),
+    careerPool: z
+      .array(
+        z
+          .object({
+            id: identifier,
+            name: shortText,
+            rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'SPECIAL']),
+            role: text,
+            requirements: stringList,
+            legacyArchetype: z.enum(['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT']),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(64),
   })
   .strict();
 
@@ -375,6 +390,7 @@ export const GenerateQuickCharacterOutputSchema = z
     experiences: stringList,
     career: z
       .object({
+        id: identifier,
         displayName: shortText,
         legacyArchetype: z.enum(['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT']),
       })

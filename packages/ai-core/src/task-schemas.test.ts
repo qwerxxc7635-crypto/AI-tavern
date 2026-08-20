@@ -166,6 +166,16 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       contentBoundaries: boundaries,
       constitution,
       extensionDefinitions: [],
+      careerPool: [
+        {
+          id: 'career-lantern-warden',
+          name: 'Lantern Warden',
+          rarity: 'COMMON',
+          role: 'Maintains beacon roads.',
+          requirements: ['Guild apprenticeship'],
+          legacyArchetype: 'WARRIOR',
+        },
+      ],
     },
     output: FAKE_TASK_OUTPUTS.GENERATE_QUICK_CHARACTER,
   },
@@ -183,6 +193,22 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       extensionDefinitions: [],
     },
     output: FAKE_TASK_OUTPUTS.EDIT_CHARACTER_DRAFT,
+  },
+  GENERATE_CAREER_POOL: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-careers',
+        constitutionRevision: 1,
+        contextSummary: JSON.stringify(constitution),
+      },
+      generationMode: 'INITIAL',
+      requestedCount: 1,
+      requestedRarities: ['COMMON'],
+      existingCareerIds: [],
+      existingCareerNames: [],
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_CAREER_POOL,
   },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },

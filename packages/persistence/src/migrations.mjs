@@ -81,6 +81,11 @@ const migrations = [
       import.meta.url,
     ),
   },
+  {
+    version: 15,
+    name: 'career_pools',
+    source: new URL('../../../database/migrations/0015_career_pools.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(
