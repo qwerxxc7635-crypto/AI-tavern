@@ -291,12 +291,13 @@
 
 ## M6-T02 Semantic Equipment
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M6-T01。
 - **Deliverable**：AI 语义 + Rules 数值的装备模型、Generator、平衡与触发器。
 - **Acceptance**：名称/历史/来源/剧情能力与 damage/defense/price 等物理分离；可绑定 Quest/NPC/Fact。
 - **Tests**：balance、rarity/price、trigger、no inflation、dedupe、save/import。
 - **Do Not**：不从描述解析数值；不生成无来源高阶装备。
+- **Implementation reference**：[`V0.3_SEMANTIC_EQUIPMENT.md`](V0.3_SEMANTIC_EQUIPMENT.md)。
 
 ## M6-T03 NPC LOD
 

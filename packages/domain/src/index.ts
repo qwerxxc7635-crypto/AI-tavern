@@ -55,6 +55,15 @@ export {
   createRuntimeCareers,
   requireCareerFromPool,
 } from './career-pool-validator.js';
+export {
+  SemanticEquipmentRuleError,
+  createEquipmentMechanics,
+  createQuestRewardEquipment,
+  resolveEquipmentTriggers,
+  validateEquipmentMechanics,
+  type EquipmentTriggerEvent,
+  type QuestRewardEquipmentInput,
+} from './semantic-equipment-validator.js';
 export type { CareerGenerationPolicy } from './career-pool-validator.js';
 export {
   KnowledgeBoundaryError,

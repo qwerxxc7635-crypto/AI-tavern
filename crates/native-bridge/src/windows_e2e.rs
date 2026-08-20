@@ -389,7 +389,12 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         .id
         .clone();
     let settlement = store
-        .commit_adventure_settlement(settlement_command(&adventure_id, &owner_id, &clock_id))
+        .commit_adventure_settlement(settlement_command(
+            &adventure_id,
+            &quest_id,
+            &owner_id,
+            &clock_id,
+        ))
         .expect("settle adventure");
     assert_eq!(settlement.outcome, "SUCCESS");
     assert_eq!(store.list().expect("campaign list")[0].state, "TAVERN");
@@ -794,6 +799,7 @@ fn adventure_turn_output(ending: bool) -> Value {
 
 fn settlement_command(
     adventure_id: &str,
+    quest_id: &str,
     publisher_id: &str,
     clock_id: &str,
 ) -> AdventureSettlementCommit {
@@ -818,9 +824,9 @@ fn settlement_command(
                 }],
                 "tavernChange":{"kind":"TROPHY","description":"A lens hangs above the hearth."},
                 "statePatchProposals":[
-                    {"kind":"QUEST","targetId":"model-symbol","rationale":"Done","payload":{"status":"COMPLETED"}},
+                    {"kind":"QUEST","targetId":quest_id,"rationale":"Done","payload":{"status":"COMPLETED"}},
                     {"kind":"RELATIONSHIP","targetId":publisher_id,"rationale":"Trusted","payload":{"trust":1}},
-                    {"kind":"ITEM_REWARD","targetId":null,"rationale":"Reward","payload":{"questId":"model-symbol","name":"Compass","description":"Stormglass","rewardTier":"NOTABLE"}}
+                    {"kind":"ITEM_REWARD","targetId":null,"rationale":"Reward","payload":{"questId":quest_id,"name":"Compass","description":"Stormglass","rewardTier":"NOTABLE"}}
                 ]
             }),
         ),
@@ -835,6 +841,38 @@ fn settlement_command(
                 "newFacts":["The beacon burns again."],
                 "clockAdvances":[{"clockId":clock_id,"amount":1,"reason":"The storm breaks."}]
             }),
+        ),
+        equipment: audit(
+            "settlement-equipment",
+            "GENERATE_ITEMS",
+            json!({
+                "schemaVersion":1,
+                "context":{"worldId":CAMPAIGN_ID,"constitutionRevision":2,"contextSummary":"Harbor"},
+                "purpose":"Quest reward",
+                "requestedCount":1,
+                "requestedRarity":"NOTABLE",
+                "source":{"kind":"QUEST_REWARD","questId":quest_id,"adventureId":adventure_id},
+                "bindingTargets":[
+                    {"kind":"QUEST","targetId":quest_id,"allowedTriggers":["QUEST_CONTEXT"],"summary":"Quest"},
+                    {"kind":"NPC","targetId":publisher_id,"allowedTriggers":["NPC_RECOGNITION"],"summary":"Publisher"},
+                    {"kind":"WORLD_FACT","targetId":format!("settlement-fact:{adventure_id}:0"),"allowedTriggers":["FACT_EVIDENCE"],"summary":"Fact"}
+                ],
+                "constitutionEvidence":{"equipmentRules":"Equipment follows local craft.","technology":"Early industrial","economy":"Fishing and shipping."},
+                "existingItemIds":[],"existingItemNames":[]
+            }),
+            json!({"adventureId":adventure_id}),
+            json!({"schemaVersion":1,"items":[{
+                "id":format!("reward-semantic-{adventure_id}"),
+                "name":"Stormglass Compass","description":"A grounded route-finding relic.","category":"TOOL",
+                "appearance":"Clouded blue glass in dark brass.","history":"Carried by a route warden.","origin":"The lantern guild.",
+                "narrativeAbilities":["Reveals faded route marks"],"semanticEffects":["Recognized by wardens"],"balanceTags":["NON_COMBAT"],
+                "bindings":[
+                    {"kind":"QUEST","targetId":quest_id,"trigger":"QUEST_CONTEXT","summary":"Recovered during this quest."},
+                    {"kind":"NPC","targetId":publisher_id,"trigger":"NPC_RECOGNITION","summary":"The publisher recognizes it."},
+                    {"kind":"WORLD_FACT","targetId":format!("settlement-fact:{adventure_id}:0"),"trigger":"FACT_EVIDENCE","summary":"It records the restored beacon."}
+                ],
+                "constitutionEvidence":{"equipmentRules":"Equipment follows local craft.","technology":"Early industrial","economy":"Fishing and shipping."}
+            }]}),
         ),
     }
 }

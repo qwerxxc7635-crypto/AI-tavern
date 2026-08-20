@@ -42,6 +42,27 @@ describe('WindowsSettlementService', () => {
     expect(command.worldEvent.validatedOutput).toMatchObject({
       clockAdvances: [{ clockId: 'clock' }],
     });
+    expect(command.equipment.input).toMatchObject({
+      requestedCount: 1,
+      requestedRarity: 'NOTABLE',
+      source: { kind: 'QUEST_REWARD', questId: 'quest', adventureId: 'adventure' },
+      constitutionEvidence: {
+        equipmentRules: 'Equipment follows local craft.',
+        technology: 'Late medieval',
+        economy: 'Fishing and coastal trade',
+      },
+    });
+    expect(command.equipment.validatedOutput).toMatchObject({
+      schemaVersion: 1,
+      items: [
+        {
+          bindings: expect.arrayContaining([
+            expect.objectContaining({ kind: 'QUEST', targetId: 'quest' }),
+            expect.objectContaining({ kind: 'NPC', targetId: 'owner' }),
+          ]),
+        },
+      ],
+    });
   });
   it('refuses a non-ending snapshot before invoking native storage', () => {
     const gateway = new Gateway();
@@ -109,7 +130,16 @@ function ending(): AdventureSnapshot {
       id: 'quest',
       publisherNpcId: 'owner',
       relatedNpcIds: [],
+      risk: 'MODERATE',
+      rewardTier: 'NOTABLE',
+      recommendedAttributes: ['knowledge'],
       content: { title: 'Beacon', objective: 'Light it', summary: 'Save it' },
+    },
+    equipmentContext: {
+      constitutionRevision: 1,
+      equipmentRules: 'Equipment follows local craft.',
+      technology: 'Late medieval',
+      economy: 'Fishing and coastal trade',
     },
     clocks: [{ id: 'clock', name: 'Storm', current: 0, max: 4 }],
     items: [],

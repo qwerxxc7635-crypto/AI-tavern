@@ -118,7 +118,33 @@
       },
       "purpose": "A clue carried by a missing sailor",
       "requestedCount": 1,
-      "existingItemIds": []
+      "requestedRarity": "NOTABLE",
+      "source": {
+        "kind": "QUEST_REWARD",
+        "questId": "quest-beacon",
+        "adventureId": "adventure-beacon"
+      },
+      "bindingTargets": [
+        {
+          "kind": "QUEST",
+          "targetId": "quest-beacon",
+          "allowedTriggers": ["QUEST_CONTEXT"],
+          "summary": "Proof recovered during the beacon quest"
+        },
+        {
+          "kind": "NPC",
+          "targetId": "npc-pilot",
+          "allowedTriggers": ["NPC_RECOGNITION"],
+          "summary": "A retired pilot recognizes the guild mark"
+        }
+      ],
+      "constitutionEvidence": {
+        "equipmentRules": "Equipment remains grounded and scarce",
+        "technology": "Late medieval",
+        "economy": "Fishing and coastal trade"
+      },
+      "existingItemIds": [],
+      "existingItemNames": []
     },
     "output": {
       "schemaVersion": 1,
@@ -126,13 +152,33 @@
         {
           "id": "item-brass-token",
           "name": "Salt-stained Brass Token",
+          "description": "A guild token that opens old harbor conversations.",
           "category": "CLUE",
           "appearance": "A stamped token with a broken lighthouse",
           "history": "Issued by a dissolved pilots guild",
           "origin": "Old eastern quay",
           "narrativeAbilities": ["Identifies a forbidden dock"],
           "semanticEffects": ["Recognized by retired pilots"],
-          "balanceTags": ["NON_COMBAT"]
+          "balanceTags": ["NON_COMBAT"],
+          "bindings": [
+            {
+              "kind": "QUEST",
+              "targetId": "quest-beacon",
+              "trigger": "QUEST_CONTEXT",
+              "summary": "Proof recovered during the beacon quest"
+            },
+            {
+              "kind": "NPC",
+              "targetId": "npc-pilot",
+              "trigger": "NPC_RECOGNITION",
+              "summary": "A retired pilot recognizes the guild mark"
+            }
+          ],
+          "constitutionEvidence": {
+            "equipmentRules": "Equipment remains grounded and scarce",
+            "technology": "Late medieval",
+            "economy": "Fishing and coastal trade"
+          }
         }
       ]
     }

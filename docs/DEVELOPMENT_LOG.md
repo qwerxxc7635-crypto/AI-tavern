@@ -4207,3 +4207,28 @@
 - `pnpm --dir windows-app build`通过，Vite生产构建转换239个模块并产出独立通用角色创建chunk。
 - portable`.emtavern`仍为v2；完整职业池导入导出和历史fixture迁移保留给M10-T05。本任务未实现M6-T02装备或后续NPC/地点/势力，也未修改Rules Engine、D20、Quest、Adventure、Provider或存档状态机。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6-T02。
+
+## 2026-08-20 — M6-T02 Semantic Equipment
+
+### 语义合同、本地机械与 Generator
+
+- 新增version 1 `SemanticEquipmentDefinition`，把名称、描述、类别、外观、历史、来源、剧情能力、语义效果和Quest/NPC/Fact绑定，与rarity、price、damage、defense、numeric effect及透明balance记录明确分层；严格结构、资源上限和Unicode规范化去重均fail closed。
+- Domain以Quest risk建立BASIC至LEGENDARY来源上限，并只按reward tier、装备类别和Quest主推荐属性派生机械。三世界fixture中的描述都故意包含`+99 damage`，最终数值仍完全由本地策略决定。
+- 新增统一`GENERATE_ITEMS`任务、schema、Prompt、Context Budget、Fake输出、缓存指标白名单和fixture。输入携带锁定Constitution三项精确证据、当前Quest/Adventure来源、已存在装备及允许绑定目标；Prompt禁止模型分配任何机械数字。
+
+### Windows 原子结算、持久化与兼容
+
+- Adventure snapshot新增只读装备生成上下文以及Quest risk/reward/recommended attributes；Windows成功结算在Summary和World Event后生成一件语义装备，并把三份generation audit交给固定Native命令。
+- Native重新验证响应、输入、Constitution revision、风险上限、类别、绑定、重复和机械预算；至少绑定当前Quest及发布者/关联NPC，Fact只接受同一结算的确定性ID。装备、归属、事件、生成记录、Quest、关系、酒馆变化、Fact、Clock和ending仍在一个immediate transaction中提交。
+- 完整语义对象嵌入既有`items.content_json`，顶层name/description与`reward_tier`/`effect_json`保持旧Item、Rules和UI兼容；没有新增migration或平行装备表。档案可读取完整语义对象，旧装备仍按原合同工作。
+- 既有`.emtavern` v2已携带items的JSON列，新增portable round-trip测试验证语义对象在导出、删除Campaign、导入后仍保留；未提前升级M10-T05负责的其他V0.3表。
+- 历史portable v2尚不含Constitution；为不破坏其中进行中的Adventure恢复，Native只在锁定行不存在时使用带固定Legacy标识、读取World Bible technology且明确economy未知的保守证据。新Campaign始终要求真实锁定Constitution，不写伪迁移数据。
+- 新增`docs/V0.3_SEMANTIC_EQUIPMENT.md`与`DEC-127`，并更新规格、Generator Framework和任务引用。自然修改的UI数据边界沿用视觉手册和现有组件，不提前执行M10-T07。
+
+### 验证、自审与限制
+
+- 合同、Domain、AI schema/Prompt、Windows服务、Native原子结算和portable archive专项通过，覆盖七类装备、四档rarity/price、四类trigger、Constitution证据、risk inflation、Unicode去重、叙事数字无authority、幂等、失败回滚和save/import。
+- 首轮完整门禁发现Adventure独立测试种子缺少新snapshot所需的Constitution，并进一步验证历史portable v2确实不携带该表；补齐当前测试的真实锁定数据，同时为历史归档加入显式Legacy兼容证据后从头重跑，没有删除测试或降低断言。
+- 最终`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 128个文件/811项通过，另1个文件/1项性能runner按设计跳过；Node 28项通过；Rust workspace 114项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TS↔Rust archive interop全部通过。
+- `pnpm --dir windows-app build`生产构建通过，Vite转换241个模块并生成独立settlement service chunk。
+- 本任务不修改Rules Engine/D20硬结果、Provider、Career Pool、Quest/NPC/Adventure状态语义、World Seed或SQLite真相架构，不进入M6-T03。用户已有`.gitignore`修改继续保持未暂存。

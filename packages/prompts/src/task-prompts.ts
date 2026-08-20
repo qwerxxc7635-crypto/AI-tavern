@@ -65,6 +65,11 @@ export const TASK_PROMPTS = Object.freeze({
     'WORLD_DESIGNER',
     'Generate exactly requestedCount distinct careers for the requested rarity multiset. Every career must arise from the supplied locked Constitution, repeat its four exact Constitution evidence strings, include every structured field, and choose one legacyArchetype only as a compatibility projection. Never add attribute modifiers, numeric bonuses, money, damage, defense, or equipment instances. INITIAL creates the visible world Career Pool; RUNTIME_DISCOVERY adds only careers not present in existingCareerIds or existingCareerNames.',
   ),
+  GENERATE_ITEMS: define(
+    'GENERATE_ITEMS',
+    'WORLD_DESIGNER',
+    'Generate exactly requestedCount distinct semantic equipment candidates at requestedRarity. Names, descriptions, appearance, history, origin, narrative abilities, semantic effects, and balance tags are narrative only. Repeat the three locked Constitution evidence strings exactly. Use only supplied binding targets and allowed triggers, include at least the Quest and one NPC binding, and do not invent target IDs. Never assign or imply damage, defense, price, check modifiers, recovery values, uses, or any other numeric mechanic; the Rules Engine derives all mechanics locally. Do not duplicate existingItemIds or existingItemNames.',
+  ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
     'WORLD_DESIGNER',

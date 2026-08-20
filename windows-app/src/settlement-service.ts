@@ -4,6 +4,8 @@ import {
   contextBudgetForTask,
   GenerateWorldEventInputSchema,
   GenerateWorldEventOutputSchema,
+  ItemInputSchema,
+  ItemOutputSchema,
   SummarizeAdventureInputSchema,
   SummarizeAdventureOutputSchema,
   type AIProvider,
@@ -40,7 +42,11 @@ export interface AdventureArchive {
     readonly description: string;
   }[];
   readonly tavernChange: { readonly kind: string; readonly description: string };
-  readonly acquiredItems: readonly { readonly name: string; readonly description: string }[];
+  readonly acquiredItems: readonly {
+    readonly name: string;
+    readonly description: string;
+    readonly semanticEquipment?: unknown;
+  }[];
   readonly worldFacts: readonly { readonly statement: string; readonly kind: string }[];
   readonly generationUses: readonly {
     readonly task: string;
@@ -67,6 +73,7 @@ export interface SettlementGateway {
     outcome: 'SUCCESS';
     summary: Audit;
     worldEvent: Audit;
+    equipment: Audit;
   }): Promise<AdventureArchive>;
   list(campaignId: string): Promise<readonly AdventureArchive[]>;
 }
@@ -145,16 +152,69 @@ export class WindowsSettlementService {
       GenerateWorldEventOutputSchema.parse,
       { adventureId },
     );
+    const factTargets = worldEvent.validatedOutput.newFacts.map((statement, index) => ({
+      kind: 'WORLD_FACT' as const,
+      targetId: `settlement-fact:${adventureId}:${index}`,
+      allowedTriggers: ['FACT_EVIDENCE'] as const,
+      summary: statement,
+    }));
+    const npcTargets = [s.quest.publisherNpcId, ...s.quest.relatedNpcIds].map((npcId) => ({
+      kind: 'NPC' as const,
+      targetId: npcId,
+      allowedTriggers: ['NPC_RECOGNITION', 'RELATIONSHIP_HOOK'] as const,
+      summary: `A quest-linked NPC may recognize the equipment: ${npcId}`,
+    }));
+    const equipmentInput = ItemInputSchema.parse({
+      schemaVersion: 1,
+      context: {
+        worldId: id,
+        constitutionRevision: s.equipmentContext.constitutionRevision,
+        contextSummary: [
+          s.quest.content.summary,
+          s.equipmentContext.equipmentRules,
+          s.equipmentContext.technology,
+          s.equipmentContext.economy,
+        ].join('\n'),
+      },
+      purpose: `Quest reward for ${s.quest.content.title}: ${summary.validatedOutput.summary}`,
+      requestedCount: 1,
+      requestedRarity: s.quest.rewardTier,
+      source: { kind: 'QUEST_REWARD', questId: s.quest.id, adventureId },
+      bindingTargets: [
+        {
+          kind: 'QUEST',
+          targetId: s.quest.id,
+          allowedTriggers: ['QUEST_CONTEXT'],
+          summary: s.quest.content.summary,
+        },
+        ...npcTargets,
+        ...factTargets,
+      ],
+      constitutionEvidence: {
+        equipmentRules: s.equipmentContext.equipmentRules,
+        technology: s.equipmentContext.technology,
+        economy: s.equipmentContext.economy,
+      },
+      existingItemIds: s.items.map(({ id: itemId }) => itemId),
+      existingItemNames: s.items.map(({ content }) => content.name),
+    });
+    const equipment = await this.generate(
+      'GENERATE_ITEMS',
+      equipmentInput,
+      ItemOutputSchema.parse,
+      { adventureId },
+    );
     return this.gateway.commit({
       campaignId: id,
       adventureId,
       outcome: 'SUCCESS',
       summary,
       worldEvent,
+      equipment,
     });
   }
   private async generate<T>(
-    task: Extract<AITask, 'SUMMARIZE_ADVENTURE' | 'GENERATE_WORLD_EVENT'>,
+    task: Extract<AITask, 'SUMMARIZE_ADVENTURE' | 'GENERATE_WORLD_EVENT' | 'GENERATE_ITEMS'>,
     input: unknown,
     parse: (v: unknown) => T,
     context: Readonly<{ adventureId: string }>,
@@ -216,7 +276,13 @@ function parseArchive(value: unknown, id: string): AdventureArchive {
     })(),
     acquiredItems: requireArray(r['acquiredItems']).map((v) => {
       const x = requireRecord(v);
-      return { name: requireString(x['name']), description: requireString(x['description']) };
+      return {
+        name: requireString(x['name']),
+        description: requireString(x['description']),
+        ...(x['semanticEquipment'] === undefined
+          ? {}
+          : { semanticEquipment: x['semanticEquipment'] }),
+      };
     }),
     worldFacts: requireArray(r['worldFacts']).map((v) => {
       const x = requireRecord(v);

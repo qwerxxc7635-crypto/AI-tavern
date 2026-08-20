@@ -2651,3 +2651,28 @@ schema 15新增每Campaign唯一、revision化的`CareerPool`，职业绑定锁�
 - Quick输入携带当前池且输出必须精确选择其中职业；Advanced保存、准备和确认复核同一引用。旧`career.id = null`档案继续可读，动态职业通过显式旧原型映射投影。
 - 本地SQLite支持初始生成、运行时追加、幂等重放和关闭重开；portable archive携带职业池及历史迁移仍由M10-T05统一处理。
 - UI复用现有Token和角色组件，不建立第二套视觉/组件体系，也不提前执行M10-T07；M6-T01不实现装备、NPC、地点或势力。
+
+## DEC-127：语义装备嵌入兼容物品行，机械层只由本地 Quest 来源派生
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T02`、`docs/V0.3_SPEC.md` 11.2节、`DEC-119`与`DEC-027`
+
+### 背景
+
+V0.3要求装备具有世界相关的名称、历史、来源、剧情能力和Quest/NPC/Fact触发，同时要求damage、defense、rarity、price和numeric bonus由Rules Engine控制。既有`items`已经参与角色归属、D20、结算和portable archive；新建平行装备表会产生两套身份与归属。继续让结算摘要同时决定叙事和固定`knowledge +1`，则无法表达类别、来源和世界差异，也会把AI文本与数值authority混在一起。
+
+### 决定与理由
+
+新增严格version 1 `SemanticEquipmentDefinition`和`GENERATE_ITEMS`。AI只生成叙事、类别、平衡标签及本地允许目标内的绑定，并逐字回传锁定Constitution的equipment rules、technology和economy。Domain/Native只依据当前已完成Quest的risk、reward tier、推荐属性和类别，以公开策略version 1派生价格、伤害、防御、物品效果和预算；任何叙事数字都不会进入计算。
+
+完整定义嵌入既有`items.content_json.semanticEquipment`，顶层name/description、`reward_tier`和`effect_json`继续作为旧合同与Rules投影。Native成功结算将装备生成审计、语义/机械对象、归属、Fact、Clock、Quest和Adventure ending原子提交；至少要求当前Quest与一个关联NPC绑定，Fact只能引用同一事务的确定性ID。
+
+### 影响与边界
+
+- 旧物品没有语义对象时继续可读；不新增schema migration、第二套Item组件或第二个装备真相源。
+- portable archive本来就完整携带item JSON列，语义对象可在format v2中原样round-trip；这不代表M10-T05其他V0.3表的格式升级已提前完成。
+- M10-T05前的历史portable v2缺少Constitution时，进行中的Adventure使用带固定Legacy标识、来自World Bible technology的保守生成证据以保持可继续；不伪造Constitution行，存在锁定版本时禁止回退。
+- Unicode规范化ID/名称重复、Constitution伪造、越权绑定、无来源高阶奖励和机械预算超限均fail closed。
+- D20仍只读取角色实际拥有且装备的`effect_json`；语义触发不会自动修改状态，后续消费者必须使用显式事件。
+- UI沿用现有Item/Character/Adventure合同并遵循视觉手册，完整Legacy迁移仍属于M10-T07；M6-T02不进入NPC LOD、地点或势力。

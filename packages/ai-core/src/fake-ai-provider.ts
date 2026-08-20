@@ -122,6 +122,49 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       ),
     };
   }
+  if (request.task === 'GENERATE_ITEMS') {
+    const input = taskInput(request);
+    if (input === undefined) return base;
+    const targets = Array.isArray(input['bindingTargets']) ? input['bindingTargets'] : [];
+    const evidence = isRecord(input['constitutionEvidence'])
+      ? input['constitutionEvidence']
+      : undefined;
+    return {
+      schemaVersion: 1,
+      items: [
+        {
+          id: 'item-stormglass-compass',
+          name: 'Stormglass Compass',
+          description: 'A weathered compass whose clouded face clears near old beacon roads.',
+          category: 'TOOL',
+          appearance: 'Dark brass surrounds a pane of blue-gray stormglass.',
+          history: 'A route warden carried it before the harbor beacons went dark.',
+          origin: 'The old lantern guild workshops.',
+          narrativeAbilities: ['Reveals faded route marks when held beneath beacon light'],
+          semanticEffects: ['Recognized by surviving lantern wardens'],
+          balanceTags: ['QUEST_REWARD', 'NON_COMBAT'],
+          bindings: targets.flatMap((target) => {
+            if (!isRecord(target)) return [];
+            const kind = target['kind'];
+            const targetId = target['targetId'];
+            const allowedTriggers = target['allowedTriggers'];
+            const summary = target['summary'];
+            if (
+              typeof kind !== 'string' ||
+              typeof targetId !== 'string' ||
+              !Array.isArray(allowedTriggers) ||
+              typeof allowedTriggers[0] !== 'string' ||
+              typeof summary !== 'string'
+            ) {
+              return [];
+            }
+            return [{ kind, targetId, trigger: allowedTriggers[0], summary }];
+          }),
+          constitutionEvidence: evidence,
+        },
+      ],
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;

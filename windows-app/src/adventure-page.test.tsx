@@ -293,11 +293,20 @@ function sceneSnapshot(): AdventureSnapshot {
       id: 'quest-beacon',
       publisherNpcId: 'npc-owner',
       relatedNpcIds: ['npc-owner'],
+      risk: 'MODERATE',
+      rewardTier: 'NOTABLE',
+      recommendedAttributes: ['knowledge'],
       content: {
         title: 'The Fading Beacon',
         summary: 'Investigate the lighthouse.',
         objective: 'Restore the beacon.',
       },
+    },
+    equipmentContext: {
+      constitutionRevision: 1,
+      equipmentRules: 'Equipment follows local craft.',
+      technology: 'Late medieval',
+      economy: 'Fishing and coastal trade',
     },
     clocks: [{ id: 'clock-storm', name: 'Storm', current: 2, max: 6 }],
     items: [

@@ -221,6 +221,42 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
       },
     ],
   },
+  GENERATE_ITEMS: {
+    schemaVersion: 1,
+    items: [
+      {
+        id: 'item-stormglass-compass',
+        name: 'Stormglass Compass',
+        description: 'A weathered compass whose clouded face clears near old beacon roads.',
+        category: 'TOOL',
+        appearance: 'Dark brass surrounds a pane of blue-gray stormglass.',
+        history: 'A route warden carried it before the harbor beacons went dark.',
+        origin: 'The old lantern guild workshops.',
+        narrativeAbilities: ['Reveals faded route marks when held beneath beacon light'],
+        semanticEffects: ['Recognized by surviving lantern wardens'],
+        balanceTags: ['QUEST_REWARD', 'NON_COMBAT'],
+        bindings: [
+          {
+            kind: 'QUEST',
+            targetId: 'quest-beacon',
+            trigger: 'QUEST_CONTEXT',
+            summary: 'Recovered while restoring the lost beacon.',
+          },
+          {
+            kind: 'NPC',
+            targetId: 'npc-owner',
+            trigger: 'NPC_RECOGNITION',
+            summary: 'The tavern owner recognizes the old guild workmanship.',
+          },
+        ],
+        constitutionEvidence: {
+          equipmentRules: 'Equipment remains grounded and scarce',
+          technology: 'Late medieval',
+          economy: 'Fishing, coastal trade, and beacon tolls',
+        },
+      },
+    ],
+  },
   GENERATE_TAVERN: {
     name: 'Ember Rest',
     position: 'The harbor crossroads',

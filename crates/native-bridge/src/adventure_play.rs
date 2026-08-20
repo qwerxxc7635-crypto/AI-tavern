@@ -19,6 +19,7 @@ pub struct AdventureSnapshot {
     pub plan_input: Value,
     pub player: Value,
     pub quest: Value,
+    pub equipment_context: Value,
     pub clocks: Vec<Value>,
     pub items: Vec<Value>,
     pub clues: Vec<Value>,
@@ -674,6 +675,7 @@ fn load_snapshot(
     };
     let player = character_data(connection, campaign_id)?;
     let quest = quest_data(connection, campaign_id, &quest_id)?;
+    let equipment_context = equipment_context(connection, campaign_id)?;
     let plan_input = plan_input(connection, campaign_id, &quest_id)?;
     let clocks = load_json_rows(
         connection,
@@ -693,6 +695,7 @@ fn load_snapshot(
             plan_input,
             player,
             quest: quest.clone(),
+            equipment_context: equipment_context.clone(),
             clocks,
             items,
             clues: Vec::new(),
@@ -758,6 +761,7 @@ fn load_snapshot(
         plan_input,
         player,
         quest,
+        equipment_context,
         clocks,
         items,
         clues,
@@ -768,6 +772,46 @@ fn load_snapshot(
         turn_generation_context,
         dice_generation_input,
     })
+}
+
+fn equipment_context(
+    connection: &Connection,
+    campaign_id: &str,
+) -> Result<Value, CampaignStoreError> {
+    let locked = connection
+        .query_row(
+            "SELECT revision, equipment_rules, technology, economy
+             FROM world_constitutions
+             WHERE campaign_id = ?1 AND status = 'LOCKED'",
+            [campaign_id],
+            |row| {
+                Ok(json!({
+                    "constitutionRevision": row.get::<_, i64>(0)?,
+                    "equipmentRules": row.get::<_, String>(1)?,
+                    "technology": row.get::<_, String>(2)?,
+                    "economy": row.get::<_, String>(3)?,
+                }))
+            },
+        )
+        .optional()?;
+    if let Some(context) = locked {
+        return Ok(context);
+    }
+    connection
+        .query_row(
+            "SELECT technology_level FROM world_bibles WHERE campaign_id = ?1",
+            [campaign_id],
+            |row| {
+                Ok(json!({
+                    "constitutionRevision": 1,
+                    "equipmentRules": "Legacy portable archive: preserve existing item effects and validate new mechanics locally.",
+                    "technology": row.get::<_, String>(0)?,
+                    "economy": "Legacy portable archive economy is unspecified.",
+                }))
+            },
+        )
+        .optional()?
+        .ok_or(CampaignStoreError::InvalidData)
 }
 
 fn plan_input(
@@ -2837,6 +2881,19 @@ mod tests {
                  ) VALUES (
                    'campaign-adventure', 1, 'TAVERN', NULL,
                    '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z'
+                 );
+                 INSERT INTO world_constitutions (
+                   campaign_id, schema_version, revision, status, world_type, era,
+                   technology, magic, peoples_json, society, politics, economy,
+                   combat_scale, death_rules, career_rules, equipment_rules,
+                   npc_rules, trait_rules, taboos_json, created_at, updated_at, locked_at
+                 ) VALUES (
+                   'campaign-adventure', 1, 1, 'LOCKED', 'Coastal fantasy', 'Late medieval',
+                   'Late medieval', 'Bounded warmth', '[]', 'Harbor guilds', 'Councils',
+                   'Fishing and coastal trade', 'Personal', 'Permanent', 'Guild careers',
+                   'Equipment follows local craft.', 'Bounded knowledge', 'Balanced traits', '[]',
+                   '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z',
+                   '2026-07-31T06:00:00.000Z'
                  );
                  INSERT INTO world_facts (
                    id, campaign_id, kind, statement, location_id, faction_ids_json,

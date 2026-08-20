@@ -208,6 +208,27 @@ export {
   normalizeCareerName,
   parseCareerPool,
 } from './career.js';
+export {
+  EQUIPMENT_BINDING_KINDS,
+  EQUIPMENT_CATEGORIES,
+  EQUIPMENT_TRIGGERS,
+  SemanticEquipmentContractError,
+  createSemanticEquipment,
+  normalizeEquipmentName,
+  parseSemanticEquipment,
+  projectSemanticEquipmentItem,
+  semanticEquipmentStorageContent,
+  type EquipmentBalanceRecord,
+  type EquipmentBinding,
+  type EquipmentBindingKind,
+  type EquipmentCategory,
+  type EquipmentConstitutionEvidence,
+  type EquipmentMechanics,
+  type EquipmentTrigger,
+  type SemanticEquipmentCandidate,
+  type SemanticEquipmentContent,
+  type SemanticEquipmentDefinition,
+} from './semantic-equipment.js';
 export type {
   CareerCandidate,
   CareerConstitutionEvidence,

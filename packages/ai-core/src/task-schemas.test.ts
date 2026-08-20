@@ -210,6 +210,46 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     },
     output: FAKE_TASK_OUTPUTS.GENERATE_CAREER_POOL,
   },
+  GENERATE_ITEMS: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-items',
+        constitutionRevision: 1,
+        contextSummary: JSON.stringify(constitution),
+      },
+      purpose: 'A grounded reward from the beacon quest',
+      requestedCount: 1,
+      requestedRarity: 'NOTABLE',
+      source: {
+        kind: 'QUEST_REWARD',
+        questId: 'quest-beacon',
+        adventureId: 'adventure-beacon',
+      },
+      bindingTargets: [
+        {
+          kind: 'QUEST',
+          targetId: 'quest-beacon',
+          allowedTriggers: ['QUEST_CONTEXT'],
+          summary: 'Recovered during the beacon quest',
+        },
+        {
+          kind: 'NPC',
+          targetId: 'npc-owner',
+          allowedTriggers: ['NPC_RECOGNITION'],
+          summary: 'The tavern owner recognizes its provenance',
+        },
+      ],
+      constitutionEvidence: {
+        equipmentRules: constitution.equipmentRules,
+        technology: constitution.technology,
+        economy: constitution.economy,
+      },
+      existingItemIds: [],
+      existingItemNames: [],
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_ITEMS,
+  },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },
     output: {

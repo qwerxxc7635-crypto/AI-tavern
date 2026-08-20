@@ -117,20 +117,64 @@ export const ItemInputSchema = versioned({
   context: generationContext,
   purpose: text,
   requestedCount: z.number().int().min(1).max(24),
+  requestedRarity: z.enum(['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY']),
+  source: z
+    .object({
+      kind: z.literal('QUEST_REWARD'),
+      questId: id,
+      adventureId: id,
+    })
+    .strict(),
+  bindingTargets: z
+    .array(
+      z
+        .object({
+          kind: z.enum(['QUEST', 'NPC', 'WORLD_FACT']),
+          targetId: id,
+          allowedTriggers: z
+            .array(
+              z.enum(['QUEST_CONTEXT', 'NPC_RECOGNITION', 'FACT_EVIDENCE', 'RELATIONSHIP_HOOK']),
+            )
+            .min(1)
+            .max(4),
+          summary: text,
+        })
+        .strict(),
+    )
+    .min(2)
+    .max(16),
+  constitutionEvidence: z
+    .object({ equipmentRules: text, technology: text, economy: text })
+    .strict(),
   existingItemIds: idList,
+  existingItemNames: z.array(name).max(64),
 });
+
+const itemBinding = z
+  .object({
+    kind: z.enum(['QUEST', 'NPC', 'WORLD_FACT']),
+    targetId: id,
+    trigger: z.enum(['QUEST_CONTEXT', 'NPC_RECOGNITION', 'FACT_EVIDENCE', 'RELATIONSHIP_HOOK']),
+    summary: text,
+  })
+  .strict();
 
 const item = z
   .object({
     id,
     name,
+    description: text,
     category: z.enum(['WEAPON', 'ARMOR', 'TOOL', 'CONSUMABLE', 'CLUE', 'TREASURE', 'OTHER']),
     appearance: text,
     history: text,
     origin: text,
-    narrativeAbilities: shortList,
-    semanticEffects: shortList,
-    balanceTags: shortList,
+    narrativeAbilities: z.array(label).min(1).max(24),
+    semanticEffects: z.array(label).min(1).max(24),
+    balanceTags: z.array(label).min(1).max(24),
+    bindings: z.array(itemBinding).min(2).max(16),
+    constitutionEvidence: z
+      .object({ equipmentRules: text, technology: text, economy: text })
+      .strict(),
   })
   .strict();
 

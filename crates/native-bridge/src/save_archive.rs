@@ -1850,6 +1850,26 @@ mod tests {
                 [FIRST_TIME],
             )
             .expect("seed fact");
+        let semantic_content = json!({
+            "name":"Archive Compass",
+            "description":"A portable semantic item.",
+            "semanticEquipment":{
+                "kind":"SEMANTIC_EQUIPMENT","schemaVersion":1,"id":"item-transfer",
+                "campaignId":"campaign-transfer","constitutionRevision":1,
+                "content":{"name":"Archive Compass","description":"A portable semantic item.","category":"CLUE","appearance":"Brass","history":"Old","origin":"Harbor","narrativeAbilities":["Identifies a route"],"semanticEffects":["Recognized by pilots"]},
+                "mechanics":{"rarity":"BASIC","price":0,"damage":0,"defense":0,"numericEffect":{"kind":"NONE"},"balance":{"policyVersion":1,"budget":2,"cost":0,"rationale":["rarity:BASIC","category:CLUE"]}},
+                "bindings":[{"kind":"QUEST","targetId":"quest-archive","trigger":"QUEST_CONTEXT","summary":"Archive fixture"}],
+                "constitutionEvidence":{"equipmentRules":"Grounded","technology":"Sail","economy":"Trade"},
+                "source":{"kind":"QUEST_REWARD","questId":"quest-archive","adventureId":"adventure-archive"},
+                "generationRecordId":"generation-archive","createdAt":FIRST_TIME
+            }
+        });
+        connection
+            .execute(
+                "INSERT INTO items(id,campaign_id,owner_character_id,source_adventure_id,content_json,reward_tier,effect_json,created_at) VALUES('item-transfer','campaign-transfer',NULL,NULL,?1,'BASIC','{\"kind\":\"NONE\"}',?2)",
+                params![semantic_content.to_string(), FIRST_TIME],
+            )
+            .expect("seed semantic item");
         connection
             .execute(
                 "INSERT INTO app_settings (key, value_json, updated_at)
@@ -1925,6 +1945,19 @@ mod tests {
                 .expect("snapshot count"),
             1
         );
+        let restored: String = connection
+            .query_row(
+                "SELECT content_json FROM items WHERE id='item-transfer'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("restored semantic item");
+        let restored: Value = serde_json::from_str(&restored).expect("semantic item JSON");
+        assert_eq!(
+            restored["semanticEquipment"]["content"]["name"],
+            "Archive Compass"
+        );
+        assert_eq!(restored["semanticEquipment"]["mechanics"]["damage"], 0);
     }
 
     #[test]
