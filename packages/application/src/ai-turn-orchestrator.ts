@@ -1,6 +1,5 @@
 import {
-  assembleTaskContext,
-  contextBudgetForTask,
+  buildUnifiedTaskContext,
   resolveModelConfig,
   routeModel,
   StandardAIError,
@@ -120,16 +119,13 @@ export class AITurnOrchestrator {
     }
 
     let context: JsonValue;
-    let contextAssembly: Awaited<ReturnType<typeof assembleTaskContext>>['assembly'];
+    let contextAssembly: Awaited<ReturnType<typeof buildUnifiedTaskContext>>['assembly'];
     try {
       context = toJsonValue(await command.buildContext(), '$context');
-      const prepared = await assembleTaskContext(
-        command.task,
-        command.requestId,
-        1,
-        context,
-        contextBudgetForTask(command.task).maxCharacters,
-      );
+      const prepared = await buildUnifiedTaskContext(command.task, context, {
+        sourceId: command.campaignId,
+        sourceRevision: 1,
+      });
       context = prepared.content;
       contextAssembly = prepared.assembly;
       this.requests.setContext(command.requestId, context, this.now());

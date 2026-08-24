@@ -4,7 +4,7 @@ import {
   FakeAIProvider,
   GeneratorRunner,
   NOOP_GENERATOR_TRANSACTION,
-  assertTaskContextBudget,
+  buildUnifiedTaskContext,
   classifyApplicationError,
   validateAIOutput,
   type AIProvider,
@@ -23,7 +23,7 @@ import {
   renderStablePromptProfile,
   type ResolvedPromptPreset,
 } from '@ember-tavern/prompts';
-import { recordContextInspection } from './context-inspector-service.js';
+import { recordContextAssemblyInspection } from './context-inspector-service.js';
 import { recordAIInspectionFailure, recordAIInspectionSuccess } from './ai-inspector-service.js';
 import {
   tauriModelSettingsGateway,
@@ -96,6 +96,17 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     input: unknown,
     options: DesktopAIExecuteOptions,
   ): Promise<DesktopAIExecution> {
+    let contextInput: unknown;
+    try {
+      const prepared = await buildUnifiedTaskContext(task, input, {
+        sourceId: `windows:${task}`,
+        sourceRevision: 1,
+      });
+      contextInput = prepared.content;
+      recordContextAssemblyInspection(task, prepared.assembly);
+    } catch (error) {
+      throw preserveOrchestrationError(error, 'CONTEXT_PREPARATION_FAILED');
+    }
     let selections: Awaited<ReturnType<typeof resolveSelections>>;
     let userPreset: ResolvedPromptPreset | null;
     try {
@@ -111,16 +122,22 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
       throw preserveOrchestrationError(error, 'RUNTIME_PROFILE_RESOLUTION_FAILED');
     }
     try {
-      assertTaskContextBudget(task, input);
-      await recordContextInspection(task, input);
-    } catch (error) {
-      throw preserveOrchestrationError(error, 'CONTEXT_PREPARATION_FAILED');
-    }
-    try {
-      return await this.executeWithSelection(selections.primary, task, input, options, userPreset);
+      return await this.executeWithSelection(
+        selections.primary,
+        task,
+        contextInput,
+        options,
+        userPreset,
+      );
     } catch (error) {
       if (selections.fallback === null || !canUseFallback(error)) throw error;
-      return this.executeWithSelection(selections.fallback, task, input, options, userPreset);
+      return this.executeWithSelection(
+        selections.fallback,
+        task,
+        contextInput,
+        options,
+        userPreset,
+      );
     }
   }
 

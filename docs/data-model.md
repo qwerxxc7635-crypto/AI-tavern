@@ -565,3 +565,9 @@ schema 26 的 `world_director_runs` 以 run ID 为主键，并对 `(campaign_id,
 schema 27 的 `director_budget_states` 保存由 Rules Engine `game_time_minutes` 推导的游戏日、四类日用量和 revision；`director_budget_admissions` 对每个 Director run 建立幂等标记，即使 run 没有 proposal 也不会重复推进预算。`director_budget_entries` 保存 proposal 的类别、批准/延后状态、原因和下一可用游戏分钟，`director_budget_cooldowns` 保存 Campaign/key 的冷却，`director_budget_decisions` 保存 append-only 求值历史。
 
 批准只是下游容量预约，不是事实提交。每日恢复、优先级 aging 和 cooldown 都由本地代码与 SQLite 事务裁决，Prompt/模型无权放宽；玩家 P0 操作不进入这些表。内部快照按 admission/state/entry/cooldown/decision 外键顺序保存恢复，portable format v2 仍不升级。完整合同见 [`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)。
+
+## 11. V0.3 Unified Context Manifest
+
+M9-T01不增加SQLite表或schema版本。`ContextAssembly`继续由有序block与manifest组成；manifest只保存block ID/type、source ID/revision、stability、version、content hash、privacy class、token估算、relevance、required/included和省略原因，不保存block内容。Application路径把manifest写入既有`generation_records.request_json`，Desktop Inspector只保存当前session的脱敏投影。
+
+Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于当次有界请求。完整层级、dump/credential门禁与Generator迁移矩阵见[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)。

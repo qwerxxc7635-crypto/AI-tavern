@@ -2998,3 +2998,26 @@ Quest维护不消耗内容额度；Opportunity 同时受四个Active Quest预约
 - Director仍不写World Fact、Quest、NPC、Faction、Clock、Adventure、Message或Event；下游原合同继续裁决。
 - 内部快照和SQLite重开保存schema 27状态；portable format v2正式升级仍留给M10-T05。
 - 本任务不新增UI/CSS，不提前执行M9或M10-T07；视觉规范、视觉债务和渐进迁移门禁保持不变。
+
+## DEC-141：所有生产 Generator 共用一个分层 Context Boundary
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M9-T01`、`DEC-123`、`DEC-127`与[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)
+
+### 背景
+
+已有Context block、budget、Inspector和NPC/Adventure/World Event安全adapter，但Desktop与Application主编排仍把最终输入包装成一个task block。这样无法统一证明层级顺序、逐层相关性、省略原因或所有Generator都经过同一dump/credential门禁；若为各页面另写构建器则会形成平行上下文栈。
+
+### 决定与理由
+
+新增单一`buildUnifiedTaskContext`，按SYSTEM、Constitution、Lore、Location、Player、Actor Knowledge、Quest/State、Memory、Recent、Action闭集分类。现有领域adapter继续负责SQLite相关性和知识授权，共享入口负责block provenance/hash、预算、可选字段relevance、可审计省略及数据库dump/credential fail-closed。
+
+Windows所有production Generator都经DesktopAIEngine进入该边界；Application回合和primary helper直接复用。一次构建结果在primary、fallback和repair之间冻结。manifest不含内容；Application沿用Generation audit持久化，Desktop沿用session Inspector，无新schema。
+
+### 影响与边界
+
+- 不修改AI task输出Schema、Rules/D20硬逻辑、Provider、Queue、SQLite事实或业务提交合同。
+- 不把完整DB、其他Actor知识、未授权Fact、凭据或API Key放入Prompt。
+- M9-T01不生成Summary/Long-term Memory，不升级Truth，不加入向量数据库；这些严格留给M9-T02/T03。
+- 本任务不新增UI/CSS；视觉规范与M10-T07渐进迁移保持不变。

@@ -21,6 +21,16 @@ export type {
   WorldEventContextSource,
 } from './context-builder.js';
 export {
+  buildUnifiedTaskContext,
+  layerForContextField,
+  UNIFIED_CONTEXT_LAYERS,
+} from './unified-context-builder.js';
+export type {
+  UnifiedContextBuild,
+  UnifiedContextBuildOptions,
+  UnifiedContextLayer,
+} from './unified-context-builder.js';
+export {
   assembleContextBlocks,
   assembleTaskContext,
   CONTEXT_BLOCK_TYPES,

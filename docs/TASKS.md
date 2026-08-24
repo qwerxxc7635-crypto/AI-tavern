@@ -443,12 +443,13 @@
 
 ## M9-T01 Unified Context Builder
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M8-T05。
 - **Deliverable**：统一分层 Context Builder，迁移所有重要 Generator。
 - **Acceptance**：只注入 Constitution、相关 Lore/Location/Player/Actor Knowledge/Quest/State/Memory/Recent/Action；无全库 dump。
 - **Tests**：relevance、ordering、secret isolation、budget、omission、all generator integrations。
 - **Do Not**：不为每个页面建独立上下文栈；不把完整 DB 序列化进 Prompt。
+- **Implementation reference**：[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)。
 
 ## M9-T02 Memory Layers
 

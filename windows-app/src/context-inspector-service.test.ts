@@ -16,12 +16,33 @@ describe('context inspector service', () => {
   it('records an actual task manifest without exposing context content', async () => {
     await recordContextInspection('NPC_REPLY', { secret: 'must-not-be-rendered' });
     const first = await sessionContextInspectorGateway.load();
-    expect(first).toMatchObject({ task: 'NPC_REPLY', entries: [{ decision: 'INCLUDED' }] });
+    expect(first).toMatchObject({
+      task: 'NPC_REPLY',
+      entries: [
+        { block: 'task', decision: 'INCLUDED' },
+        { block: 'action', decision: 'INCLUDED' },
+      ],
+    });
     expect(JSON.stringify(first)).not.toContain('must-not-be-rendered');
     expect(first?.entries[0]?.hash).toHaveLength(12);
 
     await recordContextInspection('NPC_REPLY', { secret: 'must-not-be-rendered' });
     expect((await sessionContextInspectorGateway.load())?.entries[0]?.cache).toBe('HIT');
+  });
+
+  it('masks actor-knowledge sources assembled by the unified builder', async () => {
+    await recordContextInspection('NPC_REPLY', {
+      npcKnowledge: [{ statement: 'The cellar key is under the third cask.' }],
+      currentAction: 'Ask about the cellar.',
+    });
+    const snapshot = await sessionContextInspectorGateway.load();
+    expect(snapshot?.entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ block: 'knowledge', source: '已遮罩', decision: 'INCLUDED' }),
+      ]),
+    );
+    expect(JSON.stringify(snapshot)).not.toContain('cellar key');
+    expect(JSON.stringify(snapshot)).not.toContain('npcKnowledge');
   });
 
   it('projects included and omitted entries while redacting secret sources', async () => {

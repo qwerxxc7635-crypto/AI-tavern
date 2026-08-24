@@ -268,13 +268,22 @@ describe('DesktopAIOrchestrator', () => {
       'quest-board-service.ts',
       'adventure-service.ts',
       'settlement-service.ts',
+      'universal-character-creation-service.ts',
+      'npc-lod-service.ts',
+      'dynamic-location-service.ts',
+      'active-faction-service.ts',
+      'tavern-scene-service.ts',
+      'dialogue-suggestion-service.ts',
+      'dynamic-quest-source-service.ts',
     ];
     for (const file of files) {
       const source = await readFile(`${directory}${file}`, 'utf8');
-      expect(source, file).toContain('tauriDesktopAIOrchestrator');
+      expect(source, file).toMatch(/tauriDesktopAIOrchestrator|desktopAIEngine/u);
       expect(source, file).not.toContain('new FakeAIProvider()');
       expect(source, file).not.toContain('.provider.generate(');
     }
+    const orchestrator = await readFile(`${directory}desktop-ai-orchestrator.ts`, 'utf8');
+    expect(orchestrator).toContain('buildUnifiedTaskContext');
   });
 });
 

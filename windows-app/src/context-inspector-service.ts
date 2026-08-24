@@ -1,7 +1,7 @@
 import {
-  assembleTaskContext,
-  contextBudgetForTask,
+  buildUnifiedTaskContext,
   type AITask,
+  type ContextAssembly,
   type ContextManifest,
   type ContextPrivacyClass,
   type ContextStability,
@@ -43,15 +43,15 @@ export const sessionContextInspectorGateway: ContextInspectorGateway = {
 };
 
 export async function recordContextInspection(task: AITask, input: unknown): Promise<void> {
-  const content = jsonValue(input);
-  const prepared = await assembleTaskContext(
-    task,
-    `windows:${task}`,
-    1,
-    content,
-    contextBudgetForTask(task).maxCharacters,
-  );
-  latestSnapshot = projectContextManifest(task, prepared.assembly.manifest);
+  const prepared = await buildUnifiedTaskContext(task, jsonValue(input), {
+    sourceId: `windows:${task}`,
+    sourceRevision: 1,
+  });
+  recordContextAssemblyInspection(task, prepared.assembly);
+}
+
+export function recordContextAssemblyInspection(task: AITask, assembly: ContextAssembly): void {
+  latestSnapshot = projectContextManifest(task, assembly.manifest);
 }
 
 export function projectContextManifest(

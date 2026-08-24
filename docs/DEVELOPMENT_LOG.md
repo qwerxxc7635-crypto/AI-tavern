@@ -4510,3 +4510,21 @@
 - Rust workspace 125 tests通过，另1项需明确API Key授权的真实Provider测试忽略；其中Native Bridge 91 tests包含新增预算持久化/日恢复测试。Rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。
 - Desktop production build通过，Vite转换270 modules。首轮门禁发现portable archive本地schema上限仍为26；提升到27后，archive专项、Windows E2E与完整门禁均从头复验通过。没有删除测试、降低校验或忽略错误。
 - M8-T05完成后下一项严格为M9-T01，本次未开始；用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M9-T01 完成 Unified Context Builder
+
+### 边界与实现
+
+- 在分支`task/M9-T01-unified-context-builder`、起始提交`84a987a`上继续；未回滚或重做M0–M8-T05，用户`.gitignore`修改保持未暂存。本任务未进入M9-T02，也未新增UI/CSS或SQLite迁移。
+- 新增统一十层Context合同：SYSTEM→CONSTITUTION→LORE→LOCATION→PLAYER→ACTOR_KNOWLEDGE→QUEST_STATE→MEMORY→RECENT→ACTION。每个字段形成带source/revision/stability/privacy/hash/token/relevance的immutable block；实体自身revision/schemaVersion优先成为审计revision。
+- 可选字段支持relevance与`not_relevant`/`block_budget`/`total_budget`可观察省略；required block超限fail closed且JSON不截断。最终投影继续执行既有task character budget。
+- 统一边界递归拒绝database/tables/allRows等全库envelope及credential-shaped字段。Actor Knowledge/Memory source在Inspector中遮罩；NPC授权profile内的叙事secret不被错误当作API凭据。
+- DesktopAIOrchestrator在Provider/Prompt执行前构建一次并冻结给primary/fallback/repair；Application AI Turn和primary task helper复用相同入口。14个Windows生成服务均继续通过DesktopAIEngine，不新增页面栈或Provider旁路。
+- 既有NPC/Adventure/World Event builder保留为领域adapter，继续执行Campaign、Actor Knowledge、Quest和Recent相关性过滤；M9-T03未来检索评分使用同一个optional/relevance接口，不复制体系。
+- 新增[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)与`DEC-141`，更新V0.3 Spec、Generator Framework、Data Model和任务引用。视觉规范和M10-T07迁移边界保持不变。
+
+### 验证
+
+- 专项测试覆盖十层顺序、字段相关性分类、irrelevant/budget omission、required保留、credential/full DB隔离、revision、每个AITask统一入口、Inspector脱敏、Application manifest及primary/fallback/repair冻结。
+- `pnpm check:shared`完整通过：Prettier、ESLint、TypeScript、release/i18n、Vitest 166 files/955 tests通过（另1 file/1 test为显式skip的performance baseline runner）、Node 29 tests、Rust workspace 125 tests通过（另1项需明确API Key授权的真实Provider测试ignored），archive interop通过。
+- 额外独立复验Rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换271 modules。不删除测试、不降低校验、不忽略错误。

@@ -1,7 +1,6 @@
 import {
-  assembleTaskContext,
+  buildUnifiedTaskContext,
   classifyApplicationError,
-  contextBudgetForTask,
   createContextBlock,
   providerConfigFromResolved,
   resolveModelConfig,
@@ -154,13 +153,10 @@ export async function executePrimaryAITask(
   modelProfileId: ModelProfileId | null,
   capabilities: ModelCapabilities,
 ): Promise<NormalizedAIResponse> {
-  const prepared = await assembleTaskContext(
-    request.task,
-    request.requestId,
-    1,
-    context,
-    contextBudgetForTask(request.task).maxCharacters,
-  );
+  const prepared = await buildUnifiedTaskContext(request.task, context, {
+    sourceId: campaignId,
+    sourceRevision: 1,
+  });
   const resolvedModelConfig = await resolveModelConfig({
     connectionProfile: providerConfig,
     modelProfileId,
