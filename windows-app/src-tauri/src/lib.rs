@@ -25,6 +25,7 @@ use ember_native_bridge::{
     NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit,
     QuestBoardSnapshot, QuestGenerationCommit, RandomnessSettingsSnapshot,
     RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit,
+    TavernPopulationFocusCommand, TavernPopulationProjectCommand, TavernPopulationSnapshot,
     TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
     UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
     UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
@@ -1155,6 +1156,32 @@ fn active_factions_action_apply(
 }
 
 #[tauri::command]
+fn tavern_population_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernPopulationSnapshot, CommandError> {
+    store
+        .tavern_population_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_population_project(
+    command: TavernPopulationProjectCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernPopulationSnapshot, CommandError> {
+    store.project_tavern_population(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_population_focus(
+    command: TavernPopulationFocusCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernPopulationSnapshot, CommandError> {
+    store.focus_tavern_population(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1449,6 +1476,9 @@ pub fn run() {
             active_factions_generation_get,
             active_factions_generation_commit,
             active_factions_action_apply,
+            tavern_population_get,
+            tavern_population_project,
+            tavern_population_focus,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,

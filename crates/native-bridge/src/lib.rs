@@ -20,6 +20,7 @@ mod rules_engine;
 mod save_archive;
 mod settlement;
 mod tavern_initialization;
+mod tavern_population;
 mod universal_character_creation;
 #[cfg(test)]
 mod windows_e2e;
@@ -40,6 +41,7 @@ pub use rules_engine::*;
 pub use save_archive::*;
 pub use settlement::*;
 pub use tavern_initialization::*;
+pub use tavern_population::*;
 pub use universal_character_creation::*;
 pub use world_creation::*;
 pub use world_seed::*;
@@ -92,7 +94,9 @@ const DYNAMIC_LOCATIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0017_dynamic_locations.sql");
 const ACTIVE_FACTIONS_MIGRATION: &str =
     include_str!("../../../database/migrations/0018_active_factions.sql");
-const LATEST_SCHEMA_VERSION: i64 = 18;
+const TAVERN_POPULATION_MIGRATION: &str =
+    include_str!("../../../database/migrations/0019_tavern_population.sql");
+const LATEST_SCHEMA_VERSION: i64 = 19;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -561,6 +565,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (16_i64, "npc_lod", NPC_LOD_MIGRATION),
         (17_i64, "dynamic_locations", DYNAMIC_LOCATIONS_MIGRATION),
         (18_i64, "active_factions", ACTIVE_FACTIONS_MIGRATION),
+        (19_i64, "tavern_population", TAVERN_POPULATION_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

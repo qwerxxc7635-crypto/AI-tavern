@@ -335,12 +335,13 @@
 
 ## M7-T01 Dynamic Tavern Population
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M6-T05。
 - **Deliverable**：按世界/地点/时间/势力/事件/历史投影酒馆 NPC 和机会。
 - **Acceptance**：不依赖固定 NPC；重要互动实体持久化；重开后身份/关系/历史一致。
 - **Tests**：context factors、LOD promotion、time/event changes、save/reopen、empty state。
 - **Do Not**：不每次进酒馆重生所有 NPC；不让临时 UI 列表成为事实。
+- **Implementation reference**：[`V0.3_DYNAMIC_TAVERN_POPULATION.md`](V0.3_DYNAMIC_TAVERN_POPULATION.md)。
 
 ## M7-T02 Multi-NPC Scene
 

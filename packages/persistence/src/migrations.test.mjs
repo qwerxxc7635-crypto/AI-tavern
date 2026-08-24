@@ -47,6 +47,10 @@ const coreTables = [
   'rules_events',
   'save_snapshots',
   'scene_frames',
+  'tavern_population_cycles',
+  'tavern_population_focus_events',
+  'tavern_population_members',
+  'tavern_population_states',
   'taverns',
   'universal_character_profiles',
   'world_bibles',
@@ -401,7 +405,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      18,
+      19,
     );
     const importedKnowledge = database
       .prepare(

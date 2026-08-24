@@ -101,6 +101,11 @@ const migrations = [
     name: 'active_factions',
     source: new URL('../../../database/migrations/0018_active_factions.sql', import.meta.url),
   },
+  {
+    version: 19,
+    name: 'tavern_population',
+    source: new URL('../../../database/migrations/0019_tavern_population.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

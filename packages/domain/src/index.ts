@@ -85,6 +85,17 @@ export {
   activateFactions,
   applyFactionAction,
 } from './active-faction-validator.js';
+export {
+  TavernPopulationRuleError,
+  focusTavernPopulation,
+  projectTavernPopulation,
+} from './tavern-population-projector.js';
+export type {
+  FocusTavernPopulationInput,
+  ProjectTavernPopulationInput,
+  TavernPopulationCandidate,
+  TavernPopulationProjectionPlan,
+} from './tavern-population-projector.js';
 export type {
   ActivateFactionsInput,
   ApplyFactionActionInput,

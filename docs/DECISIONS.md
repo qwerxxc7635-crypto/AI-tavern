@@ -2753,3 +2753,28 @@ schema 18 新增 `active_factions` 与 append-only `faction_action_events`。Con
 - Quest 只走既有合法状态迁移；Rules Engine、D20、NPC/Adventure合同、World Seed与Provider保持不变。
 - portable archive对schema 18表的升级仍由M10-T05负责，本任务不提前改变format v2。
 - 本任务不新增势力页面或返工旧UI；后续展示复用既有Token和组件，完整视觉收敛仍属于M10-T07。
+
+## DEC-131：动态酒馆人口采用本地事实投影与稳定来源身份
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T01`、`docs/V0.3_SPEC.md` 12节、`DEC-128`至`DEC-130`
+
+### 背景
+
+既有 Tavern 初始化会一次生成 owner、resident 和 temporary visitor，适合建立首个可玩纵向切片，但不能响应地点、时间、势力、事件和玩家历史。每次进入页面重新生成名单会改变身份并丢失互动历史；把投影只保存在 React state 又会让 UI 成为事实来源。为所有可能人物提前生成完整 NPC 则违背 NPC LOD 与懒生成边界。
+
+### 决定与理由
+
+schema 19 以 `tavern_population_states`、`members`、append-only `cycles` 和 `focus_events` 保存人口投影。既有完整 Tavern NPC 继续作为 OWNER/ESTABLISHED 来源；Location、Clock、ACTIVE Faction 和最新 Event 以 `(tavern, source kind, source id)` 唯一映射到一个绑定锁定 Constitution 的 LOD0 身份。同一 Context 与机会不产生新 cycle，也不增加 encounter；事实变化只更新受影响来源。
+
+人口机会只读取既有 Rumor、AVAILABLE Quest、Faction current action、Clock 和 Event，不执行后果或发明事实。聚焦 LOD0 时先复用既有 NPC LOD Generator 晋升该单一身份，Native 再验证 profile 与 population revision 并标记 important；important、来源身份和 encounter history 均不可倒退。UI、AI 和未来 Scene 都只能消费该快照。
+
+### 影响与边界
+
+- SQLite 是人口状态、来源身份与历史的唯一真实来源；不每次进酒馆重生全员，不用临时 UI 列表保存事实。
+- 既有 Tavern/NPC/Relationship/Knowledge/Quest 合同保持不变；人口投影不改 Rules Engine、D20、Provider、Generator/Queue、World Seed/Constitution 或存档状态机。
+- M7-T01 不新增人口模型任务；只有显式 LOD focus 复用 `GENERATE_NPC_LOD`。M7-T02 才实现多 NPC Scene、speaker arbitration 和对应 UI。
+- 仅 owner 且没有机会是合法并持久化的 empty state；动态 important 身份在来源失活后仍保留。
+- portable archive 对 schema 19 的正式升级留给 M10-T05；本任务的 save/reopen 指本地 SQLite 关闭重开，不冒充 portable round-trip。
+- 本任务没有返工 Tavern 页面或建立第二套组件体系；M7-T02 自然触及 UI 时遵循视觉手册，Legacy 迁移仍由 M10-T07 收敛。

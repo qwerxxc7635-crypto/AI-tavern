@@ -266,6 +266,35 @@ export {
   factionActionProposal,
   parseActiveFactionProfile,
 } from './active-faction.js';
+export {
+  TAVERN_OPPORTUNITY_KINDS,
+  TAVERN_POPULATION_PRESENCES,
+  TAVERN_POPULATION_SOURCE_KINDS,
+  TAVERN_POPULATION_TRIGGERS,
+  TavernPopulationContractError,
+  createTavernOpportunity,
+  createTavernPopulationContext,
+  createTavernPopulationCycle,
+  createTavernPopulationFocusEvent,
+  createTavernPopulationMember,
+  createTavernPopulationSnapshot,
+  createTavernPopulationState,
+} from './tavern-population.js';
+export type {
+  TavernOpportunity,
+  TavernOpportunityKind,
+  TavernPopulationClockFactor,
+  TavernPopulationContext,
+  TavernPopulationCycle,
+  TavernPopulationFactionFactor,
+  TavernPopulationFocusEvent,
+  TavernPopulationMember,
+  TavernPopulationPresence,
+  TavernPopulationSnapshot,
+  TavernPopulationSourceKind,
+  TavernPopulationState,
+  TavernPopulationTrigger,
+} from './tavern-population.js';
 export type {
   ActiveFactionCandidate,
   ActiveFactionProfile,

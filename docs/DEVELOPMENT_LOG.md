@@ -4297,3 +4297,22 @@
 - 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 140个文件/856项通过，另1个文件/1项性能基线按设计跳过；Node 28项通过；Rust workspace 119项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。`pnpm --dir windows-app build`生产构建通过，Vite转换247个模块。
 - portable`.emtavern`仍为v2，schema 18新表的正式跨版本导入导出保留给M10-T05。本任务未修改Rules Engine、D20硬结果、NPC/Quest/Adventure核心语义、Provider、World Seed或存档状态机，也未进入M7。
 - 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M7-T01。
+
+## 2026-08-24 — M7-T01 Dynamic Tavern Population
+
+### 本地 Context 投影、稳定身份与重要互动
+
+- 新增严格 Tavern Population 合同与纯 Domain projector，Context 固定覆盖 World、当前 Location、Clock、ACTIVE Faction、最近 Event 和 NPC History；来源替换、重复身份、错误 profile、过期 revision 和未晋升 focus 均 fail closed。
+- schema 19 新增 population state/member/cycle/focus 四表。数据库验证 Tavern/Campaign、NPC LOD、owner、Location、Clock、Faction 和 Event authority，禁止来源身份漂移、important/encounter 历史倒退及 Campaign 存续时删除。
+- TypeScript Repository 和 Rust Native 均从 SQLite 当前事实重建 Context 与机会，以 `BEGIN IMMEDIATE` 原子提交人口状态和 append-only 历史。既有初始化 owner/resident/visitor 保守复用；动态 Location/Clock/Faction/Event 来源只在首次出现时创建稳定 LOD0，不生成完整人口。
+- Rumor、AVAILABLE Quest、Faction current action、Clock 与最新 Event 只投影为机会，不执行任何 Quest/Faction/Clock 后果。相同 Context 与机会直接返回现有快照，不生成新身份、不增加 revision/encounter 或调用模型；owner-only 且无机会显式保存 empty state。
+- Windows 新增 `TavernPopulationService` 和三个 Tauri 命令。并发 refresh/focus 合并；聚焦 LOD0 时只复用既有 `NpcLodService` 晋升该身份到 LOD1，随后 Native 校验 canonical profile 与 population revision 并持久化 important/focus history。
+- 新增 `docs/V0.3_DYNAMIC_TAVERN_POPULATION.md` 与 `DEC-131`，并更新规格、Generator Framework 和任务引用。M7-T01 不新增人口 Generator，不重写既有 Tavern 页面；M7-T02 才消费快照建立多 NPC Scene 与 UI。
+
+### 验证、自审与限制
+
+- 定向合同、Domain、Repository、Windows service、Native 与 migration 测试已覆盖 context factors、同上下文不重生、Clock/Event 变化、来源身份延续/替换拒绝、单身份 LOD promotion、focus、empty state、幂等和关闭重开。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 144 个文件/866 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 115 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy 及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 249 个模块。没有通过删除测试、降低校验、写死结果或忽略错误完成门禁。
+- 当前视觉手册、视觉债务和 M10-T07 收敛门禁保持有效。本任务没有新增页面或 CSS，也没有建立平行 Primitive/Game Component；M7-T02 自然修改 UI 时继续复用 Token 与 `NpcCard`。
+- portable `.emtavern` 仍为 format v2；schema 19 新表的正式跨版本导入导出与历史 fixture 迁移严格留给 M10-T05。本任务未修改 Rules Engine、D20、Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心合同或存档状态机，也不进入 M7-T02。

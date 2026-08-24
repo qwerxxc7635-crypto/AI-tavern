@@ -91,6 +91,11 @@ export type {
   CommitFactionAction,
   CommitFactionActivation,
 } from './active-faction-repository.js';
+export { TavernPopulationRepository } from './tavern-population-repository.js';
+export type {
+  FocusTavernPopulation,
+  ProjectTavernPopulation,
+} from './tavern-population-repository.js';
 export type { CharacterCreationConfirmation } from './character-creation-session-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';
