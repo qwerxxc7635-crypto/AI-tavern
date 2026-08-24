@@ -527,12 +527,13 @@
 
 ## M10-T06 Performance Regression Gate
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M10-T05。
 - **Deliverable**：与 M1-T04 对比的自动性能门和更新报告。
 - **Acceptance**：核心延迟、queue、token、cache、长期 DB/Context 增长有阈值和解释；回归必须修复或明确接受并记录决定。
 - **Tests**：repeatability、warm/cold、long-save、threshold failure、report generation。
 - **Do Not**：不以单次最快值为结论；不降低门槛掩盖回归。
+- **Implementation reference**：[`V0.3_PERFORMANCE_REGRESSION.md`](V0.3_PERFORMANCE_REGRESSION.md)、[`DEC-149`](DECISIONS.md)。
 
 ## M10-T07 Visual System Convergence
 

@@ -3184,3 +3184,26 @@ DeepSeek usage明确返回的hit/miss是唯一Provider observation，并继续�
 - 历史TS/Rust v1/v2 fixture永久保留并加入hash门禁；v3使用新fixture，interop双向再生成/交叉导入。
 - UI在导入前显示历史迁移、目标save/world版本及“原文件不改写”；未来版本明确要求升级应用。
 - 不接入云同步/CRDT，不导出设备秘密，不改变Rules/D20、Provider、Queue、Quest/NPC/Adventure业务语义或存档ID。
+
+## DEC-149：性能回归以跨批 P95 中位数和长期增长双门禁
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T06`、`DEC-106`、`docs/V0.3_PERFORMANCE_BASELINE.md`
+
+### 背景
+
+M1-T04 已建立内容无关的五类 Fake Provider 基线，但单批亚毫秒结果容易受本机调度影响，也没有覆盖 M10 新增 GenerationQueue、长期 SQLite 存档和 Unified Context 增长。直接比较单次最快值会掩盖尾延迟；把 Fake Provider 未提供的 token/cache usage 写成 0 又会制造虚假改善。
+
+### 决定与理由
+
+M10-T06 对冷启动三批和同实例热运行三批分别采集每任务十个样本，对每批 P95 再取中位数。核心 latency/queue 阈值固定为 `max(M1 P95 × 3, M1 P95 + 5 ms)`：相对门捕捉有意义增长，绝对余量隔离亚毫秒基线的调度噪声。另设真实 GenerationQueue P95 ≤ 50 ms、SQLite 100→1000 回合增量 ≤ 4096 bytes/turn、Unified Context ≤ 2048 tokens 且增长 ≤ 1.05×。
+
+Fake usage 继续保持 unknown/NOT_EVALUATED。自动门为未来真实证据固定 input tokens 每样本平均 ≤ 16384、Provider cache hit ratio ≥ 0.50；cache hit/miss 只接受 Provider usage，不接受本地 prefix reuse。任一已评估失败使 CLI 非零退出；只能修复回归或另建明确决策接受，禁止按结果下调阈值。
+
+### 影响与边界
+
+- 自动报告只保存 commit、环境、汇总、阈值和内容无关增长数字，不保存 Prompt、messages、玩家文本、request ID、Context 内容或凭据。
+- SQLite 增长使用 `page_count × page_size`，Context 使用既有 Unified Context token 估算；长期历史仍完整持久化，只限制模型投影。
+- 本决定不修改 Rules Engine、Provider 合同、GenerationQueue 行为、SQLite schema、业务事务或存档格式。
+- 真实模型的网络 latency、token 和计费 cache 仍需单独授权，不能由 Fake 结果外推。

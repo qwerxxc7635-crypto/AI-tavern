@@ -202,6 +202,22 @@ export {
   validatePerformanceBaselineReport,
   validatePerformanceMetric,
 } from './performance-metric.js';
+export {
+  DEFAULT_PERFORMANCE_REGRESSION_THRESHOLDS,
+  evaluatePerformanceRegression,
+  M1_T04_PERFORMANCE_REFERENCE,
+  renderPerformanceRegressionMarkdown,
+} from './performance-regression.js';
+export type {
+  LongSavePerformanceObservation,
+  PerformanceGateCheck,
+  PerformanceGateStatus,
+  PerformanceReferenceSummary,
+  PerformanceRegressionGateInput,
+  PerformanceRegressionReport,
+  PerformanceRegressionThresholds,
+  ProviderUsageObservation,
+} from './performance-regression.js';
 export type {
   BaselineProviderKind,
   BaselineScenario,

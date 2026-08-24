@@ -4685,3 +4685,23 @@
 - `pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 181 files / 1018 tests通过，另1 file / 1 test性能runner按设计跳过；Node 29 tests通过。
 - Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换280 modules；`pnpm build:desktop`复验通过。
 - 未删除测试、降低SQLite/Schema/秘密校验或忽略错误；不merge、不push，不暂存用户`.gitignore`。
+
+## 2026-08-24 — M10-T06 完成 Performance Regression Gate
+
+### 范围与自动门
+
+- 在分支`task/M10-T06-performance-regression`、起始提交`43c89ca`上严格执行M10-T06；未回滚或重做M0～M10-T05，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T07，也未修改Rules Engine、Provider、Generator/Queue行为、SQLite schema、业务事务或存档格式。
+- 抽取M1-T04原Fake Provider测量函数供基线与回归复用；新增`performance:gate` CLI，拒绝覆盖已有输出，并生成内容无关JSON与Markdown。核心证据使用冷启动3批和同实例热运行3批、每任务每批10次，对run-level P95取中位数，不选择单次最快值。
+- 核心latency/queue固定门为`max(M1 P95 × 3, M1 P95 + 5 ms)`；真实GenerationQueue用concurrency=2、混合P0/P1/P2共40项压力测量，P95门为50 ms。失败测试证明任一越界会使报告FAIL，CLI也会非零退出；没有根据本次结果降低门槛。
+- 长存档在schema 32真实SQLite写入100→1000条durable message，以`page_count × page_size`计算≤4096 bytes/turn；Unified Context只投影固定recent/memory/Constitution/action，以≤2048 tokens且增长≤1.05×限制膨胀，不删除SQLite历史或传输全库。
+- Fake Provider未报告的token/cache usage继续为unknown/NOT_EVALUATED；真实证据阈值预先固定为input tokens每样本平均≤16384、Provider cache hit ratio≥0.50，且只接受Provider usage，不把本地prefix reuse冒充hit。
+
+### 证据、文档与验证
+
+- 本机门禁PASS：World cold/warm latency P95中位数0.153/0.104 ms，NPC 1.092/0.171，Quest 0.109/0.080，Action 0.082/0.073，D20 0.090/0.048；对应queue中位数均通过M1门。
+- GenerationQueue压力P95为2.000 ms；SQLite为1,556,480→2,043,904 bytes，即541.582 bytes/additional turn；Context为377→383 tokens、增长1.016×。真实Provider仍为NOT_RUN，未读取Key或调用网络模型。
+- 新增[`V0.3_PERFORMANCE_REGRESSION.md`](V0.3_PERFORMANCE_REGRESSION.md)与`DEC-149`，更新V0.3 Spec和任务状态。定向测试覆盖repeatability、warm/cold身份、long-save、跨批中位数、threshold failure、unknown usage、真实token/cache失败和report generation。
+- 首次Desktop build发现Node专用测量helper经`ai-core`根出口进入浏览器bundle；将helper改为测试/CLI私有导入后，M1旧基线runner再次成功生成3次/任务报告，M10 gate也在最终代码上再次PASS。没有用polyfill或跳过构建掩盖边界错误。
+- 最终`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 182 files / 1021 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。
+- `pnpm build:desktop`最终通过，Vite转换281 modules。用户`.gitignore`仍保持未暂存；没有merge或push。
+- M10-T06完成后下一项严格为M10-T07 Visual System Convergence；本次未开始，不merge、不push。

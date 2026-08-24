@@ -16,6 +16,7 @@
     "test:windows-e2e": "cargo test -p ember-native-bridge windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save",
     "archive:interop": "node scripts/archive-interop.mjs",
     "performance:baseline": "node scripts/performance-baseline.mjs",
+    "performance:gate": "node scripts/performance-regression.mjs",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
