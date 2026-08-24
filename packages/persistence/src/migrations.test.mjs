@@ -24,6 +24,11 @@ const coreTables = [
   'conversations',
   'credential_cleanup_queue',
   'dialogue_suggestion_cache',
+  'director_budget_admissions',
+  'director_budget_cooldowns',
+  'director_budget_decisions',
+  'director_budget_entries',
+  'director_budget_states',
   'dynamic_locations',
   'dynamic_quest_sources',
   'event_ledger',
@@ -133,7 +138,7 @@ test('skips an already applied migration on repeated startup', async () => {
     assert.equal(
       database.prepare(`SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table'`).get()
         .count,
-      coreTables.length + 1,
+      coreTables.length + 2,
     );
   });
 });
@@ -488,7 +493,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      26,
+      27,
     );
     const importedKnowledge = database
       .prepare(

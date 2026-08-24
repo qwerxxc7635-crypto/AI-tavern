@@ -601,3 +601,15 @@ export {
   type WorldDirectorTriggerKind,
   type WorldDirectorUrgency,
 } from './world-director.js';
+export {
+  DIRECTOR_BUDGET_CATEGORIES,
+  DIRECTOR_BUDGET_REASONS,
+  DIRECTOR_BUDGET_STATUSES,
+  DirectorBudgetContractError,
+  type DirectorBudgetCategory,
+  type DirectorBudgetEntry,
+  type DirectorBudgetReason,
+  type DirectorBudgetSnapshot,
+  type DirectorBudgetStatus,
+  type DirectorBudgetUsage,
+} from './director-budget.js';

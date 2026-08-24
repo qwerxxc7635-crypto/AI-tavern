@@ -147,6 +147,11 @@ const migrations = [
     name: 'world_director',
     source: new URL('../../../database/migrations/0026_world_director.sql', import.meta.url),
   },
+  {
+    version: 27,
+    name: 'director_budget',
+    source: new URL('../../../database/migrations/0027_director_budget.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

@@ -429,12 +429,13 @@
 
 ## M8-T05 Director Budget
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M8-T04。
 - **Deliverable**：Active Quest、每日事件、紧急事件、NPC 主动和后台变化预算/冷却。
 - **Acceptance**：超预算请求延后/拒绝且可观察；预算持久化并随游戏时间恢复。
 - **Tests**：limits、cooldown、day rollover、priority、starvation、save/reload。
 - **Do Not**：不靠 Prompt 自律控制数量；不丢弃 P0 玩家操作。
+- **Implementation reference**：[`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)。
 
 ---
 

@@ -559,3 +559,9 @@ schema 25 的 `dynamic_quest_sources` 以 `quest_id` 为主键，并对 `(campai
 schema 26 的 `world_director_runs` 以 run ID 为主键，并对 `(campaign_id, trigger_kind, trigger_id)` 建唯一约束。它保存 context digest、pace、pressure score、signals、suppression、完整只读来源快照和时间。`world_director_proposals` 以 `(run_id, ordinal)` 为主键，保存最多八项有序 action kind、actor/targets、理由、候选效果、urgency、future cooldown key 和 Rules/Generator/Faction Rules route。
 
 两表均为 append-only 决策审计，不是 World Fact、Quest、Faction、Clock 或事件真相源；触发器验证事件/玩家行为/Quest转换/结算引用属于同一 Campaign。内部快照按 run 后 proposal 的顺序恢复，schema 26 前快照缺失两表时为空集合兼容。完整合同见 [`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md)。
+
+## 10. V0.3 Director Budget 扩展
+
+schema 27 的 `director_budget_states` 保存由 Rules Engine `game_time_minutes` 推导的游戏日、四类日用量和 revision；`director_budget_admissions` 对每个 Director run 建立幂等标记，即使 run 没有 proposal 也不会重复推进预算。`director_budget_entries` 保存 proposal 的类别、批准/延后状态、原因和下一可用游戏分钟，`director_budget_cooldowns` 保存 Campaign/key 的冷却，`director_budget_decisions` 保存 append-only 求值历史。
+
+批准只是下游容量预约，不是事实提交。每日恢复、优先级 aging 和 cooldown 都由本地代码与 SQLite 事务裁决，Prompt/模型无权放宽；玩家 P0 操作不进入这些表。内部快照按 admission/state/entry/cooldown/decision 外键顺序保存恢复，portable format v2 仍不升级。完整合同见 [`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)。

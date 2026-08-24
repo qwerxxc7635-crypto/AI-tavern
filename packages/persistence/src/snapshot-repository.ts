@@ -54,6 +54,11 @@ type SnapshotTable =
   | 'dynamic_quest_sources'
   | 'world_director_runs'
   | 'world_director_proposals'
+  | 'director_budget_states'
+  | 'director_budget_admissions'
+  | 'director_budget_entries'
+  | 'director_budget_cooldowns'
+  | 'director_budget_decisions'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -91,6 +96,16 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     'SELECT * FROM world_director_runs WHERE campaign_id = ? ORDER BY created_at, id',
   world_director_proposals:
     'SELECT * FROM world_director_proposals WHERE campaign_id = ? ORDER BY run_id, ordinal',
+  director_budget_states:
+    'SELECT * FROM director_budget_states WHERE campaign_id = ? ORDER BY campaign_id',
+  director_budget_admissions:
+    'SELECT * FROM director_budget_admissions WHERE campaign_id = ? ORDER BY admitted_at, run_id',
+  director_budget_entries:
+    'SELECT * FROM director_budget_entries WHERE campaign_id = ? ORDER BY requested_game_time, run_id, ordinal',
+  director_budget_cooldowns:
+    'SELECT * FROM director_budget_cooldowns WHERE campaign_id = ? ORDER BY cooldown_key',
+  director_budget_decisions:
+    'SELECT * FROM director_budget_decisions WHERE campaign_id = ? ORDER BY id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -129,6 +144,11 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'dynamic_quest_sources',
   'world_director_runs',
   'world_director_proposals',
+  'director_budget_states',
+  'director_budget_admissions',
+  'director_budget_entries',
+  'director_budget_cooldowns',
+  'director_budget_decisions',
 ];
 
 export class SnapshotRepository {
@@ -330,6 +350,11 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM director_budget_decisions WHERE campaign_id = ?',
+      'DELETE FROM director_budget_cooldowns WHERE campaign_id = ?',
+      'DELETE FROM director_budget_entries WHERE campaign_id = ?',
+      'DELETE FROM director_budget_admissions WHERE campaign_id = ?',
+      'DELETE FROM director_budget_states WHERE campaign_id = ?',
       'DELETE FROM world_director_proposals WHERE campaign_id = ?',
       'DELETE FROM world_director_runs WHERE campaign_id = ?',
       'DELETE FROM dynamic_quest_sources WHERE campaign_id = ?',
@@ -507,7 +532,12 @@ function parsePayload(text: string): SnapshotPayload {
         table === 'quest_graph_evaluations' ||
         table === 'dynamic_quest_sources' ||
         table === 'world_director_runs' ||
-        table === 'world_director_proposals')
+        table === 'world_director_proposals' ||
+        table === 'director_budget_states' ||
+        table === 'director_budget_admissions' ||
+        table === 'director_budget_entries' ||
+        table === 'director_budget_cooldowns' ||
+        table === 'director_budget_decisions')
     ) {
       return [];
     }
@@ -643,6 +673,11 @@ function snapshotTableRecord(
     dynamic_quest_sources: values('dynamic_quest_sources'),
     world_director_runs: values('world_director_runs'),
     world_director_proposals: values('world_director_proposals'),
+    director_budget_states: values('director_budget_states'),
+    director_budget_admissions: values('director_budget_admissions'),
+    director_budget_entries: values('director_budget_entries'),
+    director_budget_cooldowns: values('director_budget_cooldowns'),
+    director_budget_decisions: values('director_budget_decisions'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

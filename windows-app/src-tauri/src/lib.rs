@@ -20,24 +20,25 @@ use ember_native_bridge::{
     CharacterCreationSnapshot, CharacterRulesState, CharacterTraitGenerationCommit,
     CredentialAction, CredentialCleanupReason, DialogueSuggestionCommit,
     DialogueSuggestionPreparation, DialogueSuggestionPrepareCommand, DialogueSuggestionSet,
-    DynamicLocationGenerationCommit, DynamicLocationGenerationRequest,
-    DynamicLocationGenerationSnapshot, DynamicLocationSnapshot, DynamicLocationTravelCommand,
-    DynamicQuestCommitCommand, DynamicQuestPreparation, DynamicQuestPrepareCommand,
-    FactionActionCommand, ModelCapabilitiesRegistration, ModelSettingsSnapshot,
-    ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot, NpcLodGenerationSnapshot,
-    NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit, NpcTimelineBegin,
-    NpcTimelineFail, NpcTimelineOperation, PromptManagerSnapshot, PromptPresetActivateCommand,
-    PromptPresetImportCommand, PromptPresetSaveCommand, QuestBoardSnapshot, QuestGenerationCommit,
-    QuestGraphEvaluateCommand, QuestGraphReplaceCommand, QuestGraphSnapshot,
-    QuestPoolTransitionCommand, RandomnessSettingsSnapshot, RandomnessSettingsUpdate,
-    RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit, TavernPopulationFocusCommand,
-    TavernPopulationProjectCommand, TavernPopulationSnapshot, TavernSceneCommit,
-    TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot, TavernSceneStart,
-    TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
-    UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
-    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldDirectorCommitCommand,
-    WorldDirectorPreparation, WorldDirectorPrepareCommand, WorldDirectorRun, WorldGenerationCommit,
-    WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
+    DirectorBudgetAdmitCommand, DirectorBudgetSnapshot, DynamicLocationGenerationCommit,
+    DynamicLocationGenerationRequest, DynamicLocationGenerationSnapshot, DynamicLocationSnapshot,
+    DynamicLocationTravelCommand, DynamicQuestCommitCommand, DynamicQuestPreparation,
+    DynamicQuestPrepareCommand, FactionActionCommand, ModelCapabilitiesRegistration,
+    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
+    NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit,
+    NpcTimelineBegin, NpcTimelineFail, NpcTimelineOperation, PromptManagerSnapshot,
+    PromptPresetActivateCommand, PromptPresetImportCommand, PromptPresetSaveCommand,
+    QuestBoardSnapshot, QuestGenerationCommit, QuestGraphEvaluateCommand, QuestGraphReplaceCommand,
+    QuestGraphSnapshot, QuestPoolTransitionCommand, RandomnessSettingsSnapshot,
+    RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit,
+    TavernPopulationFocusCommand, TavernPopulationProjectCommand, TavernPopulationSnapshot,
+    TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot,
+    TavernSceneStart, TavernSnapshot, UniversalCharacterCreationConfirm,
+    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
+    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
+    WorldDirectorCommitCommand, WorldDirectorPreparation, WorldDirectorPrepareCommand,
+    WorldDirectorRun, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
+    model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1470,6 +1471,24 @@ fn world_director_history(
 }
 
 #[tauri::command]
+fn director_budget_admit(
+    command: DirectorBudgetAdmitCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DirectorBudgetSnapshot, CommandError> {
+    store.admit_director_budget(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn director_budget_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<Option<DirectorBudgetSnapshot>, CommandError> {
+    store
+        .director_budget_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn quest_accept(
     campaign_id: String,
     quest_id: String,
@@ -1729,6 +1748,8 @@ pub fn run() {
             world_director_prepare,
             world_director_commit,
             world_director_history,
+            director_budget_admit,
+            director_budget_get,
             quest_accept,
             quest_pool_transition,
             quest_graph_get,

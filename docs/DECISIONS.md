@@ -2975,3 +2975,26 @@ Director 固定为无模型依赖的本地确定性评估器。它读取锁定 C
 - 来源只取当前实体ID和已提交状态，不设置主Quest或固定剧情路线。
 - 内部快照保存schema 26审计；portable archive format v2不变，正式升级留给M10-T05。
 - 本任务不新增UI/CSS；视觉手册和M10-T07渐进收敛门禁保持有效，不重构既有业务组件。
+
+## DEC-140：Director Budget 使用游戏时钟预约与持久防饥饿队列
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T05`、`DEC-139`与[`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)
+
+### 背景
+
+World Director 已能产生有界提案，但单次八项上限不能控制跨 run 的内容洪水。依赖 Prompt 自律、墙钟或内存计数会在重启、重试和模型变化时失效；直接把玩家行动放入同一队列又会违反 P0 不可丢弃门禁。
+
+### 决定与理由
+
+预算只接收已经提交的 Director proposal，以 Rules Engine `game_time_minutes` 为唯一时钟。schema 27 持久化 run admission、日用量、proposal 队列、cooldown 和 append-only decision。批准即预约容量，延后保留明确原因与下一游戏时间；优先级叠加最多三天 waiting age，旧低优先级最终可越过新高优先级，但永不绕过硬容量或冷却。
+
+Quest维护不消耗内容额度；Opportunity 同时受四个Active Quest预约限制和每日事件限制；紧急事件同时消耗每日与紧急额度。P0玩家操作完全位于预算通道之外，PLAYER_ACTION trigger 只预算其后派生的世界提案。
+
+### 影响与边界
+
+- TypeScript、Rust Native、Tauri和Windows服务共享相同政策；无Provider、timer或后台模型循环。
+- Director仍不写World Fact、Quest、NPC、Faction、Clock、Adventure、Message或Event；下游原合同继续裁决。
+- 内部快照和SQLite重开保存schema 27状态；portable format v2正式升级仍留给M10-T05。
+- 本任务不新增UI/CSS，不提前执行M9或M10-T07；视觉规范、视觉债务和渐进迁移门禁保持不变。

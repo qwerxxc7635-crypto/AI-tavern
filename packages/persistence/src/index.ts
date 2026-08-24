@@ -73,6 +73,8 @@ export { WorldConstitutionRepository } from './world-constitution-repository.js'
 export { WorldSeedRepository } from './world-seed-repository.js';
 export { WorldDirectorRepository } from './world-director-repository.js';
 export type { CommitWorldDirectorRun } from './world-director-repository.js';
+export { DirectorBudgetRepository } from './director-budget-repository.js';
+export type { AdmitDirectorRun } from './director-budget-repository.js';
 export { RulesEngineRepository, RulesIdempotencyConflictError } from './rules-engine-repository.js';
 export type { CommitRulesCommand, RulesCommitResult } from './rules-engine-repository.js';
 export { KnowledgeBoundaryRepository } from './knowledge-boundary-repository.js';

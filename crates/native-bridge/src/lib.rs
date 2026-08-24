@@ -8,6 +8,7 @@ mod cache_metrics;
 mod career_pool;
 mod character_creation;
 mod dialogue_suggestions;
+mod director_budget;
 mod dynamic_locations;
 mod dynamic_quest_sources;
 #[cfg(test)]
@@ -40,6 +41,7 @@ pub use cache_metrics::*;
 pub use career_pool::*;
 pub use character_creation::*;
 pub use dialogue_suggestions::*;
+pub use director_budget::*;
 pub use dynamic_locations::*;
 pub use dynamic_quest_sources::*;
 pub use model_settings::*;
@@ -126,7 +128,9 @@ const DYNAMIC_QUEST_SOURCES_MIGRATION: &str =
     include_str!("../../../database/migrations/0025_dynamic_quest_sources.sql");
 const WORLD_DIRECTOR_MIGRATION: &str =
     include_str!("../../../database/migrations/0026_world_director.sql");
-const LATEST_SCHEMA_VERSION: i64 = 26;
+const DIRECTOR_BUDGET_MIGRATION: &str =
+    include_str!("../../../database/migrations/0027_director_budget.sql");
+const LATEST_SCHEMA_VERSION: i64 = 27;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -617,6 +621,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             DYNAMIC_QUEST_SOURCES_MIGRATION,
         ),
         (26_i64, "world_director", WORLD_DIRECTOR_MIGRATION),
+        (27_i64, "director_budget", DIRECTOR_BUDGET_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

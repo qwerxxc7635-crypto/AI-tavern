@@ -4490,3 +4490,23 @@
 - Rustfmt、全 workspace 严格 Clippy 与 archive interoperability 通过。Rust workspace 135 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；其中 Native Bridge 90 项包含两项新增 Director 持久化/失败安全测试。
 - `pnpm --dir windows-app build` 生产构建通过，Vite 转换 268 个模块。没有删除测试、降低校验、写死结果、忽略错误或让 Director/LLM 获得事实写权限。
 - 单次最多八项只是 payload 安全上限，不冒充 M8-T05 的 durable budget/cooldown。M8-T04 完成后下一项严格为 M8-T05，本次未开始；不 merge、不 push。
+
+## 2026-08-24 — M8-T05 完成 Director Budget
+
+### 边界与实现
+
+- 在分支 `task/M8-T05-director-budget`、起始提交 `3d8af9c` 上继续；未回滚或重做 M0–M8-T04，用户已有 `.gitignore` 修改全程未暂存。本任务未进入 M9，也未新增 UI/CSS。
+- 冻结 Active Quest 4、每日事件 4、紧急事件 2、NPC 主动 2、后台变化 3 的本地上限。Rules Engine `game_time_minutes` 是唯一时钟，每 1440 分钟惰性恢复；墙钟、Prompt和模型均无预算权限。
+- Proposal 映射、cooldown、容量判断和 waiting-age 防饥饿排序由 TypeScript Domain 与 Rust Native实现。Quest更新/过期为免额度维护；Pressure同时占每日和紧急额度；Opportunity计入Active Quest预约。
+- schema 27新增状态、run admission、持久proposal队列、cooldown和append-only decision。批准先预约容量以阻断失败重试放大；延后保留原因和eligible game time；空run也精确幂等。内部快照保存全部预算表，SQLite关闭重开保持day/usage/queue/cooldown/revision。
+- Tauri新增admit/read命令，Windows服务在现有World Director提交后执行预算准入。玩家P0操作不进入预算通道；PLAYER_ACTION仅可能产生受预算的派生提案。
+- 新增[`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)与`DEC-140`，更新V0.3 Spec、Data Model和任务引用。portable `.emtavern` format v2保持不变，schema 27正式跨版本归档仍留给M10-T05。
+- 视觉规范继续作为全局标准；本任务没有换色、逐页返工或创建第二套组件体系，M10-T07的Design Token→Primitive→Game Component→Feature→Legacy→Audit收敛顺序不变。
+
+### 验证
+
+- 专项测试覆盖类别与上限、cooldown、游戏日恢复、Active Quest预约、优先级aging、防饥饿、空run幂等、内部快照、SQLite重开、Windows编排和错误cause。
+- `pnpm check:shared` 在最终工作树从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 165 files / 947 tests通过，另1 file / 1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 125 tests通过，另1项需明确API Key授权的真实Provider测试忽略；其中Native Bridge 91 tests包含新增预算持久化/日恢复测试。Rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。
+- Desktop production build通过，Vite转换270 modules。首轮门禁发现portable archive本地schema上限仍为26；提升到27后，archive专项、Windows E2E与完整门禁均从头复验通过。没有删除测试、降低校验或忽略错误。
+- M8-T05完成后下一项严格为M9-T01，本次未开始；用户`.gitignore`保持未暂存，不merge、不push。
