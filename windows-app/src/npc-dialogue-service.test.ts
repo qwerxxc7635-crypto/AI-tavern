@@ -40,6 +40,7 @@ describe('WindowsNpcDialogueService', () => {
     expect(second.relationship.trust).toBe(2);
     expect(gateway.inputs[1]).toMatchObject({
       playerMessage: 'What is warm down there?',
+      relevantLore: [],
       recentMessages: [
         { role: 'PLAYER', content: 'Show me the cellar.' },
         {

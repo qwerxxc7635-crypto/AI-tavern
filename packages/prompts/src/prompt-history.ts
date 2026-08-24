@@ -104,6 +104,11 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     change: 'Require 3-5 distinct optional Action Composer topics.',
   }),
   Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(5),
+    change: 'Consume explainably retrieved World Lore without broadening NPC knowledge authority.',
+  }),
+  Object.freeze({
     task: 'GENERATE_QUEST',
     version: promptVersion(2),
     change: 'Avoid recent quest structures and substantial repeated phrases.',

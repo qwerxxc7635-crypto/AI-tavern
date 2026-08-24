@@ -99,8 +99,8 @@ export const TASK_PROMPTS = Object.freeze({
   NPC_REPLY: define(
     'NPC_REPLY',
     'NPC_ACTOR',
-    'Reply only from this NPC perspective without repeating substantial phrases inside the response. Return 3-5 distinct suggested topics grounded in this NPC knowledge and the conversation; they are optional player suggestions with no extra authority. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
-    4,
+    'Reply only from this NPC perspective without repeating substantial phrases inside the response. Use relevantLore only as retrieved world context and never as permission to reveal knowledge the NPC does not possess. Return 3-5 distinct suggested topics grounded in this NPC knowledge and the conversation; they are optional player suggestions with no extra authority. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
+    5,
   ),
   GENERATE_DIALOGUE_SUGGESTIONS: define(
     'GENERATE_DIALOGUE_SUGGESTIONS',

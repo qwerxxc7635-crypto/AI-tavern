@@ -46,6 +46,9 @@ import {
   MemoryLayerRepository,
   NpcRepository,
   PendingAiRequestRepository,
+  QuestRepository,
+  TavernRepository,
+  WorldInfoRetrievalRepository,
   WorldRepository,
   type TransactionalSqliteDatabase,
 } from '@ember-tavern/persistence';
@@ -53,6 +56,7 @@ import { formatTaskPrompt } from '@ember-tavern/prompts';
 
 import { AIOrchestrationError, type AITurnGenerationOptions } from './ai-turn-orchestrator.js';
 import { executePrimaryAITask } from './ai-task-orchestrator.js';
+import { WorldInfoRetrievalService } from './world-info-retrieval-service.js';
 
 export interface DialogueIdentityFactory {
   memory(summary: string, index: number): NpcMemoryId;
@@ -95,11 +99,14 @@ export class NpcDialogueUseCases {
   private readonly campaigns: CampaignRepository;
   private readonly conversations: ConversationRepository;
   private readonly npcs: NpcRepository;
+  private readonly taverns: TavernRepository;
+  private readonly quests: QuestRepository;
   private readonly worlds: WorldRepository;
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
   private readonly knowledgeBoundary: KnowledgeBoundaryRepository;
   private readonly memoryLayers: MemoryLayerRepository;
+  private readonly worldInfo: WorldInfoRetrievalService;
 
   public constructor(
     database: TransactionalSqliteDatabase,
@@ -111,11 +118,14 @@ export class NpcDialogueUseCases {
     this.campaigns = new CampaignRepository(database);
     this.conversations = new ConversationRepository(database);
     this.npcs = new NpcRepository(database);
+    this.taverns = new TavernRepository(database);
+    this.quests = new QuestRepository(database);
     this.worlds = new WorldRepository(database);
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
     this.knowledgeBoundary = new KnowledgeBoundaryRepository(database);
     this.memoryLayers = new MemoryLayerRepository(database);
+    this.worldInfo = new WorldInfoRetrievalService(new WorldInfoRetrievalRepository(database));
   }
 
   public async talkToNpc(command: TalkToNpcCommand): Promise<NpcDialogueResult> {
@@ -161,6 +171,27 @@ export class NpcDialogueUseCases {
     const currentActorMemories = actorProjection.memories.filter(
       ({ id }) => this.memoryLayers.inspectLongTermMemory(id).status === 'CURRENT',
     );
+    const tavern = this.taverns.get(npc.tavernId);
+    if (tavern === null || tavern.campaignId !== campaign.id) {
+      throw new AIOrchestrationError('NPC_CONTEXT_INCOMPLETE', 'NPC tavern is missing');
+    }
+    const relatedQuestIds = this.quests
+      .listByCampaign(campaign.id)
+      .filter(
+        (quest) =>
+          !['COMPLETED', 'FAILED', 'ABANDONED'].includes(quest.status) &&
+          (quest.publisherNpcId === npc.id || quest.relatedNpcIds.includes(npc.id)),
+      )
+      .map(({ id }) => id);
+    const relevantLore = await this.worldInfo.retrieve({
+      campaignId: campaign.id,
+      text: command.playerMessage,
+      entityRefs: [{ kind: 'NPC', id: npc.id }],
+      locationIds: [tavern.locationId],
+      questIds: relatedQuestIds,
+      minimumScore: 0.2,
+      maxTokens: 1_200,
+    });
     const input = buildNpcDialogueContext(
       {
         world,
@@ -174,6 +205,7 @@ export class NpcDialogueUseCases {
             ? this.npcs.listMemories(npc.id)
             : currentActorMemories.map((memory) => ({ npcId: npc.id, summary: memory.summary })),
         playerMessage: command.playerMessage,
+        relevantLore: relevantLore.result.selections,
         ...(authorizedKnowledge === undefined ? {} : { authorizedKnowledge }),
       },
       contextBudgetForTask('NPC_REPLY'),

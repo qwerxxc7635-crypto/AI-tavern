@@ -463,12 +463,13 @@
 
 ## M9-T03 Retrieval Interface & World Info
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M9-T02。
 - **Deliverable**：结构化相关性检索接口、Lore 条目触发/优先级/预算和未来 RAG port。
 - **Acceptance**：无向量服务也可工作；触发规则可解释；稳定结果可缓存。
 - **Tests**：keyword/entity/location/quest triggers、priority、budget、false match、cache invalidation。
 - **Do Not**：不把外部向量服务设为 V0.3 前置；不复制 Lorebook 实现。
+- **Implementation reference**：[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)。
 
 ---
 

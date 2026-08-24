@@ -234,6 +234,31 @@ export type {
   SummaryScopeKind,
   WorldLoreEntry,
 } from './memory-layer.js';
+export {
+  createWorldInfoRetrievalQuery,
+  createWorldLoreRetrievalRule,
+  LORE_MATCH_MODES,
+  RETRIEVAL_ENTITY_KINDS,
+  WORLD_INFO_RETRIEVAL_REASONS,
+  WORLD_INFO_TRIGGER_KINDS,
+  WorldInfoRetrievalContractError,
+} from './world-info-retrieval.js';
+export type {
+  LoreMatchMode,
+  RetrievalEntityKind,
+  RetrievalEntityRef,
+  WorldInfoCandidateSource,
+  WorldInfoRetrievalCandidate,
+  WorldInfoRetrievalCorpus,
+  WorldInfoRetrievalManifestEntry,
+  WorldInfoRetrievalQuery,
+  WorldInfoRetrievalReason,
+  WorldInfoRetrievalResult,
+  WorldInfoRetrievalSelection,
+  WorldInfoTriggerKind,
+  WorldInfoTriggerMatch,
+  WorldLoreRetrievalRule,
+} from './world-info-retrieval.js';
 export type {
   NpcKnowledge,
   NpcKnowledgeInput,

@@ -10,3 +10,4 @@ Versioned SQLite migrations live in this directory and are applied in numeric or
 - `0025_dynamic_quest_sources.sql`: one-shot Quest Pool creation intents plus append-only, source-validated Dynamic Quest provenance.
 - `0026_world_director.sql`: append-only, trigger-bound World Director pacing runs and ordered explainable proposals.
 - `0028_memory_layers.sql`: source-backed Historical Summary and World Lore artifacts plus shared provenance snapshots for derived memory.
+- `0029_world_info_retrieval.sql`: explainable World Lore trigger, priority, budget, revision, and cache-invalidation configuration.

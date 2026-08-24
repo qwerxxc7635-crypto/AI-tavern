@@ -3044,3 +3044,26 @@ schema 28仅新增`historical_summaries`、`world_lore_entries`和共享`memory_
 - World Lore只有来源和生成审计，触发、priority、budget、cache和未来RAG port留给M9-T03。
 - 内部snapshot加入schema 12/28表并兼容旧payload；portable `.emtavern` format v2不变，统一跨语言迁移仍由M10-T05负责。
 - 不修改Rules/D20、Provider、Queue、Constitution、Quest/NPC/Adventure提交语义；不增加UI/CSS或向量数据库。
+
+## DEC-143：World Info 采用可解释本地选择与可替换 Candidate Source
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M9-T03`、`DEC-141`、`DEC-142`与[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)
+
+### 背景
+
+Source-backed World Lore 已有生成审计和失效规则，但缺少统一方式按玩家文本、实体、地点和Quest选择条目。把完整Lore塞入Prompt会破坏最小Context与预算；依赖向量服务会让V0.3离线纵向切片不可用；让各页面自行检索则会形成平行Context栈和不可解释缓存。
+
+### 决定与理由
+
+定义稳定`WorldInfoCandidateSource` port，V0.3由SQLite adapter返回同Campaign的Lore、规则和freshness。纯Domain selector计算closed trigger evidence、ANY/ALL、priority、relevance和entry/total token budget，并为所有候选输出明确manifest。关键词对Latin使用完整边界、对CJK使用规范化substring，结果按priority、score和ID确定排序。
+
+schema 29新增一对一版本化rule；Repository和SQLite共同验证结构、Campaign引用与CAS revision。应用层使用规范query digest与完整corpus digest组成的有界LRU key，因此Lore、来源freshness、规则或query任一变化都会失效。未来RAG只能替换candidate source，仍须经过相同本地裁决。
+
+### 影响与边界
+
+- NPC_REPLY v5是首个生产消费者，通过既有Unified Context的LORE层注入；Lore不授予Actor Knowledge，输出和提交状态机不变。
+- 不增加外部向量依赖、不复制Lorebook、不增加Provider或Context旁路，也不修改Rules/D20、Queue、Constitution、Quest/NPC/Adventure业务合同。
+- 内部snapshot保存schema 29 rule；portable format v2不变，正式跨语言迁移仍由M10-T05处理。
+- 本任务不新增UI/CSS；后续World Info/Inspector展示复用现有Token和组件，Legacy视觉收敛仍属于M10-T07。

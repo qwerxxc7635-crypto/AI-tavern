@@ -89,6 +89,7 @@ export {
   captureMemorySource,
   memorySourceDigest,
 } from './memory-layer-repository.js';
+export { WorldInfoRetrievalRepository } from './world-info-retrieval-repository.js';
 export type {
   MemoryArtifactFreshness,
   MemoryArtifactFreshnessReason,

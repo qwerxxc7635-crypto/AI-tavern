@@ -12,6 +12,8 @@ import {
   conversationId,
   createCampaign,
   createKnowledge,
+  createWorldLoreEntry,
+  createWorldLoreRetrievalRule,
   createNpcKnowledge,
   createNpcRelationship,
   generationRecordId,
@@ -31,6 +33,7 @@ import {
   worldTruthId,
   knowledgeId,
   worldFactId,
+  worldLoreEntryId,
   type NpcProfile,
   type PlayerCharacter,
   type Tavern,
@@ -41,11 +44,14 @@ import {
   ConversationRepository,
   GenerationRecordRepository,
   KnowledgeBoundaryRepository,
+  MemoryLayerRepository,
   NpcRepository,
   PendingAiRequestRepository,
   PlayerCharacterRepository,
   TavernRepository,
   WorldRepository,
+  WorldInfoRetrievalRepository,
+  memorySourceDigest,
   type SqliteStatement,
   type SqliteValue,
   type TransactionalSqliteDatabase,
@@ -143,6 +149,43 @@ describe('NpcDialogueUseCases', () => {
         ledgerId: eventLedgerId('ledger-dialogue-import'),
         source: 'IMPORT',
       });
+      const memoryLayers = new MemoryLayerRepository(sqlite);
+      const loreSources = memoryLayers.captureSources(campaignKey, [
+        { kind: 'WORLD_FACT', id: worldFactId('fact-known') },
+      ]);
+      const lore = memoryLayers.saveWorldLore(
+        createWorldLoreEntry({
+          id: worldLoreEntryId('lore-dialogue-cellar'),
+          campaignId: campaignKey,
+          title: 'Cellar Threshold Rite',
+          text: 'Harbor keepers cool the lower stones before opening the sealed passage.',
+          sources: loreSources,
+          sourceDigest: memorySourceDigest(loreSources),
+          generationRecordId: null,
+          revision: 1,
+          createdAt: at,
+          updatedAt: at,
+        }),
+        0,
+      );
+      new WorldInfoRetrievalRepository(sqlite).saveRule(
+        createWorldLoreRetrievalRule({
+          loreEntryId: lore.id,
+          campaignId: campaignKey,
+          keywords: [],
+          entityRefs: [{ kind: 'NPC', id: npcKey }],
+          locationIds: [locationKey],
+          questIds: [],
+          alwaysActive: false,
+          matchMode: 'ANY',
+          priority: 700,
+          tokenBudget: 600,
+          enabled: true,
+          revision: 1,
+          updatedAt: at,
+        }),
+        0,
+      );
       for (let sequenceNumber = 3; sequenceNumber <= 62; sequenceNumber += 1) {
         const isPlayer = sequenceNumber % 2 === 1;
         conversations.addMessage({
@@ -185,6 +228,10 @@ describe('NpcDialogueUseCases', () => {
         generationRecordId('generation-reply-2'),
       );
       expect(JSON.stringify(generation?.request)).toContain('The cellar has an old door.');
+      expect(JSON.stringify(generation?.request)).toContain(
+        'Harbor keepers cool the lower stones before opening the sealed passage.',
+      );
+      expect(JSON.stringify(generation?.request)).toContain('LOCATION');
       expect(JSON.stringify(generation?.request)).not.toContain('Show me the cellar door.');
       expect(JSON.stringify(generation?.request)).not.toContain(
         'The owner hid a royal seal beneath the floor.',

@@ -132,7 +132,9 @@ const DIRECTOR_BUDGET_MIGRATION: &str =
     include_str!("../../../database/migrations/0027_director_budget.sql");
 const MEMORY_LAYERS_MIGRATION: &str =
     include_str!("../../../database/migrations/0028_memory_layers.sql");
-const LATEST_SCHEMA_VERSION: i64 = 28;
+const WORLD_INFO_RETRIEVAL_MIGRATION: &str =
+    include_str!("../../../database/migrations/0029_world_info_retrieval.sql");
+const LATEST_SCHEMA_VERSION: i64 = 29;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -625,6 +627,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (26_i64, "world_director", WORLD_DIRECTOR_MIGRATION),
         (27_i64, "director_budget", DIRECTOR_BUDGET_MIGRATION),
         (28_i64, "memory_layers", MEMORY_LAYERS_MIGRATION),
+        (
+            29_i64,
+            "world_info_retrieval",
+            WORLD_INFO_RETRIEVAL_MIGRATION,
+        ),
     ] {
         let applied_name = connection
             .query_row(

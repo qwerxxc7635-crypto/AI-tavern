@@ -95,6 +95,8 @@ export type {
 } from './regeneration-use-cases.js';
 export { RulesEngineUseCases } from './rules-engine-use-cases.js';
 export { KnowledgeBoundaryUseCases } from './knowledge-boundary-use-cases.js';
+export { WorldInfoRetrievalService } from './world-info-retrieval-service.js';
+export type { CachedWorldInfoRetrieval } from './world-info-retrieval-service.js';
 export type { ExecuteRulesCommand, RulesEventIdentityFactory } from './rules-engine-use-cases.js';
 export { inspectDatabaseStartup, RecoveryCenterUseCases } from './recovery-center-use-cases.js';
 export type {

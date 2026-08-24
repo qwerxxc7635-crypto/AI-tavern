@@ -171,6 +171,7 @@ export class WindowsNpcDialogueService {
     const snapshot = await this.gateway.load(campaign, npc);
     const input = NpcReplyInputSchema.parse({
       ...snapshot.generationContext,
+      relevantLore: snapshot.generationContext['relevantLore'] ?? [],
       playerMessage,
     });
     const identity = this.createIdentity();

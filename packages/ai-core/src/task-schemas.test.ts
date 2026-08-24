@@ -439,6 +439,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     input: {
       worldSummary: world.summary,
       currentRegion: world.currentRegion,
+      relevantLore: [],
       npc: {
         ...npc,
         appearance: 'Tall, with a red wool coat.',
@@ -738,7 +739,7 @@ describe('versioned AI task schemas', () => {
         : task === 'GENERATE_NPCS'
           ? 4
           : task === 'NPC_REPLY'
-            ? 4
+            ? 5
             : task === 'GENERATE_QUEST'
               ? 3
               : [

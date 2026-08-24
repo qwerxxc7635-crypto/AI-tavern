@@ -65,6 +65,7 @@ type SnapshotTable =
   | 'knowledge_memories'
   | 'historical_summaries'
   | 'world_lore_entries'
+  | 'world_lore_retrieval_rules'
   | 'memory_artifact_sources'
   | 'adventures'
   | 'adventure_turns'
@@ -121,6 +122,8 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     'SELECT * FROM historical_summaries WHERE campaign_id = ? ORDER BY covered_to, id',
   world_lore_entries:
     'SELECT * FROM world_lore_entries WHERE campaign_id = ? ORDER BY updated_at, id',
+  world_lore_retrieval_rules:
+    'SELECT * FROM world_lore_retrieval_rules WHERE campaign_id = ? ORDER BY priority DESC, lore_entry_id',
   memory_artifact_sources:
     'SELECT * FROM memory_artifact_sources WHERE campaign_id = ? ORDER BY artifact_kind, artifact_id, ordinal',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
@@ -164,6 +167,7 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'knowledge_memories',
   'historical_summaries',
   'world_lore_entries',
+  'world_lore_retrieval_rules',
   'memory_artifact_sources',
   'dynamic_quest_sources',
   'world_director_runs',
@@ -375,6 +379,7 @@ export class SnapshotRepository {
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
       'DELETE FROM memory_artifact_sources WHERE campaign_id = ?',
+      'DELETE FROM world_lore_retrieval_rules WHERE campaign_id = ?',
       'DELETE FROM historical_summaries WHERE campaign_id = ?',
       'DELETE FROM world_lore_entries WHERE campaign_id = ?',
       'DELETE FROM knowledge_memories WHERE campaign_id = ?',
@@ -575,6 +580,7 @@ function parsePayload(text: string): SnapshotPayload {
         table === 'knowledge_memories' ||
         table === 'historical_summaries' ||
         table === 'world_lore_entries' ||
+        table === 'world_lore_retrieval_rules' ||
         table === 'memory_artifact_sources')
     ) {
       return [];
@@ -722,6 +728,7 @@ function snapshotTableRecord(
     knowledge_memories: values('knowledge_memories'),
     historical_summaries: values('historical_summaries'),
     world_lore_entries: values('world_lore_entries'),
+    world_lore_retrieval_rules: values('world_lore_retrieval_rules'),
     memory_artifact_sources: values('memory_artifact_sources'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),

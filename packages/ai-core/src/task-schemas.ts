@@ -664,6 +664,32 @@ export const NpcReplyInputSchema = z
   .object({
     worldSummary: text,
     currentRegion: shortText,
+    relevantLore: z
+      .array(
+        z
+          .object({
+            loreEntryId: identifier,
+            title: shortText,
+            text,
+            revision: z.number().int().min(1),
+            score: z.number().min(0).max(1),
+            priority: z.number().int().min(0).max(1000),
+            matches: z
+              .array(
+                z
+                  .object({
+                    kind: z.enum(['ALWAYS', 'KEYWORD', 'ENTITY', 'LOCATION', 'QUEST']),
+                    value: text,
+                    weight: z.number().min(0).max(1),
+                  })
+                  .strict(),
+              )
+              .min(1)
+              .max(161),
+          })
+          .strict(),
+      )
+      .max(12),
     npc: npcContextCard,
     relationship,
     knowledge: z

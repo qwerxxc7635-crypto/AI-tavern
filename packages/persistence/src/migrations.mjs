@@ -157,6 +157,11 @@ const migrations = [
     name: 'memory_layers',
     source: new URL('../../../database/migrations/0028_memory_layers.sql', import.meta.url),
   },
+  {
+    version: 29,
+    name: 'world_info_retrieval',
+    source: new URL('../../../database/migrations/0029_world_info_retrieval.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

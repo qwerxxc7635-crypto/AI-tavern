@@ -4545,3 +4545,23 @@
 - 专项覆盖promotion rules、Summary/source digest drift、source update/delete、Actor isolation、Long-term Memory freshness与幂等重放、双视图冲突整体回滚、旧史保留、generation provenance、本地reopen和internal snapshot round-trip；TypeScript对话生成记录证明current通用Memory优先于legacy视图，Native NPC测试证明Knowledge revision变化后stale Memory不再进入Prompt。
 - `pnpm check:shared`完整通过：Prettier、ESLint、TypeScript、release/i18n、Vitest 168 files/962 tests通过（另1 file/1 test为显式skip的performance baseline runner）、Node 29 tests、Rust workspace 136 tests通过（另1项需明确API Key授权的真实Provider测试ignored），archive interop通过。
 - 额外独立复验Rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换272 modules。不删除测试、不降低校验、不忽略错误。
+
+## 2026-08-24 — M9-T03 完成 Retrieval Interface & World Info
+
+### 边界与实现
+
+- 在分支`task/M9-T03-retrieval-world-info`、起始提交`d439adb`上继续；用户`.gitignore`修改保持未暂存。本任务未进入M10-T01，未增加UI/CSS、外部向量依赖、第二套Context栈或Lorebook复制实现。
+- 新增Campaign-scoped结构化query与版本化Lore rule：bounded keyword、闭集entity、Location、Quest、always-active、ANY/ALL、priority、entry/total token budget、enabled与CAS revision。SQLite schema 29和Repository双重拒绝畸形JSON、跨Campaign引用、身份修改和revision跳跃。
+- 纯Domain selector先排除stale/unconfigured/disabled，再产生ALWAYS/KEYWORD/ENTITY/LOCATION/QUEST具名证据；Latin关键词使用完整边界避免`port`误命中`portal`，CJK使用规范化substring。结果按priority→score→Lore ID稳定排序且不截断内容，完整manifest记录每条Lore的选择或省略原因。
+- `WorldInfoCandidateSource`隔离候选来源；当前SQLite adapter可离线工作，未来RAG只能替换该port并继续经过本地裁决。应用层有界LRU以规范query digest+完整corpus digest为key，Lore/source freshness/rule/query变化均自动miss，SQLite仍是唯一真相。
+- Application NPC对话按玩家文本、当前NPC、Tavern Location及相关非终态Quest检索，将选择结果注入既有Unified Context `LORE`层。`NPC_REPLY` Schema/Prompt升至v5并明确Lore不授予Actor Knowledge；回复、关系、Memory、不可重写时间线和提交事务语义不变。Windows既有native snapshot尚无Lore字段时显式使用空集合，避免把缺失上下文伪装成检索命中。
+- 内部snapshot纳入`world_lore_retrieval_rules`并兼容旧payload。portable`.emtavern`保持format v2，schema 29跨语言归档仍与其他V0.3表统一留给M10-T05。
+- 新增[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)与`DEC-143`，更新V0.3 Spec、Memory、Unified Context、Data Model、migration与任务引用。视觉规范和M10-T07迁移边界保持不变。
+
+### 验证
+
+- 专项测试覆盖keyword/entity/location/quest/always触发、ANY/ALL、false match、priority、score、entry/total budget、stale/disabled/unconfigured原因、rule/source/Lore/query缓存失效、跨Campaign拒绝、畸形更新、SQLite重开语义、internal snapshot及NPC生产请求的LORE注入。
+- 首轮完整门禁暴露Windows旧generation context缺少新必填字段及cache regression仍固定v4；补入显式空Lore兼容投影并推进缓存断言后，相关6项测试及完整门禁从头复验通过，没有降低Schema或跳过测试。
+- `pnpm check:shared`最终通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 172 files/970 tests通过，另1 file/1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换274 modules。
+- M9-T03完成后下一项严格为M10-T01；本次未开始。用户`.gitignore`保持未暂存，不merge、不push。

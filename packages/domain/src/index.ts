@@ -161,6 +161,7 @@ export type {
   WorldDirectorQuestInput,
   WorldDirectorTransitionInput,
 } from './world-director.js';
+export { retrieveWorldInfo, WorldInfoRetrievalError } from './world-info-retrieval.js';
 export {
   DIRECTOR_BUDGET_LIMITS,
   DIRECTOR_GAME_DAY_MINUTES,

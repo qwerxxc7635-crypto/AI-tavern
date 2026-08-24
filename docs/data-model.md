@@ -577,3 +577,9 @@ Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于�
 `historical_summaries`保存Campaign/Actor/Adventure/Conversation范围、摘要文本、覆盖时间、source digest、可选generation record和连续revision。`world_lore_entries`保存来源约束的世界说明，但不具有Truth authority。`memory_artifact_sources`按顺序保存Summary、Long-term Memory与World Lore的source kind/ID/revision/SHA-256/时间；读取时对SQLite当前来源重算，删除为`SOURCE_DELETED`，revision/hash/time变化为`SOURCE_UPDATED`。
 
 原`knowledge_memories`继续是唯一Actor Long-term Memory表；M9-T02新增来源快照而不平行建表。Recent仍是`messages`、`game_events`、`adventure_turns`原行，压缩Summary不会删除原历史。内部snapshot新增schema 12四张知识表和schema 28三张表；旧snapshot缺失时按空集合兼容。portable format v2仍不携带这些表，正式跨语言升级留给M10-T05。完整合同见[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)。
+
+## 13. V0.3 World Info Retrieval（schema 29）
+
+`world_lore_retrieval_rules`与`world_lore_entries`一对一，保存Campaign、关键词、闭集实体引用、Location/Quest ID、always-active、ANY/ALL、priority、entry token budget、enabled和连续revision。SQLite trigger与Repository共同验证Lore归属、JSON元素形状、不可变身份和revision；Repository额外验证所有引用属于同一Campaign。
+
+规则只是World Lore选择配置，不是Fact、Knowledge或Truth。检索先检查Lore source freshness，再本地计算可解释trigger/score，按priority→score→ID稳定排序并执行entry/total预算。应用层LRU只缓存规范query digest与完整corpus digest对应的结果，SQLite仍是唯一真相。内部snapshot携带schema 29规则且旧payload按空表兼容；portable format v2保持不变，正式升级留给M10-T05。完整合同见[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)。

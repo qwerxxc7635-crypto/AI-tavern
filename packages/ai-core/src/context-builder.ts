@@ -15,6 +15,7 @@ import type {
   SceneFrame,
   WorldBible,
   WorldFact,
+  WorldInfoRetrievalSelection,
 } from '@ember-tavern/contracts';
 import type { WorldClock } from '@ember-tavern/domain';
 import type { z } from 'zod';
@@ -144,6 +145,7 @@ export interface NpcDialogueContextSource {
   readonly messages: readonly Message[];
   readonly memories: readonly { readonly npcId: NpcId; readonly summary: string }[];
   readonly playerMessage: string;
+  readonly relevantLore?: readonly WorldInfoRetrievalSelection[];
   readonly authorizedKnowledge?: readonly {
     readonly targetKind: 'TRUTH' | 'CLAIM';
     readonly state: 'KNOWN' | 'SUSPECTED' | 'BELIEVED';
@@ -255,10 +257,20 @@ export function buildNpcDialogueContext(
     Math.min(budget.longTermMemoryLimit, 29),
     budget.historicalSummaryMaxCharacters,
   );
+  let relevantLore = (source.relevantLore ?? []).slice(0, 12).map((entry) => ({
+    loreEntryId: entry.loreEntryId,
+    title: entry.title,
+    text: entry.text,
+    revision: entry.revision,
+    score: entry.score,
+    priority: entry.priority,
+    matches: entry.matches.map((match) => ({ ...match })),
+  }));
 
   const build = () => ({
     worldSummary: source.world.summary,
     currentRegion: source.world.currentRegion,
+    relevantLore,
     npc: {
       id: source.npc.id,
       name: source.npc.name,
@@ -289,7 +301,9 @@ export function buildNpcDialogueContext(
     const oldestMemorySize =
       longTermMemories.length === 0 ? -1 : serializedLength(longTermMemories[0]);
     if (oldestMessageSize < 0 && oldestMemorySize < 0) {
-      throw new ContextBuildError('NPC context core fields exceed the character budget');
+      if (relevantLore.length > 0) relevantLore = relevantLore.slice(0, -1);
+      else throw new ContextBuildError('NPC context core fields exceed the character budget');
+      continue;
     }
     if (oldestMessageSize >= oldestMemorySize) recentMessages = recentMessages.slice(1);
     else longTermMemories = longTermMemories.slice(1);
