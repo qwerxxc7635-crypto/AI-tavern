@@ -142,6 +142,16 @@ export interface NormalizedAIResponse {
   readonly receivedAt: IsoTimestamp;
 }
 
+export interface AIStreamChunk {
+  readonly sequence: number;
+  readonly content: string;
+}
+
+export interface AIStreamOptions {
+  readonly signal: AbortSignal;
+  readonly onChunk: (chunk: AIStreamChunk) => void;
+}
+
 export type ConnectionErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'AUTHENTICATION'
@@ -166,4 +176,9 @@ export interface AIProvider {
   listModels(): Promise<readonly ModelInfo[]>;
   testConnection(config: ProviderConfig): Promise<TestResult>;
   generate(request: NormalizedAIRequest, config: ProviderConfig): Promise<NormalizedAIResponse>;
+  generateStream?(
+    request: NormalizedAIRequest,
+    config: ProviderConfig,
+    options: AIStreamOptions,
+  ): Promise<NormalizedAIResponse>;
 }

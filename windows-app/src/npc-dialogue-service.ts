@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
+  StructuredJsonStreamProjector,
   findRepeatedPhrase,
   type AIProvider,
 } from '@ember-tavern/ai-core';
@@ -93,6 +94,12 @@ interface RequestIdentity {
   readonly idempotencyKey: string;
 }
 
+export interface NpcDialogueStreamOptions {
+  readonly signal: AbortSignal;
+  readonly onChunk: (content: string) => void;
+  readonly onReset?: () => void;
+}
+
 export const tauriNpcDialogueGateway: NpcDialogueGateway = {
   async load(campaign, npc) {
     return parseSnapshot(
@@ -135,10 +142,7 @@ export class WindowsNpcDialogueService {
     ]);
     return Object.freeze({
       ...snapshot,
-      timeline:
-        timeline !== null && ['PENDING', 'FAILED_RETRYABLE'].includes(timeline.status)
-          ? timeline
-          : null,
+      timeline: timeline !== null && timeline.status !== 'COMMITTED' ? timeline : null,
     });
   }
 
@@ -146,20 +150,25 @@ export class WindowsNpcDialogueService {
     campaign: string,
     npc: string,
     playerMessage: string,
+    stream?: NpcDialogueStreamOptions,
   ): Promise<NpcDialogueSnapshot> {
     const latest = await this.timeline.latest(campaign, 'NPC_DIALOGUE', npc);
     if (latest !== null && ['PENDING', 'FAILED_RETRYABLE'].includes(latest.status)) {
       throw new NpcDialogueServiceError('TIMELINE_RETRY_REQUIRED');
     }
-    return this.performSend(campaign, npc, playerMessage, null);
+    return this.performSend(campaign, npc, playerMessage, null, stream);
   }
 
-  public async retry(campaign: string, npc: string): Promise<NpcDialogueSnapshot> {
+  public async retry(
+    campaign: string,
+    npc: string,
+    stream?: NpcDialogueStreamOptions,
+  ): Promise<NpcDialogueSnapshot> {
     const latest = await this.timeline.latest(campaign, 'NPC_DIALOGUE', npc);
     if (latest === null || !['PENDING', 'FAILED_RETRYABLE'].includes(latest.status)) {
       throw new NpcDialogueServiceError('TIMELINE_RETRY_UNAVAILABLE');
     }
-    return this.performSend(campaign, npc, latest.playerIntent, latest);
+    return this.performSend(campaign, npc, latest.playerIntent, latest, stream);
   }
 
   private async performSend(
@@ -167,6 +176,7 @@ export class WindowsNpcDialogueService {
     npc: string,
     playerMessage: string,
     existingTimeline: NpcTimelineOperation | null,
+    stream: NpcDialogueStreamOptions | undefined,
   ): Promise<NpcDialogueSnapshot> {
     const snapshot = await this.gateway.load(campaign, npc);
     const input = NpcReplyInputSchema.parse({
@@ -199,12 +209,35 @@ export class WindowsNpcDialogueService {
     );
     try {
       const temperature = await this.randomness.resolveTemperature();
+      let projector = stream === undefined ? null : new StructuredJsonStreamProjector('reply');
+      let rawChunks = 0;
       const generated = await this.ai.execute('NPC_REPLY', input, {
         requestId: stableIdentity.requestId,
         temperature,
         maxOutputTokens: 2_000,
         timeoutMs: 5_000,
+        ...(stream === undefined
+          ? {}
+          : {
+              stream: {
+                signal: stream.signal,
+                onChunk(chunk: { readonly content: string }) {
+                  rawChunks += 1;
+                  const visible = projector?.push(chunk.content) ?? '';
+                  if (visible.length > 0) stream.onChunk(visible);
+                },
+                onReset() {
+                  projector = new StructuredJsonStreamProjector('reply');
+                  rawChunks = 0;
+                  stream.onReset?.();
+                },
+              },
+            }),
       });
+      if (projector !== null && rawChunks > 0) {
+        const visible = projector.finish(generated.response.content);
+        if (visible.length > 0) stream?.onChunk(visible);
+      }
       let output: ReturnType<typeof NpcReplyOutputSchema.parse>;
       try {
         output = NpcReplyOutputSchema.parse(generated.validatedOutput);

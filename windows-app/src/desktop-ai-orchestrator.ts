@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/core';
+import { Channel, invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
@@ -8,6 +8,7 @@ import {
   classifyApplicationError,
   validateAIOutput,
   type AIProvider,
+  type AIStreamChunk,
   type AITask,
   type Generator,
   type GeneratorAuditEntry,
@@ -53,6 +54,13 @@ export interface DesktopAIExecuteOptions {
   readonly temperature: number;
   readonly maxOutputTokens: number;
   readonly timeoutMs: number;
+  readonly stream?: DesktopAIStreamControl;
+}
+
+export interface DesktopAIStreamControl {
+  readonly signal: AbortSignal;
+  readonly onChunk: (chunk: AIStreamChunk) => void;
+  readonly onReset?: () => void;
 }
 
 export interface DesktopAIEngine {
@@ -96,6 +104,23 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     input: unknown,
     options: DesktopAIExecuteOptions,
   ): Promise<DesktopAIExecution> {
+    let streamed = false;
+    const executionOptions: DesktopAIExecuteOptions =
+      options.stream === undefined
+        ? options
+        : {
+            ...options,
+            stream: {
+              signal: options.stream.signal,
+              onChunk(chunk) {
+                streamed = true;
+                options.stream?.onChunk(chunk);
+              },
+              onReset() {
+                options.stream?.onReset?.();
+              },
+            },
+          };
     let contextInput: unknown;
     try {
       const prepared = await buildUnifiedTaskContext(task, input, {
@@ -126,16 +151,16 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
         selections.primary,
         task,
         contextInput,
-        options,
+        executionOptions,
         userPreset,
       );
     } catch (error) {
-      if (selections.fallback === null || !canUseFallback(error)) throw error;
+      if (selections.fallback === null || streamed || !canUseFallback(error)) throw error;
       return this.executeWithSelection(
         selections.fallback,
         task,
         contextInput,
-        options,
+        executionOptions,
         userPreset,
       );
     }
@@ -284,7 +309,31 @@ class DesktopStructuredGenerator implements Generator<
   }
 
   public async generate(prepared: DesktopPreparedPrompt): Promise<DesktopRawGeneration> {
-    const response = await this.provider.generate(prepared.request, prepared.providerConfig);
+    const stream = prepared.options.stream;
+    let expectedSequence = 1;
+    let streamedContent = '';
+    const generateStream = this.provider.generateStream?.bind(this.provider);
+    const useStream = stream !== undefined && prepared.selection.model.capabilities.streaming;
+    const response =
+      useStream && generateStream !== undefined
+        ? await generateStream(prepared.request, prepared.providerConfig, {
+            signal: stream.signal,
+            onChunk(chunk) {
+              if (chunk.sequence !== expectedSequence || chunk.content.length === 0) {
+                throw new DesktopAIOrchestrationError('STREAM_ORDER_INVALID');
+              }
+              expectedSequence += 1;
+              streamedContent += chunk.content;
+              if (streamedContent.length > 4 * 1024 * 1024) {
+                throw new DesktopAIOrchestrationError('STREAM_LIMIT_EXCEEDED');
+              }
+              stream.onChunk(chunk);
+            },
+          })
+        : await this.provider.generate(prepared.request, prepared.providerConfig);
+    if (useStream && generateStream !== undefined && response.content !== streamedContent) {
+      throw new DesktopAIOrchestrationError('STREAM_FINAL_MISMATCH');
+    }
     this.lastRaw = response.content;
     return Object.freeze({ prepared, request: prepared.request, response });
   }
@@ -317,6 +366,7 @@ class DesktopStructuredGenerator implements Generator<
   }): Promise<DesktopRawGeneration | null> {
     if (failedStage !== 'VALIDATE' || !(error instanceof DesktopOutputValidationError)) return null;
     const prepared = raw.prepared;
+    prepared.options.stream?.onReset?.();
     const repair = formatOutputRepairPrompt(
       prepared.task,
       prepared.input,
@@ -420,14 +470,7 @@ class TauriNativeAIProvider implements AIProvider {
     request: NormalizedAIRequest,
     config: ProviderConfig,
   ): Promise<NormalizedAIResponse> {
-    const cachePrefixHash = config.options['cachePrefixHash'];
-    if (typeof cachePrefixHash !== 'string') {
-      throw new DesktopAIOrchestrationError('CACHE_PREFIX_INVALID');
-    }
-    const selectedProfileId = config.options['profileId'];
-    if (typeof selectedProfileId !== 'string') {
-      throw new DesktopAIOrchestrationError('MODEL_NOT_CONFIGURED');
-    }
+    const { selectedProfileId, cachePrefixHash } = nativeGenerationOptions(config);
     try {
       return parseNativeResponse(
         await invoke<unknown>('ai_generate', {
@@ -439,6 +482,89 @@ class TauriNativeAIProvider implements AIProvider {
       throw code === null ? error : new DesktopAIOrchestrationError(code);
     }
   }
+
+  public async generateStream(
+    request: NormalizedAIRequest,
+    config: ProviderConfig,
+    options: DesktopAIStreamControl,
+  ): Promise<NormalizedAIResponse> {
+    const { selectedProfileId, cachePrefixHash } = nativeGenerationOptions(config);
+    if (options.signal.aborted) throw new DesktopAIOrchestrationError('CANCELLED');
+    let expectedSequence = 1;
+    let streamedContent = '';
+    let streamError: DesktopAIOrchestrationError | null = null;
+    const channel = new Channel<unknown>();
+    channel.onmessage = (value) => {
+      if (streamError !== null || options.signal.aborted) return;
+      try {
+        const event = parseNativeStreamEvent(value);
+        if (event.requestId !== request.requestId || event.sequence !== expectedSequence) {
+          throw new DesktopAIOrchestrationError('STREAM_ORDER_INVALID');
+        }
+        expectedSequence += 1;
+        streamedContent += event.content;
+        if (streamedContent.length > 4 * 1024 * 1024) {
+          throw new DesktopAIOrchestrationError('STREAM_LIMIT_EXCEEDED');
+        }
+        options.onChunk(event);
+      } catch (error) {
+        streamError = preserveOrchestrationError(error, 'STREAM_CHUNK_INVALID');
+        void invoke('ai_stream_cancel', { requestId: request.requestId });
+      }
+    };
+    const cancel = () => {
+      void invoke('ai_stream_cancel', { requestId: request.requestId });
+    };
+    options.signal.addEventListener('abort', cancel, { once: true });
+    try {
+      const response = await invoke<unknown>('ai_generate_stream', {
+        request: { ...request, selectedProfileId, cachePrefixHash },
+        onEvent: channel,
+      });
+      if (options.signal.aborted) throw new DesktopAIOrchestrationError('CANCELLED');
+      if (streamError !== null) throw streamError;
+      const parsed = parseNativeResponse(response);
+      if (parsed.content !== streamedContent) {
+        throw new DesktopAIOrchestrationError('STREAM_FINAL_MISMATCH');
+      }
+      return parsed;
+    } catch (error) {
+      if (streamError !== null) throw streamError;
+      if (options.signal.aborted) throw new DesktopAIOrchestrationError('CANCELLED');
+      const code = tauriCommandErrorCode(error);
+      throw code === null ? error : new DesktopAIOrchestrationError(code);
+    } finally {
+      options.signal.removeEventListener('abort', cancel);
+    }
+  }
+}
+
+function nativeGenerationOptions(config: ProviderConfig): {
+  readonly selectedProfileId: string;
+  readonly cachePrefixHash: string;
+} {
+  const cachePrefixHash = config.options['cachePrefixHash'];
+  if (typeof cachePrefixHash !== 'string') {
+    throw new DesktopAIOrchestrationError('CACHE_PREFIX_INVALID');
+  }
+  const selectedProfileId = config.options['profileId'];
+  if (typeof selectedProfileId !== 'string') {
+    throw new DesktopAIOrchestrationError('MODEL_NOT_CONFIGURED');
+  }
+  return { selectedProfileId, cachePrefixHash };
+}
+
+function parseNativeStreamEvent(value: unknown): AIStreamChunk & { readonly requestId: string } {
+  const record = requireRecord(value);
+  const sequence = record['sequence'];
+  if (!Number.isSafeInteger(sequence) || (sequence as number) < 1) {
+    throw new TypeError('AI stream sequence is invalid');
+  }
+  return Object.freeze({
+    requestId: requireText(record['requestId']),
+    sequence: sequence as number,
+    content: requireText(record['content']),
+  });
 }
 
 export const tauriDesktopAIOrchestrator = new DesktopAIOrchestrator(

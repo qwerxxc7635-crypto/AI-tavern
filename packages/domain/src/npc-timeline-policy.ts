@@ -21,9 +21,11 @@ export function npcTimelineFailure(kind: NpcTimelineErrorKind, code: string): Np
   }
   const retryable =
     code === 'APP_INTERRUPTED' ||
+    code === 'CANCELLED' ||
     code === 'FACT_CONFLICT' ||
     (kind === 'PROVIDER' && RETRYABLE_PROVIDER.has(code)) ||
     (kind === 'NETWORK' && RETRYABLE_NETWORK.has(code)) ||
     (kind === 'VALIDATION' && (RETRYABLE_VALIDATION.has(code) || code.startsWith('SCHEMA_')));
-  return Object.freeze({ kind, code, retryable });
+  const streamRetryable = kind === 'VALIDATION' && code.startsWith('STREAM_');
+  return Object.freeze({ kind, code, retryable: retryable || streamRetryable });
 }

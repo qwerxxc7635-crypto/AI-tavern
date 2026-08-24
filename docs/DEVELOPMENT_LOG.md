@@ -4615,3 +4615,28 @@
 
 - `M10-T02`完成；下一项严格为`M10-T03 Streaming`，本次未开始。
 - 用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T03 完成 Streaming
+
+### 边界与实现
+
+- 在分支`task/M10-T03-streaming`、起始提交`980f187`上继续；未回滚或重做M0～M10-T02，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T04，也未扩大Rules、D20、Quest、NPC、Adventure或Persistence业务合同。
+- `AIProvider.generate`保持必需，新增capability-gated可选`generateStream`。旧配置和不支持流的Provider继续完整响应；DeepSeek、Qwen、OpenRouter与Ollama的新probe可记录streaming能力。Primary产生任何片段后不再切换fallback。
+- OpenAI-compatible Native发送`stream: true`，复用secure HTTP byte limit、overall timeout与CancellationToken。SSE decoder在byte层组装UTF-8/frame，要求合法JSON、稳定model、完整`[DONE]`；Tauri Channel按request ID发送连续sequence，最终仍返回一个完整Normalized response。
+- 有界Native stream registry覆盖active cancel和cancel-before-register竞态。TypeScript共享orchestrator再次验证sequence、总大小和`chunks.join('') === final.content`，取消、顺序错误或final mismatch均fail closed。
+- 新增顶层结构化字符串projector，处理跨chunk escape、Unicode escape与surrogate pair，拒绝嵌套同名字段冒充。NPC只显示`reply`，初始世界介绍只显示`summary`，不会向玩家展示原始JSON。
+- NPC复用durable timeline和原commit事务；取消/超时/畸形final只形成可重试失败，不插入半条Player/NPC消息。响应丢失后仍以SQLite COMMITTED为准。World只在完整Schema通过后调用原`world_generation_commit`。
+- NPC页面复用`ActionComposer` streaming/Cancel状态；World介绍复用同一stream output视觉样式与现有按钮。新增状态遵守[`EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`](EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md)，没有新增硬编码视觉值、平行组件体系或Legacy逐页返工。
+- 新增[`V0.3_STREAMING.md`](V0.3_STREAMING.md)与`DEC-146`，更新V0.3 Spec和任务引用；M10-T07的Token→Primitive→Game Component→Feature→Legacy→Audit顺序不变。
+
+### 验证
+
+- 专项测试覆盖SSE chunk order、byte-split Unicode、structured Unicode/surrogate、取消竞态、畸形/缺失final、final mismatch、NPC timeout retry、response-loss恢复、NPC/World no partial commit、非流式Provider兼容和NPC/World streaming UI。
+- 自审补强active/pre-dispatch取消区分与30秒tombstone TTL，避免完成后晚到cancel造成registry容量泄漏；并在流式草稿进入既有repair前显式清空临时投影，repair仍以完整响应验证且不拼接旧草稿。首轮完整门禁只发现`FinishReason::Default`可派生的严格Clippy问题，按编译器建议修正后从最终工作树完整重跑。
+- 最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 180 files / 1008 tests通过，另1 file / 1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 141 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换279 modules。
+
+### 结束状态
+
+- `M10-T03`实现与完整门禁完成；本地提交前不进入`M10-T04 Cache Optimization`。
+- 用户`.gitignore`保持未暂存，不merge、不push。

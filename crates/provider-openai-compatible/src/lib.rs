@@ -350,6 +350,7 @@ impl OpenAiCompatibleProvider {
             response_format,
             temperature: request.temperature,
             max_tokens: request.max_output_tokens,
+            stream: None,
         })
         .map_err(|_| ProviderError::InvalidRequest)?;
         let transport_request = self.request(
@@ -381,6 +382,74 @@ impl OpenAiCompatibleProvider {
             content: choice.message.content,
             finish_reason: normalize_finish_reason(choice.finish_reason.as_deref()),
             usage: payload.usage.map_or_else(TokenUsage::unknown, Into::into),
+            received_at: OffsetDateTime::now_utc()
+                .format(&Rfc3339)
+                .map_err(|_| ProviderError::InvalidResponse)?,
+        })
+    }
+
+    pub async fn generate_stream<F>(
+        &self,
+        config: &OpenAiCompatibleConfig,
+        request: &NormalizedRequest,
+        cancellation: CancellationToken,
+        mut on_delta: F,
+    ) -> Result<NormalizedResponse, ProviderError>
+    where
+        F: FnMut(&str) -> Result<(), ProviderError>,
+    {
+        validate_normalized_request(request)?;
+        let response_format = match &request.response_format {
+            ResponseFormat::Text => None,
+            ResponseFormat::JsonObject => Some(ApiResponseFormat {
+                kind: "json_object",
+            }),
+            ResponseFormat::JsonSchema => return Err(ProviderError::Unsupported),
+        };
+        let body = serde_json::to_vec(&ChatRequest {
+            model: &request.model_name,
+            messages: request
+                .messages
+                .iter()
+                .map(|message| ApiMessage {
+                    role: message.role.as_api_role(),
+                    content: &message.content,
+                })
+                .collect(),
+            response_format,
+            temperature: request.temperature,
+            max_tokens: request.max_output_tokens,
+            stream: Some(true),
+        })
+        .map_err(|_| ProviderError::InvalidRequest)?;
+        let mut transport_request = self.request(
+            config,
+            RequestMethod::Post,
+            "chat/completions",
+            body,
+            request.timeout,
+        )?;
+        transport_request.headers[0] =
+            RequestHeader::sensitive("accept", "text/event-stream").map_err(map_transport_error)?;
+        let mut response = self
+            .transport
+            .send_streaming(&config.endpoint, transport_request, cancellation)
+            .await
+            .map_err(map_transport_error)?;
+        let mut decoder = SseCompletionDecoder::default();
+        while let Some(chunk) = response.next_chunk().await.map_err(map_transport_error)? {
+            for delta in decoder.push(&chunk)? {
+                on_delta(&delta)?;
+            }
+        }
+        let completion = decoder.finish()?;
+        Ok(NormalizedResponse {
+            request_id: request.request_id.clone(),
+            provider_request_id: completion.provider_request_id,
+            model_name: completion.model_name,
+            content: completion.content,
+            finish_reason: completion.finish_reason,
+            usage: completion.usage,
             received_at: OffsetDateTime::now_utc()
                 .format(&Rfc3339)
                 .map_err(|_| ProviderError::InvalidResponse)?,
@@ -505,13 +574,14 @@ pub struct NormalizedResponse {
     pub received_at: String,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum FinishReason {
     Stop,
     Length,
     ContentFilter,
     ToolCall,
     Error,
+    #[default]
     Unknown,
 }
 
@@ -673,6 +743,8 @@ struct ChatRequest<'a> {
     response_format: Option<ApiResponseFormat>,
     temperature: f64,
     max_tokens: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stream: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -765,6 +837,145 @@ struct ApiUsage {
     total_tokens: Option<u64>,
     prompt_cache_hit_tokens: Option<u64>,
     prompt_cache_miss_tokens: Option<u64>,
+}
+
+#[derive(Default)]
+struct SseCompletionDecoder {
+    buffer: Vec<u8>,
+    provider_request_id: Option<String>,
+    model_name: Option<String>,
+    content: String,
+    finish_reason: FinishReason,
+    usage: Option<TokenUsage>,
+    done: bool,
+}
+
+struct StreamCompletion {
+    provider_request_id: Option<String>,
+    model_name: String,
+    content: String,
+    finish_reason: FinishReason,
+    usage: TokenUsage,
+}
+
+#[derive(Deserialize)]
+struct StreamPayload {
+    id: Option<String>,
+    model: Option<String>,
+    #[serde(default)]
+    choices: Vec<StreamChoice>,
+    usage: Option<ApiUsage>,
+}
+
+#[derive(Deserialize)]
+struct StreamChoice {
+    delta: StreamDelta,
+    finish_reason: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct StreamDelta {
+    content: Option<String>,
+}
+
+impl SseCompletionDecoder {
+    fn push(&mut self, bytes: &[u8]) -> Result<Vec<String>, ProviderError> {
+        if self.done {
+            if bytes.iter().all(u8::is_ascii_whitespace) {
+                return Ok(Vec::new());
+            }
+            return Err(ProviderError::InvalidResponse);
+        }
+        self.buffer.extend_from_slice(bytes);
+        let mut deltas = Vec::new();
+        while let Some((position, delimiter_length)) = frame_boundary(&self.buffer) {
+            let frame = self.buffer[..position].to_vec();
+            self.buffer.drain(..position + delimiter_length);
+            if let Some(delta) = self.consume_frame(&frame)? {
+                deltas.push(delta);
+            }
+        }
+        Ok(deltas)
+    }
+
+    fn consume_frame(&mut self, frame: &[u8]) -> Result<Option<String>, ProviderError> {
+        if self.done {
+            return Err(ProviderError::InvalidResponse);
+        }
+        let text = std::str::from_utf8(frame).map_err(|_| ProviderError::InvalidResponse)?;
+        let data = text
+            .lines()
+            .filter_map(|line| line.strip_prefix("data:").map(str::trim_start))
+            .collect::<Vec<_>>()
+            .join("\n");
+        if data.is_empty() {
+            return Ok(None);
+        }
+        if data == "[DONE]" {
+            self.done = true;
+            return Ok(None);
+        }
+        let payload: StreamPayload =
+            serde_json::from_str(&data).map_err(|_| ProviderError::InvalidResponse)?;
+        if let Some(value) = payload.id.and_then(non_empty) {
+            self.provider_request_id.get_or_insert(value);
+        }
+        if let Some(value) = payload.model.and_then(non_empty) {
+            if self
+                .model_name
+                .as_ref()
+                .is_some_and(|model| model != &value)
+            {
+                return Err(ProviderError::InvalidResponse);
+            }
+            self.model_name = Some(value);
+        }
+        if let Some(usage) = payload.usage {
+            self.usage = Some(usage.into());
+        }
+        let mut delta = String::new();
+        for choice in payload.choices {
+            if let Some(reason) = choice.finish_reason.as_deref() {
+                self.finish_reason = normalize_finish_reason(Some(reason));
+            }
+            if let Some(value) = choice.delta.content {
+                self.content.push_str(&value);
+                delta.push_str(&value);
+            }
+        }
+        Ok((!delta.is_empty()).then_some(delta))
+    }
+
+    fn finish(self) -> Result<StreamCompletion, ProviderError> {
+        if !self.done || !self.buffer.iter().all(u8::is_ascii_whitespace) || self.content.is_empty()
+        {
+            return Err(ProviderError::InvalidResponse);
+        }
+        let model_name = self.model_name.ok_or(ProviderError::InvalidResponse)?;
+        Ok(StreamCompletion {
+            provider_request_id: self.provider_request_id,
+            model_name,
+            content: self.content,
+            finish_reason: self.finish_reason,
+            usage: self.usage.unwrap_or_else(TokenUsage::unknown),
+        })
+    }
+}
+
+fn frame_boundary(bytes: &[u8]) -> Option<(usize, usize)> {
+    let lf = bytes
+        .windows(2)
+        .position(|part| part == b"\n\n")
+        .map(|index| (index, 2));
+    let crlf = bytes
+        .windows(4)
+        .position(|part| part == b"\r\n\r\n")
+        .map(|index| (index, 4));
+    match (lf, crlf) {
+        (Some(left), Some(right)) => Some(if left.0 <= right.0 { left } else { right }),
+        (Some(value), None) | (None, Some(value)) => Some(value),
+        (None, None) => None,
+    }
 }
 
 impl From<ApiUsage> for TokenUsage {

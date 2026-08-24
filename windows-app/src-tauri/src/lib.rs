@@ -49,13 +49,15 @@ use ember_provider_openai_compatible::{
 };
 use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
 use serde::{Deserialize, Serialize, ser::SerializeStruct};
-use tauri::{Manager, State};
+use tauri::{Manager, State, ipc::Channel};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const PROBE_RECEIPT_TTL: Duration = Duration::from_secs(15 * 60);
 const MAX_PROBE_RECEIPTS: usize = 64;
+const MAX_ACTIVE_AI_STREAMS: usize = 32;
+const AI_STREAM_CANCEL_TOMBSTONE_TTL: Duration = Duration::from_secs(30);
 
 #[derive(Debug)]
 struct CommandError {
@@ -254,6 +256,10 @@ impl From<ProviderError> for CommandError {
                 code: "TIMEOUT",
                 message: "模型服务响应超时，请重试。",
             },
+            ProviderError::Cancelled => Self {
+                code: "CANCELLED",
+                message: "生成已取消，本地存档未修改。",
+            },
             ProviderError::ModelNotFound => Self {
                 code: "MODEL_NOT_FOUND",
                 message: "当前模型不存在或已下线，请重新选择模型。",
@@ -434,6 +440,112 @@ struct RuntimeGenerateResponse {
     cache_metric_recorded: Option<bool>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeStreamEvent {
+    request_id: String,
+    sequence: u64,
+    content: String,
+}
+
+struct RegisteredAiStream {
+    cancellation: CancellationToken,
+    registered: bool,
+    created_at: Instant,
+}
+
+#[derive(Default)]
+struct AiStreamRegistry(Mutex<HashMap<String, RegisteredAiStream>>);
+
+impl AiStreamRegistry {
+    fn register(&self, request_id: &str) -> Result<CancellationToken, CommandError> {
+        if !valid_stream_request_id(request_id) {
+            return Err(ProviderError::InvalidRequest.into());
+        }
+        let mut streams = self.0.lock().map_err(|_| CommandError {
+            code: "PROVIDER_UNAVAILABLE",
+            message: "模型流式通道暂时不可用，请重试。",
+        })?;
+        streams.retain(|_, value| {
+            value.registered || value.created_at.elapsed() <= AI_STREAM_CANCEL_TOMBSTONE_TTL
+        });
+        if let Some(existing) = streams.get(request_id) {
+            if !existing.registered {
+                streams.remove(request_id);
+                return Err(ProviderError::Cancelled.into());
+            }
+            return Err(CommandError {
+                code: "PROVIDER_UNAVAILABLE",
+                message: "相同的流式生成任务正在执行，请稍后重试。",
+            });
+        }
+        if streams.len() >= MAX_ACTIVE_AI_STREAMS {
+            return Err(CommandError {
+                code: "PROVIDER_UNAVAILABLE",
+                message: "当前流式生成任务过多，请稍后重试。",
+            });
+        }
+        let cancellation = CancellationToken::new();
+        streams.insert(
+            request_id.to_owned(),
+            RegisteredAiStream {
+                cancellation: cancellation.clone(),
+                registered: true,
+                created_at: Instant::now(),
+            },
+        );
+        Ok(cancellation)
+    }
+
+    fn cancel(&self, request_id: &str) -> Result<bool, CommandError> {
+        if !valid_stream_request_id(request_id) {
+            return Err(ProviderError::InvalidRequest.into());
+        }
+        let mut streams = self.0.lock().map_err(|_| CommandError {
+            code: "PROVIDER_UNAVAILABLE",
+            message: "模型流式通道暂时不可用，请重试。",
+        })?;
+        streams.retain(|_, value| {
+            value.registered || value.created_at.elapsed() <= AI_STREAM_CANCEL_TOMBSTONE_TTL
+        });
+        if let Some(stream) = streams.get(request_id) {
+            stream.cancellation.cancel();
+        } else {
+            if streams.len() >= MAX_ACTIVE_AI_STREAMS {
+                return Err(CommandError {
+                    code: "PROVIDER_UNAVAILABLE",
+                    message: "当前流式生成任务过多，请稍后重试。",
+                });
+            }
+            let cancellation = CancellationToken::new();
+            cancellation.cancel();
+            streams.insert(
+                request_id.to_owned(),
+                RegisteredAiStream {
+                    cancellation,
+                    registered: false,
+                    created_at: Instant::now(),
+                },
+            );
+        }
+        Ok(true)
+    }
+
+    fn remove(&self, request_id: &str) {
+        if let Ok(mut streams) = self.0.lock() {
+            streams.remove(request_id);
+        }
+    }
+}
+
+fn valid_stream_request_id(request_id: &str) -> bool {
+    !request_id.is_empty()
+        && request_id.len() <= 256
+        && request_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b":._-".contains(&byte))
+}
+
 #[tauri::command]
 async fn ai_generate(
     request: RuntimeGenerateRequest,
@@ -446,6 +558,54 @@ async fn execute_ai_generate(
     request: RuntimeGenerateRequest,
     store: &CampaignStore,
 ) -> Result<RuntimeGenerateResponse, CommandError> {
+    execute_ai_generate_inner(request, store, CancellationToken::new(), false, |_| Ok(())).await
+}
+
+#[tauri::command]
+async fn ai_generate_stream(
+    request: RuntimeGenerateRequest,
+    on_event: Channel<RuntimeStreamEvent>,
+    store: State<'_, CampaignStore>,
+    streams: State<'_, AiStreamRegistry>,
+) -> Result<RuntimeGenerateResponse, CommandError> {
+    let request_id = request.request_id.clone();
+    let cancellation = streams.register(&request_id)?;
+    let mut sequence = 0_u64;
+    let result = execute_ai_generate_inner(request, store.inner(), cancellation, true, |content| {
+        sequence = sequence
+            .checked_add(1)
+            .ok_or(ProviderError::InvalidResponse)?;
+        on_event
+            .send(RuntimeStreamEvent {
+                request_id: request_id.clone(),
+                sequence,
+                content: content.to_owned(),
+            })
+            .map_err(|_| ProviderError::Cancelled)
+    })
+    .await;
+    streams.remove(&request_id);
+    result
+}
+
+#[tauri::command]
+fn ai_stream_cancel(
+    request_id: String,
+    streams: State<'_, AiStreamRegistry>,
+) -> Result<bool, CommandError> {
+    streams.cancel(&request_id)
+}
+
+async fn execute_ai_generate_inner<F>(
+    request: RuntimeGenerateRequest,
+    store: &CampaignStore,
+    cancellation: CancellationToken,
+    streaming: bool,
+    mut on_delta: F,
+) -> Result<RuntimeGenerateResponse, CommandError>
+where
+    F: FnMut(&str) -> Result<(), ProviderError>,
+{
     let runtime = store
         .model_runtime_config(&request.selected_profile_id)
         .map_err(|error| match error {
@@ -500,9 +660,16 @@ async fn execute_ai_generate(
         max_output_tokens: request.max_output_tokens,
         timeout: Duration::from_millis(request.timeout_ms),
     };
-    let response = OpenAiCompatibleProvider::new()?
-        .generate(&config, &normalized, CancellationToken::new())
-        .await?;
+    let provider = OpenAiCompatibleProvider::new()?;
+    let response = if streaming {
+        provider
+            .generate_stream(&config, &normalized, cancellation, &mut on_delta)
+            .await?
+    } else {
+        provider
+            .generate(&config, &normalized, cancellation)
+            .await?
+    };
     let cache_metric_recorded = record_cache_metric_best_effort(
         store,
         &runtime.preset_key,
@@ -771,7 +938,10 @@ async fn provider_probe(
             };
             let capabilities = ModelCapabilitiesRegistration {
                 text: true,
-                streaming: false,
+                streaming: matches!(
+                    preset_key.as_str(),
+                    "deepseek" | "qwen" | "openrouter" | "ollama"
+                ),
                 system_messages: true,
                 json_mode: preset
                     .map(|value| value.json_mode)
@@ -1684,6 +1854,7 @@ pub fn run() {
             app.manage(instance_guard);
             app.manage(store);
             app.manage(ProviderProbeRegistry::default());
+            app.manage(AiStreamRegistry::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1772,6 +1943,8 @@ pub fn run() {
             model_settings_save,
             model_settings_forget_credential,
             ai_generate,
+            ai_generate_stream,
+            ai_stream_cancel,
             randomness_settings_get,
             randomness_settings_save,
             prompt_manager_get,
@@ -1853,6 +2026,7 @@ mod tests {
             (ProviderError::Authentication, "AUTHENTICATION_FAILED"),
             (ProviderError::RateLimited, "RATE_LIMITED"),
             (ProviderError::Timeout, "TIMEOUT"),
+            (ProviderError::Cancelled, "CANCELLED"),
             (ProviderError::ModelNotFound, "MODEL_NOT_FOUND"),
             (ProviderError::InvalidResponse, "INVALID_OUTPUT"),
             (ProviderError::Network, "NETWORK_FAILED"),
@@ -1861,6 +2035,21 @@ mod tests {
             assert_eq!(command_error.code, expected);
             assert!(!command_error.message.is_empty());
         }
+    }
+
+    #[test]
+    fn stream_registry_handles_active_and_pre_dispatch_cancellation() {
+        let registry = AiStreamRegistry::default();
+        let active = registry.register("stream-active").unwrap();
+        assert!(!active.is_cancelled());
+        assert!(registry.cancel("stream-active").unwrap());
+        assert!(active.is_cancelled());
+        registry.remove("stream-active");
+
+        assert!(registry.cancel("stream-race").unwrap());
+        let error = registry.register("stream-race").unwrap_err();
+        assert_eq!(error.code, "CANCELLED");
+        assert!(registry.register("stream-race").is_ok());
     }
 
     #[test]

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
@@ -49,6 +49,15 @@ export function WorldCreationPage({
     (() => Promise<WorldCreationSnapshot>) | null
   >(null);
   const [revision, setRevision] = useState('');
+  const [streamedIntroduction, setStreamedIntroduction] = useState('');
+  const streamController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      streamController.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (campaignId === null) return;
@@ -86,6 +95,33 @@ export function WorldCreationPage({
     }
   }
 
+  function generateWorld(options: Parameters<WindowsWorldCreationService['generate']>[1]) {
+    if (campaignId === null) return;
+    const currentCampaignId = campaignId;
+    const action = async () => {
+      const controller = new AbortController();
+      streamController.current = controller;
+      setStreamedIntroduction('');
+      try {
+        return await service.generate(currentCampaignId, options, {
+          signal: controller.signal,
+          onChunk(content) {
+            setStreamedIntroduction((current) => `${current}${content}`);
+          },
+          onReset() {
+            setStreamedIntroduction('');
+          },
+        });
+      } catch (error) {
+        setStreamedIntroduction('');
+        throw error;
+      } finally {
+        if (streamController.current === controller) streamController.current = null;
+      }
+    };
+    void perform('generate', action);
+  }
+
   if (campaignId === null) {
     return (
       <main className="world-studio world-studio--message">
@@ -116,10 +152,10 @@ export function WorldCreationPage({
       <WorldOptions
         busy={busy !== null}
         error={aiError}
+        streamedIntroduction={streamedIntroduction}
+        onCancel={() => streamController.current?.abort()}
         onRetry={retryOperation === null ? undefined : () => void perform('retry', retryOperation)}
-        onGenerate={(options) =>
-          void perform('generate', () => service.generate(campaignId, options))
-        }
+        onGenerate={generateWorld}
       />
     );
   }
@@ -417,9 +453,18 @@ interface WorldOptionsProps {
   readonly error: unknown | null;
   readonly onRetry?: (() => void) | undefined;
   readonly onGenerate: (options: Parameters<WindowsWorldCreationService['generate']>[1]) => void;
+  readonly streamedIntroduction: string;
+  readonly onCancel: () => void;
 }
 
-function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
+function WorldOptions({
+  busy,
+  error,
+  streamedIntroduction,
+  onCancel,
+  onGenerate,
+  onRetry,
+}: WorldOptionsProps) {
   const [worldType, setWorldType] = useState('奇幻');
   const [tone, setTone] = useState('冒险');
   const [magic, setMagic] = useState('中');
@@ -445,6 +490,12 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
       </section>
 
       {error === null ? null : <AIErrorNotice error={error} onRetry={onRetry} />}
+
+      {streamedIntroduction.length === 0 ? null : (
+        <output className="game-action-composer__stream" aria-live="polite">
+          {streamedIntroduction}
+        </output>
+      )}
 
       <form
         className="world-options"
@@ -541,6 +592,11 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
         <button className="primary-action world-options__submit" type="submit" disabled={busy}>
           {busy ? '正在生成世界…' : '使用默认模型生成'}
         </button>
+        {busy ? (
+          <button className="quiet-action" type="button" onClick={onCancel}>
+            取消生成
+          </button>
+        ) : null}
       </form>
     </main>
   );

@@ -142,7 +142,114 @@ describe('WindowsNpcDialogueService', () => {
     expect(gateway.inputs).toHaveLength(1);
     expect(timeline.operation?.status).toBe('COMMITTED');
   });
+
+  it('projects ordered unicode reply chunks and commits the validated final result once', async () => {
+    const gateway = new MemoryDialogueGateway();
+    const output = dialogueOutput('炉火😊仍明亮。');
+    const raw = JSON.stringify(output);
+    const split = raw.indexOf('😊') + 1;
+    const engine: DesktopAIEngine = {
+      async execute(_task, _input, options) {
+        options.stream?.onChunk({ sequence: 1, content: raw.slice(0, split) });
+        options.stream?.onChunk({ sequence: 2, content: raw.slice(split) });
+        return generatedExecution(options.requestId, raw, output);
+      },
+    };
+    const visible: string[] = [];
+    const service = new WindowsNpcDialogueService(
+      gateway,
+      engine,
+      undefined,
+      undefined,
+      memoryTimeline(),
+    );
+
+    const saved = await service.send('campaign-tavern', 'npc-owner', 'How is the fire?', {
+      signal: new AbortController().signal,
+      onChunk: (chunk) => visible.push(chunk),
+    });
+
+    expect(visible.join('')).toBe('炉火😊仍明亮。');
+    expect(saved.messages.at(-1)?.content).toBe('炉火😊仍明亮。');
+    expect(gateway.inputs).toHaveLength(1);
+  });
+
+  it('cancels an interrupted stream without committing a partial message and keeps retry state', async () => {
+    const gateway = new MemoryDialogueGateway();
+    const timeline = new StatefulTimeline();
+    const controller = new AbortController();
+    const engine: DesktopAIEngine = {
+      async execute(_task, _input, options) {
+        options.stream?.onChunk({ sequence: 1, content: '{"reply":"Partial omen' });
+        if (options.stream?.signal.aborted) throw { code: 'CANCELLED' };
+        throw new Error('expected cancellation');
+      },
+    };
+    const service = new WindowsNpcDialogueService(gateway, engine, undefined, undefined, timeline);
+
+    await expect(
+      service.send('campaign-tavern', 'npc-owner', 'Read the omen.', {
+        signal: controller.signal,
+        onChunk() {
+          controller.abort();
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'CANCELLED' });
+
+    expect(gateway.inputs).toHaveLength(0);
+    expect(timeline.operation).toMatchObject({ status: 'FAILED_RETRYABLE' });
+    expect(timeline.operation?.attempts.at(-1)).toMatchObject({ errorCode: 'CANCELLED' });
+    expect((await service.load('campaign-tavern', 'npc-owner')).timeline?.status).toBe(
+      'FAILED_RETRYABLE',
+    );
+    timeline.markCommitted('npc-message-after-recovery');
+    expect((await service.load('campaign-tavern', 'npc-owner')).timeline).toBeNull();
+  });
+
+  it('rejects a mismatched final payload without committing streamed preview text', async () => {
+    const gateway = new MemoryDialogueGateway();
+    const output = dialogueOutput('A different final reply.');
+    const engine: DesktopAIEngine = {
+      async execute(_task, _input, options) {
+        options.stream?.onChunk({ sequence: 1, content: '{"reply":"Visible preview"}' });
+        return generatedExecution(options.requestId, JSON.stringify(output), output);
+      },
+    };
+    const service = new WindowsNpcDialogueService(
+      gateway,
+      engine,
+      undefined,
+      undefined,
+      memoryTimeline(),
+    );
+
+    await expect(
+      service.send('campaign-tavern', 'npc-owner', 'Tell me.', {
+        signal: new AbortController().signal,
+        onChunk() {},
+      }),
+    ).rejects.toMatchObject({ code: 'STREAM_FINAL_MISMATCH' });
+    expect(gateway.inputs).toHaveLength(0);
+  });
 });
+
+function dialogueOutput(reply: string) {
+  return {
+    reply,
+    mood: 'Wary',
+    suggestedTopics: ['The old tunnel', 'The cellar seal', 'The lighthouse road'],
+    memoryCandidate: null,
+    relationshipProposal: { trust: 1 },
+  };
+}
+
+function generatedExecution(requestId: string, content: string, validatedOutput: unknown) {
+  return {
+    request: { requestId, promptVersion: 3 },
+    response: { content },
+    validatedOutput,
+  } as never;
+}
 
 class MemoryDialogueGateway implements NpcDialogueGateway {
   public readonly inputs: unknown[] = [];

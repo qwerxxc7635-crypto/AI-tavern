@@ -32,12 +32,22 @@ export function NpcDialoguePage({
   const [draft, setDraft] = useState('');
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamedText, setStreamedText] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
   const [suggestions, setSuggestions] = useState<DialogueSuggestionSet | null>(null);
   const [suggestionError, setSuggestionError] = useState<string | undefined>();
   const [suggestionRevision, setSuggestionRevision] = useState(0);
   const sendInFlight = useRef(false);
+  const streamController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      streamController.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (campaignId === null || npcId === null) return;
@@ -83,16 +93,35 @@ export function NpcDialoguePage({
     const message = draft.trim();
     sendInFlight.current = true;
     setBusy(true);
+    setStreaming(false);
+    setStreamedText('');
     setAiError(null);
+    const controller = new AbortController();
+    streamController.current = controller;
     try {
-      setSnapshot(await service.send(campaignId, npcId, message));
+      setSnapshot(
+        await service.send(campaignId, npcId, message, {
+          signal: controller.signal,
+          onChunk(content) {
+            setStreaming(true);
+            setStreamedText((current) => `${current}${content}`);
+          },
+          onReset() {
+            setStreaming(false);
+            setStreamedText('');
+          },
+        }),
+      );
       setDraft('');
       setSelectedTopicId(null);
     } catch (error) {
       setAiError(error);
     } finally {
+      streamController.current = null;
       sendInFlight.current = false;
       setBusy(false);
+      setStreaming(false);
+      setStreamedText('');
     }
   }
 
@@ -100,16 +129,35 @@ export function NpcDialoguePage({
     if (campaignId === null || npcId === null || busy || sendInFlight.current) return;
     sendInFlight.current = true;
     setBusy(true);
+    setStreaming(false);
+    setStreamedText('');
     setAiError(null);
+    const controller = new AbortController();
+    streamController.current = controller;
     try {
-      setSnapshot(await service.retry(campaignId, npcId));
+      setSnapshot(
+        await service.retry(campaignId, npcId, {
+          signal: controller.signal,
+          onChunk(content) {
+            setStreaming(true);
+            setStreamedText((current) => `${current}${content}`);
+          },
+          onReset() {
+            setStreaming(false);
+            setStreamedText('');
+          },
+        }),
+      );
       setDraft('');
       setSelectedTopicId(null);
     } catch (error) {
       setAiError(error);
     } finally {
+      streamController.current = null;
       sendInFlight.current = false;
       setBusy(false);
+      setStreaming(false);
+      setStreamedText('');
     }
   }
 
@@ -172,7 +220,9 @@ export function NpcDialoguePage({
             }))}
             selectedSuggestionId={selectedTopicId}
             disabled={busy}
-            submitting={busy}
+            submitting={busy && !streaming}
+            streaming={streaming}
+            streamedText={streamedText}
             {...(suggestions === null && suggestionError === undefined
               ? { status: '正在整理对话建议…' }
               : {})}
@@ -187,11 +237,12 @@ export function NpcDialoguePage({
               setSelectedTopicId(suggestion.id);
             }}
             onRetry={() => setSuggestionRevision((current) => current + 1)}
+            onCancel={() => streamController.current?.abort()}
             onSubmit={() => void send()}
           />
           {snapshot.timeline === null && aiError === null ? null : (
             <AIErrorNotice
-              error={aiError ?? { code: 'APP_INTERRUPTED' }}
+              error={aiError ?? restoredTimelineError(snapshot)}
               onRetry={() => void retry()}
             />
           )}
@@ -216,6 +267,13 @@ export function NpcDialoguePage({
       </div>
     </main>
   );
+}
+
+function restoredTimelineError(snapshot: NpcDialogueSnapshot): { readonly code: string } {
+  const timeline = snapshot.timeline;
+  if (timeline === null || timeline.status === 'PENDING') return { code: 'APP_INTERRUPTED' };
+  const latest = timeline.attempts.at(-1);
+  return { code: latest?.errorCode ?? 'APP_INTERRUPTED' };
 }
 
 function Relationship({ label, value }: { readonly label: string; readonly value: number }) {

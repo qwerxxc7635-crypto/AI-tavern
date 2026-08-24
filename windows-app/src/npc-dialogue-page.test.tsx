@@ -87,6 +87,58 @@ describe('NPC dialogue page', () => {
     fireEvent.click(screen.getByRole('button', { name: '发送' }));
     await waitFor(() => expect(service.sent).toEqual(['I speak without a suggestion.']));
   });
+
+  it('shows streamed NPC prose, exposes cancel and never inserts preview as history', async () => {
+    let aborted = false;
+    const service = {
+      async load() {
+        return initialSnapshot();
+      },
+      async send(
+        _campaignId: string,
+        _npcId: string,
+        _message: string,
+        stream?: { readonly signal: AbortSignal; readonly onChunk: (content: string) => void },
+      ): Promise<NpcDialogueSnapshot> {
+        stream?.onChunk('The flame flickers.');
+        return new Promise((_resolve, reject) => {
+          stream?.signal.addEventListener(
+            'abort',
+            () => {
+              aborted = true;
+              reject({ code: 'CANCELLED' });
+            },
+            { once: true },
+          );
+        });
+      },
+      async retry() {
+        return initialSnapshot();
+      },
+    };
+    render(
+      <MemoryRouter initialEntries={['/npc?campaignId=campaign-tavern&npcId=npc-owner']}>
+        <Routes>
+          <Route
+            path="/npc"
+            element={<NpcDialoguePage service={service} suggestionService={suggestionService} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const input = await screen.findByLabelText('你想说什么？');
+    fireEvent.change(input, { target: { value: 'Read the flame.' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+
+    expect(await screen.findByText('The flame flickers.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await waitFor(() => expect(aborted).toBe(true));
+    await waitFor(() => expect(screen.queryByText('The flame flickers.')).toBeNull());
+    expect(screen.getByText('Earlier answer')).toBeTruthy();
+    expect((screen.getByLabelText('你想说什么？') as HTMLTextAreaElement).value).toBe(
+      'Read the flame.',
+    );
+  });
 });
 
 const suggestionService = {

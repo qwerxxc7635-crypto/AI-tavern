@@ -162,6 +162,7 @@ function isValidationCode(code: string): boolean {
     code === 'INVALID_OUTPUT' ||
     code === 'PROBE_STALE' ||
     code === 'REPETITION_DETECTED' ||
+    code.startsWith('STREAM_') ||
     code.startsWith('SCHEMA_') ||
     code.endsWith('_OUTPUT_MISMATCH') ||
     code.endsWith('_ENVELOPE_INVALID')

@@ -128,6 +128,101 @@ describe('DesktopAIOrchestrator', () => {
     });
   });
 
+  it('streams only through an optional capable provider and preserves the final validation path', async () => {
+    const base = profile('stream-profile', 'deepseek', 'deepseek-v4-flash');
+    if (base.capabilities === null) throw new Error('expected capabilities');
+    const settings = new MutableSettings({
+      ...base,
+      capabilities: { ...base.capabilities, streaming: true },
+    });
+    const provider = new StreamingProvider();
+    const chunks: string[] = [];
+    const result = await new DesktopAIOrchestrator(settings, provider).execute(
+      'GENERATE_WORLD',
+      worldInput('流光群岛'),
+      {
+        ...options('stream'),
+        stream: {
+          signal: new AbortController().signal,
+          onChunk: ({ content }) => chunks.push(content),
+        },
+      },
+    );
+
+    expect(provider.streamCalls).toBe(1);
+    expect(chunks.join('')).toBe(result.response.content);
+    expect(result.validatedOutput).toBeDefined();
+  });
+
+  it('keeps providers without streaming capability on the existing generate contract', async () => {
+    const provider = new CapturingProvider();
+    const chunks: string[] = [];
+    await new DesktopAIOrchestrator(
+      new MutableSettings(profile('legacy-profile', 'custom', 'legacy-model')),
+      provider,
+    ).execute('GENERATE_WORLD', worldInput('兼容世界'), {
+      ...options('legacy-stream'),
+      stream: {
+        signal: new AbortController().signal,
+        onChunk: ({ content }) => chunks.push(content),
+      },
+    });
+
+    expect(provider.calls).toHaveLength(1);
+    expect(chunks).toEqual([]);
+  });
+
+  it('rejects out-of-order chunks before final output can enter validation', async () => {
+    const base = profile('broken-stream-profile', 'deepseek', 'deepseek-v4-flash');
+    if (base.capabilities === null) throw new Error('expected capabilities');
+    const settings = new MutableSettings({
+      ...base,
+      capabilities: { ...base.capabilities, streaming: true },
+    });
+    const provider = new StreamingProvider(2);
+
+    await expect(
+      new DesktopAIOrchestrator(settings, provider).execute(
+        'GENERATE_WORLD',
+        worldInput('乱序世界'),
+        {
+          ...options('broken-stream'),
+          stream: { signal: new AbortController().signal, onChunk() {} },
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'STREAM_ORDER_INVALID' });
+  });
+
+  it('clears an invalid streamed draft before the existing non-stream repair succeeds', async () => {
+    const base = profile('repair-stream-profile', 'deepseek', 'deepseek-v4-flash');
+    if (base.capabilities === null) throw new Error('expected capabilities');
+    const chunks: string[] = [];
+    let resets = 0;
+    const result = await new DesktopAIOrchestrator(
+      new MutableSettings({
+        ...base,
+        capabilities: { ...base.capabilities, streaming: true },
+      }),
+      new RepairingStreamingProvider(),
+    ).execute('GENERATE_WORLD', worldInput('修复世界'), {
+      ...options('repair-stream'),
+      stream: {
+        signal: new AbortController().signal,
+        onChunk: ({ content }) => chunks.push(content),
+        onReset() {
+          resets += 1;
+        },
+      },
+    });
+
+    expect(chunks).toEqual(['{']);
+    expect(resets).toBe(1);
+    expect(result.validatedOutput).toBeDefined();
+    expect(result.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'REPAIR', status: 'SUCCEEDED' }),
+    );
+  });
+
   it('keeps the cache prefix stable when only dynamic player input changes', async () => {
     const orchestrator = new DesktopAIOrchestrator(
       new MutableSettings(profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash')),
@@ -363,6 +458,46 @@ class InvalidThenCapturingProvider extends CapturingProvider {
       };
     }
     return super.generate(request, config);
+  }
+}
+
+class StreamingProvider extends CapturingProvider {
+  public streamCalls = 0;
+
+  public constructor(private readonly firstSequence = 1) {
+    super();
+  }
+
+  public async generateStream(
+    request: NormalizedAIRequest,
+    config: ProviderConfig,
+    stream: NonNullable<Parameters<NonNullable<AIProvider['generateStream']>>[2]>,
+  ) {
+    this.streamCalls += 1;
+    const response = await this.generate(request, config);
+    const split = Math.max(1, Math.floor(response.content.length / 2));
+    stream.onChunk({ sequence: this.firstSequence, content: response.content.slice(0, split) });
+    stream.onChunk({ sequence: this.firstSequence + 1, content: response.content.slice(split) });
+    return response;
+  }
+}
+
+class RepairingStreamingProvider extends CapturingProvider {
+  public async generateStream(
+    request: NormalizedAIRequest,
+    _config: ProviderConfig,
+    stream: Parameters<NonNullable<AIProvider['generateStream']>>[2],
+  ) {
+    stream.onChunk({ sequence: 1, content: '{' });
+    return {
+      requestId: request.requestId,
+      providerRequestId: null,
+      modelName: request.modelName,
+      content: '{',
+      finishReason: 'LENGTH' as const,
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      receivedAt: isoTimestamp('2026-08-01T00:00:00.000Z'),
+    };
   }
 }
 

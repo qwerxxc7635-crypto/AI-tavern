@@ -107,6 +107,81 @@ fn normalized(response_format: ResponseFormat) -> NormalizedRequest {
     }
 }
 
+#[test]
+fn streaming_decoder_preserves_order_and_unicode_across_byte_boundaries() {
+    let mut decoder = SseCompletionDecoder::default();
+    let payload = concat!(
+        "data: {\"id\":\"stream-1\",\"model\":\"ember-model\",\"choices\":[{\"delta\":{\"content\":\"炉\"},\"finish_reason\":null}]}\n\n",
+        "data: {\"id\":\"stream-1\",\"model\":\"ember-model\",\"choices\":[{\"delta\":{\"content\":\"火😊\"},\"finish_reason\":\"stop\"}]}\n\n",
+        "data: [DONE]\n\n"
+    )
+    .as_bytes();
+    let split = payload
+        .windows(3)
+        .position(|part| part == "炉".as_bytes())
+        .unwrap()
+        + 1;
+    assert!(decoder.push(&payload[..split]).unwrap().is_empty());
+    assert_eq!(decoder.push(&payload[split..]).unwrap(), vec!["炉", "火😊"]);
+    let completed = decoder.finish().unwrap();
+    assert_eq!(completed.provider_request_id.as_deref(), Some("stream-1"));
+    assert_eq!(completed.model_name, "ember-model");
+    assert_eq!(completed.content, "炉火😊");
+    assert_eq!(completed.finish_reason, FinishReason::Stop);
+}
+
+#[test]
+fn streaming_decoder_rejects_malformed_or_unterminated_final_frames() {
+    let mut malformed = SseCompletionDecoder::default();
+    assert_eq!(
+        malformed.push(b"data: {not-json}\n\n"),
+        Err(ProviderError::InvalidResponse)
+    );
+
+    let mut unfinished = SseCompletionDecoder::default();
+    unfinished
+        .push(b"data: {\"model\":\"ember-model\",\"choices\":[{\"delta\":{\"content\":\"partial\"}}]}\n\n")
+        .unwrap();
+    assert!(matches!(
+        unfinished.finish(),
+        Err(ProviderError::InvalidResponse)
+    ));
+}
+
+#[tokio::test]
+async fn provider_streams_sse_deltas_and_returns_one_normalized_final_response() {
+    let response = concat!(
+        "data: {\"id\":\"stream-contract\",\"model\":\"ember-model\",\"choices\":[{\"delta\":{\"content\":\"{\\\"reply\\\":\\\"炉火\"},\"finish_reason\":null}]}\n\n",
+        "data: {\"id\":\"stream-contract\",\"model\":\"ember-model\",\"choices\":[{\"delta\":{\"content\":\"😊\\\"}\"},\"finish_reason\":\"stop\"}]}\n\n",
+        "data: [DONE]\n\n"
+    );
+    let (base_url, captured) = server(vec![(200, response)]).await;
+    let config = OpenAiCompatibleConfig::new(&base_url, None).unwrap();
+    let mut deltas = Vec::new();
+
+    let result = OpenAiCompatibleProvider::new()
+        .unwrap()
+        .generate_stream(
+            &config,
+            &normalized(ResponseFormat::JsonObject),
+            CancellationToken::new(),
+            |delta| {
+                deltas.push(delta.to_owned());
+                Ok(())
+            },
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(deltas, vec!["{\"reply\":\"炉火", "😊\"}"]);
+    assert_eq!(result.content, "{\"reply\":\"炉火😊\"}");
+    assert_eq!(result.finish_reason, FinishReason::Stop);
+    let requests = captured.lock().await;
+    let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(body["stream"], true);
+    assert!(String::from_utf8_lossy(&requests[0].head).contains("text/event-stream"));
+}
+
 #[derive(Clone, Copy, Debug)]
 enum EnabledProviderContract {
     DeepSeek,

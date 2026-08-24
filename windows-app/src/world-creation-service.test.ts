@@ -7,6 +7,7 @@ import {
   type WorldCreationSnapshot,
   type WorldDraft,
 } from './world-creation-service.js';
+import type { DesktopAIEngine } from './desktop-ai-orchestrator.js';
 
 describe('WindowsWorldCreationService', () => {
   it('uses the unified Fake Provider and commits schema-validated generation and refinement', async () => {
@@ -90,6 +91,35 @@ describe('WindowsWorldCreationService', () => {
     const confirmed = await service.confirm('campaign-world');
     expect(confirmed.campaignState).toBe('CREATING_CHARACTER');
     expect(gateway.confirmCalls).toEqual(['campaign-world']);
+  });
+
+  it('streams only the world introduction and commits the complete validated world once', async () => {
+    const gateway = new FakeWorldGateway();
+    const draft = worldDraft();
+    const raw = JSON.stringify(draft);
+    const split = raw.indexOf(draft.summary) + 8;
+    const engine: DesktopAIEngine = {
+      async execute(_task, _input, options) {
+        options.stream?.onChunk({ sequence: 1, content: raw.slice(0, split) });
+        options.stream?.onChunk({ sequence: 2, content: raw.slice(split) });
+        return {
+          request: { requestId: options.requestId, promptVersion: 2 },
+          response: { content: raw },
+          validatedOutput: draft,
+        } as never;
+      },
+    };
+    const service = new WindowsWorldCreationService(gateway, engine);
+    const visible: string[] = [];
+
+    const generated = await service.generate('campaign-world', defaultOptions(), {
+      signal: new AbortController().signal,
+      onChunk: (content) => visible.push(content),
+    });
+
+    expect(visible.join('')).toBe(draft.summary);
+    expect(generated.world?.summary).toBe(draft.summary);
+    expect(gateway.commits).toHaveLength(1);
   });
 });
 

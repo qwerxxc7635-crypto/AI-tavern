@@ -498,6 +498,7 @@ fn validate_failure(kind: &str, code: &str) -> Result<(), CampaignStoreError> {
 
 fn retryable_failure(kind: &str, code: &str) -> bool {
     code == "APP_INTERRUPTED"
+        || code == "CANCELLED"
         || code == "FACT_CONFLICT"
         || kind == "PROVIDER" && matches!(code, "RATE_LIMITED" | "PROVIDER_UNAVAILABLE")
         || kind == "NETWORK" && matches!(code, "TIMEOUT" | "NETWORK_FAILED")
@@ -505,7 +506,8 @@ fn retryable_failure(kind: &str, code: &str) -> bool {
             && (matches!(
                 code,
                 "INVALID_OUTPUT" | "REPETITION_DETECTED" | "SCHEMA_VALIDATION_FAILED"
-            ) || code.starts_with("SCHEMA_"))
+            ) || code.starts_with("SCHEMA_")
+                || code.starts_with("STREAM_"))
 }
 
 fn validate_text(value: &str, max: usize) -> Result<(), CampaignStoreError> {
@@ -599,6 +601,13 @@ mod tests {
             store.begin_npc_timeline_attempt(begin("attempt-2", "request-2", "Ask the keeper.")),
             Err(CampaignStoreError::InvalidState)
         ));
+    }
+
+    #[test]
+    fn native_policy_keeps_cancelled_and_invalid_streams_retryable() {
+        assert!(retryable_failure("GENERATION", "CANCELLED"));
+        assert!(retryable_failure("VALIDATION", "STREAM_FINAL_MISMATCH"));
+        assert!(!retryable_failure("PROVIDER", "AUTHENTICATION_FAILED"));
     }
 
     fn seed_scope(store: &CampaignStore) {

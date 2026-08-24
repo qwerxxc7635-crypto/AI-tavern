@@ -9,6 +9,7 @@ describe('npcTimelineFailure', () => {
     ['VALIDATION', 'SCHEMA_VALIDATION_FAILED'],
     ['RULE', 'FACT_CONFLICT'],
     ['GENERATION', 'APP_INTERRUPTED'],
+    ['GENERATION', 'CANCELLED'],
   ] as const)('allows the technical retry %s/%s', (kind, code) => {
     expect(npcTimelineFailure(kind, code).retryable).toBe(true);
   });

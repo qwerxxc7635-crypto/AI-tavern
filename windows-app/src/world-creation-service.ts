@@ -5,6 +5,7 @@ import {
   GenerateWorldOutputSchema,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
+  StructuredJsonStreamProjector,
   WorldConstitutionOutputSchema,
   type AIProvider,
   type AITask,
@@ -65,6 +66,12 @@ export interface GenerateWorldOptions {
     allowBetrayal: boolean;
     excludedContent: readonly string[];
   }>;
+}
+
+export interface WorldGenerationStreamOptions {
+  readonly signal: AbortSignal;
+  readonly onChunk: (content: string) => void;
+  readonly onReset?: () => void;
 }
 
 export interface WorldCreationGateway {
@@ -143,10 +150,11 @@ export class WindowsWorldCreationService {
   public async generate(
     campaignIdValue: string,
     options: GenerateWorldOptions,
+    stream?: WorldGenerationStreamOptions,
   ): Promise<WorldCreationSnapshot> {
     campaignId(campaignIdValue);
     const input = GenerateWorldInputSchema.parse(options);
-    return this.execute('GENERATE_WORLD', campaignIdValue, input);
+    return this.execute('GENERATE_WORLD', campaignIdValue, input, stream);
   }
 
   public async refine(
@@ -187,15 +195,39 @@ export class WindowsWorldCreationService {
     task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     campaignIdValue: string,
     input: unknown,
+    stream?: WorldGenerationStreamOptions,
   ): Promise<WorldCreationSnapshot> {
     const identity = this.createIdentity(task);
     const temperature = await this.randomness.resolveTemperature();
+    let projector = stream === undefined ? null : new StructuredJsonStreamProjector('summary');
+    let rawChunks = 0;
     const generated = await this.ai.execute(task, input, {
       requestId: identity.requestId,
       temperature,
       maxOutputTokens: 8_000,
       timeoutMs: 5_000,
+      ...(stream === undefined
+        ? {}
+        : {
+            stream: {
+              signal: stream.signal,
+              onChunk(chunk: { readonly content: string }) {
+                rawChunks += 1;
+                const visible = projector?.push(chunk.content) ?? '';
+                if (visible.length > 0) stream.onChunk(visible);
+              },
+              onReset() {
+                projector = new StructuredJsonStreamProjector('summary');
+                rawChunks = 0;
+                stream.onReset?.();
+              },
+            },
+          }),
     });
+    if (projector !== null && rawChunks > 0) {
+      const visible = projector.finish(generated.response.content);
+      if (visible.length > 0) stream?.onChunk(visible);
+    }
     const world =
       task === 'GENERATE_WORLD'
         ? GenerateWorldOutputSchema.parse(generated.validatedOutput)

@@ -497,12 +497,13 @@
 
 ## M10-T03 Streaming
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M10-T02。
 - **Deliverable**：NPC/介绍等可取消流式 UX、原生传输和提交边界。
 - **Acceptance**：流中断不产生正式消息；完整结果验证后一次提交；重开可辨 pending/failed/committed。
 - **Tests**：chunk order、unicode、cancel/timeout、malformed final、retry、no partial commit。
 - **Do Not**：不逐 chunk 修改世界状态；不把 streaming 作为 Provider 必需能力。
+- **Implementation reference**：[`V0.3_STREAMING.md`](V0.3_STREAMING.md)。
 
 ## M10-T04 Cache Optimization
 

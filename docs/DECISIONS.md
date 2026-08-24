@@ -3114,3 +3114,27 @@ schema 31只保存候选身份、context digest、process/execution状态、appe
 - SQLite trigger重复校验Director admission、P1批准、P2容量和schema-30资格；内部snapshot只恢复审计，portable format v2正式升级留给M10-T05。
 - 不修改Rules/D20、Provider、Quest/NPC/Adventure、World Seed/Constitution或已有Feature提交语义。
 - 本任务不新增UI/CSS；后续状态展示遵循视觉手册，Legacy视觉收敛仍由M10-T07执行。
+
+## DEC-146：Streaming 仅传输临时投影，完整结果仍走原提交事务
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T03`、`DEC-118`、`DEC-123`与[`V0.3_STREAMING.md`](V0.3_STREAMING.md)
+
+### 背景
+
+NPC回复与世界介绍已有完整结构化生成、验证和SQLite提交合同，但长响应只能等待整体完成。若逐chunk写Message/World会让取消、超时、畸形final与重开留下半事实；若把Streaming改成Provider必需能力，会破坏本地模型和旧配置兼容；若直接展示结构化JSON，又会泄露实现格式并产生错误游戏文本。
+
+### 决定与理由
+
+`AIProvider.generate`保持必需，`generateStream`仅为capability-gated可选接口。Native复用secure HTTP整体deadline/byte limit，以SSE decoder处理跨byte UTF-8和frame，再用Tauri Channel发送request-scoped连续片段；有界Cancellation registry覆盖取消早于command注册的竞态。TypeScript再次验证序号、大小及chunk拼接值与final content精确一致。
+
+结构化流只经本地projector展示顶层玩家字段：NPC为`reply`，初始世界介绍为`summary`。projector处理escape、Unicode与surrogate pair，不展示原始JSON。NPC继续先写durable timeline PENDING，完整输出通过原Schema、重复与业务验证后才在既有事务一次提交；World同样只调用原完整commit。取消、超时、顺序错误或畸形final不写正式内容。
+
+### 影响与边界
+
+- 已输出片段后不切换fallback，避免跨模型拼接；无片段失败和非流式Provider沿用既有路径。
+- Chunk、流草稿与Prompt不持久化；SQLite仍是唯一事实，timeline只记录操作状态。
+- Repair不流式展示；完整final仍可进入既有一次repair边界。
+- 不修改Rules/D20、Queue、Constitution、Quest/NPC/Adventure业务语义，不进入M10-T04。
+- 新UX复用ActionComposer及现有stream样式；视觉手册全局有效，Legacy全面迁移仍由M10-T07执行。

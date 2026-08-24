@@ -86,6 +86,8 @@ export type { AITaskSchemaDefinition } from './task-schema-registry.js';
 export * from './task-schemas.js';
 export type {
   AIProvider,
+  AIStreamChunk,
+  AIStreamOptions,
   AITask,
   ConnectionErrorCode,
   ModelCapabilities,
@@ -216,6 +218,10 @@ export type {
   ErrorSurface,
 } from './application-error.js';
 export * from './repetition-detector.js';
+export {
+  StructuredJsonStreamError,
+  StructuredJsonStreamProjector,
+} from './structured-json-stream.js';
 export {
   providerConfigFromResolved,
   resolveModelConfig,
