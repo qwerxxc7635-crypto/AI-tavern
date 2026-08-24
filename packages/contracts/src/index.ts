@@ -174,7 +174,7 @@ export type {
   PlayerAction,
   SceneFrame,
 } from './adventure.js';
-export { QUEST_STATUSES } from './quest.js';
+export { QUEST_STATUSES, QUEST_TRANSITION_SOURCES } from './quest.js';
 export type {
   Item,
   ItemContent,
@@ -183,6 +183,9 @@ export type {
   QuestContent,
   QuestRisk,
   QuestStatus,
+  QuestPoolState,
+  QuestTransition,
+  QuestTransitionSource,
   RewardTier,
   Rumor,
   RumorContent,

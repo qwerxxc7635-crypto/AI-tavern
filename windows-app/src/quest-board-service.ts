@@ -8,11 +8,16 @@ import {
   type AIProvider,
 } from '@ember-tavern/ai-core';
 import {
+  QUEST_STATUSES,
+  QUEST_TRANSITION_SOURCES,
   aiRequestId,
   campaignId,
   generationRecordId,
   idempotencyKey,
   isoTimestamp,
+  questId as parseQuestId,
+  type QuestStatus,
+  type QuestTransitionSource,
 } from '@ember-tavern/contracts';
 import {
   desktopAIEngine,
@@ -62,7 +67,10 @@ export interface QuestView {
     readonly objective: string;
     readonly failureCost: string;
   };
-  readonly status: 'AVAILABLE' | 'ACCEPTED' | 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'ABANDONED';
+  readonly status: QuestStatus;
+  readonly revision: number;
+  readonly statusSource: QuestTransitionSource;
+  readonly statusReason: string;
   readonly risk: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
   readonly recommendedAttributes: readonly ('physique' | 'agility' | 'knowledge' | 'charisma')[];
   readonly expectedTurnsMin: number;
@@ -97,10 +105,21 @@ interface QuestGenerationCommit {
   readonly generation: GenerationAudit;
 }
 
+interface QuestPoolTransitionCommand {
+  readonly campaignId: string;
+  readonly questId: string;
+  readonly expectedRevision: number;
+  readonly toStatus: QuestStatus;
+  readonly source: QuestTransitionSource;
+  readonly reason: string;
+  readonly operationId: string;
+}
+
 export interface QuestBoardGateway {
   load(campaignId: string): Promise<QuestBoardSnapshot>;
   commit(command: QuestGenerationCommit): Promise<QuestBoardSnapshot>;
   accept(campaignId: string, questId: string): Promise<QuestBoardSnapshot>;
+  transition(command: QuestPoolTransitionCommand): Promise<QuestBoardSnapshot>;
 }
 
 interface RequestIdentity {
@@ -121,6 +140,12 @@ export const tauriQuestBoardGateway: QuestBoardGateway = {
   },
   async accept(id, questId) {
     return parseSnapshot(await invoke<unknown>('quest_accept', { campaignId: id, questId }), id);
+  },
+  async transition(command) {
+    return parseSnapshot(
+      await invoke<unknown>('quest_pool_transition', { command }),
+      command.campaignId,
+    );
   },
 };
 
@@ -160,6 +185,56 @@ export class WindowsQuestBoardService {
     campaignId(id);
     requireText(questId);
     return this.gateway.accept(id, questId);
+  }
+
+  public intervene(
+    id: string,
+    quest: string,
+    expectedRevision: number,
+  ): Promise<QuestBoardSnapshot> {
+    return this.transition(
+      id,
+      quest,
+      expectedRevision,
+      'ACTIVE',
+      'PLAYER_INTERVENTION',
+      '玩家行动已实际介入该任务。',
+    );
+  }
+
+  public abandon(id: string, quest: string, expectedRevision: number): Promise<QuestBoardSnapshot> {
+    return this.transition(
+      id,
+      quest,
+      expectedRevision,
+      'ABANDONED',
+      'PLAYER',
+      '玩家明确放弃该任务。',
+    );
+  }
+
+  private transition(
+    id: string,
+    quest: string,
+    expectedRevision: number,
+    toStatus: QuestStatus,
+    source: QuestTransitionSource,
+    reason: string,
+  ): Promise<QuestBoardSnapshot> {
+    campaignId(id);
+    parseQuestId(quest);
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) {
+      throw new TypeError('Quest revision is invalid');
+    }
+    return this.gateway.transition({
+      campaignId: id,
+      questId: quest,
+      expectedRevision,
+      toStatus,
+      source,
+      reason,
+      operationId: `quest-${source.toLowerCase()}-${crypto.randomUUID()}`,
+    });
   }
 
   private async initializeOnce(id: string): Promise<QuestBoardSnapshot> {
@@ -233,9 +308,12 @@ export const windowsQuestBoardService = new WindowsQuestBoardService(
 );
 
 export class QuestBoardServiceError extends Error {
-  public constructor(public readonly code: string) {
-    super('Quest board operation failed');
+  public readonly code: string;
+
+  public constructor(code: string, cause?: unknown) {
+    super('Quest board operation failed', { cause });
     this.name = 'QuestBoardServiceError';
+    this.code = code;
   }
 }
 
@@ -314,10 +392,7 @@ function parseNpc(value: unknown): QuestNpcBrief {
 function parseQuest(value: unknown): QuestView {
   const record = requireRecord(value);
   const content = requireRecord(record['content']);
-  const status = enumValue(
-    ['AVAILABLE', 'ACCEPTED', 'ACTIVE', 'COMPLETED', 'FAILED', 'ABANDONED'] as const,
-    record['status'],
-  );
+  const status = enumValue(QUEST_STATUSES, record['status']);
   const risk = enumValue(['LOW', 'MODERATE', 'HIGH', 'EXTREME'] as const, record['risk']);
   const rewardTier = enumValue(
     ['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY'] as const,
@@ -339,6 +414,9 @@ function parseQuest(value: unknown): QuestView {
       failureCost: requireText(content['failureCost']),
     }),
     status,
+    revision: positiveInteger(record['revision']),
+    statusSource: enumValue(QUEST_TRANSITION_SOURCES, record['statusSource']),
+    statusReason: requireText(record['statusReason']),
     risk,
     recommendedAttributes: Object.freeze(
       requireArray(record['recommendedAttributes']).map((attribute) =>

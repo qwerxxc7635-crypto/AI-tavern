@@ -2880,3 +2880,26 @@ Preset 以严格version 1快照保存在device-local `app_settings.prompt_manage
 - Prompt设置不是Campaign事实，不进入portable `.emtavern`；API Key和凭据仍只在系统凭据库。
 - 本任务不修改Rules Engine、D20、Provider协议、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure合同或存档状态机。
 - UI复用现有页面/控件和Design Token；完整视觉迁移与Legacy审查仍由M10-T07执行。
+
+## DEC-136：Quest Pool 以独立生命周期表兼容旧 Adventure 投影
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T01`、`DEC-040`、[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)
+
+### 背景
+
+V0.2 的 `quests.status` 只有 AVAILABLE/ACCEPTED/ACTIVE 与终态，Quest UI 和接取入口还假定同时只有一个主任务。Adventure、结算、Rules Engine 与 Faction 已经依赖该列和外键。直接扩列或删除 ACCEPTED 会破坏旧存档与已通过测试的 Adventure 合同；继续把旧列作为真相又无法表达隐藏、发现、阻塞、更新和过期，也会让玩家实际介入被传统接受按钮门禁。
+
+### 决定与理由
+
+schema 23 新增一对一 `quest_pool_states` 作为 V0.3 生命周期唯一真相，并新增 append-only `quest_pool_transitions` 保存来源、原因、operation、revision 和时间。旧 `quests.status` 保留为兼容投影，不扩展其 CHECK；迁移原样回填所有旧状态，新代码统一读取 Pool。旧入口只在投影未分叉时同步，已由新状态机推进的 Quest 拒绝旧列覆盖。
+
+完整状态图由 TypeScript Domain、Rust Native 与 SQLite trigger 独立验证。`ACCEPTED` 仅作为旧流程可选中间态保留；玩家介入可从可见候选直接进入 ACTIVE，且不取消其他 Active Quest。COMPLETED、FAILED、EXPIRED、ABANDONED 不可逆，生成和业务入口均不能删除或重开。
+
+### 影响与边界
+
+- Rules Engine、Faction、Adventure 开始与结算在原业务事务内调用 Pool 转换；其原子性、幂等和审计保持不变。
+- Quest 内容、NPC发布者、Adventure外键和既有身份不迁移、不重造；portable archive format v2仍不扩展，schema 23正式归档留给M10-T05。
+- M8-T01只提供来源枚举和转换合同；NPC/Event/Discovery/Player Action等创建适配器及细化provenance仍按依赖留给M8-T03。
+- UI隐藏HIDDEN、允许多个Active并直接介入，继续复用既有组件与Design Token；Legacy视觉迁移仍由M10-T07执行。

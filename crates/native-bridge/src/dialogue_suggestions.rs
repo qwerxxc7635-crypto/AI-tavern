@@ -213,10 +213,11 @@ fn build_preparation(
     let open_quests = query_json_rows(
         connection,
         "SELECT json_object(
-           'id',id,'title',COALESCE(json_extract(content_json,'$.title'),id),'status',status
-         ) FROM quests
-         WHERE campaign_id=?1 AND status IN ('AVAILABLE','ACCEPTED','ACTIVE')
-         ORDER BY updated_at DESC,id LIMIT 12",
+           'id',q.id,'title',COALESCE(json_extract(q.content_json,'$.title'),q.id),'status',qp.status
+         ) FROM quests q JOIN quest_pool_states qp ON qp.quest_id=q.id
+         WHERE q.campaign_id=?1
+           AND qp.status IN ('DISCOVERED','AVAILABLE','ACCEPTED','ACTIVE','BLOCKED','UPDATED')
+         ORDER BY qp.updated_at DESC,q.id LIMIT 12",
         campaign_id,
     )?;
     let input = json!({

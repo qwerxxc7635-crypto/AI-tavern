@@ -5,7 +5,11 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use crate::{
-    CampaignStore, CampaignStoreError, CharacterAttributes, validate_id, validate_timestamp,
+    CampaignStore, CampaignStoreError, CharacterAttributes,
+    quest_pool::{
+        transition_allowed as quest_transition_allowed, transition_quest_pool_in_transaction,
+    },
+    validate_id, validate_timestamp,
 };
 
 const MAX_HIT_POINTS: i64 = 999;
@@ -315,20 +319,18 @@ impl CampaignStore {
             return Err(CampaignStoreError::InvalidState);
         }
         if let Some((quest_id, status)) = &quest_after {
-            let changed = transaction.execute(
-                "UPDATE quests SET status = ?1, updated_at = ?2
-                 WHERE id = ?3 AND campaign_id = ?4 AND status = ?5",
-                params![
-                    status,
-                    input.occurred_at,
-                    quest_id,
-                    input.command.campaign_id,
-                    quest_before.as_ref().map(|(_, value)| value),
-                ],
+            transition_quest_pool_in_transaction(
+                &transaction,
+                &input.command.campaign_id,
+                quest_id,
+                None,
+                quest_before.as_ref().map(|(_, value)| value.as_str()),
+                status,
+                "LOCAL_RULE",
+                "Rules Engine applied a validated quest transition",
+                &format!("quest:rules:{}", input.idempotency_key),
+                &input.occurred_at,
             )?;
-            if changed != 1 {
-                return Err(CampaignStoreError::InvalidState);
-            }
         }
 
         transaction.execute(
@@ -579,7 +581,7 @@ fn apply_action(
             validate_quest_status(status)?;
             let before = connection
                 .query_row(
-                    "SELECT status FROM quests WHERE id = ?1 AND campaign_id = ?2",
+                    "SELECT status FROM quest_pool_states WHERE quest_id = ?1 AND campaign_id = ?2",
                     params![quest_id, state.campaign_id],
                     |row| row.get::<_, String>(0),
                 )
@@ -894,11 +896,16 @@ fn action_name(value: &RulesAction) -> &'static str {
 
 fn validate_quest_status(value: &str) -> Result<(), CampaignStoreError> {
     if [
+        "HIDDEN",
+        "DISCOVERED",
         "AVAILABLE",
         "ACCEPTED",
         "ACTIVE",
+        "BLOCKED",
+        "UPDATED",
         "COMPLETED",
         "FAILED",
+        "EXPIRED",
         "ABANDONED",
     ]
     .contains(&value)
@@ -907,15 +914,6 @@ fn validate_quest_status(value: &str) -> Result<(), CampaignStoreError> {
     } else {
         Err(CampaignStoreError::InvalidData)
     }
-}
-
-fn quest_transition_allowed(before: &str, after: &str) -> bool {
-    matches!(
-        (before, after),
-        ("AVAILABLE", "ACCEPTED")
-            | ("ACCEPTED", "ACTIVE" | "ABANDONED")
-            | ("ACTIVE", "COMPLETED" | "FAILED" | "ABANDONED")
-    )
 }
 
 fn unique<T>(values: &[T], key: impl Fn(&T) -> &String) -> Result<(), CampaignStoreError> {

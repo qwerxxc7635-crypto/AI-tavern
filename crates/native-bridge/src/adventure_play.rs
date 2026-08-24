@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::npc_dialogue::validate_knowledge_provenance;
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    quest_pool::transition_quest_pool_in_transaction, validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -292,11 +293,27 @@ impl CampaignStore {
              WHERE id = ?2 AND campaign_id = ?3 AND state = 'PREPARING'",
             params![at, adventure_id, campaign_id],
         )?;
-        transaction.execute(
-            "UPDATE quests SET status = 'ACTIVE', updated_at = ?1
-             WHERE id = ?2 AND campaign_id = ?3 AND status = 'ACCEPTED'",
-            params![at, quest_id, campaign_id],
+        let pool_status: String = transaction.query_row(
+            "SELECT status FROM quest_pool_states WHERE quest_id=?1 AND campaign_id=?2",
+            params![quest_id, campaign_id],
+            |row| row.get(0),
         )?;
+        if pool_status == "ACCEPTED" {
+            transition_quest_pool_in_transaction(
+                &transaction,
+                campaign_id,
+                &quest_id,
+                None,
+                Some("ACCEPTED"),
+                "ACTIVE",
+                "ADVENTURE",
+                "Adventure started from a compatible accepted quest",
+                &format!("quest:adventure-start:{adventure_id}"),
+                &at,
+            )?;
+        } else if pool_status != "ACTIVE" {
+            return Err(CampaignStoreError::InvalidState);
+        }
         transaction.execute(
             "UPDATE campaigns SET state = 'ADVENTURE', updated_at = ?1
              WHERE id = ?2 AND state = 'TAVERN'",
@@ -821,7 +838,8 @@ fn plan_input(
 ) -> Result<Value, CampaignStoreError> {
     let world = world_context(connection, campaign_id)?;
     let quest = quest_data(connection, campaign_id, quest_id)?;
-    if text_field(&quest, "status")? != "ACCEPTED"
+    let status = text_field(&quest, "status")?;
+    if !["ACCEPTED", "ACTIVE"].contains(&status.as_str())
         && !["ADVENTURE"].contains(&campaign_state(connection, campaign_id)?.as_str())
     {
         return Err(CampaignStoreError::InvalidState);
@@ -1516,10 +1534,11 @@ fn quest_data(
 ) -> Result<Value, CampaignStoreError> {
     connection
         .query_row(
-            "SELECT id, publisher_npc_id, content_json, status, risk, recommended_attributes_json,
+            "SELECT q.id, q.publisher_npc_id, q.content_json, pool.status, q.risk, q.recommended_attributes_json,
                     expected_turns_min, expected_turns_max, reward_tier,
                     related_npc_ids_json, related_fact_ids_json
-             FROM quests WHERE id = ?1 AND campaign_id = ?2",
+             FROM quests q JOIN quest_pool_states pool ON pool.quest_id=q.id
+             WHERE q.id = ?1 AND q.campaign_id = ?2",
             params![quest_id, campaign_id],
             |row| {
                 Ok(json!({

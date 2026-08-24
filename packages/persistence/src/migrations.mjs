@@ -106,6 +106,32 @@ const migrations = [
     name: 'tavern_population',
     source: new URL('../../../database/migrations/0019_tavern_population.sql', import.meta.url),
   },
+  {
+    version: 20,
+    name: 'multi_npc_scene',
+    source: new URL('../../../database/migrations/0020_multi_npc_scene.sql', import.meta.url),
+  },
+  {
+    version: 21,
+    name: 'immutable_npc_timeline',
+    source: new URL(
+      '../../../database/migrations/0021_immutable_npc_timeline.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 22,
+    name: 'dialogue_suggestion_cache',
+    source: new URL(
+      '../../../database/migrations/0022_dialogue_suggestion_cache.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 23,
+    name: 'multi_quest_pool',
+    source: new URL('../../../database/migrations/0023_multi_quest_pool.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

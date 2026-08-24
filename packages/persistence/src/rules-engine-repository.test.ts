@@ -162,7 +162,11 @@ describe('RulesEngineRepository', () => {
         afterRevision: 2,
       });
       expect(
-        database.prepare("SELECT status FROM quests WHERE id = 'quest-rules-persistence'").get(),
+        database
+          .prepare(
+            "SELECT status FROM quest_pool_states WHERE quest_id = 'quest-rules-persistence'",
+          )
+          .get(),
       ).toEqual({ status: 'ACCEPTED' });
 
       expect(() =>

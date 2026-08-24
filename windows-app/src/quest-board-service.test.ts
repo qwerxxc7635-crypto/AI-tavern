@@ -9,7 +9,7 @@ import {
 } from './quest-board-service.js';
 
 describe('WindowsQuestBoardService', () => {
-  it('generates two validated quests once and accepts only through the gateway', async () => {
+  it('generates two validated quests once and activates both through player intervention', async () => {
     const gateway = new MemoryQuestGateway();
     let identity = 0;
     const service = new WindowsQuestBoardService(gateway, new FakeAIProvider(), () => {
@@ -37,9 +37,19 @@ describe('WindowsQuestBoardService', () => {
       recentQuestStructures: ['moderate|notable|8-12|agility,knowledge'],
     });
 
-    const accepted = await service.accept('campaign-tavern', required(first.quests[0]).id);
-    expect(accepted.quests[0]?.status).toBe('ACCEPTED');
-    expect(gateway.accepts).toEqual(['quest-1']);
+    const firstActive = await service.intervene('campaign-tavern', required(first.quests[0]).id, 1);
+    const bothActive = await service.intervene(
+      'campaign-tavern',
+      required(firstActive.quests[1]).id,
+      1,
+    );
+    expect(bothActive.quests.map(({ status }) => status)).toEqual(['ACTIVE', 'ACTIVE']);
+    expect(gateway.transitions).toHaveLength(2);
+    expect(gateway.transitions[0]).toMatchObject({
+      source: 'PLAYER_INTERVENTION',
+      toStatus: 'ACTIVE',
+      expectedRevision: 1,
+    });
   });
 });
 
@@ -47,6 +57,7 @@ class MemoryQuestGateway implements QuestBoardGateway {
   public readonly commits: Parameters<QuestBoardGateway['commit']>[0][] = [];
   public readonly inputs: unknown[] = [];
   public readonly accepts: string[] = [];
+  public readonly transitions: Parameters<QuestBoardGateway['transition']>[0][] = [];
   private snapshot = emptySnapshot();
 
   public async load() {
@@ -72,6 +83,9 @@ class MemoryQuestGateway implements QuestBoardGateway {
       publisherName: publisher.name,
       content: output.content,
       status: 'AVAILABLE' as const,
+      revision: 1,
+      statusSource: 'GENERATION' as const,
+      statusReason: 'Generated opportunity.',
       risk: output.risk,
       recommendedAttributes: output.recommendedAttributes,
       expectedTurnsMin: output.expectedTurns.min,
@@ -106,6 +120,25 @@ class MemoryQuestGateway implements QuestBoardGateway {
       ...this.snapshot,
       quests: this.snapshot.quests.map((quest) =>
         quest.id === questId ? { ...quest, status: 'ACCEPTED' as const } : quest,
+      ),
+    };
+    return this.snapshot;
+  }
+
+  public async transition(command: Parameters<QuestBoardGateway['transition']>[0]) {
+    this.transitions.push(command);
+    this.snapshot = {
+      ...this.snapshot,
+      quests: this.snapshot.quests.map((quest) =>
+        quest.id === command.questId
+          ? {
+              ...quest,
+              status: command.toStatus,
+              revision: quest.revision + 1,
+              statusSource: command.source,
+              statusReason: command.reason,
+            }
+          : quest,
       ),
     };
     return this.snapshot;

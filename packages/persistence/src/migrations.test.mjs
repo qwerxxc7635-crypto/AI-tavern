@@ -23,6 +23,7 @@ const coreTables = [
   'character_rule_states',
   'conversations',
   'credential_cleanup_queue',
+  'dialogue_suggestion_cache',
   'dynamic_locations',
   'event_ledger',
   'faction_action_events',
@@ -39,10 +40,15 @@ const coreTables = [
   'npc_lod_profiles',
   'npc_lod_transitions',
   'npc_relationships',
+  'npc_timeline_attempts',
+  'npc_timeline_operations',
   'npcs',
   'pending_ai_requests',
   'player_characters',
   'provider_configs',
+  'quest_pool_restore_sessions',
+  'quest_pool_states',
+  'quest_pool_transitions',
   'quests',
   'rules_events',
   'save_snapshots',
@@ -51,6 +57,10 @@ const coreTables = [
   'tavern_population_focus_events',
   'tavern_population_members',
   'tavern_population_states',
+  'tavern_scene_actor_proposals',
+  'tavern_scene_participants',
+  'tavern_scene_turns',
+  'tavern_scenes',
   'taverns',
   'universal_character_profiles',
   'world_bibles',
@@ -116,6 +126,71 @@ test('skips an already applied migration on repeated startup', async () => {
       database.prepare(`SELECT COUNT(*) AS count FROM sqlite_master WHERE type = 'table'`).get()
         .count,
       coreTables.length + 1,
+    );
+  });
+});
+
+test('backfills every legacy quest into the multi-quest pool without changing its status', async () => {
+  await withDatabase(async (database) => {
+    await applyMigrations(database);
+    database.exec(`
+      DROP TRIGGER quest_pool_state_insert_guard;
+      DROP TRIGGER quest_pool_state_update_guard;
+      DROP TRIGGER quest_pool_state_after_update;
+      DROP TRIGGER quest_pool_after_quest_insert;
+      DROP TRIGGER quest_pool_legacy_status_stale_guard;
+      DROP TRIGGER quest_pool_after_legacy_status_update;
+      DROP TRIGGER quest_pool_transition_update_guard;
+      DROP TRIGGER quest_pool_transition_delete_guard;
+      DROP TABLE quest_pool_transitions;
+      DROP TABLE quest_pool_states;
+      DROP TABLE quest_pool_restore_sessions;
+      DELETE FROM schema_migrations WHERE version=23;
+      INSERT INTO campaigns(id,schema_version,state,created_at,updated_at)
+      VALUES('campaign-quest-migration',1,'TAVERN','2026-08-24T00:00:00.000Z','2026-08-24T00:00:00.000Z');
+      INSERT INTO taverns(
+        id,campaign_id,location_id,name,position,environment,special_rules_json,
+        long_term_problem,changes_json,created_at,updated_at
+      ) VALUES('tavern-quest-migration','campaign-quest-migration','location','Ember','Road',
+        'Warm','[]','Storm','[]','2026-08-24T00:00:00.000Z','2026-08-24T00:00:00.000Z');
+      INSERT INTO npcs(
+        id,campaign_id,tavern_id,residency,name,identity,appearance,personality,goal,secret,
+        speech_style,current_mood,current_status,memories_json,created_at,updated_at
+      ) VALUES('npc-quest-migration','campaign-quest-migration','tavern-quest-migration','OWNER',
+        'Keeper','Keeper','Coat','Steady','Protect','Hidden','Brief','Calm','ACTIVE','[]',
+        '2026-08-24T00:00:00.000Z','2026-08-24T00:00:00.000Z');
+      INSERT INTO quests(
+        id,campaign_id,publisher_npc_id,content_json,status,risk,recommended_attributes_json,
+        expected_turns_min,expected_turns_max,reward_tier,related_npc_ids_json,
+        related_fact_ids_json,created_at,updated_at
+      ) VALUES('quest-migration','campaign-quest-migration','npc-quest-migration',
+        '{"title":"Old","summary":"Old","objective":"Old","failureCost":"Old"}',
+        'FAILED','LOW','["knowledge"]',8,12,'BASIC','[]','[]',
+        '2026-08-24T00:00:00.000Z','2026-08-24T01:00:00.000Z');
+    `);
+
+    await applyMigrations(database);
+    assert.deepEqual(
+      { ...database.prepare('SELECT status,revision,last_source FROM quest_pool_states').get() },
+      { status: 'FAILED', revision: 1, last_source: 'MIGRATION' },
+    );
+    assert.deepEqual(
+      {
+        ...database
+          .prepare(
+            'SELECT from_status,to_status,before_revision,after_revision FROM quest_pool_transitions',
+          )
+          .get(),
+      },
+      { from_status: null, to_status: 'FAILED', before_revision: 0, after_revision: 1 },
+    );
+    assert.throws(() =>
+      database
+        .prepare(
+          `UPDATE quest_pool_states SET status='ACTIVE',revision=2,last_source='SYSTEM',
+           last_reason='Rewrite',last_operation_id='rewrite',updated_at='2026-08-24T02:00:00.000Z'`,
+        )
+        .run(),
     );
   });
 });
@@ -405,7 +480,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      19,
+      23,
     );
     const importedKnowledge = database
       .prepare(

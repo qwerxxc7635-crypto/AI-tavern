@@ -1,4 +1,4 @@
-import type { JsonValue } from '@ember-tavern/contracts';
+import { QUEST_STATUSES, type JsonValue } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
 import { findRepeatedNpcArchetype, findRepeatedPhrase } from './repetition-detector.js';
@@ -191,7 +191,7 @@ const questContext = z
   .object({
     id: identifier,
     content: questContent,
-    status: z.enum(['AVAILABLE', 'ACCEPTED', 'ACTIVE', 'COMPLETED', 'FAILED', 'ABANDONED']),
+    status: z.enum(QUEST_STATUSES),
     risk: questRisk,
     rewardTier,
   })

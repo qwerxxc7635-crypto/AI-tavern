@@ -138,3 +138,8 @@ export {
   assertWorldSeed,
   deterministicWorldUint32,
 } from './world-seed.js';
+export {
+  QUEST_TERMINAL_STATUSES,
+  QuestPoolRuleError,
+  assertQuestPoolTransition,
+} from './quest-pool.js';

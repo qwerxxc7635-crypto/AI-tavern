@@ -17,6 +17,7 @@ mod npc_lod;
 mod npc_timeline;
 mod prompt_manager;
 mod quest_board;
+mod quest_pool;
 mod randomness_settings;
 mod repetition;
 mod rules_engine;
@@ -43,6 +44,7 @@ pub use npc_lod::*;
 pub use npc_timeline::*;
 pub use prompt_manager::*;
 pub use quest_board::*;
+pub use quest_pool::*;
 pub use randomness_settings::*;
 pub use rules_engine::*;
 pub use save_archive::*;
@@ -110,7 +112,9 @@ const IMMUTABLE_NPC_TIMELINE_MIGRATION: &str =
     include_str!("../../../database/migrations/0021_immutable_npc_timeline.sql");
 const DIALOGUE_SUGGESTION_CACHE_MIGRATION: &str =
     include_str!("../../../database/migrations/0022_dialogue_suggestion_cache.sql");
-const LATEST_SCHEMA_VERSION: i64 = 22;
+const MULTI_QUEST_POOL_MIGRATION: &str =
+    include_str!("../../../database/migrations/0023_multi_quest_pool.sql");
+const LATEST_SCHEMA_VERSION: i64 = 23;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -593,6 +597,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             "dialogue_suggestion_cache",
             DIALOGUE_SUGGESTION_CACHE_MIGRATION,
         ),
+        (23_i64, "multi_quest_pool", MULTI_QUEST_POOL_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

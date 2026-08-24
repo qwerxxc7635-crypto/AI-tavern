@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    quest_pool::transition_quest_pool_in_transaction, validate_id,
 };
 
 #[derive(Debug, Deserialize)]
@@ -220,7 +221,7 @@ impl CampaignStore {
             return Err(CampaignStoreError::NotFound);
         }
         let at = current_timestamp()?;
-        let (quest_id, publisher_id, risk, reward_tier, recommended_attributes, related_npcs): (String, String, String, String, String, String) = tx.query_row("SELECT q.id,q.publisher_npc_id,q.risk,q.reward_tier,q.recommended_attributes_json,q.related_npc_ids_json FROM quests q JOIN adventures a ON a.quest_id=q.id WHERE a.id=?1 AND q.campaign_id=?2 AND q.status='ACTIVE'", params![command.adventure_id, command.campaign_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?))).map_err(|_| CampaignStoreError::InvalidState)?;
+        let (quest_id, publisher_id, risk, reward_tier, recommended_attributes, related_npcs): (String, String, String, String, String, String) = tx.query_row("SELECT q.id,q.publisher_npc_id,q.risk,q.reward_tier,q.recommended_attributes_json,q.related_npc_ids_json FROM quests q JOIN adventures a ON a.quest_id=q.id JOIN quest_pool_states qp ON qp.quest_id=q.id WHERE a.id=?1 AND q.campaign_id=?2 AND qp.status='ACTIVE'", params![command.adventure_id, command.campaign_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?))).map_err(|_| CampaignStoreError::InvalidState)?;
         let character_id: String = tx.query_row(
             "SELECT id FROM player_characters WHERE campaign_id=?1",
             [&command.campaign_id],
@@ -268,9 +269,17 @@ impl CampaignStore {
                 tavern_id
             ],
         )?;
-        tx.execute(
-            "UPDATE quests SET status='COMPLETED',updated_at=?1 WHERE id=?2",
-            params![at, quest_id],
+        transition_quest_pool_in_transaction(
+            &tx,
+            &command.campaign_id,
+            &quest_id,
+            None,
+            Some("ACTIVE"),
+            "COMPLETED",
+            "ADVENTURE",
+            "Adventure settlement completed the quest",
+            &format!("quest:settlement:{}", command.adventure_id),
+            &at,
         )?;
         let reward = reward_from(&summary.state_patch_proposals)?;
         let mut item_ids = Vec::new();

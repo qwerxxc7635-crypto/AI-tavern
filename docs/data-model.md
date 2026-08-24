@@ -207,7 +207,7 @@ erDiagram
 | `campaign_id` | TEXT FK → campaigns.id ON DELETE CASCADE | 所属存档 |
 | `publisher_npc_id` | TEXT FK → npcs.id ON DELETE RESTRICT | 发布者 |
 | `content_json` | TEXT JSON | 标题、简介、目标、失败代价 |
-| `status` | TEXT CHECK QuestStatus | AVAILABLE至ABANDONED |
+| `status` | TEXT CHECK V0.2 QuestStatus | V0.3仅作旧Adventure与迁移兼容投影 |
 | `risk` | TEXT CHECK QuestRisk | 风险 |
 | `recommended_attributes_json` | TEXT JSON | 推荐属性数组 |
 | `expected_turns_min` | INTEGER CHECK >= 1 | 最少回合 |
@@ -219,6 +219,47 @@ erDiagram
 | `updated_at` | TEXT | 修改时间 |
 
 索引：`idx_quests_campaign_status(campaign_id, status)`、`idx_quests_publisher(publisher_npc_id)`。
+
+### 3.9.1 `quest_pool_states`（schema 23）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `quest_id` | TEXT PK/FK → quests.id ON DELETE CASCADE | Quest稳定身份 |
+| `campaign_id` | TEXT FK → campaigns.id ON DELETE CASCADE | 所属存档 |
+| `status` | TEXT CHECK QuestStatus | V0.3生命周期唯一真相 |
+| `revision` | INTEGER CHECK >= 1 | 乐观并发revision |
+| `last_source` | TEXT CHECK QuestTransitionSource | 最近变化来源 |
+| `last_reason` | TEXT | 最近变化原因 |
+| `last_operation_id` | TEXT UNIQUE | 幂等操作ID |
+| `created_at` | TEXT | 建立时间 |
+| `updated_at` | TEXT | 最近转换时间 |
+
+`idx_quest_pool_campaign_status(campaign_id, status, updated_at, quest_id)`支持多任务投影。数据库 trigger 校验完整状态图、revision递增、玩家介入/放弃权限和终态不可逆；旧`quests.status`不能覆盖已经分叉的Pool状态。
+
+### 3.9.2 `quest_pool_transitions`（schema 23）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `operation_id` | TEXT PK | 幂等操作ID |
+| `quest_id` | TEXT FK → quest_pool_states | Quest身份 |
+| `campaign_id` | TEXT FK → quest_pool_states | Campaign身份 |
+| `from_status` | TEXT NULL CHECK QuestStatus | 初始化时为空 |
+| `to_status` | TEXT CHECK QuestStatus | 提交后的状态 |
+| `source` | TEXT CHECK QuestTransitionSource | 权威来源 |
+| `reason` | TEXT | 可审计原因 |
+| `before_revision` | INTEGER CHECK >= 0 | 提交前revision |
+| `after_revision` | INTEGER = before + 1 | 提交后revision |
+| `occurred_at` | TEXT | 发生时间 |
+
+转换账本append-only。Campaign删除允许级联清理；Campaign存在时不能修改或删除单条历史。完整兼容与事务边界见[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)。
+
+### 3.9.3 `quest_pool_restore_sessions`（schema 23）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `campaign_id` | TEXT PK/FK → campaigns.id ON DELETE CASCADE | 正在完整恢复内部快照的Campaign |
+
+该表是事务级恢复门禁，不是游戏状态。Snapshot Repository在立即事务内先插入、完整重建Quest Pool后删除；提交或回滚后必须为空。只有存在该门禁时，Quest重插入可跳过自动初始化且账本可被完整替换。普通业务路径仍受append-only trigger保护。
 
 ### 3.10 `adventures`
 

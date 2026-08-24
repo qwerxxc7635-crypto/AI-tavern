@@ -31,7 +31,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
 
     assert.equal(result.status, 'MIGRATED');
     assert.equal(result.fromVersion, 0);
-    assert.equal(result.toVersion, 19);
+    assert.equal(result.toVersion, 23);
     assert.notEqual(result.backupPath, null);
     await access(result.backupPath);
 
@@ -65,6 +65,10 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
         { version: 17, name: 'dynamic_locations' },
         { version: 18, name: 'active_factions' },
         { version: 19, name: 'tavern_population' },
+        { version: 20, name: 'multi_npc_scene' },
+        { version: 21, name: 'immutable_npc_timeline' },
+        { version: 22, name: 'dialogue_suggestion_cache' },
+        { version: 23, name: 'multi_quest_pool' },
       ],
     );
     assert.equal(migrated.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');

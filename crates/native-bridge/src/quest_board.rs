@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
-    repetition::find_repeated_phrase, repetition::quest_structure_signature, validate_id,
+    quest_pool::transition_quest_pool_in_transaction, repetition::find_repeated_phrase,
+    repetition::quest_structure_signature, validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -60,6 +61,9 @@ pub struct QuestView {
     pub publisher_name: String,
     pub content: QuestContentView,
     pub status: String,
+    pub revision: i64,
+    pub status_source: String,
+    pub status_reason: String,
     pub risk: String,
     pub recommended_attributes: Vec<String>,
     pub expected_turns_min: i64,
@@ -238,7 +242,7 @@ impl CampaignStore {
         require_tavern_campaign(&transaction, campaign_id)?;
         let status = transaction
             .query_row(
-                "SELECT status FROM quests WHERE id = ?1 AND campaign_id = ?2",
+                "SELECT status FROM quest_pool_states WHERE quest_id = ?1 AND campaign_id = ?2",
                 params![quest_id, campaign_id],
                 |row| row.get::<_, String>(0),
             )
@@ -252,20 +256,18 @@ impl CampaignStore {
         if status != "AVAILABLE" {
             return Err(CampaignStoreError::InvalidState);
         }
-        let active: i64 = transaction.query_row(
-            "SELECT COUNT(*) FROM quests
-             WHERE campaign_id = ?1 AND status IN ('ACCEPTED', 'ACTIVE')",
-            [campaign_id],
-            |row| row.get(0),
-        )?;
-        if active != 0 {
-            return Err(CampaignStoreError::InvalidState);
-        }
         let at = current_timestamp()?;
-        transaction.execute(
-            "UPDATE quests SET status = 'ACCEPTED', updated_at = ?1
-             WHERE id = ?2 AND campaign_id = ?3 AND status = 'AVAILABLE'",
-            params![at, quest_id, campaign_id],
+        transition_quest_pool_in_transaction(
+            &transaction,
+            campaign_id,
+            quest_id,
+            None,
+            Some("AVAILABLE"),
+            "ACCEPTED",
+            "LEGACY",
+            "Compatible legacy acceptance",
+            &format!("quest:legacy-accept:{quest_id}"),
+            &at,
         )?;
         transaction.execute(
             "UPDATE campaigns SET updated_at = ?1 WHERE id = ?2",
@@ -277,7 +279,7 @@ impl CampaignStore {
     }
 }
 
-fn load_snapshot(
+pub(crate) fn load_snapshot(
     connection: &Connection,
     campaign_id: &str,
 ) -> Result<QuestBoardSnapshot, CampaignStoreError> {
@@ -393,11 +395,13 @@ fn load_quests(
     campaign_id: &str,
 ) -> Result<Vec<QuestView>, CampaignStoreError> {
     let mut statement = connection.prepare(
-        "SELECT q.id, q.publisher_npc_id, n.name, q.content_json, q.status, q.risk,
+        "SELECT q.id, q.publisher_npc_id, n.name, q.content_json, pool.status, q.risk,
                 q.recommended_attributes_json, q.expected_turns_min, q.expected_turns_max,
-                q.reward_tier, q.created_at, q.updated_at
+                q.reward_tier, q.created_at, pool.updated_at, pool.revision,
+                pool.last_source, pool.last_reason
          FROM quests q
          JOIN npcs n ON n.id = q.publisher_npc_id
+         JOIN quest_pool_states pool ON pool.quest_id=q.id AND pool.campaign_id=q.campaign_id
          WHERE q.campaign_id = ?1
          ORDER BY q.created_at, q.id",
     )?;
@@ -415,6 +419,9 @@ fn load_quests(
                     failure_cost: content.failure_cost,
                 },
                 status: row.get(4)?,
+                revision: row.get(12)?,
+                status_source: row.get(13)?,
+                status_reason: row.get(14)?,
                 risk: row.get(5)?,
                 recommended_attributes: from_json(row.get(6)?)?,
                 expected_turns_min: row.get(7)?,
@@ -634,6 +641,7 @@ fn from_json<T: for<'de> Deserialize<'de>>(value: String) -> rusqlite::Result<T>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::QuestPoolTransitionCommand;
 
     #[test]
     fn generates_two_quests_accepts_one_and_restores_after_reopen() {
@@ -664,10 +672,16 @@ mod tests {
             .accept_quest("campaign-quests", &first_id)
             .expect("accept first");
         assert_eq!(accepted.quests[0].status, "ACCEPTED");
-        assert!(matches!(
-            reopened.accept_quest("campaign-quests", &second_id),
-            Err(CampaignStoreError::InvalidState)
-        ));
+        let both = reopened
+            .accept_quest("campaign-quests", &second_id)
+            .expect("accept second");
+        assert_eq!(
+            both.quests
+                .iter()
+                .filter(|quest| quest.status == "ACCEPTED")
+                .count(),
+            2
+        );
         drop(reopened);
 
         let reopened_again = CampaignStore::open(&database_path).expect("reopen accepted");
@@ -679,6 +693,96 @@ mod tests {
                 .status,
             "ACCEPTED"
         );
+    }
+
+    #[test]
+    fn player_intervention_activates_multiple_quests_and_terminal_state_survives_reopen() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let path = directory.path().join("multi-quest.sqlite");
+        let store = CampaignStore::open(&path).expect("open");
+        seed_board(&store);
+        let initial = store
+            .quest_board_snapshot("campaign-quests")
+            .expect("initial");
+        let first = store
+            .commit_quest_generation(command(&initial, "npc-owner", 1))
+            .expect("first");
+        let generated = store
+            .commit_quest_generation(command(&first, "npc-resident", 2))
+            .expect("second");
+        let first_id = generated.quests[0].id.clone();
+        let second_id = generated.quests[1].id.clone();
+        let one_active = store
+            .transition_quest_pool(transition(
+                &first_id,
+                1,
+                "ACTIVE",
+                "PLAYER_INTERVENTION",
+                "one",
+            ))
+            .expect("activate one");
+        assert_eq!(one_active.quests[0].revision, 2);
+        let both_active = store
+            .transition_quest_pool(transition(
+                &second_id,
+                1,
+                "ACTIVE",
+                "PLAYER_INTERVENTION",
+                "two",
+            ))
+            .expect("activate two");
+        assert_eq!(
+            both_active
+                .quests
+                .iter()
+                .filter(|quest| quest.status == "ACTIVE")
+                .count(),
+            2
+        );
+        let failed = store
+            .transition_quest_pool(transition(&first_id, 2, "FAILED", "SYSTEM", "failed"))
+            .expect("fail first");
+        assert_eq!(failed.quests[0].status, "FAILED");
+        assert!(matches!(
+            store.transition_quest_pool(transition(&first_id, 3, "ACTIVE", "SYSTEM", "rewrite")),
+            Err(CampaignStoreError::InvalidState)
+        ));
+        drop(store);
+
+        let reopened = CampaignStore::open(&path).expect("reopen");
+        let restored = reopened
+            .quest_board_snapshot("campaign-quests")
+            .expect("restore");
+        assert_eq!(restored.quests[0].status, "FAILED");
+        assert_eq!(restored.quests[1].status, "ACTIVE");
+        let count: i64 = reopened
+            .connect()
+            .expect("connection")
+            .query_row(
+                "SELECT COUNT(*) FROM quest_pool_transitions WHERE campaign_id='campaign-quests'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("transition count");
+        assert_eq!(count, 5);
+    }
+
+    fn transition(
+        quest_id: &str,
+        expected_revision: i64,
+        to_status: &str,
+        source: &str,
+        suffix: &str,
+    ) -> QuestPoolTransitionCommand {
+        QuestPoolTransitionCommand {
+            campaign_id: "campaign-quests".to_owned(),
+            quest_id: quest_id.to_owned(),
+            expected_revision,
+            to_status: to_status.to_owned(),
+            source: source.to_owned(),
+            reason: "Quest state changed by authoritative local flow.".to_owned(),
+            operation_id: format!("quest-transition-{suffix}"),
+        }
     }
 
     #[test]

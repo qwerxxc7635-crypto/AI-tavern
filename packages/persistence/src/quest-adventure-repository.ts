@@ -33,6 +33,7 @@ import {
 import { CampaignRepository, PersistenceDataError } from './campaign-repository.js';
 import { parseStoredDiceResult } from './dice-result-validation.js';
 import { GameEventRepository } from './game-event-repository.js';
+import { QuestPoolRepository } from './quest-pool-repository.js';
 import {
   parseJson,
   requireArray,
@@ -56,7 +57,11 @@ const ADVENTURE_OUTCOMES = ['SUCCESS', 'PARTIAL_SUCCESS', 'FAILURE'] as const;
 const CHECK_DIFFICULTIES = [8, 11, 14, 17] as const;
 
 export class QuestRepository {
-  public constructor(private readonly database: SqliteDatabase) {}
+  private readonly database: SqliteDatabase;
+
+  public constructor(database: SqliteDatabase) {
+    this.database = database;
+  }
 
   public create(quest: Quest): void {
     this.database
@@ -71,7 +76,13 @@ export class QuestRepository {
   }
 
   public get(id: Quest['id']): Quest | null {
-    const row = this.database.prepare('SELECT * FROM quests WHERE id = ?').get(id);
+    const row = this.database
+      .prepare(
+        `SELECT quests.*,quest_pool_states.status AS pool_status
+         FROM quests JOIN quest_pool_states ON quest_pool_states.quest_id=quests.id
+         WHERE quests.id=?`,
+      )
+      .get(id);
     return row === undefined ? null : mapQuest(row);
   }
 
@@ -79,9 +90,10 @@ export class QuestRepository {
     return Object.freeze(
       this.database
         .prepare(
-          `SELECT * FROM quests
-           WHERE campaign_id = ?
-           ORDER BY created_at, id`,
+          `SELECT quests.*,quest_pool_states.status AS pool_status
+           FROM quests JOIN quest_pool_states ON quest_pool_states.quest_id=quests.id
+           WHERE quests.campaign_id = ?
+           ORDER BY quests.created_at, quests.id`,
         )
         .all(id)
         .map(mapQuest),
@@ -102,16 +114,6 @@ export class QuestRepository {
       }
       if (quest.status !== 'AVAILABLE') {
         throw new PersistenceDataError(`Only AVAILABLE quests can be accepted: ${id}`);
-      }
-      const active = database
-        .prepare(
-          `SELECT id FROM quests
-           WHERE campaign_id = ? AND status IN ('ACCEPTED', 'ACTIVE')
-           LIMIT 1`,
-        )
-        .get(campaign);
-      if (active !== undefined) {
-        throw new PersistenceDataError('Campaign already has an accepted or active main quest');
       }
       one(
         database
@@ -141,6 +143,10 @@ export class QuestRepository {
     }
   }
 
+  public accept(id: Quest['id'], campaign: Quest['campaignId'], at: Quest['updatedAt']): Quest {
+    return this.acceptAsOnlyMain(id, campaign, at);
+  }
+
   public update(quest: Quest): void {
     const current = this.get(quest.id);
     if (current === null) throw new PersistenceDataError(`Quest not found: ${quest.id}`);
@@ -153,30 +159,62 @@ export class QuestRepository {
         'Quest campaignId, publisherNpcId and createdAt cannot change',
       );
     }
-    one(
-      this.database
-        .prepare(
-          `UPDATE quests SET
-             content_json = ?, status = ?, risk = ?, recommended_attributes_json = ?,
-             expected_turns_min = ?, expected_turns_max = ?, reward_tier = ?,
-             related_npc_ids_json = ?, related_fact_ids_json = ?, updated_at = ?
-           WHERE id = ?`,
-        )
-        .run(
-          JSON.stringify(quest.content),
-          quest.status,
-          quest.risk,
-          JSON.stringify(quest.recommendedAttributes),
-          quest.expectedTurns.min,
-          quest.expectedTurns.max,
-          quest.rewardTier,
-          JSON.stringify(quest.relatedNpcIds),
-          JSON.stringify(quest.relatedFactIds),
-          quest.updatedAt,
-          quest.id,
-        ),
-      `Quest not found: ${quest.id}`,
-    );
+    const database = this.database;
+    database.prepare('SAVEPOINT quest_repository_update').run();
+    try {
+      if (current.status !== quest.status) {
+        const pool = new QuestPoolRepository(database as TransactionalSqliteDatabase);
+        const state = pool.get(quest.id);
+        if (state === null)
+          throw new PersistenceDataError(`Quest pool state not found: ${quest.id}`);
+        pool.transitionInCurrentTransaction({
+          operationId: `quest:repository:${quest.id}:${quest.updatedAt}:${quest.status}`,
+          campaignId: quest.campaignId,
+          questId: quest.id,
+          expectedRevision: state.revision,
+          toStatus: quest.status,
+          source: 'LOCAL_RULE',
+          reason: 'Validated local state patch changed the quest lifecycle',
+          occurredAt: quest.updatedAt,
+        });
+      }
+      one(
+        database
+          .prepare(
+            `UPDATE quests SET
+               content_json = ?, risk = ?, recommended_attributes_json = ?,
+               expected_turns_min = ?, expected_turns_max = ?, reward_tier = ?,
+               related_npc_ids_json = ?, related_fact_ids_json = ?, updated_at = ?
+             WHERE id = ?`,
+          )
+          .run(
+            JSON.stringify(quest.content),
+            quest.risk,
+            JSON.stringify(quest.recommendedAttributes),
+            quest.expectedTurns.min,
+            quest.expectedTurns.max,
+            quest.rewardTier,
+            JSON.stringify(quest.relatedNpcIds),
+            JSON.stringify(quest.relatedFactIds),
+            quest.updatedAt,
+            quest.id,
+          ),
+        `Quest not found: ${quest.id}`,
+      );
+      database.prepare('RELEASE SAVEPOINT quest_repository_update').run();
+    } catch (error) {
+      try {
+        database.prepare('ROLLBACK TO SAVEPOINT quest_repository_update').run();
+        database.prepare('RELEASE SAVEPOINT quest_repository_update').run();
+      } catch (rollbackError) {
+        throw new AggregateError(
+          [error, rollbackError],
+          'Quest update and savepoint rollback both failed',
+          { cause: rollbackError },
+        );
+      }
+      throw error;
+    }
   }
 }
 
@@ -240,8 +278,12 @@ export class AdventureRepository {
       }
       const quests = new QuestRepository(database);
       const quest = quests.get(adventure.questId);
-      if (quest === null || quest.campaignId !== campaignIdValue || quest.status !== 'ACCEPTED') {
-        throw new PersistenceDataError('Adventure requires its accepted quest');
+      if (
+        quest === null ||
+        quest.campaignId !== campaignIdValue ||
+        !['ACCEPTED', 'ACTIVE'].includes(quest.status)
+      ) {
+        throw new PersistenceDataError('Adventure requires an accepted or active quest');
       }
       const campaigns = new CampaignRepository(database);
       const campaign = campaigns.get(campaignIdValue);
@@ -254,7 +296,9 @@ export class AdventureRepository {
         updatedAt: at,
       });
       this.update(started);
-      quests.update(Object.freeze({ ...quest, status: 'ACTIVE', updatedAt: at }));
+      if (quest.status === 'ACCEPTED') {
+        quests.update(Object.freeze({ ...quest, status: 'ACTIVE', updatedAt: at }));
+      }
       campaigns.update(transitionCampaign(campaign, 'ADVENTURE', at));
       database.exec('COMMIT');
       return started;
@@ -516,7 +560,7 @@ function mapQuest(value: unknown): Quest {
       objective: requireString(content['objective'], 'content.objective'),
       failureCost: requireString(content['failureCost'], 'content.failureCost'),
     }),
-    status: requireEnum(QUEST_STATUSES, row['status'], 'status'),
+    status: requireEnum(QUEST_STATUSES, row['pool_status'], 'pool_status'),
     risk: requireEnum(QUEST_RISKS, row['risk'], 'risk'),
     recommendedAttributes: Object.freeze(
       requireArray(

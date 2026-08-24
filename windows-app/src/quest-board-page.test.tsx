@@ -10,7 +10,7 @@ import type { QuestBoardSnapshot } from './quest-board-service.js';
 afterEach(cleanup);
 
 describe('quest board page', () => {
-  it('shows list, detail, risk and attributes then enters preparation after acceptance', async () => {
+  it('hides undiscovered quests and enters preparation by direct intervention', async () => {
     const service = new FakeQuestService();
     render(
       <MemoryRouter initialEntries={['/quests?campaignId=campaign-tavern']}>
@@ -26,12 +26,13 @@ describe('quest board page', () => {
     expect(screen.getByText('知识')).toBeTruthy();
     expect(screen.getByText('敏捷')).toBeTruthy();
     expect(screen.getByText('Restore the beacon.')).toBeTruthy();
+    expect(screen.queryByText('Hidden Thread')).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: '接受任务' }));
+    fireEvent.click(screen.getByRole('button', { name: '介入任务' }));
     expect(await screen.findByRole('link', { name: '进入冒险准备' })).toBeTruthy();
     fireEvent.click(screen.getByRole('link', { name: '进入冒险准备' }));
     expect(await screen.findByText('准备 quest-one campaign-tavern')).toBeTruthy();
-    expect(service.accepted).toEqual(['quest-one']);
+    expect(service.intervened).toEqual(['quest-one']);
   });
 });
 
@@ -45,7 +46,7 @@ function AdventureEcho() {
 }
 
 class FakeQuestService {
-  public readonly accepted: string[] = [];
+  public readonly intervened: string[] = [];
   private snapshot = boardSnapshot();
 
   public async load() {
@@ -56,12 +57,38 @@ class FakeQuestService {
     return this.snapshot;
   }
 
-  public async accept(_campaignId: string, questId: string) {
-    this.accepted.push(questId);
+  public async intervene(_campaignId: string, questId: string, revision: number) {
+    this.intervened.push(questId);
     this.snapshot = {
       ...this.snapshot,
       quests: this.snapshot.quests.map((quest) =>
-        quest.id === questId ? { ...quest, status: 'ACCEPTED' as const } : quest,
+        quest.id === questId
+          ? {
+              ...quest,
+              status: 'ACTIVE' as const,
+              revision: revision + 1,
+              statusSource: 'PLAYER_INTERVENTION' as const,
+              statusReason: '玩家已经介入。',
+            }
+          : quest,
+      ),
+    };
+    return this.snapshot;
+  }
+
+  public async abandon(_campaignId: string, questId: string, revision: number) {
+    this.snapshot = {
+      ...this.snapshot,
+      quests: this.snapshot.quests.map((quest) =>
+        quest.id === questId
+          ? {
+              ...quest,
+              status: 'ABANDONED' as const,
+              revision: revision + 1,
+              statusSource: 'PLAYER' as const,
+              statusReason: '玩家已经放弃。',
+            }
+          : quest,
       ),
     };
     return this.snapshot;
@@ -92,7 +119,11 @@ function boardSnapshot(): QuestBoardSnapshot {
         'moderate|notable|8-12|agility,knowledge',
       ],
     },
-    quests: [quest('quest-one', 'The Fading Beacon'), quest('quest-two', 'The Lost Courier')],
+    quests: [
+      quest('quest-one', 'The Fading Beacon'),
+      quest('quest-two', 'The Lost Courier'),
+      { ...quest('quest-hidden', 'Hidden Thread'), status: 'HIDDEN' },
+    ],
   };
 }
 
@@ -108,6 +139,9 @@ function quest(id: string, title: string) {
       failureCost: 'Ships remain trapped.',
     },
     status: 'AVAILABLE' as const,
+    revision: 1,
+    statusSource: 'GENERATION' as const,
+    statusReason: '任务机会已经出现。',
     risk: 'MODERATE' as const,
     recommendedAttributes: ['knowledge', 'agility'] as const,
     expectedTurnsMin: 8,

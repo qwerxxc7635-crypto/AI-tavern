@@ -38,7 +38,7 @@ import {
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { applyMigrations } from '../../persistence/src/migrations.mjs';
-import { AIOrchestrationError, QuestUseCases } from './index.js';
+import { QuestUseCases } from './index.js';
 
 const directories: string[] = [];
 const campaignKey = campaignId('campaign-quests');
@@ -66,7 +66,7 @@ afterEach(async () => {
 });
 
 describe('QuestUseCases', () => {
-  it('generates two available quests and permits only one accepted main quest', async () => {
+  it('generates two available quests and permits both to coexist as accepted quests', async () => {
     const database = await createDatabase();
     try {
       const sqlite = adaptDatabase(database);
@@ -92,13 +92,13 @@ describe('QuestUseCases', () => {
       expect(new QuestRepository(sqlite).listByCampaign(campaignKey)).toHaveLength(2);
 
       expect(useCases.acceptQuest(campaignKey, first.id).status).toBe('ACCEPTED');
-      expect(() => useCases.acceptQuest(campaignKey, second.id)).toThrow(AIOrchestrationError);
-      expect(new QuestRepository(sqlite).get(second.id)?.status).toBe('AVAILABLE');
+      expect(useCases.acceptQuest(campaignKey, second.id).status).toBe('ACCEPTED');
+      expect(new QuestRepository(sqlite).get(second.id)?.status).toBe('ACCEPTED');
       expect(
         new QuestRepository(sqlite)
           .listByCampaign(campaignKey)
           .filter(({ status }) => status === 'ACCEPTED' || status === 'ACTIVE'),
-      ).toHaveLength(1);
+      ).toHaveLength(2);
     } finally {
       database.close();
     }

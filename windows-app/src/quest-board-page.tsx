@@ -12,7 +12,7 @@ import { APP_PATHS, buildRoute, campaignParentRoute } from './navigation.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { QuestCard } from './ui/game-components.js';
 
-type QuestActions = Pick<WindowsQuestBoardService, 'load' | 'initialize' | 'accept'>;
+type QuestActions = Pick<WindowsQuestBoardService, 'load' | 'initialize' | 'intervene' | 'abandon'>;
 
 const RISK_LABELS: Readonly<Record<QuestView['risk'], string>> = {
   LOW: '低',
@@ -49,9 +49,10 @@ export function QuestBoardPage({
       .then((loaded) => {
         if (!active) return;
         setSnapshot(loaded);
+        const visible = loaded.quests.filter(({ status }) => status !== 'HIDDEN');
         setSelectedId(
-          loaded.quests.find(({ status }) => status === 'ACCEPTED' || status === 'ACTIVE')?.id ??
-            loaded.quests[0]?.id ??
+          visible.find(({ status }) => status === 'ACCEPTED' || status === 'ACTIVE')?.id ??
+            visible[0]?.id ??
             null,
         );
       })
@@ -67,17 +68,32 @@ export function QuestBoardPage({
     () => snapshot?.quests.find(({ id }) => id === selectedId) ?? null,
     [selectedId, snapshot],
   );
-  const hasMainQuest =
-    snapshot?.quests.some(({ status }) => status === 'ACCEPTED' || status === 'ACTIVE') ?? false;
+  const visibleQuests = useMemo(
+    () => snapshot?.quests.filter(({ status }) => status !== 'HIDDEN') ?? [],
+    [snapshot],
+  );
 
-  async function acceptSelected() {
+  async function interveneSelected() {
     if (campaignId === null || selected === null || busy) return;
     setBusy(true);
     setError(null);
     try {
-      setSnapshot(await service.accept(campaignId, selected.id));
-    } catch {
-      setError('当前已有主任务，或该任务已经不能接受。');
+      setSnapshot(await service.intervene(campaignId, selected.id, selected.revision));
+    } catch (cause) {
+      setError(new Error('任务状态已经变化，无法按当前版本介入。', { cause }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function abandonSelected() {
+    if (campaignId === null || selected === null || busy) return;
+    setBusy(true);
+    setError(null);
+    try {
+      setSnapshot(await service.abandon(campaignId, selected.id, selected.revision));
+    } catch (cause) {
+      setError(new Error('任务状态已经变化，无法按当前版本放弃。', { cause }));
     } finally {
       setBusy(false);
     }
@@ -110,14 +126,14 @@ export function QuestBoardPage({
         <div>
           <p className="eyebrow">{snapshot.source.tavernName} · 任务告示</p>
           <h1>任务告示</h1>
-          <p>选择一份委托，先确认风险、目标和推荐能力。</p>
+          <p>任务可以并行推进；实际介入会直接激活，不需要先接受为唯一主任务。</p>
         </div>
-        <span>{snapshot.quests.length} 份委托</span>
+        <span>{visibleQuests.length} 份可见任务</span>
       </header>
 
       <div className="quest-board-layout">
         <section className="quest-list" aria-label="任务列表">
-          {snapshot.quests.map((quest) => (
+          {visibleQuests.map((quest) => (
             <QuestCard
               key={quest.id}
               className="quest-card"
@@ -173,26 +189,41 @@ export function QuestBoardPage({
                 <strong key={attribute}>{ATTRIBUTE_LABELS[attribute]}</strong>
               ))}
             </div>
-            {selected.status === 'ACCEPTED' || selected.status === 'ACTIVE' ? (
-              <Link
-                className="primary-action"
-                to={buildRoute(APP_PATHS.adventure, {
-                  campaignId,
-                  questId: selected.id,
-                })}
-              >
-                进入冒险准备
-              </Link>
-            ) : (
-              <button
-                className="primary-action"
-                type="button"
-                disabled={busy || hasMainQuest || selected.status !== 'AVAILABLE'}
-                onClick={() => void acceptSelected()}
-              >
-                {hasMainQuest ? '已有主任务' : busy ? '正在接受…' : '接受任务'}
-              </button>
-            )}
+            <p>
+              状态依据：{selected.statusReason} · 修订 {selected.revision}
+            </p>
+            <div className="quest-detail__actions">
+              {selected.status === 'ACCEPTED' || selected.status === 'ACTIVE' ? (
+                <Link
+                  className="primary-action"
+                  to={buildRoute(APP_PATHS.adventure, {
+                    campaignId,
+                    questId: selected.id,
+                  })}
+                >
+                  进入冒险准备
+                </Link>
+              ) : ['DISCOVERED', 'AVAILABLE', 'UPDATED'].includes(selected.status) ? (
+                <button
+                  className="primary-action"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void interveneSelected()}
+                >
+                  {busy ? '正在介入…' : '介入任务'}
+                </button>
+              ) : null}
+              {canAbandon(selected.status) ? (
+                <button
+                  className="quiet-action"
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void abandonSelected()}
+                >
+                  放弃任务
+                </button>
+              ) : null}
+            </div>
             {error === null ? null : (
               <p className="form-error" role="alert">
                 {typeof error === 'string' ? error : '操作未完成，请重试。'}
@@ -207,19 +238,33 @@ export function QuestBoardPage({
 
 function statusLabel(status: QuestView['status']): string {
   switch (status) {
+    case 'HIDDEN':
+      return '隐藏';
+    case 'DISCOVERED':
+      return '已发现';
     case 'AVAILABLE':
       return '可接受';
     case 'ACCEPTED':
       return '已接受';
     case 'ACTIVE':
       return '进行中';
+    case 'BLOCKED':
+      return '受阻';
+    case 'UPDATED':
+      return '有更新';
     case 'COMPLETED':
       return '已完成';
     case 'FAILED':
       return '失败';
+    case 'EXPIRED':
+      return '已过期';
     case 'ABANDONED':
       return '已放弃';
   }
+}
+
+function canAbandon(status: QuestView['status']): boolean {
+  return ['DISCOVERED', 'AVAILABLE', 'ACCEPTED', 'ACTIVE', 'BLOCKED', 'UPDATED'].includes(status);
 }
 
 function QuestMessage({ title, detail }: { readonly title: string; readonly detail?: string }) {

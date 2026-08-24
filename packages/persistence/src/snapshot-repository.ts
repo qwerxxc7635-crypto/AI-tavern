@@ -45,6 +45,8 @@ type SnapshotTable =
   | 'npc_knowledge'
   | 'npc_relationships'
   | 'quests'
+  | 'quest_pool_states'
+  | 'quest_pool_transitions'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -66,6 +68,9 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     FROM npc_relationships JOIN npcs ON npcs.id = npc_relationships.npc_id
     WHERE npcs.campaign_id = ? ORDER BY npc_relationships.npc_id`,
   quests: 'SELECT * FROM quests WHERE campaign_id = ? ORDER BY id',
+  quest_pool_states: 'SELECT * FROM quest_pool_states WHERE campaign_id = ? ORDER BY quest_id',
+  quest_pool_transitions:
+    'SELECT * FROM quest_pool_transitions WHERE campaign_id = ? ORDER BY quest_id, after_revision',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -88,6 +93,8 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'npc_knowledge',
   'npc_relationships',
   'quests',
+  'quest_pool_states',
+  'quest_pool_transitions',
   'adventures',
   'adventure_turns',
   'conversations',
@@ -266,12 +273,19 @@ export class SnapshotRepository {
       .map(toStoredRow);
 
     this.database.exec('PRAGMA defer_foreign_keys = ON');
+    this.database
+      .prepare('INSERT INTO quest_pool_restore_sessions (campaign_id) VALUES (?)')
+      .run(snapshot.campaignId);
     this.deleteCampaignState(snapshot.campaignId);
     this.restoreCampaign(payload.campaign);
     for (const table of INSERT_ORDER) {
       for (const stored of payload.tables[table]) this.insertRow(table, stored);
     }
+    this.backfillLegacyQuestPool(snapshot.campaignId);
     for (const request of turnRequests) this.restoreTurnRequest(request);
+    this.database
+      .prepare('DELETE FROM quest_pool_restore_sessions WHERE campaign_id = ?')
+      .run(snapshot.campaignId);
     return snapshot;
   }
 
@@ -288,6 +302,8 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM quest_pool_transitions WHERE campaign_id = ?',
+      'DELETE FROM quest_pool_states WHERE campaign_id = ?',
       `DELETE FROM messages WHERE conversation_id IN
          (SELECT id FROM conversations WHERE campaign_id = ?)`,
       `DELETE FROM adventure_turns WHERE adventure_id IN
@@ -309,6 +325,39 @@ export class SnapshotRepository {
       'DELETE FROM world_bibles WHERE campaign_id = ?',
     ];
     for (const sql of statements) this.database.prepare(sql).run(campaign);
+  }
+
+  private backfillLegacyQuestPool(campaign: CampaignId): void {
+    this.database
+      .prepare(
+        `INSERT INTO quest_pool_states (
+           quest_id,campaign_id,status,revision,last_source,last_reason,last_operation_id,
+           created_at,updated_at
+         )
+         SELECT id,campaign_id,status,1,'MIGRATION',
+           'Restored from a legacy internal snapshot.','quest:snapshot-migration:' || id,
+           created_at,updated_at
+         FROM quests
+         WHERE campaign_id=?
+           AND NOT EXISTS (SELECT 1 FROM quest_pool_states WHERE quest_id=quests.id)`,
+      )
+      .run(campaign);
+    this.database
+      .prepare(
+        `INSERT INTO quest_pool_transitions (
+           operation_id,quest_id,campaign_id,from_status,to_status,source,reason,
+           before_revision,after_revision,occurred_at
+         )
+         SELECT last_operation_id,quest_id,campaign_id,NULL,status,last_source,last_reason,
+           0,1,updated_at
+         FROM quest_pool_states
+         WHERE campaign_id=?
+           AND NOT EXISTS (
+             SELECT 1 FROM quest_pool_transitions
+             WHERE quest_pool_transitions.quest_id=quest_pool_states.quest_id
+           )`,
+      )
+      .run(campaign);
   }
 
   private restoreCampaign(row: StoredRow): void {
@@ -388,6 +437,12 @@ function parsePayload(text: string): SnapshotPayload {
   const tableRoot = requireRow(root['tables'], 'Snapshot tables must be an object');
   const tables = snapshotTableRecord((table) => {
     const rows = tableRoot[table];
+    if (
+      rows === undefined &&
+      (table === 'quest_pool_states' || table === 'quest_pool_transitions')
+    ) {
+      return [];
+    }
     if (!Array.isArray(rows)) throw new PersistenceDataError(`Snapshot table ${table} is invalid`);
     return rows.map((row) => requireStoredRow(row, `snapshot table ${table}`));
   });
@@ -511,6 +566,8 @@ function snapshotTableRecord(
     npc_knowledge: values('npc_knowledge'),
     npc_relationships: values('npc_relationships'),
     quests: values('quests'),
+    quest_pool_states: values('quest_pool_states'),
+    quest_pool_transitions: values('quest_pool_transitions'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

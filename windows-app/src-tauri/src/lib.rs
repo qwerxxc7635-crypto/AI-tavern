@@ -27,13 +27,14 @@ use ember_native_bridge::{
     NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit, NpcTimelineBegin,
     NpcTimelineFail, NpcTimelineOperation, PromptManagerSnapshot, PromptPresetActivateCommand,
     PromptPresetImportCommand, PromptPresetSaveCommand, QuestBoardSnapshot, QuestGenerationCommit,
-    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
-    TavernGenerationCommit, TavernPopulationFocusCommand, TavernPopulationProjectCommand,
-    TavernPopulationSnapshot, TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare,
-    TavernSceneSnapshot, TavernSceneStart, TavernSnapshot, UniversalCharacterCreationConfirm,
-    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
-    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
-    WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
+    QuestPoolTransitionCommand, RandomnessSettingsSnapshot, RandomnessSettingsUpdate,
+    RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit, TavernPopulationFocusCommand,
+    TavernPopulationProjectCommand, TavernPopulationSnapshot, TavernSceneCommit,
+    TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot, TavernSceneStart,
+    TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
+    UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
+    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1434,6 +1435,14 @@ fn quest_accept(
 }
 
 #[tauri::command]
+fn quest_pool_transition(
+    command: QuestPoolTransitionCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store.transition_quest_pool(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn adventure_get(
     campaign_id: String,
     quest_id: Option<String>,
@@ -1643,6 +1652,7 @@ pub fn run() {
             quest_board_get,
             quest_generation_commit,
             quest_accept,
+            quest_pool_transition,
             adventure_get,
             adventure_plan_commit,
             adventure_start,

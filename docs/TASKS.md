@@ -389,12 +389,13 @@
 
 ## M8-T01 Multi-Quest Pool
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M7-T05。
 - **Deliverable**：完整 Quest 状态机、类型、Repository 和多任务 UI。
 - **Acceptance**：多任务并存且合法迁移；玩家介入可激活；失败/过期/放弃不可被生成抹掉。
 - **Tests**：all states/transitions、multiple active、implicit activation、save/reload/migration。
 - **Do Not**：不保留 `currentQuest` 为唯一真源；不强制接受按钮。
+- **Implementation reference**：[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)。
 
 ## M8-T02 Quest Graph
 

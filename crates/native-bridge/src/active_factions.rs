@@ -6,7 +6,11 @@ use serde_json::{Value, json};
 
 use crate::{
     CampaignStore, CampaignStoreError, CharacterGenerationAudit, current_timestamp,
-    insert_character_generation, validate_character_generation_audit, validate_id,
+    insert_character_generation,
+    quest_pool::{
+        transition_allowed as legal_quest_transition, transition_quest_pool_in_transaction,
+    },
+    validate_character_generation_audit, validate_id,
 };
 
 const PLAYER_RELATIONS: [&str; 6] = [
@@ -372,10 +376,18 @@ impl CampaignStore {
             update_profile(&transaction, profile, prior.revision)?;
         }
         if let Some((quest_id, before_status, after_status)) = &quest_change {
-            let count = transaction.execute("UPDATE quests SET status=?1,updated_at=?2 WHERE id=?3 AND campaign_id=?4 AND status=?5", params![after_status, at, quest_id, command.campaign_id, before_status])?;
-            if count != 1 {
-                return Err(CampaignStoreError::InvalidState);
-            }
+            transition_quest_pool_in_transaction(
+                &transaction,
+                &command.campaign_id,
+                quest_id,
+                None,
+                Some(before_status),
+                after_status,
+                "FACTION",
+                "Faction action changed quest conditions",
+                &format!("quest:faction:{}", command.operation_id),
+                &at,
+            )?;
         }
         match (&world_fact, &command.world_fact_id) {
             (Some((statement, location)), Some(id)) => {
@@ -679,7 +691,7 @@ fn apply_consequences(
                 }
                 let before: String = connection
                     .query_row(
-                        "SELECT status FROM quests WHERE id=?1 AND campaign_id=?2",
+                        "SELECT status FROM quest_pool_states WHERE quest_id=?1 AND campaign_id=?2",
                         params![quest_id, command.campaign_id],
                         |row| row.get(0),
                     )
@@ -864,19 +876,6 @@ fn set_relation(profile: &mut ActiveFactionProfile, target: &str, relation: &str
     } else if relation == "ENEMY" {
         profile.enemy_faction_ids.push(target.to_owned());
     }
-}
-fn legal_quest_transition(before: &str, after: &str) -> bool {
-    matches!(
-        (before, after),
-        ("AVAILABLE", "ACCEPTED")
-            | ("AVAILABLE", "FAILED")
-            | ("ACCEPTED", "ACTIVE")
-            | ("ACCEPTED", "ABANDONED")
-            | ("ACCEPTED", "FAILED")
-            | ("ACTIVE", "COMPLETED")
-            | ("ACTIVE", "FAILED")
-            | ("ACTIVE", "ABANDONED")
-    )
 }
 fn valid_text(value: &str, max: usize) -> bool {
     !value.is_empty() && value.trim() == value && value.chars().count() <= max

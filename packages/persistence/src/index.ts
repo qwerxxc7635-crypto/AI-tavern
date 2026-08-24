@@ -60,6 +60,8 @@ export type {
 } from './pending-ai-request-repository.js';
 export { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 export { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
+export { QuestPoolRepository } from './quest-pool-repository.js';
+export type { TransitionQuestPoolState } from './quest-pool-repository.js';
 export { TurnTransaction } from './turn-transaction.js';
 export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';

@@ -4393,3 +4393,22 @@
 - `pnpm --dir windows-app build` 生产构建通过，Vite 转换 261 个模块。没有删除测试、降低校验、写死结果、忽略错误、修改 Campaign schema 或把 Core/秘密放进 bundle。
 - 本任务没有修改 Rules Engine、D20、AI Provider协议、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心业务合同或存档状态机，也没有进入 M8-T01。视觉手册继续有效；完整 Legacy UI 迁移仍由 M10-T07 统一处理。
 - 用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M8-T01 Multi-Quest Pool
+
+### 多任务真相源、玩家介入与终态保护
+
+- Quest合同扩展到HIDDEN、DISCOVERED、AVAILABLE、兼容ACCEPTED、ACTIVE、BLOCKED、UPDATED、COMPLETED、FAILED、EXPIRED、ABANDONED，并增加有界转换来源。Domain冻结完整合法边；完成、失败、过期和放弃均为不可逆终态。
+- schema 23新增`quest_pool_states`生命周期真相源、append-only `quest_pool_transitions`和仅供内部快照事务使用的`quest_pool_restore_sessions`。迁移原样回填所有旧Quest；revision、operation、来源、原因与时间均持久化，旧`quests.status`不能覆盖已经分叉的新状态。
+- TypeScript Repository与Rust Native分别验证状态图、来源语义、乐观revision和幂等重放。Rules Engine、Faction、Adventure开始及结算改为在原业务事务内转换Quest Pool，不改变D20、奖励、NPC、Adventure或其他业务合同。
+- 内部自动快照现在保存并精确恢复Pool和转换账本；schema 23前的旧内部快照从其Quest状态建立revision 1迁移记录。恢复门禁只在立即事务内生效，普通业务路径仍不能删除历史。
+- Quest UI隐藏HIDDEN，展示状态原因/revision，允许多个任务同时ACTIVE。玩家“介入任务”从可见候选直接激活，不需要唯一主任务或传统接受门禁；兼容accept入口仍可服务旧Adventure流程，但不再限制其他任务。
+- 新增[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)与`DEC-136`，并更新V0.3规格、data model和任务引用。Node技能约束落实为type-only imports、显式字段、错误cause/rollback链、事务savepoint与隔离测试。
+
+### 验证、自审与限制
+
+- 专项测试覆盖全部状态和合法/非法转换、多Active、玩家直接介入、终态不可改写、幂等与竞争revision、schema 22→23回填、关闭重开、自动快照恢复、Rules/Faction/Adventure跨模块事务和隐藏任务UI。
+- `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 154个文件/915项通过，另1个文件/1项性能基线按设计跳过；Node 29项通过；Rust workspace 130项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。
+- `pnpm --dir windows-app build`生产构建通过，Vite转换262个模块。没有删除测试、降低校验、写死结果、忽略错误或回滚已完成任务。
+- portable`.emtavern`仍为format v2；schema 23正式跨版本归档严格留给M10-T05。M8-T02 Quest Graph、M8-T03动态来源和World Director均未提前实现。
+- 新增UI复用既有Quest页面、组件和Design Token，没有新增CSS或平行组件体系；视觉手册与M10-T07 Legacy迁移门禁保持有效。用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
