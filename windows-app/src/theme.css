@@ -1667,6 +1667,42 @@ textarea:disabled {
   background: var(--line);
 }
 
+.tavern-scene {
+  display: grid;
+  gap: var(--space-card);
+  padding: var(--space-card);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-card);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-card);
+}
+
+.tavern-scene__participants {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: var(--space-control-inline);
+}
+
+.tavern-scene__play {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(18rem, 0.8fr);
+  gap: var(--space-card);
+}
+
+.tavern-scene__status {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-control-block);
+}
+
+.tavern-scene__status span {
+  padding: var(--space-control-block) var(--space-control-inline);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-control);
+  color: var(--color-text-secondary);
+}
+
 .tavern-patrons,
 .tavern-sidebar > section,
 .clock-board {

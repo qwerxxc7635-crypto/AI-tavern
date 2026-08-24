@@ -345,12 +345,13 @@
 
 ## M7-T02 Multi-NPC Scene
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M7-T01。
 - **Deliverable**：场景参与者、speaker/action proposal、turn arbitration 和 UI。
 - **Acceptance**：说话/打断/沉默/偷听/离开/介入由知识与目标驱动，不机械轮流；每个 Actor 只获授权 Context。
 - **Tests**：speaker selection、silence/leave/interruption、knowledge leakage、concurrency、persistence。
 - **Do Not**：不把多个 NPC 合成全知 Agent；不固定轮询。
+- **Implementation reference**：[`V0.3_MULTI_NPC_SCENE.md`](V0.3_MULTI_NPC_SCENE.md)。
 
 ## M7-T03 Immutable NPC Timeline
 

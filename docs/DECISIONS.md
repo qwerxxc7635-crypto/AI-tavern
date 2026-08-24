@@ -2778,3 +2778,27 @@ schema 19 以 `tavern_population_states`、`members`、append-only `cycles` 和 
 - 仅 owner 且没有机会是合法并持久化的 empty state；动态 important 身份在来源失活后仍保留。
 - portable archive 对 schema 19 的正式升级留给 M10-T05；本任务的 save/reopen 指本地 SQLite 关闭重开，不冒充 portable round-trip。
 - 本任务没有返工 Tavern 页面或建立第二套组件体系；M7-T02 自然触及 UI 时遵循视觉手册，Legacy 迁移仍由 M10-T07 收敛。
+
+## DEC-132：多 NPC 场景采用逐 Actor 生成与本地单次仲裁
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T02`、`docs/V0.3_SPEC.md` 12节、`DEC-123`、`DEC-128`与`DEC-131`
+
+### 背景
+
+把全部 NPC、目标、秘密和知识放进一个模型请求虽然容易生成连贯群聊，却会形成全知 Agent，使 Actor Knowledge 边界失效。固定轮询能避免同时发言，但无法表达沉默、偷听、离开、介入或由目标驱动的打断，并让参与顺序成为隐藏规则。
+
+### 决定与理由
+
+每个在场 Actor 独立获得一份 canonical Context：自己的 LOD、目标、授权 Knowledge、Memory，其他人的公开身份，公开 Turn 与玩家意图。`PROPOSE_TAVERN_SCENE_ACTION` 只产生该 Actor 的一个结构化行动提案；Native 从 SQLite 重建每份输入，验证 Actor、Action、Target、Knowledge 引用和 generation audit。
+
+本地仲裁最多选中一个发言行动，同时保留沉默、偷听和离开等非发言结果。点名、知识引用、有限 urgency 和行动语义决定优先级，稳定 Actor ID 仅作平局键，不按参与者数组轮询。scene revision、全部 generation record/proposal、仲裁结果和离开状态在 schema 20 的 immediate transaction 中原子提交。
+
+### 影响与边界
+
+- SQLite 是参与者、状态、Turn 与 proposal provenance 的唯一真实来源；UI 和模型都不能直接改 Scene。
+- 其他 Actor 的人格、目标、秘密、Memory 与 Knowledge 永不进入当前 Actor 输入；引用越权 fail closed。
+- Tavern UI 复用 `NpcCard`、`DialogueView` 和 `ActionComposer`，新增 CSS 只使用既有 Token；不建立平行组件体系，不提前执行 M10-T07。
+- M7-T02 不实现成功回复不可 Swipe、技术 Retry、事实冲突修复或不可变正式时间线，这些仍属于 M7-T03。
+- portable archive 对 schema 20 的升级留给 M10-T05；本地 SQLite 关闭重开已经保存完整场景。

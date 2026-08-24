@@ -1,4 +1,14 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
+export { TAVERN_SCENE_ACTIONS, TAVERN_SCENE_PARTICIPANT_STATUSES } from './tavern-scene.js';
+export type {
+  TavernSceneAction,
+  TavernSceneActorProposal,
+  TavernSceneParticipant,
+  TavernSceneParticipantStatus,
+  TavernSceneResolvedAction,
+  TavernSceneSnapshot,
+  TavernSceneTurn,
+} from './tavern-scene.js';
 export { SNAPSHOT_KINDS } from './snapshot.js';
 export type { SaveSnapshot, SnapshotKind } from './snapshot.js';
 export type {

@@ -417,6 +417,15 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     memoryCandidate: 'The player asked Ilyra to reveal the cellar door.',
     relationshipProposal: { trust: 1 },
   },
+  PROPOSE_TAVERN_SCENE_ACTION: {
+    actorId: 'npc-owner',
+    action: 'SPEAK',
+    targetNpcId: null,
+    utterance: 'The lantern road has been too quiet tonight.',
+    citedKnowledgeIds: [],
+    urgency: 1,
+    rationale: 'The player addressed the room and the owner has a relevant concern.',
+  },
   GENERATE_QUEST: {
     content: quest,
     risk: 'MODERATE',

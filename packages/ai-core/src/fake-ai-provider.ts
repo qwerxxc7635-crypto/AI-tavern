@@ -350,6 +350,29 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       };
     }
   }
+  if (request.task === 'PROPOSE_TAVERN_SCENE_ACTION') {
+    const input = taskInput(request);
+    const actor = isRecord(input?.['actor']) ? input['actor'] : undefined;
+    const actorId = typeof actor?.['id'] === 'string' ? actor['id'] : 'npc-owner';
+    const allowed = Array.isArray(input?.['allowedActions']) ? input['allowedActions'] : [];
+    const action = allowed.includes('SPEAK')
+      ? 'SPEAK'
+      : allowed.includes('INTERVENE')
+        ? 'INTERVENE'
+        : 'SILENCE';
+    return {
+      actorId,
+      action,
+      targetNpcId: null,
+      utterance:
+        action === 'SILENCE'
+          ? null
+          : `${typeof actor?.['name'] === 'string' ? actor['name'] : 'A patron'} answers from their own place by the hearth.`,
+      citedKnowledgeIds: [],
+      urgency: 1,
+      rationale: 'The visible player intent invites this actor to respond from their own context.',
+    };
+  }
   if (request.task !== 'GENERATE_ADVENTURE_TURN') return base;
   const adventureBase = FAKE_TASK_OUTPUTS.GENERATE_ADVENTURE_TURN;
   const input = taskInput(request);

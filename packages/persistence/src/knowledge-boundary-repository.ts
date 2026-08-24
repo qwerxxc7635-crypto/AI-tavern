@@ -448,10 +448,17 @@ export class KnowledgeBoundaryRepository {
   }
 
   private requireActor(campaign: CampaignId, actor: KnowledgeActor): void {
-    const table = actor.type === 'NPC' ? 'npcs' : 'player_characters';
     const row = this.database
-      .prepare(`SELECT 1 AS present FROM ${table} WHERE id = ? AND campaign_id = ?`)
-      .get(actor.id, campaign);
+      .prepare(
+        actor.type === 'NPC'
+          ? `SELECT 1 AS present FROM npcs WHERE id = ? AND campaign_id = ?
+             UNION
+             SELECT 1 AS present FROM npc_lod_profiles WHERE id = ? AND campaign_id = ?`
+          : `SELECT 1 AS present FROM player_characters WHERE id = ? AND campaign_id = ?`,
+      )
+      .get(
+        ...(actor.type === 'NPC' ? [actor.id, campaign, actor.id, campaign] : [actor.id, campaign]),
+      );
     if (row === undefined)
       throw new PersistenceDataError('Knowledge actor is outside the campaign');
   }

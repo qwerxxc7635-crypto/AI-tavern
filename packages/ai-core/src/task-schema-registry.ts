@@ -42,6 +42,8 @@ import {
   GenerateWorldOutputSchema,
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
+  ProposeTavernSceneActionInputSchema,
+  ProposeTavernSceneActionOutputSchema,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
   ResolveDiceResultInputSchema,
@@ -88,6 +90,10 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),
+  PROPOSE_TAVERN_SCENE_ACTION: definition(
+    ProposeTavernSceneActionInputSchema,
+    ProposeTavernSceneActionOutputSchema,
+  ),
   GENERATE_QUEST: definition(GenerateQuestInputSchema, GenerateQuestOutputSchema, 2),
   GENERATE_ADVENTURE_PLAN: definition(
     GenerateAdventurePlanInputSchema,

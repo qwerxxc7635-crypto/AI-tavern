@@ -1057,6 +1057,73 @@ export const ExtractMemoriesOutputSchema = z
   })
   .strict();
 
+const tavernSceneAction = z.enum([
+  'SPEAK',
+  'INTERRUPT',
+  'SILENCE',
+  'EAVESDROP',
+  'LEAVE',
+  'INTERVENE',
+]);
+export const ProposeTavernSceneActionInputSchema = z
+  .object({
+    sceneId: identifier,
+    sceneRevision: z.number().int().min(1),
+    actor: z
+      .object({
+        id: identifier,
+        name: shortText,
+        populationRole: shortText,
+        currentBehavior: text,
+        personality: text.nullable(),
+        goals: stringList,
+      })
+      .strict(),
+    visibleParticipants: z
+      .array(
+        z
+          .object({
+            id: identifier,
+            name: shortText,
+            populationRole: shortText,
+            status: z.enum(['ACTIVE', 'LISTENING']),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(6),
+    authorizedKnowledge: z.array(z.object({ id: identifier, content: text }).strict()).max(50),
+    memories: z.array(z.object({ id: identifier, summary: text }).strict()).max(30),
+    recentPublicTurns: z
+      .array(z.object({ speakerNpcId: identifier.nullable(), text }).strict())
+      .max(12),
+    playerIntent: text,
+    addressedNpcId: identifier.nullable(),
+    allowedActions: z.array(tavernSceneAction).min(1).max(6),
+  })
+  .strict();
+export const ProposeTavernSceneActionOutputSchema = z
+  .object({
+    actorId: identifier,
+    action: tavernSceneAction,
+    targetNpcId: identifier.nullable(),
+    utterance: text.nullable(),
+    citedKnowledgeIds: identifierList,
+    urgency: z.number().int().min(0).max(3),
+    rationale: text,
+  })
+  .strict()
+  .superRefine((proposal, context) => {
+    const vocal = ['SPEAK', 'INTERRUPT', 'INTERVENE'].includes(proposal.action);
+    if (vocal !== (proposal.utterance !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['utterance'],
+        message: 'utterance must match vocal action',
+      });
+    }
+  });
+
 export const CheckConsistencyInputSchema = z
   .object({
     world: worldContext,

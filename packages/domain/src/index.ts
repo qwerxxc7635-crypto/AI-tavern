@@ -90,6 +90,8 @@ export {
   focusTavernPopulation,
   projectTavernPopulation,
 } from './tavern-population-projector.js';
+export { TavernSceneRuleError, arbitrateTavernScene } from './tavern-scene-arbiter.js';
+export type { ArbitrateTavernSceneInput } from './tavern-scene-arbiter.js';
 export type {
   FocusTavernPopulationInput,
   ProjectTavernPopulationInput,

@@ -102,6 +102,11 @@ export const TASK_PROMPTS = Object.freeze({
     'Reply only from this NPC perspective without repeating substantial phrases inside the response. Return 3-5 distinct suggested topics grounded in this NPC knowledge and the conversation; they are optional player suggestions with no extra authority. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
     4,
   ),
+  PROPOSE_TAVERN_SCENE_ACTION: define(
+    'PROPOSE_TAVERN_SCENE_ACTION',
+    'NPC_ACTOR',
+    "Propose exactly one action for the supplied actor only. Use only that actor's authorized knowledge, memories, goals, and the public scene transcript. Never infer another participant's private motive, memory, secret, or knowledge. SPEAK, INTERRUPT, and INTERVENE require an utterance; SILENCE, EAVESDROP, and LEAVE require null. Cite only supplied knowledge IDs. The program validates and arbitrates all independent proposals locally; this proposal never mutates game state.",
+  ),
   GENERATE_QUEST: define(
     'GENERATE_QUEST',
     'WORLD_DESIGNER',

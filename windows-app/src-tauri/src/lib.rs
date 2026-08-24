@@ -26,10 +26,11 @@ use ember_native_bridge::{
     QuestBoardSnapshot, QuestGenerationCommit, RandomnessSettingsSnapshot,
     RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit,
     TavernPopulationFocusCommand, TavernPopulationProjectCommand, TavernPopulationSnapshot,
-    TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
-    UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
-    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
-    model_endpoint_fingerprint, model_probe_fingerprint,
+    TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot,
+    TavernSceneStart, TavernSnapshot, UniversalCharacterCreationConfirm,
+    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
+    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
+    WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1182,6 +1183,41 @@ fn tavern_population_focus(
 }
 
 #[tauri::command]
+fn tavern_scene_get(
+    campaign_id: String,
+    scene_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneSnapshot, CommandError> {
+    store
+        .tavern_scene_snapshot(&campaign_id, &scene_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_start(
+    command: TavernSceneStart,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneSnapshot, CommandError> {
+    store.start_tavern_scene(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_turn_prepare(
+    command: TavernScenePrepare,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneGenerationRequest, CommandError> {
+    store.prepare_tavern_scene_turn(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_turn_commit(
+    command: TavernSceneCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneSnapshot, CommandError> {
+    store.commit_tavern_scene_turn(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1479,6 +1515,10 @@ pub fn run() {
             tavern_population_get,
             tavern_population_project,
             tavern_population_focus,
+            tavern_scene_get,
+            tavern_scene_start,
+            tavern_scene_turn_prepare,
+            tavern_scene_turn_commit,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,

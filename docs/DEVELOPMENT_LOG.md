@@ -4316,3 +4316,22 @@
 - `pnpm --dir windows-app build` 生产构建通过，Vite 转换 249 个模块。没有通过删除测试、降低校验、写死结果或忽略错误完成门禁。
 - 当前视觉手册、视觉债务和 M10-T07 收敛门禁保持有效。本任务没有新增页面或 CSS，也没有建立平行 Primitive/Game Component；M7-T02 自然修改 UI 时继续复用 Token 与 `NpcCard`。
 - portable `.emtavern` 仍为 format v2；schema 19 新表的正式跨版本导入导出与历史 fixture 迁移严格留给 M10-T05。本任务未修改 Rules Engine、D20、Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心合同或存档状态机，也不进入 M7-T02。
+
+## 2026-08-24 — M7-T02 Multi-NPC Scene
+
+### 逐 Actor Context、本地仲裁与 Tavern UI
+
+- 新增 `PROPOSE_TAVERN_SCENE_ACTION` 严格 schema、Prompt、Context Budget、Fake Provider 输出和缓存指标白名单。每次请求只包含一个 Actor 的 LOD、目标、授权 Knowledge/Memory；其他参与者只有公开身份和状态，模型只提交结构化行动候选。
+- 合同与 Domain 建立 `SPEAK`、`INTERRUPT`、`SILENCE`、`EAVESDROP`、`LEAVE`、`INTERVENE` 闭集。仲裁按玩家点名、授权知识、有限 urgency 和行动语义选择至多一个发言者，同时保留非发言行动；Actor ID 只作平局键，不固定轮询。
+- schema 20 新增 Scene、Participant、append-only Turn 与 Actor Proposal。Rust Native 在 current transaction 重建每份 Actor 输入，验证 generation audit 和知识引用后，原子保存 generation provenance、提案、仲裁结果、离开状态与 scene revision；幂等重放和竞争 revision fail closed。
+- Windows `TavernSceneService` 对同 Scene 并发 send 合并，独立并发调用既有桌面 AI 编排；Tavern 页面消费 Population 快照，按需复用 LOD focus，并复用 `NpcCard`、`DialogueView` 与 `ActionComposer` 展示多人场景。新增 CSS 只使用既有 Design Token，没有建立第二套组件体系或提前执行 Legacy UI 迁移。
+- TypeScript Knowledge Repository 的 NPC authority 与 schema 16 一致扩展到 `npc_lod_profiles`，使低 LOD 稳定身份可参与逐 Actor 知识边界，不放宽跨 Campaign/Actor 校验。
+- 新增 [`V0.3_MULTI_NPC_SCENE.md`](V0.3_MULTI_NPC_SCENE.md) 与 `DEC-132`，并更新 V0.3 规格、Generator Framework 和任务引用。M7-T03 的正式回复锁定、技术 Retry 和事实冲突修复没有提前实现。
+
+### 验证、自审与限制
+
+- 定向测试覆盖非轮询 speaker selection、沉默/离开、知识泄漏、逐 Actor 输入和并发 send 合并。`pnpm check:shared` 从头通过：Prettier、release metadata、简体中文文案、ESLint、TypeScript；Vitest 146 个文件/873 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 120 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；archive interop 通过。
+- 全 workspace 严格 Clippy 与 rustfmt 通过；Windows 生产构建通过，Vite 转换 254 个模块。没有删除测试、降低校验、写死业务结果或忽略错误。
+- portable `.emtavern` 仍为 format v2；schema 20 的正式导入导出升级留给 M10-T05。本任务不修改 Rules Engine、D20、Provider 栈、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 业务语义或存档状态机，也不进入 M7-T03。
+- 视觉实现遵循已持久化手册与现有 Token/组件合同；既有页面的 Legacy 视觉债务仍由 M10-T07 统一迁移和审查。
+- 用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。

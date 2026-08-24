@@ -467,6 +467,39 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       relationshipProposal: { trust: 1 },
     },
   },
+  PROPOSE_TAVERN_SCENE_ACTION: {
+    input: {
+      sceneId: 'scene-1',
+      sceneRevision: 1,
+      actor: {
+        id: 'npc-1',
+        name: 'Ilyra',
+        populationRole: 'Tavern owner',
+        currentBehavior: 'Keeps watch over the common room.',
+        personality: 'Measured and direct.',
+        goals: ['Keep the tavern safe.'],
+      },
+      visibleParticipants: [
+        { id: 'npc-1', name: 'Ilyra', populationRole: 'Tavern owner', status: 'ACTIVE' },
+        { id: 'npc-2', name: 'Tomas', populationRole: 'Visitor', status: 'LISTENING' },
+      ],
+      authorizedKnowledge: [{ id: 'knowledge-1', content: 'The cellar has an old door.' }],
+      memories: [{ id: 'memory-1', summary: 'A traveler asked about the cellar.' }],
+      recentPublicTurns: [],
+      playerIntent: 'I ask who knows the cellar.',
+      addressedNpcId: 'npc-1',
+      allowedActions: ['SPEAK', 'INTERRUPT', 'SILENCE', 'EAVESDROP', 'LEAVE'],
+    },
+    output: {
+      actorId: 'npc-1',
+      action: 'SPEAK',
+      targetNpcId: null,
+      utterance: 'I know the cellar door.',
+      citedKnowledgeIds: ['knowledge-1'],
+      urgency: 1,
+      rationale: 'The question is directly relevant to known information.',
+    },
+  },
   GENERATE_QUEST: {
     input: {
       world,
