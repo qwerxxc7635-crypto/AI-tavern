@@ -18,6 +18,7 @@ import type {
   ModelSettingsGateway,
   ModelSettingsSnapshot,
 } from './model-settings-service.js';
+import type { PromptProfileSource } from './prompt-manager-service.js';
 
 describe('DesktopAIOrchestrator', () => {
   it('normalizes Rust RFC3339 sub-millisecond timestamps at the native boundary', () => {
@@ -146,6 +147,29 @@ describe('DesktopAIOrchestrator', () => {
     expect(first.request.messages).not.toEqual(second.request.messages);
   });
 
+  it('changes the cache revision for user guidance without changing core prompt order', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const baseline = await new DesktopAIOrchestrator(settings, new CapturingProvider()).execute(
+      'GENERATE_WORLD',
+      worldInput('风暴群岛'),
+      options('prompt-default'),
+    );
+    const customized = await new DesktopAIOrchestrator(
+      settings,
+      new CapturingProvider(),
+      promptSource(8),
+    ).execute('GENERATE_WORLD', worldInput('风暴群岛'), options('prompt-custom'));
+
+    expect(customized.cachePrefixHash).not.toBe(baseline.cachePrefixHash);
+    expect(customized.request.messages[0]?.content).toContain('[GAME_RULES]');
+    expect(customized.request.messages[0]?.content).toContain('[USER_GUIDANCE]');
+    expect(customized.request.messages[0]?.content.indexOf('[GAME_RULES]')).toBeLessThan(
+      customized.request.messages[0]?.content.indexOf('[USER_GUIDANCE]') ?? -1,
+    );
+  });
+
   it('uses the saved fallback only for a retryable Provider failure', async () => {
     const primary = profile('primary-profile', 'deepseek', 'deepseek-v4-flash');
     const fallback = profile('fallback-profile', 'custom', 'fallback-model');
@@ -171,6 +195,32 @@ describe('DesktopAIOrchestrator', () => {
       selectedProfileId: 'fallback-profile',
       request: { modelName: 'fallback-model' },
     });
+  });
+
+  it('freezes one prompt preset across primary failure and fallback execution', async () => {
+    const primary = profile('primary-profile', 'deepseek', 'deepseek-v4-flash');
+    const fallback = profile('fallback-profile', 'custom', 'fallback-model');
+    const settings = new MutableSettings(primary);
+    settings.current = {
+      profiles: [primary, fallback],
+      defaultModelProfileId: primary.id,
+      fallbackModelProfileId: fallback.id,
+      pendingCredentialCleanupCount: 0,
+    };
+    let resolutions = 0;
+    const source = promptSource(12, () => {
+      resolutions += 1;
+    });
+    const provider = new CapturingProvider('provider-primary-profile');
+    await new DesktopAIOrchestrator(settings, provider, source).execute(
+      'GENERATE_WORLD',
+      worldInput('同一意图'),
+      options('prompt-fallback'),
+    );
+
+    expect(resolutions).toBe(1);
+    expect(provider.calls).toHaveLength(2);
+    expect(provider.calls[0]?.request.messages).toEqual(provider.calls[1]?.request.messages);
   });
 
   it.each([
@@ -372,5 +422,28 @@ function options(suffix: string) {
     temperature: 0.8,
     maxOutputTokens: 4_000,
     timeoutMs: 5_000,
+  };
+}
+
+function promptSource(revision: number, onResolve: () => void = () => {}): PromptProfileSource {
+  return {
+    async resolve() {
+      onResolve();
+      return {
+        managerRevision: revision,
+        presetId: 'preset-candle',
+        presetName: 'Candlelit',
+        presetVersion: 3,
+        blocks: [
+          {
+            id: 'tone',
+            name: 'Tone',
+            content: 'Use restrained candlelit prose.',
+            enabled: true,
+            tasks: [],
+          },
+        ],
+      };
+    },
   };
 }

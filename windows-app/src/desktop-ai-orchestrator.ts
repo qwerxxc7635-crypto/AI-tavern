@@ -21,6 +21,7 @@ import {
   formatOutputRepairPrompt,
   formatTaskPrompt,
   renderStablePromptProfile,
+  type ResolvedPromptPreset,
 } from '@ember-tavern/prompts';
 import { recordContextInspection } from './context-inspector-service.js';
 import { recordAIInspectionFailure, recordAIInspectionSuccess } from './ai-inspector-service.js';
@@ -29,6 +30,11 @@ import {
   type ModelProfile,
   type ModelSettingsGateway,
 } from './model-settings-service.js';
+import {
+  defaultPromptProfileSource,
+  tauriPromptProfileSource,
+  type PromptProfileSource,
+} from './prompt-manager-service.js';
 
 export interface DesktopAIExecution {
   readonly request: NormalizedAIRequest;
@@ -71,10 +77,19 @@ interface NativeGenerateResponse extends NormalizedAIResponse {
 }
 
 export class DesktopAIOrchestrator implements DesktopAIEngine {
+  private readonly settings: ModelSettingsGateway;
+  private readonly provider: AIProvider;
+  private readonly promptProfiles: PromptProfileSource;
+
   public constructor(
-    private readonly settings: ModelSettingsGateway,
-    private readonly provider: AIProvider,
-  ) {}
+    settings: ModelSettingsGateway,
+    provider: AIProvider,
+    promptProfiles: PromptProfileSource = defaultPromptProfileSource,
+  ) {
+    this.settings = settings;
+    this.provider = provider;
+    this.promptProfiles = promptProfiles;
+  }
 
   public async execute(
     task: AITask,
@@ -82,10 +97,18 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     options: DesktopAIExecuteOptions,
   ): Promise<DesktopAIExecution> {
     let selections: Awaited<ReturnType<typeof resolveSelections>>;
+    let userPreset: ResolvedPromptPreset | null;
     try {
-      selections = await resolveSelections(this.settings);
+      [selections, userPreset] = await Promise.all([
+        resolveSelections(this.settings).catch((error: unknown) => {
+          throw preserveOrchestrationError(error, 'MODEL_SETTINGS_RESOLUTION_FAILED');
+        }),
+        this.promptProfiles.resolve(task).catch((error: unknown) => {
+          throw preserveOrchestrationError(error, 'PROMPT_MANAGER_RESOLUTION_FAILED');
+        }),
+      ]);
     } catch (error) {
-      throw preserveOrchestrationError(error, 'MODEL_SETTINGS_RESOLUTION_FAILED');
+      throw preserveOrchestrationError(error, 'RUNTIME_PROFILE_RESOLUTION_FAILED');
     }
     try {
       assertTaskContextBudget(task, input);
@@ -94,10 +117,10 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
       throw preserveOrchestrationError(error, 'CONTEXT_PREPARATION_FAILED');
     }
     try {
-      return await this.executeWithSelection(selections.primary, task, input, options);
+      return await this.executeWithSelection(selections.primary, task, input, options, userPreset);
     } catch (error) {
       if (selections.fallback === null || !canUseFallback(error)) throw error;
-      return this.executeWithSelection(selections.fallback, task, input, options);
+      return this.executeWithSelection(selections.fallback, task, input, options, userPreset);
     }
   }
 
@@ -106,6 +129,7 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     task: AITask,
     input: unknown,
     options: DesktopAIExecuteOptions,
+    userPreset: ResolvedPromptPreset | null,
   ): Promise<DesktopAIExecution> {
     const startedAt = Date.now();
     const lifecycle: GeneratorAuditEntry[] = [];
@@ -118,7 +142,7 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
         },
       }).run(
         generator,
-        { selection, task, input, options },
+        { selection, task, input, options, userPreset },
         { executionId: options.requestId, idempotencyKey: options.requestId },
       );
       const execution = Object.freeze({ ...result.value, lifecycle: result.audit });
@@ -159,6 +183,7 @@ interface DesktopGeneratorInput {
   readonly task: AITask;
   readonly input: unknown;
   readonly options: DesktopAIExecuteOptions;
+  readonly userPreset: ResolvedPromptPreset | null;
 }
 
 interface DesktopPreparedPrompt extends DesktopGeneratorInput {
@@ -188,10 +213,13 @@ class DesktopStructuredGenerator implements Generator<
   Omit<DesktopAIExecution, 'lifecycle'>,
   never
 > {
+  private readonly provider: AIProvider;
   private lastRequest: NormalizedAIRequest | null = null;
   private lastRaw: string | null = null;
 
-  public constructor(private readonly provider: AIProvider) {}
+  public constructor(provider: AIProvider) {
+    this.provider = provider;
+  }
 
   public inspectionState(): Readonly<{
     request: NormalizedAIRequest | null;
@@ -208,7 +236,9 @@ class DesktopStructuredGenerator implements Generator<
     let prompt: ReturnType<typeof formatTaskPrompt>;
     let cachePrefixHash: string;
     try {
-      prompt = formatTaskPrompt(context.task, context.input, context.selection.model.capabilities);
+      prompt = formatTaskPrompt(context.task, context.input, context.selection.model.capabilities, {
+        userPreset: context.userPreset,
+      });
       cachePrefixHash = await sha256(renderStablePromptProfile(prompt.stableProfile));
     } catch (error) {
       throw preserveOrchestrationError(error, 'PROMPT_PREPARATION_FAILED');
@@ -276,6 +306,7 @@ class DesktopStructuredGenerator implements Generator<
       raw.response.content,
       error.validation,
       prepared.selection.model.capabilities,
+      { userPreset: prepared.userPreset },
     );
     const request: NormalizedAIRequest = {
       ...raw.request,
@@ -396,6 +427,7 @@ class TauriNativeAIProvider implements AIProvider {
 export const tauriDesktopAIOrchestrator = new DesktopAIOrchestrator(
   tauriModelSettingsGateway,
   new TauriNativeAIProvider(),
+  tauriPromptProfileSource,
 );
 
 export function desktopAIEngine(source?: DesktopAIEngine | AIProvider): DesktopAIEngine {
@@ -405,20 +437,28 @@ export function desktopAIEngine(source?: DesktopAIEngine | AIProvider): DesktopA
 }
 
 export class DesktopAIOrchestrationError extends Error {
-  public constructor(public readonly code: string) {
-    super('Desktop AI orchestration failed');
+  public readonly code: string;
+
+  public constructor(code: string, cause?: unknown) {
+    super('Desktop AI orchestration failed', { cause });
     this.name = 'DesktopAIOrchestrationError';
+    this.code = code;
   }
 }
 
 class DesktopOutputValidationError extends DesktopAIOrchestrationError {
+  public readonly validation: Parameters<typeof formatOutputRepairPrompt>[3];
+  public readonly raw: string;
+
   public constructor(
     code: string,
-    public readonly validation: Parameters<typeof formatOutputRepairPrompt>[3],
-    public readonly raw: string,
+    validation: Parameters<typeof formatOutputRepairPrompt>[3],
+    raw: string,
   ) {
     super(code);
     this.name = 'DesktopOutputValidationError';
+    this.validation = validation;
+    this.raw = raw;
   }
 }
 
@@ -450,7 +490,7 @@ function preserveOrchestrationError(
 ): DesktopAIOrchestrationError {
   return error instanceof DesktopAIOrchestrationError
     ? error
-    : new DesktopAIOrchestrationError(fallbackCode);
+    : new DesktopAIOrchestrationError(fallbackCode, error);
 }
 
 async function resolveSelections(settings: ModelSettingsGateway): Promise<{

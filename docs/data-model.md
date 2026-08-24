@@ -431,6 +431,8 @@ erDiagram
 
 保留键`randomness_profile_v1`保存`profile`与`customTemperature`：CONSERVATIVE/BALANCED/HIGH必须分别解析为0.2/0.7/1.1且自定义值为空，CUSTOM必须携带0至2的有限自定义值。该设置只控制生成请求采样，导出存档不携带，也不得改变本地D20或其他Hard Logic。
 
+保留键`prompt_manager_v1`保存schema version 1、manager revision、活动preset ID及有界preset列表。Preset只含名称、递增version和有序User Guidance块；不能保存Core Rule Prompt、完整运行时Context、Campaign事实或秘密。所有修改在SQLite立即事务内比较manager/preset revision，导入导出格式与安全边界见[`V0.3_PROMPT_MANAGER.md`](V0.3_PROMPT_MANAGER.md)。
+
 ## 5. JSON列清单与边界
 
 | 表 | JSON列 |

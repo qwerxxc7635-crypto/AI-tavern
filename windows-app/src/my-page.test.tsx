@@ -43,7 +43,7 @@ describe('My page information architecture', () => {
     };
   }
 
-  it('exposes all eight device-setting sections and the release version', async () => {
+  it('exposes all nine device-setting sections and the release version', async () => {
     render(
       <MemoryRouter>
         <MyPage
@@ -58,7 +58,7 @@ describe('My page information architecture', () => {
     );
 
     const navigation = screen.getByRole('navigation', { name: '我的页面分区' });
-    expect(navigation.querySelectorAll('a')).toHaveLength(8);
+    expect(navigation.querySelectorAll('a')).toHaveLength(9);
     for (const { id, label } of MY_SECTIONS) {
       expect(screen.getByRole('link', { name: new RegExp(label, 'u') }).getAttribute('href')).toBe(
         `#${id}`,

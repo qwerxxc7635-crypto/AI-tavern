@@ -21,11 +21,14 @@ import {
   type RandomnessSettingsGateway,
   type RandomnessSettingsSnapshot,
 } from './randomness-settings-service.js';
+import { PromptManagerPanel } from './prompt-manager-panel.js';
+import type { PromptManagerGateway } from './prompt-manager-service.js';
 
 export const MY_SECTIONS = [
   { id: 'api', label: 'API', description: '连接与模型档案' },
   { id: 'routing', label: '默认与备用', description: '任务路由与切换策略' },
   { id: 'generation', label: '生成参数', description: '采样、长度与超时' },
+  { id: 'prompt-manager', label: '提示词管理器', description: '只读核心规则与用户风格预设' },
   { id: 'deepseek-cache', label: 'DeepSeek 缓存', description: '稳定前缀与缓存观测' },
   { id: 'context', label: '上下文', description: '预算、来源与装配清单' },
   { id: 'ai-inspector', label: 'AI 检查器', description: '高级生成诊断与遮罩视图' },
@@ -38,11 +41,13 @@ export function MyPage({
   randomnessGateway = tauriRandomnessSettingsGateway,
   contextInspectorGateway = sessionContextInspectorGateway,
   aiInspectorGateway = sessionAIInspectorGateway,
+  promptManagerGateway,
 }: {
   readonly versionGateway?: VersionGateway;
   readonly randomnessGateway?: RandomnessSettingsGateway;
   readonly contextInspectorGateway?: ContextInspectorGateway;
   readonly aiInspectorGateway?: AIInspectorGateway;
+  readonly promptManagerGateway?: PromptManagerGateway;
 }) {
   const [search] = useSearchParams();
   const [version, setVersion] = useState<string | null>(null);
@@ -110,6 +115,15 @@ export function MyPage({
             <SectionCopy eyebrow={playerText.coreUi.promptCache} title="DeepSeek 缓存">
               查看稳定Prompt前缀、半稳定上下文和缓存观测；缓存不会成为游戏状态真相源。
             </SectionCopy>
+          </section>
+
+          <section id="prompt-manager" className="my-hub__entry">
+            <SectionCopy eyebrow="命运叙事风格" title="提示词管理器">
+              核心规则保持只读；可编辑预设只调整叙事风格，不能改变知识边界、输出结构或本地游戏状态。
+            </SectionCopy>
+            <PromptManagerPanel
+              {...(promptManagerGateway === undefined ? {} : { gateway: promptManagerGateway })}
+            />
           </section>
 
           <section id="context" className="my-hub__entry">

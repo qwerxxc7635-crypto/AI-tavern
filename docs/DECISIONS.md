@@ -2854,3 +2854,29 @@ schema 22 使用独立 immutable `dialogue_suggestion_cache`。Native 将 Campai
 - M7-T04 不改变 Immutable Timeline、Rules/D20、Provider/Queue、Quest/NPC/Adventure 或存档状态机，也不实现 M7-T05 Prompt Manager。
 - UI 沿用视觉手册、Design Token 与既有 Game Component；不新增 CSS，不提前执行 M10-T07 Legacy 迁移。
 - portable archive format v2 保持不变，schema 22 的正式归档策略由 M10-T05 统一处理。
+
+## DEC-135：Prompt Manager 采用不可覆盖 Core 与末尾 User Guidance
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T05`、`DEC-123`、`DEC-127`与`docs/V0.3_PROMPT_MANAGER.md`
+
+### 背景
+
+统一 Prompt catalog、稳定缓存前缀、Context Assembly 和结构修复已经存在，但玩家无法保存叙事风格。若把完整 system prompt 暴露为可编辑文本，用户配置可以删除知识边界、输出 Schema 或本地状态权限；若每次 fallback/repair 重新读取设置，同一技术执行又可能使用两个不同 Prompt 身份。把 preset 当 Campaign 事实保存还会污染可移植存档和跨 Campaign 语义。
+
+### 决定与理由
+
+稳定 Prompt 固定为六段。前五段 Core 由应用代码和当前任务/世界事实生成，用户只能在末尾 `USER_GUIDANCE` 增加有序、可禁用、可按 task 筛选的风格块。该段自身重申低权限：不能覆盖此前段落、访问缺失知识、改变结构或提交状态。
+
+Preset 以严格version 1快照保存在device-local `app_settings.prompt_manager_v1`。manager revision和preset version采用单个`BEGIN IMMEDIATE`事务乐观并发；缺失设置等同默认，活动ID可清空恢复默认。非法持久快照只能通过Native事务内再次确认非法的安全重置清除；无revision调用不能删除有效快照。Bundle只导入导出用户preset并复用秘密扫描，Core永不序列化。
+
+桌面编排与Model Settings并行读取一次活动preset，在primary、fallback和structural repair间冻结。Stable profile升级到version 3，manager revision、preset身份/version和有序块进入cache prefix，使设置变化自然失效旧前缀。
+
+### 影响与边界
+
+- AI仍只是内容候选；Context、Knowledge、Schema、Rules和SQLite事务权限没有放宽。
+- “我的”页只展示Core只读说明和User preset编辑；没有system safety/rule覆盖入口，也不复制SillyTavern UI。
+- Prompt设置不是Campaign事实，不进入portable `.emtavern`；API Key和凭据仍只在系统凭据库。
+- 本任务不修改Rules Engine、D20、Provider协议、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure合同或存档状态机。
+- UI复用现有页面/控件和Design Token；完整视觉迁移与Legacy审查仍由M10-T07执行。

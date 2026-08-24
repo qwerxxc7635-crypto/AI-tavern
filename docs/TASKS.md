@@ -375,12 +375,13 @@
 
 ## M7-T05 Prompt Manager
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M7-T04。
 - **Deliverable**：User Editable 与 Core Rule Prompt 分层、preset/version/import/export（无秘密）。
 - **Acceptance**：用户调整风格不破坏规则、知识边界或 Schema；错误配置可恢复默认。
 - **Tests**：merge/order、core immutability、version、import/export、secret scan、cache revision。
 - **Do Not**：不提供覆盖系统安全/规则 Prompt 的入口；不复制 SillyTavern UI。
+- **Implementation reference**：[`V0.3_PROMPT_MANAGER.md`](V0.3_PROMPT_MANAGER.md)。
 
 ---
 

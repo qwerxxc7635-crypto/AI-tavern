@@ -25,7 +25,8 @@ use ember_native_bridge::{
     FactionActionCommand, ModelCapabilitiesRegistration, ModelSettingsSnapshot,
     ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot, NpcLodGenerationSnapshot,
     NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit, NpcTimelineBegin,
-    NpcTimelineFail, NpcTimelineOperation, QuestBoardSnapshot, QuestGenerationCommit,
+    NpcTimelineFail, NpcTimelineOperation, PromptManagerSnapshot, PromptPresetActivateCommand,
+    PromptPresetImportCommand, PromptPresetSaveCommand, QuestBoardSnapshot, QuestGenerationCommit,
     RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
     TavernGenerationCommit, TavernPopulationFocusCommand, TavernPopulationProjectCommand,
     TavernPopulationSnapshot, TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare,
@@ -644,6 +645,55 @@ fn randomness_settings_save(
     store: State<'_, CampaignStore>,
 ) -> Result<RandomnessSettingsSnapshot, CommandError> {
     store.save_randomness_settings(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_manager_get(
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.prompt_manager().map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_save(
+    command: PromptPresetSaveCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.save_prompt_preset(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_activate(
+    command: PromptPresetActivateCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.activate_prompt_preset(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_import(
+    command: PromptPresetImportCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.import_prompt_preset(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_export(
+    preset_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<String, CommandError> {
+    store.export_prompt_preset(&preset_id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_manager_reset(
+    expected_revision: Option<u64>,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store
+        .reset_prompt_manager(expected_revision)
+        .map_err(Into::into)
 }
 
 fn retry_pending_credential_cleanup(
@@ -1612,6 +1662,12 @@ pub fn run() {
             ai_generate,
             randomness_settings_get,
             randomness_settings_save,
+            prompt_manager_get,
+            prompt_preset_save,
+            prompt_preset_activate,
+            prompt_preset_import,
+            prompt_preset_export,
+            prompt_manager_reset,
             provider_probe
         ])
         .run(tauri::generate_context!())

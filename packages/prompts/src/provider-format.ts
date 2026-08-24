@@ -18,6 +18,7 @@ import {
 } from './stable-prompt-profile.js';
 import { taskPrompt } from './task-prompts.js';
 import { renderContextCacheLayout } from './context-cache-renderer.js';
+import type { ResolvedPromptPreset } from './prompt-manager.js';
 
 export interface FormattedTaskPrompt {
   readonly promptVersion: PromptVersion;
@@ -38,6 +39,7 @@ export interface StructuralRepairError {
 export interface PromptFormatContext {
   readonly stableWorldTruths?: JsonValue;
   readonly cacheLayout?: ContextCacheLayout;
+  readonly userPreset?: ResolvedPromptPreset | null;
 }
 
 export function formatTaskPrompt(
@@ -54,6 +56,7 @@ export function formatTaskPrompt(
     definition,
     outputSchema,
     context.stableWorldTruths,
+    context.userPreset,
   );
   const system = renderStablePromptProfile(stableProfile);
   const user = [
@@ -83,8 +86,9 @@ export function formatOutputRepairPrompt(
   invalidOutput: string,
   error: StructuralRepairError,
   capabilities: ModelCapabilities,
+  context: PromptFormatContext = Object.freeze({}),
 ): FormattedTaskPrompt {
-  const base = formatTaskPrompt(task, input, capabilities);
+  const base = formatTaskPrompt(task, input, capabilities, context);
   const instruction = [
     'The previous response failed local structure validation.',
     'Repair that response into exactly one JSON value matching the requested schema.',

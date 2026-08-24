@@ -177,7 +177,7 @@ describe('provider-neutral prompt formatting', () => {
 });
 
 describe('stable prompt profile', () => {
-  it('fixes the five required prefix sections and versions the profile', () => {
+  it('fixes the six required prefix sections and versions the profile', () => {
     const formatted = formatTaskPrompt('GENERATE_WORLD', worldInput, capabilities);
     expect(formatted.stableProfile).toMatchObject({
       id: STABLE_PROMPT_PROFILE_ID,
@@ -192,7 +192,7 @@ describe('stable prompt profile', () => {
     expect(formatted.stableProfile.sections[3]?.content).toMatchObject({
       task: 'GENERATE_WORLD',
       logicalRole: 'WORLD_DESIGNER',
-      stableProfileVersion: 2,
+      stableProfileVersion: STABLE_PROMPT_PROFILE_VERSION,
     });
   });
 

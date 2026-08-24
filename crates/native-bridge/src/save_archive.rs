@@ -1078,7 +1078,7 @@ fn assert_no_secret_keys(value: &Value) -> Result<(), CampaignStoreError> {
     Ok(())
 }
 
-fn assert_no_secret_text(text: &str) -> Result<(), CampaignStoreError> {
+pub(crate) fn assert_no_secret_text(text: &str) -> Result<(), CampaignStoreError> {
     if secret_patterns()
         .iter()
         .any(|pattern| pattern.is_match(text))

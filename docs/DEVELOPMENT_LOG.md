@@ -4374,3 +4374,22 @@
 - `pnpm --dir windows-app build` 生产构建通过，Vite 转换 258 个模块。门禁后补充的中文动态错误文案与 Campaign cascade 专项测试亦通过 Prettier、ESLint、TypeScript 和对应 Rust 测试。
 - portable `.emtavern` 仍为 format v2；schema 22 派生缓存的正式归档策略留给 M10-T05。本任务没有修改 Rules Engine、D20、Immutable Timeline、Quest/NPC/Adventure 核心合同、Provider/Queue、World Seed/Constitution 或存档状态机，也没有进入 M7-T05。
 - 自然触及 UI 继续复用既有 Design Token、`ActionComposer` 与视觉手册；没有新增 CSS、平行组件体系或提前执行 M10-T07 Legacy 迁移。用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M7-T05 Prompt Manager
+
+### 不可覆盖 Core、版本化 User Guidance 与设备级恢复
+
+- Prompt package 新增严格 Prompt Manager schema：最多 24 个 preset、每个最多 8 个有序块、稳定 ID、递增 version、启用状态和 AI task 闭集。Stable Prompt profile 升级为 version 3，固定前五段 Core 后追加低权限 `USER_GUIDANCE`；默认模式也保留 inactive 段，用户内容以 JSON 字符串数据进入，不能改写此前 Core、Schema、Knowledge 或提交权限。
+- Native 复用 `app_settings.prompt_manager_v1`，不提升 Campaign schema。创建、更新、启用和导入都在单个 `BEGIN IMMEDIATE` 事务中比较 manager revision；更新还比较 preset version。Preset bundle 固定 `EMBER_PROMPT_PRESET` version 1，只含用户块，并复用存档秘密扫描器拒绝凭据。关闭重开 SQLite 后顺序、版本和活动状态保持一致。
+- 合法设置可把活动 preset 清空恢复默认；合法 JSON 但不符合 Prompt schema 的损坏设置只能由专用 Native 恢复在事务内再次确认非法后清除。无 revision 请求不能删除一个并发出现的有效设置，错误导入/秘密/过期修改均不替换最后有效快照。
+- Desktop AI Orchestrator 在每次执行开始时并行读取 Model Settings 和活动 preset，一次解析后冻结给 primary、fallback 和 structural repair。manager revision、preset ID/version 与有序块进入稳定 cache prefix，设置变化会改变 hash，动态玩家输入仍不改变稳定前缀。
+- “我的”页面新增提示词管理器：Core 只读说明、活动 preset/默认恢复、preset version、块增删/排序/启用、导入导出和损坏设置安全恢复。实现复用当前表单与 Design Token，没有 Core 编辑入口、第二套 UI 体系或 SillyTavern 界面复制。
+- 新增 [`V0.3_PROMPT_MANAGER.md`](V0.3_PROMPT_MANAGER.md) 与 `DEC-135`，并更新规格、Generator Framework、data model 和任务引用。Node skill 约束落实为 type-only imports、显式字段而非 parameter properties、错误 cause 保留、模型/Prompt 设置并行读取及隔离单测。
+
+### 验证、自审与限制
+
+- 定向测试覆盖 merge/order、task scope、Core immutability、repair、cache revision、primary/fallback冻结、version、reopen、import/export、secret scan、过期并发、默认恢复、损坏快照安全恢复和 UI 只读边界。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 152 个文件/909 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 128 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 261 个模块。没有删除测试、降低校验、写死结果、忽略错误、修改 Campaign schema 或把 Core/秘密放进 bundle。
+- 本任务没有修改 Rules Engine、D20、AI Provider协议、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心业务合同或存档状态机，也没有进入 M8-T01。视觉手册继续有效；完整 Legacy UI 迁移仍由 M10-T07 统一处理。
+- 用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
