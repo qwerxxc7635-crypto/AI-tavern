@@ -71,6 +71,8 @@ export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';
 export { WorldConstitutionRepository } from './world-constitution-repository.js';
 export { WorldSeedRepository } from './world-seed-repository.js';
+export { WorldDirectorRepository } from './world-director-repository.js';
+export type { CommitWorldDirectorRun } from './world-director-repository.js';
 export { RulesEngineRepository, RulesIdempotencyConflictError } from './rules-engine-repository.js';
 export type { CommitRulesCommand, RulesCommitResult } from './rules-engine-repository.js';
 export { KnowledgeBoundaryRepository } from './knowledge-boundary-repository.js';

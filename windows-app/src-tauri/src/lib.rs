@@ -35,8 +35,9 @@ use ember_native_bridge::{
     TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot, TavernSceneStart,
     TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
     UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
-    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
-    model_endpoint_fingerprint, model_probe_fingerprint,
+    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldDirectorCommitCommand,
+    WorldDirectorPreparation, WorldDirectorPrepareCommand, WorldDirectorRun, WorldGenerationCommit,
+    WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1442,6 +1443,33 @@ fn dynamic_quest_commit(
 }
 
 #[tauri::command]
+fn world_director_prepare(
+    command: WorldDirectorPrepareCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldDirectorPreparation, CommandError> {
+    store.prepare_world_director(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_director_commit(
+    command: WorldDirectorCommitCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldDirectorRun, CommandError> {
+    store.commit_world_director(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_director_history(
+    campaign_id: String,
+    limit: usize,
+    store: State<'_, CampaignStore>,
+) -> Result<Vec<WorldDirectorRun>, CommandError> {
+    store
+        .world_director_history(&campaign_id, limit)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn quest_accept(
     campaign_id: String,
     quest_id: String,
@@ -1698,6 +1726,9 @@ pub fn run() {
             quest_generation_commit,
             dynamic_quest_prepare,
             dynamic_quest_commit,
+            world_director_prepare,
+            world_director_commit,
+            world_director_history,
             quest_accept,
             quest_pool_transition,
             quest_graph_get,

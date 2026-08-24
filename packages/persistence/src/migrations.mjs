@@ -142,6 +142,11 @@ const migrations = [
     name: 'dynamic_quest_sources',
     source: new URL('../../../database/migrations/0025_dynamic_quest_sources.sql', import.meta.url),
   },
+  {
+    version: 26,
+    name: 'world_director',
+    source: new URL('../../../database/migrations/0026_world_director.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

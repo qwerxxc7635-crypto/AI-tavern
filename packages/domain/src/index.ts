@@ -151,3 +151,13 @@ export {
   dynamicQuestInitialStatus,
   validateDynamicQuestSource,
 } from './dynamic-quest-source.js';
+export { evaluateWorldDirector } from './world-director.js';
+export type {
+  EvaluateWorldDirectorInput,
+  WorldDirectorClockInput,
+  WorldDirectorEvaluation,
+  WorldDirectorEventInput,
+  WorldDirectorFactionInput,
+  WorldDirectorQuestInput,
+  WorldDirectorTransitionInput,
+} from './world-director.js';

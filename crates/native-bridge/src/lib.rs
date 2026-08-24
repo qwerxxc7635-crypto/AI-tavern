@@ -32,6 +32,7 @@ mod universal_character_creation;
 #[cfg(test)]
 mod windows_e2e;
 mod world_creation;
+mod world_director;
 mod world_seed;
 pub use active_factions::*;
 pub use adventure_play::*;
@@ -58,6 +59,7 @@ pub use tavern_population::*;
 pub use tavern_scene::*;
 pub use universal_character_creation::*;
 pub use world_creation::*;
+pub use world_director::*;
 pub use world_seed::*;
 
 use std::ffi::OsString;
@@ -122,7 +124,9 @@ const QUEST_GRAPH_MIGRATION: &str =
     include_str!("../../../database/migrations/0024_quest_graph.sql");
 const DYNAMIC_QUEST_SOURCES_MIGRATION: &str =
     include_str!("../../../database/migrations/0025_dynamic_quest_sources.sql");
-const LATEST_SCHEMA_VERSION: i64 = 25;
+const WORLD_DIRECTOR_MIGRATION: &str =
+    include_str!("../../../database/migrations/0026_world_director.sql");
+const LATEST_SCHEMA_VERSION: i64 = 26;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -612,6 +616,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             "dynamic_quest_sources",
             DYNAMIC_QUEST_SOURCES_MIGRATION,
         ),
+        (26_i64, "world_director", WORLD_DIRECTOR_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

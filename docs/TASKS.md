@@ -419,12 +419,13 @@
 
 ## M8-T04 World Director
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M8-T03。
 - **Deliverable**：节奏评估、实体行动提案、调度和可解释决策记录。
 - **Acceptance**：Director 只提议何时/谁/什么需变化，Rules/Generator 决定合法内容；无固定主线。
 - **Tests**：quiet/overload/foreshadow/pressure/expiry、deterministic rules、failure safety。
 - **Do Not**：不让 Director 直接写事实；不后台无限调用模型。
+- **Implementation reference**：[`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md)。
 
 ## M8-T05 Director Budget
 

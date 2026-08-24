@@ -4464,3 +4464,29 @@
 - `M8-T03` 完成；下一项严格为 `M8-T04 World Director`，本次未开始。
 - portable `.emtavern` format v2 保持不变；schema 25 正式跨版本归档仍留给 M10-T05。12 个开放任务上限仅为本 adapter 的 fail-closed 安全阀，不替代 M8-T05 的持久每日预算和 cooldown。
 - Rules Engine、D20、Provider、Generation Queue、SQLite 真相源、Save/Resume、World Seed/Constitution 与 Quest/NPC/Adventure 核心业务合同未被视觉规范或本任务重构；不 merge、不 push。
+
+## 2026-08-24 — M8-T04 完成 World Director
+
+### 开始状态与边界
+
+- 在分支 `task/M8-T04-world-director`、起始提交 `43652a9` 上继续；未回滚或重做 M0–M8-T03，用户已有 `.gitignore` 修改全程未暂存。
+- World Director 冻结为本地确定性调度器，不是 AI Agent 或第二事实源。本任务只实现节奏评估、实体行动提案、显式触发调度和可解释审计；没有进入 M8-T05 的持久每日预算、cooldown、day rollover 或 starvation。
+- 再次核对用户视觉手册附件与 `docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md` 的 SHA-256 均为 `1ef31784546fb0bd5fc35022741d18522ac977781f933580dc1ffa5f8d854c7e`。既有 V0.3 Spec、视觉债务与 M10-T07 收敛任务已完整覆盖 Design Token 至 Visual Consistency Audit，无需建立第二套 UI 体系；本任务没有新增 UI/CSS。
+
+### 实现
+
+- 新增共享 Director action/pace/route/trigger/suppression、preparation 和 immutable run 合同，以及 TypeScript 纯 Domain 求值器。压力由 Active/Blocked Quest、临界 Clock、敌对 Active Faction 和近期失败确定；quiet、balanced、pressured、overloaded 四档使用稳定规则和最多八项有界提案。
+- 自然过期按 Quest 创建后数据库累计的 committed `WORLD_CLOCK_ADVANCED` 计数判断：DISCOVERED/AVAILABLE 为三次，BLOCKED 为五次，不会因最近二十条事件窗口被其他事件挤占。过载只保留收敛性的 `QUEST_EXPIRE`，新 pressure/foreshadow/Faction 内容均附明确抑制原因。
+- schema 26 新增 append-only `world_director_runs` 和有序 `world_director_proposals`。Campaign/trigger/事件类型、唯一重放、rank、route 与 JSON 均由约束/trigger 验证；内部快照捕获、按外键顺序恢复，并兼容 schema 26 前空集合。
+- TypeScript Repository 与 Rust Native 读取相同 SQLite 投影，计算 canonical SHA-256 context digest，在 immediate transaction 中重算并拒绝陈旧上下文，只追加审计而不写 World Fact、Quest、Clock、Faction、NPC、Adventure、Message 或 Game Event。精确 trigger replay 幂等，冲突身份 fail closed。
+- Tauri 新增 prepare/commit/history 命令；Windows 服务仅接受显式 MANUAL/WORLD_EVENT/PLAYER_ACTION/QUEST_TRANSITION/SETTLEMENT trigger，相同在途触发合并，历史只读且保留 signals、rationale、effects、route、cooldown key、suppression 和 source snapshot。服务没有 `AIProvider`、timer 或后台模型调用循环。
+- 新增 [`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md) 与 `DEC-139`，并更新 V0.3 Spec、Data Model、Migration 索引和任务引用。portable `.emtavern` format v2 保持不变；schema 26 正式跨版本归档仍留给 M10-T05。
+- Node skill 约束落实为 type-only imports、显式类字段而非 parameter properties、错误 cause/rollback 链、prepare/commit 隔离边界和独立服务测试。提交前自审进一步把 TypeScript locale/UTF-16 排序与截断改为和 Rust 一致的 Unicode code-point 顺序及字符上限。
+
+### 验证、自审与限制
+
+- 专项测试覆盖 quiet opportunity、foreshadow、pressure、自然 expiry、overload suppression、确定性顺序、触发合并、只读解释历史、失败 cause、陈旧 digest 原子拒绝、幂等重放、关闭重开、无事实副作用和内部快照恢复。
+- `pnpm check:shared` 在最终工作树从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 162 个文件/938 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 29 项通过。
+- Rustfmt、全 workspace 严格 Clippy 与 archive interoperability 通过。Rust workspace 135 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；其中 Native Bridge 90 项包含两项新增 Director 持久化/失败安全测试。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 268 个模块。没有删除测试、降低校验、写死结果、忽略错误或让 Director/LLM 获得事实写权限。
+- 单次最多八项只是 payload 安全上限，不冒充 M8-T05 的 durable budget/cooldown。M8-T04 完成后下一项严格为 M8-T05，本次未开始；不 merge、不 push。

@@ -52,6 +52,8 @@ type SnapshotTable =
   | 'quest_graph_revisions'
   | 'quest_graph_evaluations'
   | 'dynamic_quest_sources'
+  | 'world_director_runs'
+  | 'world_director_proposals'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -85,6 +87,10 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     'SELECT * FROM quest_graph_evaluations WHERE campaign_id = ? ORDER BY occurred_at, operation_id',
   dynamic_quest_sources:
     'SELECT * FROM dynamic_quest_sources WHERE campaign_id = ? ORDER BY created_at, quest_id',
+  world_director_runs:
+    'SELECT * FROM world_director_runs WHERE campaign_id = ? ORDER BY created_at, id',
+  world_director_proposals:
+    'SELECT * FROM world_director_proposals WHERE campaign_id = ? ORDER BY run_id, ordinal',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -121,6 +127,8 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'world_clocks',
   'game_events',
   'dynamic_quest_sources',
+  'world_director_runs',
+  'world_director_proposals',
 ];
 
 export class SnapshotRepository {
@@ -322,6 +330,8 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM world_director_proposals WHERE campaign_id = ?',
+      'DELETE FROM world_director_runs WHERE campaign_id = ?',
       'DELETE FROM dynamic_quest_sources WHERE campaign_id = ?',
       'DELETE FROM quest_graph_evaluations WHERE campaign_id = ?',
       'DELETE FROM quest_graph_revisions WHERE campaign_id = ?',
@@ -495,7 +505,9 @@ function parsePayload(text: string): SnapshotPayload {
         table === 'quest_graph_edges' ||
         table === 'quest_graph_revisions' ||
         table === 'quest_graph_evaluations' ||
-        table === 'dynamic_quest_sources')
+        table === 'dynamic_quest_sources' ||
+        table === 'world_director_runs' ||
+        table === 'world_director_proposals')
     ) {
       return [];
     }
@@ -629,6 +641,8 @@ function snapshotTableRecord(
     quest_graph_revisions: values('quest_graph_revisions'),
     quest_graph_evaluations: values('quest_graph_evaluations'),
     dynamic_quest_sources: values('dynamic_quest_sources'),
+    world_director_runs: values('world_director_runs'),
+    world_director_proposals: values('world_director_proposals'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

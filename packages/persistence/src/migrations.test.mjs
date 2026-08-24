@@ -72,6 +72,8 @@ const coreTables = [
   'world_bibles',
   'world_clocks',
   'world_constitutions',
+  'world_director_proposals',
+  'world_director_runs',
   'world_facts',
   'world_random_streams',
   'world_seeds',
@@ -486,7 +488,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      25,
+      26,
     );
     const importedKnowledge = database
       .prepare(

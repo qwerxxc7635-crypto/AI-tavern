@@ -2951,3 +2951,27 @@ schema 25 以唯一 `(campaign, source kind, occurrence)` 去重，并用一次�
 - portable archive format v2 不升级，schema 25 跨版本归档留给 M10-T05。
 - Rules Engine、D20、Provider、Queue、World Seed/Constitution 与 NPC/Quest/Adventure 合同不修改。
 - 本任务不新增 UI/CSS；后续 Quest 视觉迁移仍复用既有组件并由 M10-T07 执行。
+
+## DEC-139：World Director 采用确定性本地调度与只提案权限
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T04`、`DEC-136`至`DEC-138`与[`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md)
+
+### 背景
+
+Quest Pool、Quest Graph 和动态来源已有合法状态、依赖与内容入口，但仍缺少统一节奏判断：安静世界需要机会，临界时钟需要压力或伏笔，长期未解决任务需要自然过期，过载时则必须停止继续制造内容。若让模型自行决定调度、直接写事实或持续后台运行，会绕过 Rules/SQLite、产生固定主线倾向和无限调用风险；若在本任务持久化每日额度，又会提前进入 M8-T05。
+
+### 决定与理由
+
+Director 固定为无模型依赖的本地确定性评估器。它读取锁定 Constitution revision、当前地点、Quest Pool、Clocks、Faction公开行动和近期已提交记录，计算有界压力分段并按稳定顺序输出最多八项可解释提案。过载只保留收敛性的Quest过期提案；其他新内容提案记录明确抑制原因。Quest过期依据自创建后数据库累计的世界时钟推进数，不受最近事件窗口挤压。
+
+提案只路由到Rules、Generator或Faction Rules，不执行结果。schema 26保存append-only run/source snapshot/proposal审计。Windows只接受显式durable trigger，相同在途触发合并；Native提交事务重算context digest，拒绝陈旧上下文和冲突重放。服务无AI Provider、timer或后台生成循环。
+
+### 影响与边界
+
+- Director不能插入或更新World Fact、Quest、Clock、Faction、NPC、Adventure、Message或Game Event；SQLite和既有规则事务继续裁决事实。
+- 最多八项是单次载荷安全上限，不是每日预算。持久budget/cooldown、day rollover与starvation严格由M8-T05实现。
+- 来源只取当前实体ID和已提交状态，不设置主Quest或固定剧情路线。
+- 内部快照保存schema 26审计；portable archive format v2不变，正式升级留给M10-T05。
+- 本任务不新增UI/CSS；视觉手册和M10-T07渐进收敛门禁保持有效，不重构既有业务组件。

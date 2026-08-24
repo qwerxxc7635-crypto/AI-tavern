@@ -8,3 +8,4 @@ Versioned SQLite migrations live in this directory and are applied in numeric or
 - `0013_universal_character.sql`: versioned universal character profiles and Constitution-bound world extension definitions with V0.2 row compatibility.
 - `0014_character_creation_sessions.sql`: durable Quick/Advanced drafts, field locks, cancellation/resume, and confirmation audit state.
 - `0025_dynamic_quest_sources.sql`: one-shot Quest Pool creation intents plus append-only, source-validated Dynamic Quest provenance.
+- `0026_world_director.sql`: append-only, trigger-bound World Director pacing runs and ordered explainable proposals.

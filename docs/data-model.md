@@ -553,3 +553,9 @@ erDiagram
 schema 25 的 `dynamic_quest_sources` 以 `quest_id` 为主键，并对 `(campaign_id, source_kind, occurrence_id)` 建唯一约束。它保存六类来源的实体标识、可见性、玩家是否介入、公开摘要、来源快照、相关事实 ID、SHA-256 Context 摘要、Generation Record、预算快照和创建时间；所有引用必须属于同一 Campaign，普通更新和删除被 trigger 拒绝。
 
 `quest_pool_creation_intents` 是同一事务内的一次性表。动态 Quest 插入前写入本地裁定的初始状态、原因和 operation ID，`quests` insert trigger 将其投影为 Quest Pool 初始转换后立即删除。该表在稳定状态必须为空，不是第二个 Quest 状态真相源。详细合同见 [`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)。
+
+## 9. V0.3 World Director 审计扩展
+
+schema 26 的 `world_director_runs` 以 run ID 为主键，并对 `(campaign_id, trigger_kind, trigger_id)` 建唯一约束。它保存 context digest、pace、pressure score、signals、suppression、完整只读来源快照和时间。`world_director_proposals` 以 `(run_id, ordinal)` 为主键，保存最多八项有序 action kind、actor/targets、理由、候选效果、urgency、future cooldown key 和 Rules/Generator/Faction Rules route。
+
+两表均为 append-only 决策审计，不是 World Fact、Quest、Faction、Clock 或事件真相源；触发器验证事件/玩家行为/Quest转换/结算引用属于同一 Campaign。内部快照按 run 后 proposal 的顺序恢复，schema 26 前快照缺失两表时为空集合兼容。完整合同见 [`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md)。
