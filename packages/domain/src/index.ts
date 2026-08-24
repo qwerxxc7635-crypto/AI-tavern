@@ -92,6 +92,8 @@ export {
 } from './tavern-population-projector.js';
 export { TavernSceneRuleError, arbitrateTavernScene } from './tavern-scene-arbiter.js';
 export type { ArbitrateTavernSceneInput } from './tavern-scene-arbiter.js';
+export { npcTimelineFailure } from './npc-timeline-policy.js';
+export type { NpcTimelineErrorKind, NpcTimelineFailure } from './npc-timeline-policy.js';
 export type {
   FocusTavernPopulationInput,
   ProjectTavernPopulationInput,

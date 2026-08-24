@@ -77,6 +77,10 @@ class FakeDialogueService {
     };
     return this.snapshot;
   }
+
+  public async retry() {
+    return this.snapshot;
+  }
 }
 
 function initialSnapshot(): NpcDialogueSnapshot {
@@ -98,6 +102,7 @@ function initialSnapshot(): NpcDialogueSnapshot {
     ],
     suggestedTopics: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'],
     generationContext: {},
+    timeline: null,
   };
 }
 

@@ -23,14 +23,15 @@ use ember_native_bridge::{
     DynamicLocationTravelCommand, FactionActionCommand, ModelCapabilitiesRegistration,
     ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
     NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit,
-    QuestBoardSnapshot, QuestGenerationCommit, RandomnessSettingsSnapshot,
-    RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit,
-    TavernPopulationFocusCommand, TavernPopulationProjectCommand, TavernPopulationSnapshot,
-    TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot,
-    TavernSceneStart, TavernSnapshot, UniversalCharacterCreationConfirm,
-    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
-    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
-    WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
+    NpcTimelineBegin, NpcTimelineFail, NpcTimelineOperation, QuestBoardSnapshot,
+    QuestGenerationCommit, RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand,
+    RulesCommitReceipt, TavernGenerationCommit, TavernPopulationFocusCommand,
+    TavernPopulationProjectCommand, TavernPopulationSnapshot, TavernSceneCommit,
+    TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot, TavernSceneStart,
+    TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
+    UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
+    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
+    model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -112,6 +113,7 @@ fn command_error_policy(code: &str) -> CommandErrorPolicy {
         ),
         "CANCELLED" => error_policy("GENERATION", true, false, "TOAST", &["RETRY", "CANCEL"]),
         "INVALID_OUTPUT"
+        | "FACT_CONFLICT"
         | "PROBE_STALE"
         | "REPETITION_DETECTED"
         | "WORLD_COMMIT_OUTPUT_MISMATCH"
@@ -187,6 +189,10 @@ impl From<CampaignStoreError> for CommandError {
             CampaignStoreError::InvalidData | CampaignStoreError::IncompatibleSchema => Self {
                 code: "CAMPAIGN_DATA_INVALID",
                 message: "本地存档数据无法读取。",
+            },
+            CampaignStoreError::FactConflict => Self {
+                code: "FACT_CONFLICT",
+                message: "生成内容与当前世界事实冲突，可用相同意图进行技术重试。",
             },
             CampaignStoreError::ArchiveInvalid => Self {
                 code: "SAVE_ARCHIVE_INVALID",
@@ -1218,6 +1224,36 @@ fn tavern_scene_turn_commit(
 }
 
 #[tauri::command]
+fn npc_timeline_get(
+    campaign_id: String,
+    scope_kind: String,
+    scope_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<Option<NpcTimelineOperation>, CommandError> {
+    store
+        .latest_npc_timeline(&campaign_id, &scope_kind, &scope_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_timeline_begin(
+    command: NpcTimelineBegin,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcTimelineOperation, CommandError> {
+    store
+        .begin_npc_timeline_attempt(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_timeline_fail(
+    command: NpcTimelineFail,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcTimelineOperation, CommandError> {
+    store.fail_npc_timeline_attempt(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn universal_character_creation_start(
     command: UniversalCharacterCreationStart,
     store: State<'_, CampaignStore>,
@@ -1519,6 +1555,9 @@ pub fn run() {
             tavern_scene_start,
             tavern_scene_turn_prepare,
             tavern_scene_turn_commit,
+            npc_timeline_get,
+            npc_timeline_begin,
+            npc_timeline_fail,
             universal_character_creation_start,
             universal_character_creation_save,
             universal_character_quick_commit,

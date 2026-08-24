@@ -5,7 +5,12 @@ import {
   ProposeTavernSceneActionOutputSchema,
   type AIProvider,
 } from '@ember-tavern/ai-core';
-import { campaignId, isoTimestamp, type TavernSceneSnapshot } from '@ember-tavern/contracts';
+import {
+  campaignId,
+  isoTimestamp,
+  type NpcTimelineOperation,
+  type TavernSceneSnapshot,
+} from '@ember-tavern/contracts';
 import {
   desktopAIEngine,
   tauriDesktopAIOrchestrator,
@@ -16,6 +21,7 @@ import {
   tauriRandomnessTemperatureSource,
   type RandomnessTemperatureSource,
 } from './randomness-settings-service.js';
+import { npcTimelineService, type NpcTimelineService } from './npc-timeline-service.js';
 
 interface GenerationAudit {
   readonly requestId: string;
@@ -66,6 +72,8 @@ export interface TavernSceneGateway {
       readonly actorId: string;
       readonly generation: GenerationAudit;
     }[];
+    readonly timelineSubmissionId: string;
+    readonly timelineAttemptId: string;
   }): Promise<TavernSceneSnapshot>;
 }
 
@@ -93,6 +101,10 @@ export class TavernSceneService {
     private readonly gateway: TavernSceneGateway = tauriTavernSceneGateway,
     provider?: AIProvider | DesktopAIEngine,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
+    private readonly timeline: Pick<
+      NpcTimelineService,
+      'latest' | 'begin' | 'recordFailure'
+    > = npcTimelineService,
   ) {
     this.ai = desktopAIEngine(provider);
   }
@@ -128,13 +140,53 @@ export class TavernSceneService {
     const key = `${campaign}:${scene.id}`;
     const existing = this.sends.get(key);
     if (existing !== undefined) return existing;
-    const operation = this.performSend(campaign, scene, playerIntent, addressedNpcId).finally(
-      () => {
-        if (this.sends.get(key) === operation) this.sends.delete(key);
-      },
-    );
+    const operation = this.performWithRecovery(
+      campaign,
+      scene,
+      playerIntent,
+      addressedNpcId,
+    ).finally(() => {
+      if (this.sends.get(key) === operation) this.sends.delete(key);
+    });
     this.sends.set(key, operation);
     return operation;
+  }
+
+  public retry(campaign: string, scene: TavernSceneSnapshot): Promise<TavernSceneSnapshot> {
+    const key = `${campaign}:${scene.id}`;
+    const existing = this.sends.get(key);
+    if (existing !== undefined) return existing;
+    const operation = this.timeline
+      .latest(campaign, 'TAVERN_SCENE', scene.id)
+      .then((timeline) => {
+        if (timeline === null || !['PENDING', 'FAILED_RETRYABLE'].includes(timeline.status)) {
+          throw new TavernSceneServiceError('TIMELINE_RETRY_UNAVAILABLE');
+        }
+        return this.performSend(
+          campaign,
+          scene,
+          timeline.playerIntent,
+          timeline.addressedNpcId,
+          timeline,
+        );
+      })
+      .finally(() => {
+        if (this.sends.get(key) === operation) this.sends.delete(key);
+      });
+    this.sends.set(key, operation);
+    return operation;
+  }
+
+  private async performWithRecovery(
+    campaign: string,
+    scene: TavernSceneSnapshot,
+    playerIntent: string,
+    addressedNpcId: string | null,
+  ): Promise<TavernSceneSnapshot> {
+    const timeline = await this.timeline.latest(campaign, 'TAVERN_SCENE', scene.id);
+    return timeline !== null && ['PENDING', 'FAILED_RETRYABLE'].includes(timeline.status)
+      ? this.performSend(campaign, scene, timeline.playerIntent, timeline.addressedNpcId, timeline)
+      : this.performSend(campaign, scene, playerIntent, addressedNpcId, null);
   }
 
   private async performSend(
@@ -142,6 +194,7 @@ export class TavernSceneService {
     scene: TavernSceneSnapshot,
     playerIntent: string,
     addressedNpcId: string | null,
+    existingTimeline: NpcTimelineOperation | null,
   ): Promise<TavernSceneSnapshot> {
     campaignId(campaign);
     const prepared = await this.gateway.prepare({
@@ -152,54 +205,105 @@ export class TavernSceneService {
     });
     if (prepared.scene.revision !== scene.revision)
       throw new TavernSceneServiceError('REVISION_CONFLICT');
-    const temperature = await this.randomness.resolveTemperature();
-    const generations = await Promise.all(
-      prepared.actorInputs.map(async ({ actorId, input: rawInput }) => {
-        const input = ProposeTavernSceneActionInputSchema.parse(rawInput);
-        const suffix = crypto.randomUUID();
-        const generated = await this.ai.execute('PROPOSE_TAVERN_SCENE_ACTION', input, {
-          requestId: `scene-request-${suffix}`,
-          temperature,
-          maxOutputTokens: 1_000,
-          timeoutMs: 5_000,
-        });
-        const output = ProposeTavernSceneActionOutputSchema.parse(generated.validatedOutput);
-        if (
-          output.actorId !== actorId ||
-          !input.allowedActions.includes(output.action) ||
-          output.citedKnowledgeIds.some(
-            (id) => !input.authorizedKnowledge.some((entry) => entry.id === id),
-          )
-        ) {
-          throw new TavernSceneServiceError('ACTOR_SCOPE_VIOLATION');
-        }
-        return Object.freeze({
-          actorId,
-          generation: Object.freeze({
-            requestId: generated.request.requestId,
-            generationRecordId: `scene-generation-${suffix}`,
-            idempotencyKey: `scene-action:${scene.id}:${scene.revision}:${actorId}`,
-            promptVersion: generated.request.promptVersion,
-            input,
-            context: { actorId, sceneId: scene.id },
-            request: generated.request,
-            rawResponseText: generated.response.content,
-            validatedOutput: output,
-          }),
-        });
-      }),
-    );
-    const suffix = crypto.randomUUID();
-    return this.gateway.commit({
-      campaignId: campaign,
-      sceneId: scene.id,
-      expectedRevision: scene.revision,
-      turnId: `tavern-scene-turn-${suffix}`,
-      operationId: `tavern-scene-turn-operation-${suffix}`,
-      playerIntent,
-      addressedNpcId,
-      generations,
+    const planned = prepared.actorInputs.map(({ actorId, input }) => {
+      const suffix = crypto.randomUUID();
+      return Object.freeze({
+        actorId,
+        input,
+        requestId: `scene-request-${suffix}`,
+        generationRecordId: `scene-generation-${suffix}`,
+        idempotencyKey: `scene-action:${scene.id}:${scene.revision}:${actorId}`,
+      });
     });
+    const attemptId = `npc-timeline-attempt-${crypto.randomUUID()}`;
+    const operation = await this.timeline.begin(
+      {
+        campaignId: campaign,
+        scopeKind: 'TAVERN_SCENE',
+        scopeId: scene.id,
+        playerIntent,
+        addressedNpcId,
+        hardResultKey: null,
+      },
+      {
+        attemptId,
+        requestIds: planned.map(({ requestId }) => requestId),
+        generationRecordIds: planned.map(({ generationRecordId }) => generationRecordId),
+        idempotencyKeys: planned.map(({ idempotencyKey }) => idempotencyKey),
+      },
+      existingTimeline,
+    );
+    try {
+      const temperature = await this.randomness.resolveTemperature();
+      const generations = await Promise.all(
+        planned.map(
+          async ({ actorId, input: rawInput, requestId, generationRecordId, idempotencyKey }) => {
+            const input = ProposeTavernSceneActionInputSchema.parse(rawInput);
+            const generated = await this.ai.execute('PROPOSE_TAVERN_SCENE_ACTION', input, {
+              requestId,
+              temperature,
+              maxOutputTokens: 1_000,
+              timeoutMs: 5_000,
+            });
+            let output: ReturnType<typeof ProposeTavernSceneActionOutputSchema.parse>;
+            try {
+              output = ProposeTavernSceneActionOutputSchema.parse(generated.validatedOutput);
+            } catch (error) {
+              throw new TavernSceneServiceError('SCHEMA_VALIDATION_FAILED', { cause: error });
+            }
+            if (
+              output.actorId !== actorId ||
+              !input.allowedActions.includes(output.action) ||
+              output.citedKnowledgeIds.some(
+                (id) => !input.authorizedKnowledge.some((entry) => entry.id === id),
+              )
+            ) {
+              throw new TavernSceneServiceError('ACTOR_SCOPE_VIOLATION');
+            }
+            return Object.freeze({
+              actorId,
+              generation: Object.freeze({
+                requestId: generated.request.requestId,
+                generationRecordId,
+                idempotencyKey,
+                promptVersion: generated.request.promptVersion,
+                input,
+                context: { actorId, sceneId: scene.id },
+                request: generated.request,
+                rawResponseText: generated.response.content,
+                validatedOutput: output,
+              }),
+            });
+          },
+        ),
+      );
+      return await this.gateway.commit({
+        campaignId: campaign,
+        sceneId: scene.id,
+        expectedRevision: scene.revision,
+        turnId: `tavern-scene-turn-${operation.id}`,
+        operationId: `tavern-scene-turn-operation-${operation.operationId}`,
+        playerIntent,
+        addressedNpcId,
+        generations,
+        timelineSubmissionId: operation.id,
+        timelineAttemptId: attemptId,
+      });
+    } catch (error) {
+      const durable = await this.timeline.latest(campaign, 'TAVERN_SCENE', scene.id);
+      if (durable?.status === 'COMMITTED') {
+        return this.gateway.start({
+          campaignId: campaign,
+          sceneId: scene.id,
+          operationId: `tavern-scene-reopen-${scene.id}`,
+          participantNpcIds: scene.participants.map(({ npcId }) => npcId),
+          listeningNpcIds: scene.participants
+            .filter(({ status }) => status === 'LISTENING')
+            .map(({ npcId }) => npcId),
+        });
+      }
+      throw await this.timeline.recordFailure(operation, attemptId, error);
+    }
   }
 }
 
@@ -297,4 +401,5 @@ export const tavernSceneService = new TavernSceneService(
   tauriTavernSceneGateway,
   tauriDesktopAIOrchestrator,
   tauriRandomnessTemperatureSource,
+  npcTimelineService,
 );

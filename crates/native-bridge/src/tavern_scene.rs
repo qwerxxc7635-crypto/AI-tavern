@@ -92,6 +92,10 @@ pub struct TavernSceneCommit {
     pub player_intent: String,
     pub addressed_npc_id: Option<String>,
     pub generations: Vec<TavernSceneActorGeneration>,
+    #[serde(default)]
+    pub timeline_submission_id: Option<String>,
+    #[serde(default)]
+    pub timeline_attempt_id: Option<String>,
 }
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -258,6 +262,10 @@ impl CampaignStore {
             let expected = expected_map
                 .get(&actor.actor_id)
                 .ok_or(CampaignStoreError::InvalidData)?;
+            if actor.generation.input != expected.input && command.timeline_submission_id.is_some()
+            {
+                return Err(CampaignStoreError::FactConflict);
+            }
             validate_audit(&actor.generation, &expected.input)?;
             let proposal: Proposal =
                 serde_json::from_value(actor.generation.validated_output.clone())
@@ -307,6 +315,28 @@ impl CampaignStore {
             if proposal.action == "LEAVE" {
                 tx.execute("UPDATE tavern_scene_participants SET status='LEFT',left_at=?1 WHERE scene_id=?2 AND npc_id=?3",params![at,command.scene_id,proposal.actor_id])?;
             }
+        }
+        match (
+            command.timeline_submission_id.as_deref(),
+            command.timeline_attempt_id.as_deref(),
+        ) {
+            (Some(submission_id), Some(attempt_id)) => {
+                let generation_ids = command
+                    .generations
+                    .iter()
+                    .map(|actor| actor.generation.generation_record_id.clone())
+                    .collect::<Vec<_>>();
+                crate::commit_npc_timeline(
+                    &tx,
+                    submission_id,
+                    attempt_id,
+                    &command.turn_id,
+                    &generation_ids,
+                    &at,
+                )?;
+            }
+            (None, None) => {}
+            _ => return Err(CampaignStoreError::InvalidData),
         }
         tx.execute(
             "UPDATE tavern_scenes SET revision=revision+1,updated_at=?1 WHERE id=?2",
@@ -446,6 +476,21 @@ fn insert_generation(
     a: &CharacterGenerationAudit,
     at: &str,
 ) -> Result<(), CampaignStoreError> {
+    tx.execute(
+        "INSERT INTO pending_ai_requests(
+           id,campaign_id,turn_id,idempotency_key,task,status,model_profile_id,
+           input_json,context_json,attempt_count,last_error_json,created_at,updated_at
+         ) VALUES(?1,?2,NULL,?3,'PROPOSE_TAVERN_SCENE_ACTION','COMMITTED',NULL,
+           ?4,?5,1,NULL,?6,?6)",
+        params![
+            a.request_id,
+            campaign,
+            a.idempotency_key,
+            serde_json::to_string(&a.input).map_err(|_| CampaignStoreError::InvalidData)?,
+            serde_json::to_string(&a.context).map_err(|_| CampaignStoreError::InvalidData)?,
+            at
+        ],
+    )?;
     tx.execute("INSERT INTO generation_records(id,campaign_id,request_id,task,model_profile_id,prompt_version,request_json,raw_response_text,validated_output_json,validation_error_json,started_at,completed_at) VALUES(?1,?2,?3,'PROPOSE_TAVERN_SCENE_ACTION',NULL,?4,?5,?6,?7,NULL,?8,?8)",params![a.generation_record_id,campaign,a.request_id,a.prompt_version,serde_json::to_string(&a.request).map_err(|_|CampaignStoreError::InvalidData)?,a.raw_response_text,serde_json::to_string(&a.validated_output).map_err(|_|CampaignStoreError::InvalidData)?,at])?;
     Ok(())
 }

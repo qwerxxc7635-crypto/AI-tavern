@@ -13,6 +13,7 @@ mod entity_schema_contract;
 mod model_settings;
 mod npc_dialogue;
 mod npc_lod;
+mod npc_timeline;
 mod quest_board;
 mod randomness_settings;
 mod repetition;
@@ -36,6 +37,7 @@ pub use dynamic_locations::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
 pub use npc_lod::*;
+pub use npc_timeline::*;
 pub use quest_board::*;
 pub use randomness_settings::*;
 pub use rules_engine::*;
@@ -100,7 +102,9 @@ const TAVERN_POPULATION_MIGRATION: &str =
     include_str!("../../../database/migrations/0019_tavern_population.sql");
 const MULTI_NPC_SCENE_MIGRATION: &str =
     include_str!("../../../database/migrations/0020_multi_npc_scene.sql");
-const LATEST_SCHEMA_VERSION: i64 = 20;
+const IMMUTABLE_NPC_TIMELINE_MIGRATION: &str =
+    include_str!("../../../database/migrations/0021_immutable_npc_timeline.sql");
+const LATEST_SCHEMA_VERSION: i64 = 21;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -152,6 +156,8 @@ pub enum CampaignStoreError {
     AlreadyArchived,
     #[error("stored campaign data is invalid")]
     InvalidData,
+    #[error("generated content conflicts with current campaign facts")]
+    FactConflict,
     #[error("campaign is not in the required state")]
     InvalidState,
     #[error("database schema is incompatible")]
@@ -571,6 +577,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         (18_i64, "active_factions", ACTIVE_FACTIONS_MIGRATION),
         (19_i64, "tavern_population", TAVERN_POPULATION_MIGRATION),
         (20_i64, "multi_npc_scene", MULTI_NPC_SCENE_MIGRATION),
+        (
+            21_i64,
+            "immutable_npc_timeline",
+            IMMUTABLE_NPC_TIMELINE_MIGRATION,
+        ),
     ] {
         let applied_name = connection
             .query_row(

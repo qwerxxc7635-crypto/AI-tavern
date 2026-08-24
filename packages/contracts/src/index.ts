@@ -1,4 +1,16 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
+export {
+  NPC_TIMELINE_ATTEMPT_STATUSES,
+  NPC_TIMELINE_SCOPE_KINDS,
+  NPC_TIMELINE_STATUSES,
+} from './npc-timeline.js';
+export type {
+  NpcTimelineAttempt,
+  NpcTimelineAttemptStatus,
+  NpcTimelineOperation,
+  NpcTimelineScopeKind,
+  NpcTimelineStatus,
+} from './npc-timeline.js';
 export { TAVERN_SCENE_ACTIONS, TAVERN_SCENE_PARTICIPANT_STATUSES } from './tavern-scene.js';
 export type {
   TavernSceneAction,

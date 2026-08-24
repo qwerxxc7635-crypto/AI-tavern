@@ -4335,3 +4335,23 @@
 - portable `.emtavern` 仍为 format v2；schema 20 的正式导入导出升级留给 M10-T05。本任务不修改 Rules Engine、D20、Provider 栈、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 业务语义或存档状态机，也不进入 M7-T03。
 - 视觉实现遵循已持久化手册与现有 Token/组件合同；既有页面的 Legacy 视觉债务仍由 M10-T07 统一迁移和审查。
 - 用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M7-T03 Immutable NPC Timeline
+
+### 先锁意图、技术 Attempt 与正式封存
+
+- 新增严格 `NpcTimelineOperation`/`Attempt` 合同及纯 Domain retry policy。Operation 锁定 Campaign/Scope、玩家意图、点名 NPC 和可选硬结果引用；技术 Attempt 使用新 request/generation ID 并保留首个 Attempt 的稳定 idempotency key。
+- schema 21 新增 `npc_timeline_operations` 和 append-only `npc_timeline_attempts`，限制每个 Scope 同时只有一个未解决 Operation。SQLite trigger 禁止修改锁定身份、非法状态转换、完成 Attempt 重写，以及删除/改写正式 NPC 回复和紧邻玩家输入；保护范围没有追溯扩大到旧的非 Timeline 消息。
+- Rust Native 独立计算 Retry 白名单，只有网络/Provider 暂时失败、结构/重复、`FACT_CONFLICT` 和 `APP_INTERRUPTED` 可重试；认证、配额、规则、持久化和未知失败终止。STARTED Attempt 在重开恢复时先记录 `APP_INTERRUPTED`，随后只允许同一意图、点名和硬结果进入新 Attempt。
+- 单 NPC 与多 NPC Native 提交均验证 Timeline Scope、generation/request/idempotency provenance 和 canonical Context，并在同一 immediate transaction 原子保存消息或 Scene Turn、全部 generation audit、业务后果与 COMMITTED Timeline。多 NPC 还为每 Actor 保存 pending request，保持 Actor 顺序和逐 Actor 稳定 key。
+- Windows 新增统一 `NpcTimelineService` 与三个 Tauri 命令。单 NPC/Scene 在 Provider 调用前持久化 Attempt；AI 错误 Retry 调用专用 `retry()`，不把旧失败重新当作新 send。Native 已提交但响应丢失时读取 durable COMMITTED 并重载 SQLite，不重复提交。
+- 页面重载会暴露 PENDING/FAILED_RETRYABLE 恢复入口；未解决单 NPC Operation 拒绝新输入。既有 UI 没有 Swipe 或成功回复刷新入口，自然修改继续复用 `ActionComposer`、`DialogueView`、`NpcCard` 和 Design Token，没有提前执行 M7-T04 或 M10-T07。
+- 新增 [`V0.3_IMMUTABLE_NPC_TIMELINE.md`](V0.3_IMMUTABLE_NPC_TIMELINE.md) 与 `DEC-133`，并更新 V0.3 规格、Generator Framework 和任务引用。
+
+### 验证、自审与限制
+
+- 定向测试覆盖锁定意图/硬结果、network retry、schema/fact policy、非技术失败终止、应用中断恢复、成功封存、消息 append-only、响应丢失、防重复提交和多 NPC 顺序；Native 还验证提交引用必须属于目标 NPC 对话或目标 Scene。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 148 个文件/890 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 123 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 257 个模块。没有删除测试、降低校验、写死业务结果或忽略错误。
+- portable `.emtavern` 仍为 format v2；schema 21 的正式导入导出升级严格留给 M10-T05。本任务没有修改 Rules Engine、D20、Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心合同或存档状态机，也不进入 M7-T04。
+- 视觉实现继续遵循已持久化手册和渐进迁移策略；没有逐页返工 Legacy UI。用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。

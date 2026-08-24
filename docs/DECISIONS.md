@@ -2802,3 +2802,30 @@ schema 19 以 `tavern_population_states`、`members`、append-only `cycles` 和 
 - Tavern UI 复用 `NpcCard`、`DialogueView` 和 `ActionComposer`，新增 CSS 只使用既有 Token；不建立平行组件体系，不提前执行 M10-T07。
 - M7-T02 不实现成功回复不可 Swipe、技术 Retry、事实冲突修复或不可变正式时间线，这些仍属于 M7-T03。
 - portable archive 对 schema 20 的升级留给 M10-T05；本地 SQLite 关闭重开已经保存完整场景。
+
+## DEC-133：正式 NPC 时间线采用先锁意图、技术 Attempt 与原子封存
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T03`、`docs/V0.3_SPEC.md` 12 节、`DEC-123`、`DEC-132`
+
+### 背景
+
+既有单 NPC 和多 NPC 服务只在 Native 成功提交时留下 generation 记录。Provider 调用前没有持久的玩家意图与 Attempt 身份，页面 Retry 会重新走 send，因此应用中断、响应丢失或结构/事实冲突后无法证明重试使用原意图，也无法在 SQLite 层阻止成功回复再次生成。仅隐藏 Swipe 按钮不能建立正式时间线。
+
+### 决定与理由
+
+schema 21 新增 `npc_timeline_operations` 与 append-only `npc_timeline_attempts`。Windows 在 Provider 调用前锁定 Campaign/Scope、玩家意图、点名 NPC 和可选硬结果引用；每次技术尝试保存新的 request/generation ID，并沿用首个 Attempt 的稳定 idempotency key。应用中断的 STARTED Attempt 先以 `APP_INTERRUPTED` 结案，再在同一 Operation 下恢复。
+
+允许 Retry 的失败闭集为网络、Provider 暂时不可用、结构/重复、明确事实冲突和应用中断。TypeScript Domain 与 Rust Native 独立计算同一政策，调用者不能声明任意失败可重试。认证、配额、规则、持久化与未知失败终止 Operation。
+
+单 NPC 消息或多 NPC Scene Turn、全部 request/generation provenance 及 Timeline 在一个 Native immediate transaction 原子提交。Native 验证提交引用属于锁定 Scope；成功 Operation 和 Attempt 不可再变更。正式 NPC 回复及紧邻玩家输入由 SQLite trigger 保护为 append-only；旧的非 Timeline 消息不被本任务追溯锁定，保持既有恢复兼容。
+
+### 影响与边界
+
+- UI 没有普通 Swipe；Retry 使用专用入口并拒绝新意图覆盖未解决 Operation。
+- Native 已提交但响应丢失时，应用读取 durable COMMITTED 并重载结果，不重复提交。
+- 多 NPC Retry 保持 Actor 顺序与每 Actor 稳定 key；D20 硬结果只作为不可变引用延续，绝不重投。
+- 事实变化造成 canonical Context 不匹配时返回 `FACT_CONFLICT`，随后以同一意图在最新授权事实上技术修复；AI 不能直接修改事实。
+- 本决定不改变 Adventure regeneration、Rules Engine、D20、Quest/NPC/Adventure 核心合同、Provider/Queue、World Seed/Constitution 或存档状态机。
+- portable archive 的 schema 21 表升级仍由 M10-T05 统一完成；M7-T04 对话建议及 M10-T07 Legacy UI 迁移没有提前实现。

@@ -58,6 +58,10 @@ pub struct NpcDialogueCommit {
     pub npc_id: String,
     pub player_message: String,
     pub generation: TavernGenerationAudit,
+    #[serde(default)]
+    pub timeline_submission_id: Option<String>,
+    #[serde(default)]
+    pub timeline_attempt_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -139,7 +143,11 @@ impl CampaignStore {
         if command.generation.input != expected_input
             || command.generation.context != json!({ "npcId": command.npc_id })
         {
-            return Err(CampaignStoreError::InvalidData);
+            return Err(if command.timeline_submission_id.is_some() {
+                CampaignStoreError::FactConflict
+            } else {
+                CampaignStoreError::InvalidData
+            });
         }
 
         let prior_conversation_id =
@@ -178,6 +186,8 @@ impl CampaignStore {
         };
         let at = current_timestamp()?;
         let conversation_id = prior_conversation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let player_message_id = Uuid::new_v4().to_string();
+        let npc_message_id = Uuid::new_v4().to_string();
         transaction.execute(
             "INSERT OR IGNORE INTO conversations (
                id, campaign_id, kind, npc_id, adventure_id, created_at, updated_at
@@ -197,7 +207,7 @@ impl CampaignStore {
                content, generation_record_id, created_at
              ) VALUES (?1, ?2, ?3, 'PLAYER', NULL, ?4, NULL, ?5)",
             params![
-                Uuid::new_v4().to_string(),
+                player_message_id,
                 conversation_id,
                 next_sequence,
                 command.player_message,
@@ -210,7 +220,7 @@ impl CampaignStore {
                content, generation_record_id, created_at
              ) VALUES (?1, ?2, ?3, 'NPC', ?4, ?5, ?6, ?7)",
             params![
-                Uuid::new_v4().to_string(),
+                npc_message_id,
                 conversation_id,
                 next_sequence + 1,
                 command.npc_id,
@@ -223,6 +233,21 @@ impl CampaignStore {
             "UPDATE conversations SET updated_at = ?1 WHERE id = ?2",
             params![at, conversation_id],
         )?;
+        match (
+            command.timeline_submission_id.as_deref(),
+            command.timeline_attempt_id.as_deref(),
+        ) {
+            (Some(submission_id), Some(attempt_id)) => crate::commit_npc_timeline(
+                &transaction,
+                submission_id,
+                attempt_id,
+                &npc_message_id,
+                std::slice::from_ref(&command.generation.generation_record_id),
+                &at,
+            )?,
+            (None, None) => {}
+            _ => return Err(CampaignStoreError::InvalidData),
+        }
         transaction.execute(
             "UPDATE npcs SET current_mood = ?1, updated_at = ?2
              WHERE id = ?3 AND campaign_id = ?4 AND current_status = 'ACTIVE'",
@@ -1011,6 +1036,7 @@ fn replayed(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NpcTimelineBegin;
 
     #[test]
     fn consecutive_dialogue_survives_reopen_with_order_and_relationship() {
@@ -1048,6 +1074,90 @@ mod tests {
         );
         assert_eq!(second.relationship.trust, 2);
         assert_eq!(second.npc.current_mood, "Wary");
+    }
+
+    #[test]
+    fn timeline_commit_is_atomic_append_only_and_not_regenerable() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_dialogue(&store);
+        seed_timeline_profile(&store);
+        let snapshot = store
+            .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
+            .expect("snapshot");
+        let mut dialogue = command(&snapshot, 1, "Show me the cellar.");
+        let timeline = NpcTimelineBegin {
+            id: "timeline-dialogue-id".to_owned(),
+            operation_id: "timeline-dialogue-operation".to_owned(),
+            campaign_id: "campaign-dialogue".to_owned(),
+            scope_kind: "NPC_DIALOGUE".to_owned(),
+            scope_id: "npc-owner".to_owned(),
+            player_intent: dialogue.player_message.clone(),
+            addressed_npc_id: Some("npc-owner".to_owned()),
+            hard_result_key: None,
+            attempt_id: "timeline-dialogue-attempt-1".to_owned(),
+            request_ids: vec![dialogue.generation.request_id.clone()],
+            generation_record_ids: vec![dialogue.generation.generation_record_id.clone()],
+            idempotency_keys: vec![dialogue.generation.idempotency_key.clone()],
+        };
+        store
+            .begin_npc_timeline_attempt(timeline)
+            .expect("lock intent before generation commit");
+        dialogue.timeline_submission_id = Some("timeline-dialogue-id".to_owned());
+        dialogue.timeline_attempt_id = Some("timeline-dialogue-attempt-1".to_owned());
+        let saved = store
+            .commit_npc_dialogue(dialogue)
+            .expect("atomic timeline commit");
+        assert_eq!(saved.messages.len(), 2);
+        let committed = store
+            .latest_npc_timeline("campaign-dialogue", "NPC_DIALOGUE", "npc-owner")
+            .expect("load timeline")
+            .expect("timeline exists");
+        assert_eq!(committed.status, "COMMITTED");
+        assert_eq!(committed.attempts[0].status, "COMMITTED");
+        assert_eq!(
+            committed.committed_ref_id.as_deref(),
+            Some(saved.messages[1].id.as_str())
+        );
+
+        let connection = store.connect().expect("connect");
+        assert!(
+            connection
+                .execute(
+                    "UPDATE messages SET content='rewritten' WHERE id=?1",
+                    [&saved.messages[1].id]
+                )
+                .is_err()
+        );
+        assert!(
+            connection
+                .execute("DELETE FROM messages WHERE id=?1", [&saved.messages[0].id])
+                .is_err()
+        );
+        drop(connection);
+
+        let replay = store
+            .begin_npc_timeline_attempt(NpcTimelineBegin {
+                id: committed.id.clone(),
+                operation_id: committed.operation_id.clone(),
+                campaign_id: committed.campaign_id.clone(),
+                scope_kind: committed.scope_kind.clone(),
+                scope_id: committed.scope_id.clone(),
+                player_intent: committed.player_intent.clone(),
+                addressed_npc_id: committed.addressed_npc_id.clone(),
+                hard_result_key: committed.hard_result_key.clone(),
+                attempt_id: "timeline-dialogue-attempt-2".to_owned(),
+                request_ids: vec!["dialogue-request-replay".to_owned()],
+                generation_record_ids: vec!["dialogue-generation-replay".to_owned()],
+                idempotency_keys: vec!["dialogue-key-1".to_owned()],
+            })
+            .expect("committed replay returns the sealed operation");
+        assert_eq!(replay.status, "COMMITTED");
+        assert_eq!(replay.attempts.len(), 1);
+        store
+            .delete_campaign("campaign-dialogue")
+            .expect("campaign cascade can remove sealed timeline data");
     }
 
     #[test]
@@ -1277,6 +1387,32 @@ mod tests {
             .expect("seed dialogue");
     }
 
+    fn seed_timeline_profile(store: &CampaignStore) {
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                r#"INSERT INTO world_constitutions(
+                   campaign_id,schema_version,revision,status,world_type,era,technology,magic,
+                   peoples_json,society,politics,economy,combat_scale,death_rules,career_rules,
+                   equipment_rules,npc_rules,trait_rules,taboos_json,created_at,updated_at,locked_at
+                 ) VALUES(
+                   'campaign-dialogue',1,1,'LOCKED','Fantasy','Late medieval','Steel','Rare',
+                   '[]','Guilds','Council','Coin','Personal','Final','Open','Grounded','Persistent',
+                   'Balanced','[]','2026-07-31T05:00:00.000Z','2026-07-31T05:00:00.000Z',
+                   '2026-07-31T05:00:00.000Z'
+                 );
+                 INSERT INTO npc_lod_profiles(
+                   id,campaign_id,schema_version,constitution_revision,lod,revision,profile_json,
+                   generation_record_id,created_at,updated_at
+                 ) VALUES(
+                   'npc-owner','campaign-dialogue',1,1,3,1,
+                   '{"kind":"NPC_LOD_PROFILE","schemaVersion":1,"id":"npc-owner","campaignId":"campaign-dialogue","constitutionRevision":1,"lod":3,"revision":1,"generationRecordId":null,"createdAt":"2026-07-31T05:00:00.000Z","updatedAt":"2026-07-31T05:00:00.000Z"}',
+                   NULL,'2026-07-31T05:00:00.000Z','2026-07-31T05:00:00.000Z'
+                 );"#,
+            )
+            .expect("seed timeline profile");
+    }
+
     fn command(
         snapshot: &NpcDialogueSnapshot,
         index: usize,
@@ -1314,6 +1450,8 @@ mod tests {
                 raw_response_text: output.to_string(),
                 validated_output: output,
             },
+            timeline_submission_id: None,
+            timeline_attempt_id: None,
         }
     }
 }

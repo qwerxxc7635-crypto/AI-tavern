@@ -25,7 +25,7 @@ type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
 interface TavernPageProps {
   readonly service?: TavernActions;
   readonly populationService?: Pick<TavernPopulationService, 'refresh' | 'focus'>;
-  readonly sceneService?: Pick<TavernSceneService, 'start' | 'send'>;
+  readonly sceneService?: Pick<TavernSceneService, 'start' | 'send' | 'retry'>;
 }
 
 const RESIDENCY_LABELS: Readonly<Record<TavernNpcView['residency'], string>> = {
@@ -289,6 +289,18 @@ export function TavernPage({
               submitLabel="推进场景"
               submitting={sceneBusy}
               {...(sceneError === undefined ? {} : { error: sceneError })}
+              onRetry={() => {
+                if (campaignId === null || scene === null) return;
+                setSceneBusy(true);
+                setSceneError(undefined);
+                void sceneService
+                  .retry(campaignId, scene)
+                  .then(setScene)
+                  .catch((caught: unknown) =>
+                    setSceneError(caught instanceof Error ? caught.message : '技术重试未完成'),
+                  )
+                  .finally(() => setSceneBusy(false));
+              }}
               onChange={setSceneIntent}
               onSuggestion={(suggestion) => {
                 setSelectedNpcId(suggestion.id);

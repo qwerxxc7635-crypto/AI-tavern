@@ -11,7 +11,7 @@ import { playerText } from './localization/index.js';
 import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
 import { ActionComposer, DialogueView } from './ui/game-components.js';
 
-type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
+type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send' | 'retry'>;
 
 export function NpcDialoguePage({
   service = windowsNpcDialogueService,
@@ -60,6 +60,23 @@ export function NpcDialoguePage({
     setAiError(null);
     try {
       setSnapshot(await service.send(campaignId, npcId, message));
+      setDraft('');
+      setSelectedTopicId(null);
+    } catch (error) {
+      setAiError(error);
+    } finally {
+      sendInFlight.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function retry() {
+    if (campaignId === null || npcId === null || busy || sendInFlight.current) return;
+    sendInFlight.current = true;
+    setBusy(true);
+    setAiError(null);
+    try {
+      setSnapshot(await service.retry(campaignId, npcId));
       setDraft('');
       setSelectedTopicId(null);
     } catch (error) {
@@ -141,7 +158,12 @@ export function NpcDialoguePage({
             }}
             onSubmit={() => void send()}
           />
-          {aiError === null ? null : <AIErrorNotice error={aiError} onRetry={() => void send()} />}
+          {snapshot.timeline === null && aiError === null ? null : (
+            <AIErrorNotice
+              error={aiError ?? { code: 'APP_INTERRUPTED' }}
+              onRetry={() => void retry()}
+            />
+          )}
         </section>
 
         <aside className="dialogue-sidebar">

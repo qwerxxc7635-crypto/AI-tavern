@@ -355,12 +355,13 @@
 
 ## M7-T03 Immutable NPC Timeline
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M7-T02。
 - **Deliverable**：正式回复锁定、技术 Retry、事实冲突修复和 UI 规则。
 - **Acceptance**：无普通 Swipe；成功回复不能刷新；技术 Retry 使用同一意图/硬结果且不重复提交。
 - **Tests**：success lock、network/schema/fact retry、duplicate、crash recovery、multi-NPC ordering。
 - **Do Not**：不删除既有消息换新结果；不让 Retry 重投 D20。
+- **Implementation reference**：[`V0.3_IMMUTABLE_NPC_TIMELINE.md`](V0.3_IMMUTABLE_NPC_TIMELINE.md)。
 
 ## M7-T04 Dialogue Suggestions
 

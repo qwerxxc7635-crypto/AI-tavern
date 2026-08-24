@@ -103,7 +103,9 @@ function policyFor(code: string): Readonly<{
     ].includes(code);
     return policy('PERSISTENCE', retryable, false, 'ERROR_STATE');
   }
-  if (code === 'CANCELLED') return policy('GENERATION', true, false, 'TOAST');
+  if (code === 'CANCELLED' || code === 'APP_INTERRUPTED') {
+    return policy('GENERATION', true, false, 'TOAST');
+  }
   return policy('GENERATION', false, false, 'ERROR_STATE');
 }
 
@@ -156,6 +158,7 @@ function isModelCode(code: string): boolean {
 
 function isValidationCode(code: string): boolean {
   return (
+    code === 'FACT_CONFLICT' ||
     code === 'INVALID_OUTPUT' ||
     code === 'PROBE_STALE' ||
     code === 'REPETITION_DETECTED' ||

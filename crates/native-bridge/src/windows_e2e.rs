@@ -745,6 +745,8 @@ fn dialogue_command(
             json!({"npcId":npc_id}),
             output,
         ),
+        timeline_submission_id: None,
+        timeline_attempt_id: None,
     }
 }
 
