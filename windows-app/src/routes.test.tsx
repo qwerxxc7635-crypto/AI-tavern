@@ -32,6 +32,12 @@ describe('Windows application shell', () => {
     );
 
     expect(screen.getByRole('navigation', { name: '主导航' })).toBeTruthy();
+    expect(screen.getByRole('link', { name: '跳到主要内容' }).getAttribute('href')).toBe(
+      '#app-main',
+    );
+    expect(document.querySelector('#app-main')?.getAttribute('tabindex')).toBe('-1');
+    fireEvent.click(screen.getByRole('link', { name: '跳到主要内容' }));
+    expect(document.activeElement).toBe(document.querySelector('#app-main'));
     expect(WINDOWS_NAVIGATION).toHaveLength(6);
     expect(screen.getByRole('heading', { name: '酒馆' })).toBeTruthy();
     expect(screen.getByRole('link', { name: '酒馆' }).getAttribute('aria-current')).toBe('page');

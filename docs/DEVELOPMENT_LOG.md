@@ -4705,3 +4705,26 @@
 - 最终`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 182 files / 1021 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。
 - `pnpm build:desktop`最终通过，Vite转换281 modules。用户`.gitignore`仍保持未暂存；没有merge或push。
 - M10-T06完成后下一项严格为M10-T07 Visual System Convergence；本次未开始，不merge、不push。
+
+## 2026-08-24 — M10-T07 完成 Visual System Convergence
+
+### 范围与视觉架构
+
+- 在分支`task/M10-T07-visual-system-convergence`、起始提交`932c16b`上严格执行M10-T07；未回滚或重做M0～M10-T06，用户已有`.gitignore`修改保持未暂存。本任务没有进入M11，也没有修改Rules Engine、D20硬结果、Provider、Generator/Queue、SQLite、存档或Quest/NPC/Adventure业务合同。
+- 按`Design Tokens → UI Primitives → Game Components → Feature Pages → Legacy UI Migration → Visual Consistency Audit`完成收敛。三层Token切换为视觉手册的暖黑/深木/羊皮纸/余烬金方向，并冻结中文UI/叙事字体栈、4px spacing、6/10/14/16px radius、Border、Shadow与Motion。
+- `theme.css`、`ui/primitives.css`和`ui/game-components.css`的raw color/rgba从41处降为0，应用CSS不再直接读取Primitive`--et-*`。新增静态门同时拒绝raw typography、spacing、radius、border、shadow与animation timing/easing；媒体阈值、运行时几何和keyframe transform保持明确例外，不包装无意义Token。
+- 保留历史class作为兼容适配边界，但全部读取同一Semantic/Component Token；没有引入CSS框架或复制第二套组件。Tavern/NPC/Quest/Adventure/Character AI继续复用NpcCard、QuestCard、DialogueView、ActionComposer与AIFieldAssist；D20跳过操作迁入共享Button，不改变已保存结果、reveal回调或重新投掷语义。
+- 应用壳新增HashRouter安全的skip link，首个Tab可见且Enter后焦点落到`#app-main`而不改变路由。Paper error危险文本首次真实截图对比度不足后，新增Paper语义danger覆盖和自动对比度门，没有以降低阈值接受缺陷。
+
+### 视觉证据与文档
+
+- 真实Chromium覆盖860×600 Settings、1180×760 My、1366×768 Saves、1920×1080 Quest Paper/error；四个视口document宽度均等于viewport，可见后代横向越界为0。额外保存skip-link focus截图与SHA-256清单。
+- 真实reduced-motion浏览器结果为media query命中、D20/Spinner animation-name均`none`、navigation transition duration为`0s`；D20组件测试继续证明skip与reduced-motion只揭示同一硬结果。
+- 新增[`audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md`](audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md)与`DEC-150`；关闭[`V0.3_VISUAL_MIGRATION.md`](V0.3_VISUAL_MIGRATION.md)适用债务，更新Design Token规范、V0.3 Spec与任务状态。M12仍必须独立复算，不能直接继承本次PASS。
+
+### 验证与结束状态
+
+- 专项测试覆盖raw视觉值静态门、组件复用清单、Feature/状态矩阵、Paper/Ember contrast、skip-link焦点、D20 skip/reduced-motion、forced-colors、四视口布局合同与生产build。
+- `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 183 files / 1038 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；Windows纵向E2E与TypeScript↔Rust archive interop全部通过。
+- `pnpm build:desktop`最终通过，Vite转换281 modules；构建产物只用于本地验证，没有作为源码提交。
+- M10-T07完成后下一项严格为M11-T01；本次不进入M11，不merge、不push，用户`.gitignore`继续保持未暂存。

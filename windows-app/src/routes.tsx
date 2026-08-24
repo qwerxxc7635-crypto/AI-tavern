@@ -117,6 +117,16 @@ export function AppShell() {
 
   return (
     <div className="app-frame">
+      <a
+        className="skip-link"
+        href="#app-main"
+        onClick={(event) => {
+          event.preventDefault();
+          document.querySelector<HTMLElement>('#app-main')?.focus();
+        }}
+      >
+        跳到主要内容
+      </a>
       <aside className="sidebar">
         <div className="brand">
           <span className="brand__mark" aria-hidden="true">
@@ -166,11 +176,13 @@ export function AppShell() {
               : playerText.titlebar.campaign(campaignId.slice(0, 8))}
           </p>
         </header>
-        <AppErrorBoundary key={location.pathname}>
-          <Suspense fallback={<AppLoading />}>
-            <Outlet />
-          </Suspense>
-        </AppErrorBoundary>
+        <div id="app-main" className="workspace__main" tabIndex={-1}>
+          <AppErrorBoundary key={location.pathname}>
+            <Suspense fallback={<AppLoading />}>
+              <Outlet />
+            </Suspense>
+          </AppErrorBoundary>
+        </div>
       </div>
     </div>
   );

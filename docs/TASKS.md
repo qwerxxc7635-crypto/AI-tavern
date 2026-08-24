@@ -537,12 +537,13 @@
 
 ## M10-T07 Visual System Convergence
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M10-T06。
 - **Deliverable**：按 `Design Tokens → UI Primitives → Game Components → Feature Pages → Legacy UI Migration → Visual Consistency Audit` 完成 V0.3 桌面 UI 收敛，关闭 `docs/V0.3_VISUAL_MIGRATION.md` 中适用视觉债务并形成视觉证据。
 - **Acceptance**：Typography、Color、Spacing、Radius、Border、Shadow、Motion 均由 Design Token 唯一供值；既有共享 primitive/game component 被复用而无第二套体系；Character/NPC/Quest/Trait/D20/Narrative/Adventure/Tavern/Settings 等功能页符合视觉手册、信息层级和 AI 身份；四个既定桌面视口无溢出，WCAG AA、键盘焦点、非颜色状态、reduced-motion 与可跳过 D20 动画通过；逐页视觉一致性审查无未记录差异。
 - **Tests**：raw visual value/token 静态门、组件复用清单、页面/状态矩阵、四视口真实截图、contrast/focus/reduced-motion、loading/streaming/toast/empty/error、视觉债务复算与回归 build。
 - **Do Not**：不改变业务语义、状态机、数据合同或存档；不大规模一次性重写前端；不复制现有组件制造平行体系；不以换色/背景替代完整收敛；不使用大量金边、火焰、Emoji、巨大圆角、聊天气泡或 SaaS Dashboard 布局。
+- **Implementation reference**：[`V0.3_VISUAL_MIGRATION.md`](V0.3_VISUAL_MIGRATION.md)、[`audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md`](audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md)、[`DEC-150`](DECISIONS.md)。
 
 ---
 

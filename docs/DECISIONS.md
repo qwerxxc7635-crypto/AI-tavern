@@ -3207,3 +3207,26 @@ Fake usage 继续保持 unknown/NOT_EVALUATED。自动门为未来真实证据�
 - SQLite 增长使用 `page_count × page_size`，Context 使用既有 Unified Context token 估算；长期历史仍完整持久化，只限制模型投影。
 - 本决定不修改 Rules Engine、Provider 合同、GenerationQueue 行为、SQLite schema、业务事务或存档格式。
 - 真实模型的网络 latency、token 和计费 cache 仍需单独授权，不能由 Fake 结果外推。
+
+## DEC-150：视觉值冻结为三层 Token 单一来源，Legacy class 只保留兼容边界
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T07`、[`EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`](EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md)、[`audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md`](audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md)
+
+### 背景
+
+M2 已建立三层 Token、UI Primitives 和 Game Components，但历史页面仍有 41 处 raw color/rgba、冷蓝灰色板、重复字体/间距/圆角/阴影/动效值，以及只能以 Tab 顺序绕过侧栏的应用壳。一次性改写所有 JSX 会扩大回归面并威胁已通过测试的业务状态机；只换颜色又无法满足完整视觉手册与唯一来源要求。
+
+### 决定与理由
+
+Primitive 冻结原始暖黑、深木、羊皮纸、余烬金、功能色、字体、4px 间距、6/10/14/16px 圆角、Border、Shadow、Motion 和 layer。Semantic 提供主题含义，Component 只引用 Semantic；`theme.css` 与两套共享组件 CSS 禁止 raw color 和直接 `--et-*`。自动门同时检查 typography、spacing、radius、border、shadow 与 animation timing/easing，防止后续重新散落硬编码。
+
+现有 Button/Input/Card/Overlay/State 与 Character/NPC/Quest/Trait/Dialogue/Action/AI/Generation/Status 组件继续是唯一共享体系。历史 class 不复制成新组件，也不为改名大规模重写页面；它们只作为兼容适配边界读取同一 Semantic/Component Token，并由生产页面复用测试固定。应用壳新增 HashRouter 安全的 skip link，D20 跳过操作复用共享 Button，但硬结果、reveal 回调和业务计时不变。
+
+### 影响与边界
+
+- Paper 只在 NPC 对话、Quest 与 Adventure 等手册型页面局部启用；Settings/My 保持低装饰桌面 HUD，不展示机器人、GPT/LLM 品牌或夸张火焰/金边。
+- 四个既定视口继续沿用 860×600、1180×760、1366×768、1920×1080；不改变已有里程碑、门禁或页面业务合同。
+- media breakpoint、运行时几何宽高、百分比和 keyframe transform 不是可主题化视觉值，不包装成无意义 Token；其余差异必须通过静态门或进入 M12 findings ledger。
+- 本决定不修改 Rules Engine、AI Provider、Generator/Queue、SQLite、Persistence、Save/Resume、World Seed/Constitution、D20 硬结果或 Quest/NPC/Adventure 核心语义。

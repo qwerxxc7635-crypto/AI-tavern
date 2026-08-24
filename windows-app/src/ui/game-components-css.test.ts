@@ -26,7 +26,7 @@ describe('game component visual contract', () => {
     const selected = block(
       '.game-npc-card.is-selected,\n.game-quest-card.is-selected,\n.game-trait-card.is-selected',
     );
-    expect(selected).toContain('box-shadow: inset 3px 0 0');
+    expect(selected).toContain('box-shadow: var(--shadow-selection-rail)');
     expect(css).toMatch(
       /\.game-action-composer__suggestions \[aria-pressed='true'\][\s\S]*box-shadow:/,
     );

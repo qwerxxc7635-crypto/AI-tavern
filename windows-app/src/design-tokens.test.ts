@@ -4,7 +4,10 @@ import { describe, expect, it } from 'vitest';
 
 const tokens = readFileSync(new URL('./design-tokens.css', import.meta.url), 'utf8');
 const theme = readFileSync(new URL('./theme.css', import.meta.url), 'utf8');
-const allStyles = `${tokens}\n${theme}`;
+const primitives = readFileSync(new URL('./ui/primitives.css', import.meta.url), 'utf8');
+const gameComponents = readFileSync(new URL('./ui/game-components.css', import.meta.url), 'utf8');
+const applicationStyles = `${theme}\n${primitives}\n${gameComponents}`;
+const allStyles = `${tokens}\n${applicationStyles}`;
 
 describe('three-layer design-token contract', () => {
   it('defines every required category and keeps layers ordered', () => {
@@ -44,9 +47,9 @@ describe('three-layer design-token contract', () => {
     expect([...usages].filter((usage) => !definitions.has(usage))).toEqual([]);
   });
 
-  it('moves core-shell and paper-page colors to tokens while bounding legacy hardcodes', () => {
+  it('keeps every application color behind the token contract', () => {
     const rawThemeColors = theme.match(/#[0-9a-f]{3,8}|rgba?\([^)]*\)/gi) ?? [];
-    expect(rawThemeColors.length).toBeLessThanOrEqual(45);
+    expect(rawThemeColors).toEqual([]);
 
     for (const selector of [
       'body',
@@ -62,6 +65,38 @@ describe('three-layer design-token contract', () => {
       '.quest-board-layout',
     ]) {
       expect(block(theme, selector), selector).not.toMatch(/#[0-9a-f]{3,8}|rgba?\(/i);
+    }
+  });
+
+  it('blocks raw typography, spacing, radius, border, shadow and motion values', () => {
+    expect(applicationStyles).not.toMatch(/var\(--et-/);
+    for (const property of ['font-family', 'font-size']) {
+      const values = [
+        ...applicationStyles.matchAll(new RegExp(`${property}:\\s*([^;]+);`, 'g')),
+      ].map((match) => match[1]?.trim());
+      expect(
+        values.every((value) => value?.startsWith('var(') === true),
+        property,
+      ).toBe(true);
+    }
+    expect(applicationStyles).not.toMatch(/font-weight:\s*(?:400|600|700)/);
+    expect(applicationStyles).not.toMatch(/(?:line-height|letter-spacing):\s*-?[\d.]+/);
+    expect(applicationStyles).not.toMatch(
+      /(?:margin|padding|gap|row-gap|column-gap)(?:-[\w-]+)?:\s*[^;]*(?:\d+(?:\.\d+)?(?:rem|px))/,
+    );
+    expect(applicationStyles).not.toMatch(/border-radius:\s*[^;]*(?:\d+(?:\.\d+)?(?:rem|px|%))/);
+    expect(applicationStyles).not.toMatch(/border(?:-[\w-]+)?:\s*[^;]*(?:\d+(?:\.\d+)?px)/);
+    const shadowValues = [...applicationStyles.matchAll(/(?:box|text)-shadow:\s*([^;]+);/g)].map(
+      (match) => match[1]?.trim(),
+    );
+    expect(shadowValues.every((value) => value?.startsWith('var(') === true)).toBe(true);
+    for (const declaration of applicationStyles.match(/animation:\s*[^;]+;/g) ?? []) {
+      expect(declaration === 'animation: none;' || declaration.includes('var(--duration-')).toBe(
+        true,
+      );
+      expect(declaration === 'animation: none;' || declaration.includes('var(--easing-')).toBe(
+        true,
+      );
     }
   });
 

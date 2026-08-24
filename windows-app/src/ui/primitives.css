@@ -3,7 +3,7 @@
   width: 1px;
   height: 1px;
   padding: 0;
-  margin: -1px;
+  margin: calc(-1 * var(--space-hairline));
   overflow: hidden;
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
@@ -15,13 +15,13 @@
   min-height: 2.75rem;
   display: inline-flex;
   padding: var(--space-control-block) var(--space-control-inline);
-  border: 1px solid var(--button-border);
+  border: var(--border-width-thin) solid var(--button-border);
   border-radius: var(--control-radius);
   align-items: center;
   justify-content: center;
-  gap: var(--et-space-2);
+  gap: var(--space-2);
   font: inherit;
-  font-weight: var(--et-font-weight-bold);
+  font-weight: var(--font-weight-bold);
   cursor: pointer;
   transition:
     filter var(--duration-interface) var(--easing-interface),
@@ -66,35 +66,35 @@
 .ui-field__control:focus-visible,
 .ui-tabs [role='tab']:focus-visible,
 .ui-dialog:focus-visible {
-  outline: 2px solid var(--control-focus-ring);
-  outline-offset: 3px;
+  outline: var(--border-width-medium) solid var(--control-focus-ring);
+  outline-offset: var(--space-1);
   scroll-margin-block: var(--space-section);
 }
 
 .ui-spinner {
   width: 1em;
   height: 1em;
-  border: 2px solid currentColor;
+  border: var(--border-width-medium) solid currentColor;
   border-right-color: var(--color-transparent);
   border-radius: var(--radius-pill);
-  animation: ui-spin var(--et-duration-slow) linear infinite;
+  animation: ui-spin var(--duration-loader) var(--easing-linear) infinite;
 }
 
 .ui-field {
   display: grid;
-  gap: var(--et-space-2);
+  gap: var(--space-2);
   color: var(--color-text-primary);
 }
 
 .ui-field > label {
-  font-weight: var(--et-font-weight-bold);
+  font-weight: var(--font-weight-bold);
 }
 
 .ui-field__control {
   width: 100%;
   min-height: 2.75rem;
   padding: var(--space-control-block) var(--space-control-inline);
-  border: 1px solid var(--field-border);
+  border: var(--border-width-thin) solid var(--field-border);
   border-radius: var(--control-radius);
   color: var(--field-foreground);
   background: var(--field-background);
@@ -113,7 +113,7 @@ textarea.ui-field__control {
 .ui-field > p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: var(--et-font-size-sm);
+  font-size: var(--font-size-sm);
 }
 
 .ui-field > .ui-field__error {
@@ -122,7 +122,7 @@ textarea.ui-field__control {
 
 .ui-card {
   overflow: hidden;
-  border: 1px solid var(--card-border);
+  border: var(--border-width-thin) solid var(--card-border);
   border-radius: var(--card-radius);
   color: var(--color-text-primary);
   background: var(--card-background);
@@ -146,20 +146,20 @@ textarea.ui-field__control {
 }
 
 .ui-card__header p {
-  margin-top: var(--et-space-2);
+  margin-top: var(--space-2);
   color: var(--color-text-secondary);
 }
 
 .ui-card__footer {
   display: flex;
-  border-top: 1px solid var(--card-border);
+  border-top: var(--border-width-thin) solid var(--card-border);
   justify-content: flex-end;
-  gap: var(--et-space-2);
+  gap: var(--space-2);
 }
 
 .ui-dialog {
-  width: min(36rem, calc(100vw - 2 * var(--et-space-5)));
-  max-height: calc(100dvh - 2 * var(--et-space-5));
+  width: min(36rem, calc(100vw - 2 * var(--space-5)));
+  max-height: calc(100dvh - 2 * var(--space-5));
   padding: 0;
   border: 0;
   color: var(--dialog-foreground);
@@ -172,7 +172,7 @@ textarea.ui-field__control {
 
 .ui-dialog__surface {
   overflow: hidden;
-  border: 1px solid var(--dialog-border);
+  border: var(--border-width-thin) solid var(--dialog-border);
   border-radius: var(--card-radius);
   background: var(--dialog-background);
   box-shadow: var(--shadow-floating);
@@ -188,7 +188,7 @@ textarea.ui-field__control {
   display: flex;
   align-items: start;
   justify-content: space-between;
-  gap: var(--et-space-4);
+  gap: var(--space-4);
 }
 
 .ui-dialog__header h2,
@@ -197,7 +197,7 @@ textarea.ui-field__control {
 }
 
 .ui-dialog__header p {
-  margin-top: var(--et-space-2);
+  margin-top: var(--space-2);
   color: var(--color-text-secondary);
 }
 
@@ -208,13 +208,13 @@ textarea.ui-field__control {
 
 .ui-dialog__footer {
   display: flex;
-  border-top: 1px solid var(--dialog-border);
+  border-top: var(--border-width-thin) solid var(--dialog-border);
   justify-content: flex-end;
-  gap: var(--et-space-2);
+  gap: var(--space-2);
 }
 
 .ui-dialog--drawer {
-  width: min(28rem, calc(100vw - var(--et-space-5)));
+  width: min(28rem, calc(100vw - var(--space-5)));
   height: 100dvh;
   max-height: 100dvh;
   margin: 0 0 0 auto;
@@ -227,14 +227,14 @@ textarea.ui-field__control {
 
 .ui-tabs {
   display: grid;
-  gap: var(--et-space-4);
+  gap: var(--space-4);
 }
 
 .ui-tabs__list {
   display: flex;
   overflow-x: auto;
-  border-bottom: 1px solid var(--color-border-subtle);
-  gap: var(--et-space-1);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+  gap: var(--space-1);
 }
 
 .ui-tabs [role='tab'] {
@@ -242,7 +242,7 @@ textarea.ui-field__control {
   min-height: 2.75rem;
   padding: var(--space-control-block) var(--space-control-inline);
   border: 0;
-  border-bottom: 2px solid var(--color-transparent);
+  border-bottom: var(--border-width-medium) solid var(--color-transparent);
   color: var(--color-text-secondary);
   background: var(--color-transparent);
   font: inherit;
@@ -267,18 +267,18 @@ textarea.ui-field__control {
 .ui-tooltip__content {
   position: absolute;
   z-index: var(--layer-overlay);
-  bottom: calc(100% + var(--et-space-2));
+  bottom: calc(100% + var(--space-2));
   left: 50%;
   width: max-content;
   max-width: 18rem;
-  padding: var(--et-space-2) var(--et-space-3);
+  padding: var(--space-2) var(--space-3);
   border-radius: var(--control-radius);
   opacity: 0;
   visibility: hidden;
   transform: translateX(-50%);
   color: var(--tooltip-foreground);
   background: var(--tooltip-background);
-  font-size: var(--et-font-size-sm);
+  font-size: var(--font-size-sm);
   pointer-events: none;
   transition:
     opacity var(--duration-feedback) var(--easing-interface),
@@ -297,12 +297,12 @@ textarea.ui-field__control {
   display: flex;
   min-width: min(22rem, 100%);
   padding: var(--card-padding);
-  border: 1px solid var(--color-border-strong);
-  border-left: 3px solid var(--color-accent);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-left: var(--border-width-accent) solid var(--color-accent);
   border-radius: var(--control-radius);
   align-items: center;
   justify-content: space-between;
-  gap: var(--et-space-4);
+  gap: var(--space-4);
   color: var(--toast-foreground);
   background: var(--toast-background);
   box-shadow: var(--shadow-floating);
@@ -317,20 +317,20 @@ textarea.ui-field__control {
 }
 
 .ui-toast p {
-  margin: var(--et-space-1) 0 0;
+  margin: var(--space-1) 0 0;
   color: var(--color-text-secondary);
 }
 
 .ui-skeleton > div {
   display: grid;
-  gap: var(--et-space-3);
+  gap: var(--space-3);
 }
 
 .ui-skeleton > div > span {
   min-height: 1rem;
   border-radius: var(--control-radius);
   background: var(--skeleton-background);
-  animation: ui-pulse 1.4s var(--easing-interface) infinite alternate;
+  animation: ui-pulse var(--duration-ambient) var(--easing-interface) infinite alternate;
 }
 
 .ui-skeleton > div > span:last-child {
@@ -339,13 +339,13 @@ textarea.ui-field__control {
 
 .ui-progress {
   display: grid;
-  gap: var(--et-space-2);
+  gap: var(--space-2);
 }
 
 .ui-progress > div {
   display: flex;
   justify-content: space-between;
-  gap: var(--et-space-3);
+  gap: var(--space-3);
 }
 
 .ui-progress progress {
@@ -358,16 +358,16 @@ textarea.ui-field__control {
 .ui-progress p {
   margin: 0;
   color: var(--color-text-secondary);
-  font-size: var(--et-font-size-sm);
+  font-size: var(--font-size-sm);
 }
 
 .ui-state {
   display: grid;
   padding: var(--space-section);
-  border: 1px dashed var(--color-border-strong);
+  border: var(--border-width-thin) dashed var(--color-border-strong);
   border-radius: var(--card-radius);
   place-items: center;
-  gap: var(--et-space-3);
+  gap: var(--space-3);
   text-align: center;
   color: var(--color-text-primary);
   background: var(--card-background);

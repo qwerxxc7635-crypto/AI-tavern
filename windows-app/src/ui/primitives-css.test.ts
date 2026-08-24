@@ -18,7 +18,7 @@ describe('UI primitive visual contract', () => {
     expect(block('.ui-button')).toContain('min-height: 2.75rem');
     expect(block('.ui-field__control')).toContain('min-height: 2.75rem');
     expect(css).toMatch(
-      /\.ui-button:focus-visible,[\s\S]*outline: 2px solid var\(--control-focus-ring\)/,
+      /\.ui-button:focus-visible,[\s\S]*outline: var\(--border-width-medium\) solid var\(--control-focus-ring\)/,
     );
   });
 

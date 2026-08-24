@@ -14,6 +14,7 @@ describe('design-token theme contrast', () => {
     ['paper secondary text', '--et-color-ink-500', '--et-color-paper-100', 4.5],
     ['paper accent text', '--et-color-ember-600', '--et-color-paper-100', 4.5],
     ['paper positive text', '--et-color-moss-700', '--et-color-paper-100', 4.5],
+    ['paper danger text', '--et-color-ember-700', '--et-color-paper-100', 4.5],
   ])('%s meets its WCAG contrast contract', (_label, foreground, background, minimum) => {
     expect(contrast(requireHex(foreground), requireHex(background))).toBeGreaterThanOrEqual(
       minimum,
