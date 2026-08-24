@@ -217,6 +217,23 @@ export {
   createNpcKnowledge,
   createNpcRelationship,
 } from './tavern.js';
+export {
+  MEMORY_LAYER_KINDS,
+  MEMORY_SOURCE_KINDS,
+  SUMMARY_SCOPE_KINDS,
+  MemoryLayerContractError,
+  createHistoricalSummary,
+  createWorldLoreEntry,
+} from './memory-layer.js';
+export type {
+  HistoricalSummary,
+  MemoryLayerKind,
+  MemorySourceKind,
+  MemorySourceSelector,
+  MemorySourceSnapshot,
+  SummaryScopeKind,
+  WorldLoreEntry,
+} from './memory-layer.js';
 export type {
   NpcKnowledge,
   NpcKnowledgeInput,
@@ -522,6 +539,8 @@ export {
   claimId,
   knowledgeId,
   memoryId,
+  historicalSummaryId,
+  worldLoreEntryId,
 } from './foundation.js';
 export type {
   ActionOptionId,
@@ -564,6 +583,8 @@ export type {
   ClaimId,
   KnowledgeId,
   MemoryId,
+  HistoricalSummaryId,
+  WorldLoreEntryId,
 } from './foundation.js';
 export {
   DYNAMIC_QUEST_ENTITY_KINDS,

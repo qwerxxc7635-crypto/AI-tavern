@@ -35,6 +35,7 @@ import { projectActorKnowledge, type ActorKnowledgeProjection } from '@ember-tav
 
 import { PersistenceDataError } from './campaign-repository.js';
 import { EventLedgerRepository } from './event-ledger-repository.js';
+import { captureMemorySource } from './memory-layer-repository.js';
 import {
   parseJson,
   requireArray,
@@ -311,45 +312,85 @@ export class KnowledgeBoundaryRepository {
 
   public appendMemory(memory: Memory): Memory {
     const canonical = createMemory(memory);
-    return this.inTransaction(() => {
-      this.requireActor(canonical.campaignId, canonical.actor);
-      for (const id of canonical.sourceKnowledgeIds) {
-        const source = this.getKnowledge(id);
-        if (
-          source !== null &&
-          (source.campaignId !== canonical.campaignId ||
-            source.actor.type !== canonical.actor.type ||
-            source.actor.id !== canonical.actor.id)
-        ) {
-          throw new PersistenceDataError('Memory cannot reference another actor Knowledge');
-        }
+    return this.inTransaction(() => this.appendMemoryInTransaction(canonical));
+  }
+
+  /** Caller owns the surrounding SQLite transaction. */
+  public appendMemoryInTransaction(memory: Memory): Memory {
+    const canonical = createMemory(memory);
+    const existing = this.getMemory(canonical.id);
+    if (existing !== null) {
+      if (!sameMemory(existing, canonical)) {
+        throw new PersistenceDataError('Memory ID is already used by different content');
       }
-      this.database
-        .prepare(
-          `INSERT INTO knowledge_memories (
+      return existing;
+    }
+    this.requireActor(canonical.campaignId, canonical.actor);
+    for (const id of canonical.sourceKnowledgeIds) {
+      const source = this.getKnowledge(id);
+      if (
+        source !== null &&
+        (source.campaignId !== canonical.campaignId ||
+          source.actor.type !== canonical.actor.type ||
+          source.actor.id !== canonical.actor.id)
+      ) {
+        throw new PersistenceDataError('Memory cannot reference another actor Knowledge');
+      }
+    }
+    const sources = [
+      ...canonical.sourceKnowledgeIds.map((id) => ({ kind: 'KNOWLEDGE' as const, id })),
+      ...canonical.sourceEventIds.map((id) => ({ kind: 'GAME_EVENT' as const, id })),
+    ].map((source) =>
+      captureMemorySource(this.database, canonical.campaignId, source, canonical.actor),
+    );
+    this.database
+      .prepare(
+        `INSERT INTO knowledge_memories (
              id, campaign_id, actor_type, actor_id, summary,
              source_knowledge_ids_json, source_event_ids_json, revision, created_at
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
-          canonical.id,
-          canonical.campaignId,
-          canonical.actor.type,
-          canonical.actor.id,
-          canonical.summary,
-          json(canonical.sourceKnowledgeIds),
-          json(canonical.sourceEventIds),
-          canonical.revision,
-          canonical.createdAt,
-        );
-      return this.requireMemory(canonical.id);
-    });
+      )
+      .run(
+        canonical.id,
+        canonical.campaignId,
+        canonical.actor.type,
+        canonical.actor.id,
+        canonical.summary,
+        json(canonical.sourceKnowledgeIds),
+        json(canonical.sourceEventIds),
+        canonical.revision,
+        canonical.createdAt,
+      );
+    const insertSource = this.database.prepare(
+      `INSERT INTO memory_artifact_sources (
+           campaign_id,artifact_kind,artifact_id,ordinal,source_kind,source_id,
+           source_revision,source_hash,source_occurred_at
+         ) VALUES (?, 'LONG_TERM', ?, ?, ?, ?, ?, ?, ?)`,
+    );
+    sources.forEach((source, ordinal) =>
+      insertSource.run(
+        canonical.campaignId,
+        canonical.id,
+        ordinal,
+        source.kind,
+        source.id,
+        source.revision,
+        source.contentHash,
+        source.occurredAt,
+      ),
+    );
+    return this.requireMemory(canonical.id);
   }
 
   public requireMemory(id: Memory['id']): Memory {
+    const memory = this.getMemory(id);
+    if (memory === null) throw new PersistenceDataError(`Memory not found: ${id}`);
+    return memory;
+  }
+
+  public getMemory(id: Memory['id']): Memory | null {
     const row = this.database.prepare('SELECT * FROM knowledge_memories WHERE id = ?').get(id);
-    if (row === undefined) throw new PersistenceDataError(`Memory not found: ${id}`);
-    return mapMemory(row);
+    return row === undefined ? null : mapMemory(row);
   }
 
   public listActorMemories(campaign: CampaignId, actor: KnowledgeActor): readonly Memory[] {
@@ -720,6 +761,20 @@ function positiveInteger(value: unknown, label: string): number {
 
 function json(value: unknown): string {
   return JSON.stringify(value);
+}
+
+function sameMemory(left: Memory, right: Memory): boolean {
+  return (
+    left.id === right.id &&
+    left.campaignId === right.campaignId &&
+    left.actor.type === right.actor.type &&
+    left.actor.id === right.actor.id &&
+    left.summary === right.summary &&
+    JSON.stringify(left.sourceKnowledgeIds) === JSON.stringify(right.sourceKnowledgeIds) &&
+    JSON.stringify(left.sourceEventIds) === JSON.stringify(right.sourceEventIds) &&
+    left.revision === right.revision &&
+    left.createdAt === right.createdAt
+  );
 }
 
 function jsonValue(value: unknown): JsonValue {

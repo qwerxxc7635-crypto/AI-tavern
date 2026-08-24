@@ -453,12 +453,13 @@
 
 ## M9-T02 Memory Layers
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M9-T01。
 - **Deliverable**：Structured Fact、Recent、Summary、Long-term Memory、World Lore 的合同、生成、验证和存储。
 - **Acceptance**：摘要可追溯且不升级 Truth；长期记忆有来源/Actor/时间；旧史可压缩但 SQLite 原记录保留。
 - **Tests**：promotion rules、summary drift、actor isolation、source deletion/update、save/import。
 - **Do Not**：不把摘要作为唯一历史；不提前引入向量数据库。
+- **Implementation reference**：[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)。
 
 ## M9-T03 Retrieval Interface & World Info
 

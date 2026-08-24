@@ -4528,3 +4528,20 @@
 - 专项测试覆盖十层顺序、字段相关性分类、irrelevant/budget omission、required保留、credential/full DB隔离、revision、每个AITask统一入口、Inspector脱敏、Application manifest及primary/fallback/repair冻结。
 - `pnpm check:shared`完整通过：Prettier、ESLint、TypeScript、release/i18n、Vitest 166 files/955 tests通过（另1 file/1 test为显式skip的performance baseline runner）、Node 29 tests、Rust workspace 125 tests通过（另1项需明确API Key授权的真实Provider测试ignored），archive interop通过。
 - 额外独立复验Rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换271 modules。不删除测试、不降低校验、不忽略错误。
+
+## 2026-08-24 — M9-T02 完成 Memory Layers
+
+### 边界与实现
+
+- 在分支`task/M9-T02-memory-layers`、起始提交`4c1c188`上继续；用户`.gitignore`修改保持未暂存。本任务未进入M9-T03，未实现检索/向量/Lore trigger，也未新增UI/CSS。
+- 固定Structured Fact、Recent、Summary、Long-term Memory、World Lore五层权威。Truth/Claim/Actor Knowledge与原Message/Event/Turn不重造；派生Summary/Lore/Memory无Truth authority，压缩不删除原史。
+- schema 28新增Historical Summary、World Lore和共享source snapshot。每个派生artifact保存Campaign/Actor、来源revision/hash/time、digest、generation record和连续revision；来源删除/更新可观察为stale，current-only列表不再投影。
+- 现有`knowledge_memories`继续是唯一通用Long-term Memory表。`EXTRACT_MEMORIES`除turn citation外必须有程序验证的Actor Knowledge/Event来源；同一SQLite事务幂等提交legacy NPC兼容视图、通用Memory与请求终态，任一投影冲突都会整体回滚。TypeScript与Native NPC上下文优先current通用Memory，否则兼容回退legacy隔离列表。
+- 内部snapshot首次纳入schema 12四张知识表和schema 28三张memory表，旧payload按空集合恢复。portable `.emtavern` v2按既定边界不升级，完整跨语言格式迁移仍留给M10-T05。
+- 新增[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)与`DEC-142`，更新V0.3 Spec、Unified Context、Data Model、migration说明和任务引用；视觉规范/M10-T07边界不变。
+
+### 验证
+
+- 专项覆盖promotion rules、Summary/source digest drift、source update/delete、Actor isolation、Long-term Memory freshness与幂等重放、双视图冲突整体回滚、旧史保留、generation provenance、本地reopen和internal snapshot round-trip；TypeScript对话生成记录证明current通用Memory优先于legacy视图，Native NPC测试证明Knowledge revision变化后stale Memory不再进入Prompt。
+- `pnpm check:shared`完整通过：Prettier、ESLint、TypeScript、release/i18n、Vitest 168 files/962 tests通过（另1 file/1 test为显式skip的performance baseline runner）、Node 29 tests、Rust workspace 136 tests通过（另1项需明确API Key授权的真实Provider测试ignored），archive interop通过。
+- 额外独立复验Rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换272 modules。不删除测试、不降低校验、不忽略错误。

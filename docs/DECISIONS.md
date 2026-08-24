@@ -3021,3 +3021,26 @@ Windows所有production Generator都经DesktopAIEngine进入该边界；Applicat
 - 不把完整DB、其他Actor知识、未授权Fact、凭据或API Key放入Prompt。
 - M9-T01不生成Summary/Long-term Memory，不升级Truth，不加入向量数据库；这些严格留给M9-T02/T03。
 - 本任务不新增UI/CSS；视觉规范与M10-T07渐进迁移保持不变。
+
+## DEC-142：派生 Memory 以来源快照失效，不成为第二套 Truth
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M9-T02`、`DEC-123`、`DEC-141`与[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)
+
+### 背景
+
+V0.3已经有World Truth/Claim/Actor Knowledge、原始Message/Event/Turn、旧NPC记忆、通用Actor Memory和Adventure Summary，但缺少一个共同规则证明摘要来自哪些行、来源变化后是否仍可用、World Lore是否误当事实，以及旧史压缩后原记录是否保留。另建Memory Truth或把摘要覆盖历史都会破坏SQLite authority与审计。
+
+### 决定与理由
+
+保留五层：Structured Fact、Recent、Summary、Long-term Memory、World Lore。Summary/Lore和新写入Long-term Memory保存有序source ID/revision/hash/time；Repository只对当前SQLite来源计算freshness，删除或变化使派生物stale。派生物无Truth authority，AI只能产生待验证文本，程序绑定来源、Actor、Campaign、generation record和revision。
+
+schema 28仅新增`historical_summaries`、`world_lore_entries`和共享`memory_artifact_sources`；通用Long-term Memory继续使用`knowledge_memories`。`EXTRACT_MEMORIES`必须同时有模型可引用的turn citation与程序验证的Actor Knowledge/Event来源，提交后保留legacy NPC兼容视图并写通用Memory。NPC上下文优先current通用Memory，无可用通用记录时才回退隔离后的legacy列表。
+
+### 影响与边界
+
+- 压缩从不删除Message/Event/Turn/Fact；Summary不能成为唯一历史。
+- World Lore只有来源和生成审计，触发、priority、budget、cache和未来RAG port留给M9-T03。
+- 内部snapshot加入schema 12/28表并兼容旧payload；portable `.emtavern` format v2不变，统一跨语言迁移仍由M10-T05负责。
+- 不修改Rules/D20、Provider、Queue、Constitution、Quest/NPC/Adventure提交语义；不增加UI/CSS或向量数据库。

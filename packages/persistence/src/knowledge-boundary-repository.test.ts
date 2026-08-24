@@ -277,7 +277,7 @@ describe('KnowledgeBoundaryRepository', () => {
           createdAt: at,
         }),
       ),
-    ).toThrow('transaction failed');
+    ).toThrow('Memory source not found');
     expect(() =>
       repository.appendMemory(
         createMemory({
@@ -291,7 +291,7 @@ describe('KnowledgeBoundaryRepository', () => {
           createdAt: at,
         }),
       ),
-    ).toThrow('transaction failed');
+    ).toThrow('Memory source not found');
     const second = knowledge(
       'knowledge-rollback',
       'NPC',

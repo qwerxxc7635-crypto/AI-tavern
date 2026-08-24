@@ -19,6 +19,7 @@ import {
   idempotencyKey,
   isoTimestamp,
   locationId,
+  memoryId,
   messageId,
   npcId,
   npcMemoryId,
@@ -41,6 +42,7 @@ import {
   GenerationRecordRepository,
   KnowledgeBoundaryRepository,
   NpcRepository,
+  PendingAiRequestRepository,
   PlayerCharacterRepository,
   TavernRepository,
   WorldRepository,
@@ -203,6 +205,8 @@ describe('NpcDialogueUseCases', () => {
         conversationId: conversationKey,
         npcId: npcKey,
         sourceTurnIds: [turnId('turn-1')],
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+        sourceEventIds: [],
       });
       expect(memories).toEqual([
         {
@@ -222,6 +226,84 @@ describe('NpcDialogueUseCases', () => {
       expect(JSON.stringify(memoryGeneration?.request)).toContain('dialogue-history-62');
       expect(JSON.stringify(memoryGeneration?.request)).not.toContain('dialogue-history-30');
       expect(new NpcRepository(sqlite).listMemories(npcKey).at(-1)).toEqual(memories[0]);
+      expect(
+        new KnowledgeBoundaryRepository(sqlite).requireMemory(memoryId('memory-0')),
+      ).toMatchObject({
+        actor: { type: 'NPC', id: npcKey },
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+      });
+      const replay = await useCases.extractMemories({
+        ...request('memories'),
+        campaignId: campaignKey,
+        conversationId: conversationKey,
+        npcId: npcKey,
+        sourceTurnIds: [turnId('turn-1')],
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+        sourceEventIds: [],
+      });
+      expect(replay).toEqual(memories);
+      expect(
+        new KnowledgeBoundaryRepository(sqlite).listActorMemories(campaignKey, {
+          type: 'NPC',
+          id: npcKey,
+        }),
+      ).toHaveLength(1);
+
+      await useCases.talkToNpc({
+        ...request('reply-3'),
+        campaignId: campaignKey,
+        conversationId: conversationKey,
+        playerMessageId: messageId('message-player-3'),
+        npcMessageId: messageId('message-npc-3'),
+        npcId: npcKey,
+        playerMessage: 'What promise did I make about the passage?',
+      });
+      const currentMemoryGeneration = new GenerationRecordRepository(sqlite).get(
+        generationRecordId('generation-reply-3'),
+      );
+      expect(JSON.stringify(currentMemoryGeneration?.request)).toContain(
+        'The player promised Ilyra to investigate the lighthouse passage.',
+      );
+      expect(JSON.stringify(currentMemoryGeneration?.request)).not.toContain('memory-history-19');
+
+      boundary.appendMemory({
+        kind: 'MEMORY',
+        id: memoryId('memory-universal-conflict'),
+        campaignId: campaignKey,
+        actor: { type: 'NPC', id: npcKey },
+        summary: 'An existing memory with a different immutable identity payload.',
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+        sourceEventIds: [],
+        revision: 1,
+        createdAt: at,
+      });
+      const conflictingUseCases = new NpcDialogueUseCases(
+        sqlite,
+        new FakeAIProvider(() => at),
+        config,
+        { memory: () => npcMemoryId('memory-universal-conflict') },
+        () => at,
+      );
+      await expect(
+        conflictingUseCases.extractMemories({
+          ...request('memories-conflict'),
+          campaignId: campaignKey,
+          conversationId: conversationKey,
+          npcId: npcKey,
+          sourceTurnIds: [turnId('turn-1')],
+          sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+          sourceEventIds: [],
+        }),
+      ).rejects.toMatchObject({ code: 'COMMIT_FAILED' });
+      expect(
+        npcRepository
+          .listMemories(npcKey)
+          .some(({ id }) => id === npcMemoryId('memory-universal-conflict')),
+      ).toBe(false);
+      expect(
+        new PendingAiRequestRepository(sqlite).get(aiRequestId('request-memories-conflict'))
+          ?.status,
+      ).toBe('FAILED');
     } finally {
       database.close();
     }

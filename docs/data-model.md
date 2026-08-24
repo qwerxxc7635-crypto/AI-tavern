@@ -571,3 +571,9 @@ schema 27 的 `director_budget_states` 保存由 Rules Engine `game_time_minutes
 M9-T01不增加SQLite表或schema版本。`ContextAssembly`继续由有序block与manifest组成；manifest只保存block ID/type、source ID/revision、stability、version、content hash、privacy class、token估算、relevance、required/included和省略原因，不保存block内容。Application路径把manifest写入既有`generation_records.request_json`，Desktop Inspector只保存当前session的脱敏投影。
 
 Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于当次有界请求。完整层级、dump/credential门禁与Generator迁移矩阵见[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)。
+
+## 12. V0.3 Memory Layers（schema 28）
+
+`historical_summaries`保存Campaign/Actor/Adventure/Conversation范围、摘要文本、覆盖时间、source digest、可选generation record和连续revision。`world_lore_entries`保存来源约束的世界说明，但不具有Truth authority。`memory_artifact_sources`按顺序保存Summary、Long-term Memory与World Lore的source kind/ID/revision/SHA-256/时间；读取时对SQLite当前来源重算，删除为`SOURCE_DELETED`，revision/hash/time变化为`SOURCE_UPDATED`。
+
+原`knowledge_memories`继续是唯一Actor Long-term Memory表；M9-T02新增来源快照而不平行建表。Recent仍是`messages`、`game_events`、`adventure_turns`原行，压缩Summary不会删除原历史。内部snapshot新增schema 12四张知识表和schema 28三张表；旧snapshot缺失时按空集合兼容。portable format v2仍不携带这些表，正式跨语言升级留给M10-T05。完整合同见[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)。

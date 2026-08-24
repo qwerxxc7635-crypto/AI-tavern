@@ -84,6 +84,16 @@ export type {
   KnowledgeMutationIdentity,
   SaveKnowledgeOnceInput,
 } from './knowledge-boundary-repository.js';
+export {
+  MemoryLayerRepository,
+  captureMemorySource,
+  memorySourceDigest,
+} from './memory-layer-repository.js';
+export type {
+  MemoryArtifactFreshness,
+  MemoryArtifactFreshnessReason,
+  MemoryArtifactKind,
+} from './memory-layer-repository.js';
 export { UniversalCharacterRepository } from './universal-character-repository.js';
 export { CharacterCreationSessionRepository } from './character-creation-session-repository.js';
 export { CareerPoolRepository } from './career-pool-repository.js';

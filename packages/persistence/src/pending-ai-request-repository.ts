@@ -18,6 +18,7 @@ import {
   type Item,
   type Conversation,
   type Message,
+  type Memory,
   type NpcKnowledge,
   type NpcMemory,
   type NpcProfile,
@@ -51,6 +52,7 @@ import { PlayerCharacterRepository } from './player-character-repository.js';
 import { QuestRepository } from './quest-adventure-repository.js';
 import { AdventureRepository } from './quest-adventure-repository.js';
 import { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
+import { KnowledgeBoundaryRepository } from './knowledge-boundary-repository.js';
 
 const TERMINAL_STATUSES = ['COMMITTED', 'CANCELLED'] as const;
 const SECRET_FIELD = /api.?key|authorization|bearer|access.?token|secret.?key/i;
@@ -535,6 +537,7 @@ export class PendingAiRequestRepository {
     key: IdempotencyKey,
     campaign: Campaign['id'],
     memories: readonly NpcMemory[],
+    longTermMemories: readonly Memory[],
     at: IsoTimestamp,
   ): IdempotentCommitResult {
     this.database.exec('BEGIN IMMEDIATE');
@@ -545,12 +548,29 @@ export class PendingAiRequestRepository {
         return 'ALREADY_COMMITTED';
       }
       const npcs = new NpcRepository(this.database);
-      for (const memory of memories) {
+      const knowledge = new KnowledgeBoundaryRepository(this.database);
+      if (memories.length !== longTermMemories.length) {
+        throw new PersistenceDataError('NPC and Long-term Memory projections do not match');
+      }
+      for (const [index, memory] of memories.entries()) {
         const npc = npcs.get(memory.npcId);
         if (npc === null || npc.campaignId !== campaign) {
           throw new PersistenceDataError('NPC memory belongs to another campaign');
         }
+        const longTerm = longTermMemories[index];
+        if (
+          longTerm === undefined ||
+          longTerm.campaignId !== campaign ||
+          longTerm.actor.type !== 'NPC' ||
+          longTerm.actor.id !== memory.npcId ||
+          String(longTerm.id) !== String(memory.id) ||
+          longTerm.summary !== memory.summary ||
+          longTerm.createdAt !== memory.createdAt
+        ) {
+          throw new PersistenceDataError('NPC and Long-term Memory projections do not match');
+        }
         npcs.appendMemory(memory);
+        knowledge.appendMemoryInTransaction(longTerm);
       }
       this.markCommitted(request.id, at);
       this.database.exec('COMMIT');

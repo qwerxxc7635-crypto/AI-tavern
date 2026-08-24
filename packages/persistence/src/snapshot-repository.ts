@@ -59,6 +59,13 @@ type SnapshotTable =
   | 'director_budget_entries'
   | 'director_budget_cooldowns'
   | 'director_budget_decisions'
+  | 'world_truths'
+  | 'knowledge_claims'
+  | 'actor_knowledge'
+  | 'knowledge_memories'
+  | 'historical_summaries'
+  | 'world_lore_entries'
+  | 'memory_artifact_sources'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -106,6 +113,16 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     'SELECT * FROM director_budget_cooldowns WHERE campaign_id = ? ORDER BY cooldown_key',
   director_budget_decisions:
     'SELECT * FROM director_budget_decisions WHERE campaign_id = ? ORDER BY id',
+  world_truths: 'SELECT * FROM world_truths WHERE campaign_id = ? ORDER BY id',
+  knowledge_claims: 'SELECT * FROM knowledge_claims WHERE campaign_id = ? ORDER BY id',
+  actor_knowledge: 'SELECT * FROM actor_knowledge WHERE campaign_id = ? ORDER BY id',
+  knowledge_memories: 'SELECT * FROM knowledge_memories WHERE campaign_id = ? ORDER BY id',
+  historical_summaries:
+    'SELECT * FROM historical_summaries WHERE campaign_id = ? ORDER BY covered_to, id',
+  world_lore_entries:
+    'SELECT * FROM world_lore_entries WHERE campaign_id = ? ORDER BY updated_at, id',
+  memory_artifact_sources:
+    'SELECT * FROM memory_artifact_sources WHERE campaign_id = ? ORDER BY artifact_kind, artifact_id, ordinal',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -141,6 +158,13 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'items',
   'world_clocks',
   'game_events',
+  'world_truths',
+  'knowledge_claims',
+  'actor_knowledge',
+  'knowledge_memories',
+  'historical_summaries',
+  'world_lore_entries',
+  'memory_artifact_sources',
   'dynamic_quest_sources',
   'world_director_runs',
   'world_director_proposals',
@@ -350,6 +374,13 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM memory_artifact_sources WHERE campaign_id = ?',
+      'DELETE FROM historical_summaries WHERE campaign_id = ?',
+      'DELETE FROM world_lore_entries WHERE campaign_id = ?',
+      'DELETE FROM knowledge_memories WHERE campaign_id = ?',
+      'DELETE FROM actor_knowledge WHERE campaign_id = ?',
+      'DELETE FROM knowledge_claims WHERE campaign_id = ?',
+      'DELETE FROM world_truths WHERE campaign_id = ?',
       'DELETE FROM director_budget_decisions WHERE campaign_id = ?',
       'DELETE FROM director_budget_cooldowns WHERE campaign_id = ?',
       'DELETE FROM director_budget_entries WHERE campaign_id = ?',
@@ -537,7 +568,14 @@ function parsePayload(text: string): SnapshotPayload {
         table === 'director_budget_admissions' ||
         table === 'director_budget_entries' ||
         table === 'director_budget_cooldowns' ||
-        table === 'director_budget_decisions')
+        table === 'director_budget_decisions' ||
+        table === 'world_truths' ||
+        table === 'knowledge_claims' ||
+        table === 'actor_knowledge' ||
+        table === 'knowledge_memories' ||
+        table === 'historical_summaries' ||
+        table === 'world_lore_entries' ||
+        table === 'memory_artifact_sources')
     ) {
       return [];
     }
@@ -678,6 +716,13 @@ function snapshotTableRecord(
     director_budget_entries: values('director_budget_entries'),
     director_budget_cooldowns: values('director_budget_cooldowns'),
     director_budget_decisions: values('director_budget_decisions'),
+    world_truths: values('world_truths'),
+    knowledge_claims: values('knowledge_claims'),
+    actor_knowledge: values('actor_knowledge'),
+    knowledge_memories: values('knowledge_memories'),
+    historical_summaries: values('historical_summaries'),
+    world_lore_entries: values('world_lore_entries'),
+    memory_artifact_sources: values('memory_artifact_sources'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

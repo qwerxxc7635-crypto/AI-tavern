@@ -381,8 +381,26 @@ fn allowed_references(
         )?,
         memory_ids: query_ids(
             connection,
-            "SELECT id FROM knowledge_memories WHERE campaign_id=?1 AND actor_type='NPC'
-             AND actor_id=?2 ORDER BY id LIMIT 64",
+            "SELECT memory.id FROM knowledge_memories memory
+             WHERE memory.campaign_id=?1 AND memory.actor_type='NPC' AND memory.actor_id=?2
+             AND EXISTS (SELECT 1 FROM memory_artifact_sources source
+               WHERE source.artifact_kind='LONG_TERM' AND source.artifact_id=memory.id)
+             AND NOT EXISTS (
+               SELECT 1 FROM memory_artifact_sources source
+               WHERE source.artifact_kind='LONG_TERM' AND source.artifact_id=memory.id AND (
+                 (source.source_kind='KNOWLEDGE' AND NOT EXISTS (
+                   SELECT 1 FROM actor_knowledge knowledge
+                   WHERE knowledge.id=source.source_id AND knowledge.campaign_id=memory.campaign_id
+                     AND knowledge.actor_type=memory.actor_type AND knowledge.actor_id=memory.actor_id
+                     AND knowledge.revision=source.source_revision
+                 )) OR
+                 (source.source_kind='GAME_EVENT' AND NOT EXISTS (
+                   SELECT 1 FROM game_events event WHERE event.id=source.source_id
+                     AND event.campaign_id=memory.campaign_id
+                     AND event.schema_version=source.source_revision
+                 )) OR source.source_kind NOT IN ('KNOWLEDGE','GAME_EVENT')
+               )
+             ) ORDER BY memory.id LIMIT 64",
             &profile.campaign_id,
             &profile.id,
         )?,

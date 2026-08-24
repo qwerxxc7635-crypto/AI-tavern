@@ -14,6 +14,7 @@ import {
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
+  memoryId,
   turnId,
   type AiRequestId,
   type Campaign,
@@ -21,9 +22,11 @@ import {
   type Conversation,
   type ConversationId,
   type GenerationRecordId,
+  type GameEventId,
   type IdempotencyKey,
   type IsoTimestamp,
   type JsonValue,
+  type KnowledgeId,
   type Message,
   type MessageId,
   type ModelProfileId,
@@ -40,6 +43,7 @@ import {
   ConversationRepository,
   GenerationRecordRepository,
   KnowledgeBoundaryRepository,
+  MemoryLayerRepository,
   NpcRepository,
   PendingAiRequestRepository,
   WorldRepository,
@@ -76,6 +80,8 @@ export interface ExtractMemoriesCommand extends DialogueGenerationRequest {
   readonly conversationId: ConversationId;
   readonly npcId: NpcId;
   readonly sourceTurnIds: readonly TurnId[];
+  readonly sourceKnowledgeIds: readonly KnowledgeId[];
+  readonly sourceEventIds: readonly GameEventId[];
 }
 
 export interface NpcDialogueResult {
@@ -93,6 +99,7 @@ export class NpcDialogueUseCases {
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
   private readonly knowledgeBoundary: KnowledgeBoundaryRepository;
+  private readonly memoryLayers: MemoryLayerRepository;
 
   public constructor(
     database: TransactionalSqliteDatabase,
@@ -108,6 +115,7 @@ export class NpcDialogueUseCases {
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
     this.knowledgeBoundary = new KnowledgeBoundaryRepository(database);
+    this.memoryLayers = new MemoryLayerRepository(database);
   }
 
   public async talkToNpc(command: TalkToNpcCommand): Promise<NpcDialogueResult> {
@@ -141,15 +149,18 @@ export class NpcDialogueUseCases {
     const messages =
       existing === null ? Object.freeze([]) : this.conversations.listMessages(existing.id);
     const actor = { type: 'NPC' as const, id: npc.id };
-    const actorKnowledge = this.knowledgeBoundary.listActorKnowledge(campaign.id, actor);
+    const actorProjection = this.knowledgeBoundary.projectActor(campaign.id, actor);
     const authorizedKnowledge =
-      actorKnowledge.length === 0
+      actorProjection.entries.length === 0
         ? undefined
-        : this.knowledgeBoundary.projectActor(campaign.id, actor).entries.map((entry) => ({
+        : actorProjection.entries.map((entry) => ({
             targetKind: entry.targetKind,
             state: entry.state,
             statement: `${entry.subject} ${entry.predicate} ${JSON.stringify(entry.object)}`,
           }));
+    const currentActorMemories = actorProjection.memories.filter(
+      ({ id }) => this.memoryLayers.inspectLongTermMemory(id).status === 'CURRENT',
+    );
     const input = buildNpcDialogueContext(
       {
         world,
@@ -158,7 +169,10 @@ export class NpcDialogueUseCases {
         relationship,
         facts: this.worlds.listFacts(campaign.id),
         messages,
-        memories: this.npcs.listMemories(npc.id),
+        memories:
+          currentActorMemories.length === 0
+            ? this.npcs.listMemories(npc.id)
+            : currentActorMemories.map((memory) => ({ npcId: npc.id, summary: memory.summary })),
         playerMessage: command.playerMessage,
         ...(authorizedKnowledge === undefined ? {} : { authorizedKnowledge }),
       },
@@ -251,12 +265,25 @@ export class NpcDialogueUseCases {
     const transcriptHistory = this.conversations
       .listMessages(conversation.id)
       .map(({ role, content }) => `${role}: ${content}`);
-    if (transcriptHistory.length === 0 || command.sourceTurnIds.length === 0) {
+    if (
+      transcriptHistory.length === 0 ||
+      command.sourceTurnIds.length === 0 ||
+      (command.sourceKnowledgeIds.length === 0 && command.sourceEventIds.length === 0)
+    ) {
       throw new AIOrchestrationError(
         'MEMORY_SOURCE_EMPTY',
-        'Memory extraction requires transcript and source turn IDs',
+        'Memory extraction requires transcript, turn citations, and durable Actor sources',
       );
     }
+    const actor = { type: 'NPC' as const, id: npc.id };
+    this.memoryLayers.captureSources(
+      command.campaignId,
+      [
+        ...command.sourceKnowledgeIds.map((id) => ({ kind: 'KNOWLEDGE' as const, id })),
+        ...command.sourceEventIds.map((id) => ({ kind: 'GAME_EVENT' as const, id })),
+      ],
+      actor,
+    );
     const budget = contextBudgetForTask('EXTRACT_MEMORIES');
     const transcript = compressContextHistory(
       transcriptHistory,
@@ -299,11 +326,23 @@ export class NpcDialogueUseCases {
         });
       }),
     );
+    const longTermMemories = memories.map((memory) => ({
+      kind: 'MEMORY' as const,
+      id: memoryId(memory.id),
+      campaignId: command.campaignId,
+      actor,
+      summary: memory.summary,
+      sourceKnowledgeIds: command.sourceKnowledgeIds,
+      sourceEventIds: command.sourceEventIds,
+      revision: 1,
+      createdAt: timestamp,
+    }));
     try {
       this.requests.commitMemoriesOnce(
         command.idempotencyKey,
         command.campaignId,
         memories,
+        longTermMemories,
         timestamp,
       );
     } catch (error) {

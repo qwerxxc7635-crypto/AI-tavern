@@ -406,8 +406,28 @@ fn load_actor_memories(
     npc_id: &str,
 ) -> Result<Vec<String>, CampaignStoreError> {
     let mut statement = connection.prepare(
-        "SELECT summary FROM knowledge_memories
-         WHERE campaign_id = ?1 AND actor_type = 'NPC' AND actor_id = ?2
+        "SELECT memory.summary FROM knowledge_memories memory
+         WHERE memory.campaign_id = ?1 AND memory.actor_type = 'NPC' AND memory.actor_id = ?2
+         AND EXISTS (
+           SELECT 1 FROM memory_artifact_sources source
+           WHERE source.artifact_kind='LONG_TERM' AND source.artifact_id=memory.id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM memory_artifact_sources source
+           WHERE source.artifact_kind='LONG_TERM' AND source.artifact_id=memory.id AND (
+             (source.source_kind='KNOWLEDGE' AND NOT EXISTS (
+               SELECT 1 FROM actor_knowledge knowledge
+               WHERE knowledge.id=source.source_id AND knowledge.campaign_id=memory.campaign_id
+                 AND knowledge.actor_type=memory.actor_type AND knowledge.actor_id=memory.actor_id
+                 AND knowledge.revision=source.source_revision
+             )) OR
+             (source.source_kind='GAME_EVENT' AND NOT EXISTS (
+               SELECT 1 FROM game_events event
+               WHERE event.id=source.source_id AND event.campaign_id=memory.campaign_id
+                 AND event.schema_version=source.source_revision
+             )) OR source.source_kind NOT IN ('KNOWLEDGE','GAME_EVENT')
+           )
+         )
          ORDER BY created_at, id LIMIT 129",
     )?;
     let memories = statement
@@ -1253,6 +1273,23 @@ mod tests {
                    'TRUTH', 'truth-authorized', NULL, 'KNOWN', 'ACTOR_PRIVATE',
                    'LOCAL_RULE', 'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
                    '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO knowledge_memories (
+                   id,campaign_id,actor_type,actor_id,summary,source_knowledge_ids_json,
+                   source_event_ids_json,revision,created_at
+                 ) VALUES (
+                   'memory-authorized','campaign-dialogue','NPC','npc-owner',
+                   'The sealed route opens at moonrise.','[\"knowledge-authorized\"]','[]',1,
+                   '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO memory_artifact_sources (
+                   campaign_id,artifact_kind,artifact_id,ordinal,source_kind,source_id,
+                   source_revision,source_hash,source_occurred_at
+                 ) VALUES (
+                   'campaign-dialogue','LONG_TERM','memory-authorized',0,'KNOWLEDGE',
+                   'knowledge-authorized',1,
+                   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                   '2026-08-14T12:00:00.000Z'
                  );",
             )
             .expect("seed actor projection");
@@ -1269,9 +1306,26 @@ mod tests {
                 "statement": "sealed_route opens_at \"moonrise\""
             }])
         );
+        assert_eq!(
+            snapshot.generation_context["longTermMemories"],
+            json!(["The sealed route opens at moonrise."])
+        );
         let serialized = snapshot.generation_context.to_string();
         assert!(!serialized.contains("hidden succession"));
         assert!(!serialized.contains("cellar door is warm"));
+
+        let connection = store.connect().expect("connect for source update");
+        connection
+            .execute(
+                "UPDATE actor_knowledge SET revision=2,updated_at=?1 WHERE id='knowledge-authorized'",
+                ["2026-08-14T12:10:00.000Z"],
+            )
+            .expect("advance source revision");
+        drop(connection);
+        let stale = store
+            .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
+            .expect("exclude stale memory");
+        assert_eq!(stale.generation_context["longTermMemories"], json!([]));
     }
 
     #[test]

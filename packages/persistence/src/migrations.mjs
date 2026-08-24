@@ -152,6 +152,11 @@ const migrations = [
     name: 'director_budget',
     source: new URL('../../../database/migrations/0027_director_budget.sql', import.meta.url),
   },
+  {
+    version: 28,
+    name: 'memory_layers',
+    source: new URL('../../../database/migrations/0028_memory_layers.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

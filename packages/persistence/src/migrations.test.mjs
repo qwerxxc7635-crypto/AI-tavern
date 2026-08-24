@@ -35,11 +35,13 @@ const coreTables = [
   'faction_action_events',
   'game_events',
   'generation_records',
+  'historical_summaries',
   'items',
   'knowledge_claims',
   'knowledge_memories',
   'location_connections',
   'location_travel_events',
+  'memory_artifact_sources',
   'messages',
   'model_profiles',
   'npc_knowledge',
@@ -80,6 +82,7 @@ const coreTables = [
   'world_director_proposals',
   'world_director_runs',
   'world_facts',
+  'world_lore_entries',
   'world_random_streams',
   'world_seeds',
   'world_truths',
@@ -493,7 +496,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      27,
+      28,
     );
     const importedKnowledge = database
       .prepare(

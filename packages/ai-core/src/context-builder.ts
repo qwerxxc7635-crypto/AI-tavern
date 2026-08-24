@@ -6,8 +6,8 @@ import type {
   Clue,
   GameEvent,
   Message,
+  NpcId,
   NpcKnowledge,
-  NpcMemory,
   NpcProfile,
   NpcRelationship,
   PlayerCharacter,
@@ -142,7 +142,7 @@ export interface NpcDialogueContextSource {
   readonly relationship: NpcRelationship;
   readonly facts: readonly WorldFact[];
   readonly messages: readonly Message[];
-  readonly memories: readonly NpcMemory[];
+  readonly memories: readonly { readonly npcId: NpcId; readonly summary: string }[];
   readonly playerMessage: string;
   readonly authorizedKnowledge?: readonly {
     readonly targetKind: 'TRUTH' | 'CLAIM';
