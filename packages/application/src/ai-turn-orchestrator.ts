@@ -34,7 +34,11 @@ import {
   type TransactionalSqliteDatabase,
   type TurnCommit,
 } from '@ember-tavern/persistence';
-import { formatTaskPrompt, type FormattedTaskPrompt } from '@ember-tavern/prompts';
+import {
+  formatTaskPrompt,
+  stableWorldTruthsFromContext,
+  type FormattedTaskPrompt,
+} from '@ember-tavern/prompts';
 
 import { AITaskOrchestrator, type AIRouteKind } from './ai-task-orchestrator.js';
 
@@ -190,7 +194,9 @@ export class AITurnOrchestrator {
       selectedModelProfileId = selectedProfile.id;
       const formatted =
         command.formatPrompt?.(context, decision.model.capabilities) ??
-        formatTaskPrompt(command.task, context, decision.model.capabilities);
+        formatTaskPrompt(command.task, context, decision.model.capabilities, {
+          stableWorldTruths: stableWorldTruthsFromContext(contextAssembly),
+        });
       request = Object.freeze({
         requestId: command.requestId,
         task: command.task,

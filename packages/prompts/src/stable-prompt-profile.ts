@@ -1,12 +1,12 @@
-import { canonicalJson, type AITask } from '@ember-tavern/ai-core';
+import { canonicalJson, type AITask, type ContextAssembly } from '@ember-tavern/ai-core';
 import type { JsonValue, PromptVersion } from '@ember-tavern/contracts';
 
 import { BASE_RULES } from './base-rules.js';
 import type { TaskPromptDefinition } from './task-prompts.js';
 import type { ResolvedPromptPreset } from './prompt-manager.js';
 
-export const STABLE_PROMPT_PROFILE_ID = 'deepseek-v4-flash-prefix-v3';
-export const STABLE_PROMPT_PROFILE_VERSION = 3;
+export const STABLE_PROMPT_PROFILE_ID = 'deepseek-v4-flash-prefix-v4';
+export const STABLE_PROMPT_PROFILE_VERSION = 4;
 
 export const STABLE_PROMPT_SECTION_KINDS = [
   'SYSTEM_CONTRACT',
@@ -104,6 +104,43 @@ export function renderStablePromptProfile(profile: StablePromptProfile): string 
     .join('\n\n');
 }
 
+/**
+ * Projects only authoritative stable rule blocks into the Provider prefix.
+ * Volatile block identity, source identity, private knowledge and dynamic input
+ * are deliberately excluded. A source revision remains part of the bytes so a
+ * changed Constitution cannot accidentally reuse an earlier prefix identity.
+ */
+export function stableWorldTruthsFromContext(assembly: ContextAssembly): JsonValue {
+  return freezeJson({
+    blocks: assembly.blocks
+      .filter(({ stability, type }) => stability === 'stable' && type === 'rules')
+      .map(({ type, sourceRevision, version, content }) => ({
+        type,
+        sourceRevision,
+        version,
+        content: projectStableJson(content) ?? null,
+      })),
+  });
+}
+
+function projectStableJson(value: JsonValue): JsonValue | undefined {
+  if (typeof value === 'string') return isUuid(value) ? undefined : value;
+  if (value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      const projected = projectStableJson(entry);
+      return projected === undefined ? [] : [projected];
+    });
+  }
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, entry]) => {
+      if (isForbiddenStableKey(key)) return [];
+      const projected = projectStableJson(entry);
+      return projected === undefined ? [] : [[key, projected]];
+    }),
+  );
+}
+
 function assertStableWorldTruths(value: JsonValue): void {
   visitStableValue(value, '$');
 }
@@ -119,19 +156,27 @@ function visitStableValue(value: JsonValue, path: string): void {
     return;
   }
   for (const [key, entry] of Object.entries(value)) {
-    const normalized = key.replaceAll(/[^a-z0-9]/gi, '').toLowerCase();
-    if (
-      normalized.includes('timestamp') ||
-      normalized.includes('requestid') ||
-      normalized === 'uuid' ||
-      normalized.includes('transienterror') ||
-      normalized.includes('cachemetric') ||
-      normalized.includes('uidebug')
-    ) {
+    if (isForbiddenStableKey(key)) {
       throw new TypeError(`${path}.${key} is not allowed in the stable prompt prefix`);
     }
     visitStableValue(entry, `${path}.${key}`);
   }
+}
+
+function isForbiddenStableKey(key: string): boolean {
+  const normalized = key.replaceAll(/[^a-z0-9]/gi, '').toLowerCase();
+  return (
+    normalized.includes('timestamp') ||
+    normalized.includes('requestid') ||
+    normalized === 'uuid' ||
+    normalized === 'createdat' ||
+    normalized === 'updatedat' ||
+    normalized === 'lockedat' ||
+    normalized === 'recordedat' ||
+    normalized.includes('transienterror') ||
+    normalized.includes('cachemetric') ||
+    normalized.includes('uidebug')
+  );
 }
 
 function isUuid(value: string): boolean {

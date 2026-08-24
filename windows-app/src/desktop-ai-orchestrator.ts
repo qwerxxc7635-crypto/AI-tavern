@@ -12,6 +12,7 @@ import {
   type AITask,
   type Generator,
   type GeneratorAuditEntry,
+  type ContextAssembly,
   type ModelInfo,
   type NormalizedAIRequest,
   type NormalizedAIResponse,
@@ -22,6 +23,7 @@ import {
   formatOutputRepairPrompt,
   formatTaskPrompt,
   renderStablePromptProfile,
+  stableWorldTruthsFromContext,
   type ResolvedPromptPreset,
 } from '@ember-tavern/prompts';
 import { recordContextAssemblyInspection } from './context-inspector-service.js';
@@ -122,12 +124,14 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
             },
           };
     let contextInput: unknown;
+    let contextAssembly: ContextAssembly;
     try {
       const prepared = await buildUnifiedTaskContext(task, input, {
         sourceId: `windows:${task}`,
         sourceRevision: 1,
       });
       contextInput = prepared.content;
+      contextAssembly = prepared.assembly;
       recordContextAssemblyInspection(task, prepared.assembly);
     } catch (error) {
       throw preserveOrchestrationError(error, 'CONTEXT_PREPARATION_FAILED');
@@ -151,6 +155,7 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
         selections.primary,
         task,
         contextInput,
+        contextAssembly,
         executionOptions,
         userPreset,
       );
@@ -160,6 +165,7 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
         selections.fallback,
         task,
         contextInput,
+        contextAssembly,
         executionOptions,
         userPreset,
       );
@@ -170,6 +176,7 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
     selection: RuntimeSelection,
     task: AITask,
     input: unknown,
+    contextAssembly: ContextAssembly,
     options: DesktopAIExecuteOptions,
     userPreset: ResolvedPromptPreset | null,
   ): Promise<DesktopAIExecution> {
@@ -184,7 +191,7 @@ export class DesktopAIOrchestrator implements DesktopAIEngine {
         },
       }).run(
         generator,
-        { selection, task, input, options, userPreset },
+        { selection, task, input, contextAssembly, options, userPreset },
         { executionId: options.requestId, idempotencyKey: options.requestId },
       );
       const execution = Object.freeze({ ...result.value, lifecycle: result.audit });
@@ -224,6 +231,7 @@ interface DesktopGeneratorInput {
   readonly selection: RuntimeSelection;
   readonly task: AITask;
   readonly input: unknown;
+  readonly contextAssembly: ContextAssembly;
   readonly options: DesktopAIExecuteOptions;
   readonly userPreset: ResolvedPromptPreset | null;
 }
@@ -279,6 +287,7 @@ class DesktopStructuredGenerator implements Generator<
     let cachePrefixHash: string;
     try {
       prompt = formatTaskPrompt(context.task, context.input, context.selection.model.capabilities, {
+        stableWorldTruths: stableWorldTruthsFromContext(context.contextAssembly),
         userPreset: context.userPreset,
       });
       cachePrefixHash = await sha256(renderStablePromptProfile(prompt.stableProfile));
@@ -373,7 +382,10 @@ class DesktopStructuredGenerator implements Generator<
       raw.response.content,
       error.validation,
       prepared.selection.model.capabilities,
-      { userPreset: prepared.userPreset },
+      {
+        stableWorldTruths: stableWorldTruthsFromContext(prepared.contextAssembly),
+        userPreset: prepared.userPreset,
+      },
     );
     const request: NormalizedAIRequest = {
       ...raw.request,

@@ -3138,3 +3138,26 @@ NPC回复与世界介绍已有完整结构化生成、验证和SQLite提交合�
 - Repair不流式展示；完整final仍可进入既有一次repair边界。
 - 不修改Rules/D20、Queue、Constitution、Quest/NPC/Adventure业务语义，不进入M10-T04。
 - 新UX复用ActionComposer及现有stream样式；视觉手册全局有效，Legacy全面迁移仍由M10-T07执行。
+
+## DEC-147：缓存身份绑定实际稳定规则字节，Provider 与会话证据分离
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T04`、`DEC-067`～`DEC-070`、[`V0.3_CACHE_OPTIMIZATION.md`](V0.3_CACHE_OPTIMIZATION.md)
+
+### 背景
+
+桌面主调用链原先只对 Stable Prompt Profile 计算哈希，Unified Context 的 Constitution/locked rules 仍只存在于完整 Task Input；旧 Context Cache Layout 也没有接入该生产链。相同哈希因此不能完整表达应用期望稳定的 Constitution/Rules/Prompt。另一方面，会话中重复出现同一哈希只能证明本机见过该前缀，不能证明 Provider 计费缓存命中。
+
+### 决定与理由
+
+Stable Profile v4 从已完成知识授权与预算的 Unified Context 中，只投影 `stable/rules` block。投影包含规范内容、source revision 和block version，不包含随机block/source ID；UUID、时间、request/cache/UI元数据被排除。完整原输入继续位于动态尾部，因而优化不会删除正确上下文。桌面primary/fallback/repair冻结并复用同一assembly，Application默认turn formatter使用同一投影。
+
+DeepSeek usage明确返回的hit/miss是唯一Provider observation，并继续有界持久化200项。进程内另设只含hash的200项LRU，输出`PREFIX_FIRST_SEEN/PREFIX_REUSED`且明确标记session observation。AI Inspector分别显示两者，并保留token/latency的unknown语义。
+
+### 影响与边界
+
+- Profile/Prompt Manager、Constitution revision或稳定规则变化会失效；Recent、Action与私密Knowledge变化不污染稳定前缀。
+- prefix hash描述应用控制并实际发送的UTF-8稳定内容，不伪造Provider线路角色封装或计费结果。
+- 缓存指标仍是device telemetry，不进入SQLite游戏事实或portable archive；不新增schema。
+- 本任务不修改Rules/D20、Provider协议、Queue、Quest/NPC/Adventure或Save合同；M10-T05仍是下一任务。

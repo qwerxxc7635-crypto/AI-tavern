@@ -230,8 +230,12 @@ function AIInspectorPanel({ gateway }: { readonly gateway: AIInspectorGateway })
               <dd>{snapshot.latencyMs} 毫秒</dd>
             </div>
             <div>
-              <dt>缓存</dt>
-              <dd>{snapshot.cache.observation}</dd>
+              <dt>Provider 缓存</dt>
+              <dd>{snapshot.cache.providerObservation}</dd>
+            </div>
+            <div>
+              <dt>会话前缀观测</dt>
+              <dd>{snapshot.cache.sessionObservation}</dd>
             </div>
             <div>
               <dt>令牌</dt>

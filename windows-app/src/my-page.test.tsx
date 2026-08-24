@@ -153,7 +153,11 @@ describe('My page information architecture', () => {
       generation: { task: 'NPC_REPLY', status: 'FAILED', errorCode: 'INVALID_OUTPUT' },
       provider: { id: 'provider-main', displayName: '主模型', model: 'model-main' },
       latencyMs: 120,
-      cache: { observation: 'MISS', prefixHash: '0123456789ab' },
+      cache: {
+        providerObservation: 'MISS',
+        sessionObservation: 'PREFIX_REUSED',
+        prefixHash: '0123456789ab',
+      },
       tokens: { input: 90, output: 10, total: 100, cacheHit: 0, cacheMiss: 90 },
       context: null,
       prompt: [{ role: 'USER', characters: 200, content: '［提示内容已遮罩］' }],

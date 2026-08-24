@@ -75,7 +75,11 @@ describe('AI inspector service', () => {
     const snapshot = await sessionAIInspectorGateway.load('ADVANCED');
     expect(snapshot).toMatchObject({
       latencyMs: 125,
-      cache: { observation: 'HIT', prefixHash: 'aaaaaaaaaaaa' },
+      cache: {
+        providerObservation: 'HIT',
+        sessionObservation: 'PREFIX_FIRST_SEEN',
+        prefixHash: 'aaaaaaaaaaaa',
+      },
       tokens: { input: 90, output: 20, total: 110, cacheHit: 50, cacheMiss: 0 },
       validation: { status: 'PASSED' },
       repair: { attempted: true, status: 'SUCCEEDED' },
@@ -83,6 +87,28 @@ describe('AI inspector service', () => {
     expect(snapshot?.lifecycle).toHaveLength(2);
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot?.parsed)).toBe(true);
+  });
+
+  it('labels repeated session prefixes without claiming a Provider cache hit', async () => {
+    const input = successInput();
+    await recordAIInspectionSuccess({
+      ...input,
+      response: {
+        ...input.response,
+        usage: { ...input.response.usage, promptCacheHitTokens: null, promptCacheMissTokens: null },
+      },
+    });
+    await recordAIInspectionSuccess({
+      ...input,
+      response: {
+        ...input.response,
+        usage: { ...input.response.usage, promptCacheHitTokens: null, promptCacheMissTokens: null },
+      },
+    });
+    expect((await sessionAIInspectorGateway.load('ADVANCED'))?.cache).toMatchObject({
+      providerObservation: 'UNKNOWN',
+      sessionObservation: 'PREFIX_REUSED',
+    });
   });
 
   it('keeps empty and failed records diagnosable with bounded validation details', async () => {

@@ -242,6 +242,32 @@ describe('DesktopAIOrchestrator', () => {
     expect(first.request.messages).not.toEqual(second.request.messages);
   });
 
+  it('keeps stable rules in the prefix and invalidates it when those rules change', async () => {
+    const orchestrator = new DesktopAIOrchestrator(
+      new MutableSettings(profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash')),
+      new CapturingProvider(),
+    );
+    const first = await orchestrator.execute(
+      'CHECK_CONSISTENCY',
+      consistencyInput(['死亡结果不可刷新'], '玩家查看门锁。'),
+      options('stable-rules-a'),
+    );
+    const dynamicChange = await orchestrator.execute(
+      'CHECK_CONSISTENCY',
+      consistencyInput(['死亡结果不可刷新'], '玩家离开酒馆。'),
+      options('stable-rules-b'),
+    );
+    const ruleChange = await orchestrator.execute(
+      'CHECK_CONSISTENCY',
+      consistencyInput(['死亡结果不可刷新', '低魔法世界'], '玩家离开酒馆。'),
+      options('stable-rules-c'),
+    );
+
+    expect(dynamicChange.cachePrefixHash).toBe(first.cachePrefixHash);
+    expect(ruleChange.cachePrefixHash).not.toBe(first.cachePrefixHash);
+    expect(first.request.messages[0]?.content).toContain('[STABLE_WORLD_TRUTHS]');
+  });
+
   it('changes the cache revision for user guidance without changing core prompt order', async () => {
     const settings = new MutableSettings(
       profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
@@ -557,6 +583,22 @@ function worldInput(concept: string) {
       allowBetrayal: true,
       excludedContent: [],
     },
+  };
+}
+
+function consistencyInput(lockedRules: readonly string[], proposedContent: string) {
+  return {
+    world: {
+      name: '暮湾',
+      currentRegion: '旧港',
+      summary: '潮雾笼罩的低魔港城。',
+      coreConflict: '守灯人与走私者争夺旧航道。',
+      technologyLevel: '铁器时代',
+      powerRules: ['魔法稀少且代价明确。'],
+    },
+    lockedRules,
+    knownFacts: ['旧灯塔仍在运转。'],
+    proposedContent,
   };
 }
 

@@ -507,12 +507,13 @@
 
 ## M10-T04 Cache Optimization
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M10-T03。
 - **Deliverable**：Constitution/Rules/Prompt 稳定前缀、动态尾部、指标和基线对比。
 - **Acceptance**：相同稳定输入字节一致；动态行动不污染前缀；真实 Provider 指标与会话观察明确区分。
 - **Tests**：byte stability、revision invalidation、privacy、metric cap、real-provider test opt-in。
 - **Do Not**：不为命中牺牲正确上下文；不虚报 Provider cache。
+- **Implementation reference**：[`V0.3_CACHE_OPTIMIZATION.md`](V0.3_CACHE_OPTIMIZATION.md)。
 
 ## M10-T05 V0.3 Save Schema & Migration
 

@@ -4640,3 +4640,26 @@
 
 - `M10-T03`实现与完整门禁完成；本地提交前不进入`M10-T04 Cache Optimization`。
 - 用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T04 完成 Cache Optimization
+
+### 边界与实现
+
+- 在分支`task/M10-T04-cache-optimization`、起始提交`d14b0db`上继续；未回滚或重做M0～M10-T03，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T05，未新增SQLite schema，也未修改Rules、D20、Queue、Quest/NPC/Adventure或存档业务合同。
+- Stable Prompt Profile推进到v4。Desktop primary/fallback/repair与Application默认turn formatter从同一次Unified Context assembly投影`stable/rules`，将Constitution/locked rules的规范内容、source revision和block version加入实际稳定前缀；随机ID、UUID、墙钟、request/cache/UI元数据、Actor Knowledge、Recent与Action均不进入。
+- 完整原任务输入仍保留在动态尾部，不以缓存命中牺牲正确上下文。相同稳定语义生成逐字节一致前缀；Prompt Manager、Profile、Constitution revision或规则内容变化会失效。
+- AI Inspector把Provider明确usage得到的`HIT/MISS/UNKNOWN`与进程内`PREFIX_FIRST_SEEN/PREFIX_REUSED`分字段展示。会话LRU只保留200个hash；DeepSeek设备指标继续原子保留最近200项且不保存Prompt、message、request ID、credential或玩家输入。
+- 指标白名单补齐Quick Character、Advanced Edit与Dialogue Suggestions。Rust专项测试暴露ratio经JSON往返后严格浮点相等可能误拒绝合法指标，修为只接受`f64::EPSILON`内序列化误差，整数hit/miss与计算语义保持严格。
+- 新增[`V0.3_CACHE_OPTIMIZATION.md`](V0.3_CACHE_OPTIMIZATION.md)与`DEC-147`，更新V0.3 Spec和任务引用。视觉手册继续全局有效；本任务只在既有AI Inspector指标区增加证据标签，复用现有组件/Token，没有Legacy逐页返工，M10-T07收敛顺序不变。
+
+### 性能与真实Provider证据
+
+- 使用M1-T04同一Fake Provider schema每任务10次重跑：World P50/P95 0.120/2.294 ms、NPC 0.204/1.845、Quest 0.061/0.601、Action 0.096/1.237、D20 0.032/0.241。两轮均保留受控Quest failure与Action retry；token/cache为unknown，未伪造0，单机微秒级差异不宣称性能改善或回归。
+- 真实DeepSeek测试继续是显式API Key opt-in的ignored test，覆盖相同stable system、不同dynamic input、同prefix hash、Provider hit token与SQLite重开。常规门禁未读取Key、未调用真实Provider，真实验证状态为NOT_RUN。
+
+### 验证
+
+- 专项测试覆盖stable byte equality、动态行动隔离、Constitution revision失效、UUID/时间/private knowledge隐私、桌面生产请求、Prompt Manager失效、session/Provider证据分离及TypeScript/Rust/session三处200项上限。
+- `pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 181 files / 1015 tests通过，另1 file / 1 test性能runner按设计跳过；Node 29 tests通过。Rust workspace 142 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；archive interop通过。
+- 额外独立复验rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换280 modules。自审确认primary/fallback/repair复用同一稳定assembly、无Prompt/credential持久化、无动态行动进入prefix、无Provider cache虚报。
+- M10-T04完成后下一项严格为M10-T05，本次未开始；用户`.gitignore`保持未暂存，不merge、不push。

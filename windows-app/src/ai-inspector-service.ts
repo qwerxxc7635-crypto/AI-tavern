@@ -9,6 +9,7 @@ import {
   sessionContextInspectorGateway,
   type ContextInspectorSnapshot,
 } from './context-inspector-service.js';
+import { SessionCachePrefixTracker, type SessionCacheObservation } from './cache-observation.js';
 
 export const AI_INSPECTOR_MODES = ['PLAYER', 'ADVANCED', 'DEVELOPER'] as const;
 export type AIInspectorMode = (typeof AI_INSPECTOR_MODES)[number];
@@ -32,7 +33,8 @@ export interface AIInspectorSnapshot {
   };
   readonly latencyMs: number;
   readonly cache: {
-    readonly observation: 'HIT' | 'MISS' | 'UNKNOWN';
+    readonly providerObservation: 'HIT' | 'MISS' | 'UNKNOWN';
+    readonly sessionObservation: SessionCacheObservation | 'UNKNOWN';
     readonly prefixHash: string | null;
   };
   readonly tokens: {
@@ -114,6 +116,7 @@ const INLINE_SECRET =
 const JSON_SECRET_VALUE =
   /("(?:api.?key|authorization|access.?token|secret|password|cookie|credential|world.?truth|hidden|unrevealed)[^"]*"\s*:\s*)"(?:[^"\\]|\\.)*"/giu;
 const inspections: InspectionDraft[] = [];
+const sessionCachePrefixes = new SessionCachePrefixTracker();
 
 export const sessionAIInspectorGateway: AIInspectorGateway = {
   async load(mode) {
@@ -152,7 +155,8 @@ export async function recordAIInspectionSuccess(input: RecordAIInspectionSuccess
         }),
         latencyMs: boundedLatency(input.latencyMs),
         cache: Object.freeze({
-          observation: cacheObservation(input.response),
+          providerObservation: cacheObservation(input.response),
+          sessionObservation: sessionCachePrefixes.observe(input.cachePrefixHash),
           prefixHash: boundedHash(input.cachePrefixHash),
         }),
         tokens: tokenProjection(input.response),
@@ -192,7 +196,11 @@ export async function recordAIInspectionFailure(input: RecordAIInspectionFailure
           model: optionalBoundedText(input.model),
         }),
         latencyMs: boundedLatency(input.latencyMs),
-        cache: Object.freeze({ observation: 'UNKNOWN', prefixHash: null }),
+        cache: Object.freeze({
+          providerObservation: 'UNKNOWN',
+          sessionObservation: 'UNKNOWN',
+          prefixHash: null,
+        }),
         tokens: emptyTokens(),
         context,
         prompt:
@@ -209,6 +217,7 @@ export async function recordAIInspectionFailure(input: RecordAIInspectionFailure
 
 export function resetAIInspectorForTests(): void {
   inspections.length = 0;
+  sessionCachePrefixes.reset();
 }
 
 function append(draft: InspectionDraft): void {
@@ -345,7 +354,7 @@ function boundedLifecycle(entries: readonly GeneratorAuditEntry[]): readonly Gen
 
 function cacheObservation(
   response: NormalizedAIResponse,
-): AIInspectorSnapshot['cache']['observation'] {
+): AIInspectorSnapshot['cache']['providerObservation'] {
   if ((response.usage.promptCacheHitTokens ?? 0) > 0) return 'HIT';
   if ((response.usage.promptCacheMissTokens ?? 0) > 0) return 'MISS';
   return 'UNKNOWN';

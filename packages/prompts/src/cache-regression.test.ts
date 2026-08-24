@@ -13,6 +13,8 @@ import {
   promptCachePrefixHash,
   renderContextCacheLayout,
   renderPromptCachePrefix,
+  renderStablePromptProfile,
+  stableWorldTruthsFromContext,
 } from './index.js';
 
 const schema = { properties: { answer: { type: 'string' } }, type: 'object' } as const;
@@ -69,7 +71,89 @@ describe('DeepSeek cache regression', () => {
     expect(updated.promptVersion).toBe(6);
     expect(updatedHash).not.toBe(currentHash);
   });
+
+  it('projects stable rules byte-identically while excluding private dynamic context', async () => {
+    const first = await stableAssembly('volatile-a', 7, 'Ask about the cellar.', 'private-a');
+    const second = await stableAssembly('volatile-b', 7, 'Leave the tavern.', 'private-b');
+    const firstTruths = stableWorldTruthsFromContext(first);
+    const secondTruths = stableWorldTruthsFromContext(second);
+
+    expect(canonical(firstTruths)).toBe(canonical(secondTruths));
+    expect(canonical(firstTruths)).not.toMatch(/volatile|cellar|tavern|private/u);
+    const firstProfile = createStablePromptProfile(TASK_PROMPTS.NPC_REPLY, schema, firstTruths);
+    const secondProfile = createStablePromptProfile(TASK_PROMPTS.NPC_REPLY, schema, secondTruths);
+    expect(renderStablePromptProfile(firstProfile)).toBe(renderStablePromptProfile(secondProfile));
+  });
+
+  it('invalidates stable prefix bytes when the Constitution revision changes', async () => {
+    const first = stableWorldTruthsFromContext(
+      await stableAssembly('volatile-a', 7, 'Wait.', 'private-a'),
+    );
+    const revised = stableWorldTruthsFromContext(
+      await stableAssembly('volatile-b', 8, 'Wait.', 'private-a'),
+    );
+    expect(canonical(first)).not.toBe(canonical(revised));
+  });
 });
+
+function canonical(value: unknown): string {
+  return JSON.stringify(value);
+}
+
+async function stableAssembly(
+  volatileIdentity: string,
+  constitutionRevision: number,
+  actionText: string,
+  privateKnowledge: string,
+) {
+  const rules = await createContextBlock({
+    id: `rules-${volatileIdentity}`,
+    type: 'rules',
+    content: {
+      constitution: {
+        campaignId: '123e4567-e89b-42d3-a456-426614174000',
+        createdAt: '2026-08-24T00:00:00.000Z',
+        revision: constitutionRevision,
+        magic: 'LOW',
+      },
+    },
+    sourceId: `campaign-${volatileIdentity}`,
+    sourceRevision: constitutionRevision,
+    stability: 'stable',
+    priority: 100,
+    tokenBudget: 200,
+    privacyClass: 'game_private',
+    version: 1,
+  });
+  const knowledge = await createContextBlock({
+    id: `knowledge-${volatileIdentity}`,
+    type: 'knowledge',
+    content: { knowledge: privateKnowledge },
+    sourceId: `actor-${volatileIdentity}`,
+    sourceRevision: 1,
+    stability: 'semi_stable',
+    priority: 50,
+    tokenBudget: 200,
+    privacyClass: 'secret',
+    version: 1,
+  });
+  const action = await createContextBlock({
+    id: `action-${volatileIdentity}`,
+    type: 'action',
+    content: { action: actionText },
+    sourceId: `turn-${volatileIdentity}`,
+    sourceRevision: 1,
+    stability: 'dynamic',
+    priority: 10,
+    tokenBudget: 200,
+    privacyClass: 'game_private',
+    version: 1,
+  });
+  return assembleContextBlocks(
+    [rules, knowledge, action].map((block) => ({ block, relevance: 1, required: true })),
+    { maxTokens: 1_000, typeOrder: ['rules', 'knowledge', 'action'] },
+  );
+}
 
 async function layout(
   randomId: string,

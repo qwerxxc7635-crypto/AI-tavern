@@ -15,6 +15,7 @@ export {
   STABLE_PROMPT_SECTION_KINDS,
   createStablePromptProfile,
   renderStablePromptProfile,
+  stableWorldTruthsFromContext,
 } from './stable-prompt-profile.js';
 export type {
   StablePromptProfile,
