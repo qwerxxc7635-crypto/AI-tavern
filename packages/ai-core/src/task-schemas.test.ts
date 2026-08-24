@@ -739,18 +739,19 @@ describe('versioned AI task schemas', () => {
           ? 4
           : task === 'NPC_REPLY'
             ? 4
-            : [
-                  'GENERATE_WORLD',
-                  'REFINE_WORLD',
-                  'GENERATE_CHARACTER_TRAITS',
-                  'COMPLETE_CHARACTER_BACKGROUND',
-                  'GENERATE_QUEST',
-                  'GENERATE_WORLD_EVENT',
-                  'SUMMARIZE_ADVENTURE',
-                  'RESOLVE_DICE_RESULT',
-                ].includes(task)
-              ? 2
-              : 1;
+            : task === 'GENERATE_QUEST'
+              ? 3
+              : [
+                    'GENERATE_WORLD',
+                    'REFINE_WORLD',
+                    'GENERATE_CHARACTER_TRAITS',
+                    'COMPLETE_CHARACTER_BACKGROUND',
+                    'GENERATE_WORLD_EVENT',
+                    'SUMMARIZE_ADVENTURE',
+                    'RESOLVE_DICE_RESULT',
+                  ].includes(task)
+                ? 2
+                : 1;
     expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);

@@ -812,6 +812,58 @@ export const GenerateQuestInputSchema = z
     playerConcept: text,
     recentQuestTitles: z.array(shortText).max(20),
     recentQuestStructures: z.array(shortText).max(20),
+    dynamicSource: z
+      .object({
+        kind: z.enum([
+          'NPC',
+          'FACTION',
+          'WORLD_EVENT',
+          'DISCOVERY',
+          'PLAYER_ACTION',
+          'CONSEQUENCE',
+        ]),
+        occurrenceId: identifier,
+        entityKind: z.enum([
+          'NPC',
+          'FACTION',
+          'GAME_EVENT',
+          'WORLD_FACT',
+          'PLAYER_ACTION',
+          'QUEST_GRAPH',
+        ]),
+        entityId: identifier,
+        summary: text,
+        actorNpcId: identifier.nullable(),
+        visibility: z.enum(['PLAYER_VISIBLE', 'HIDDEN']),
+        playerIntervened: z.boolean(),
+      })
+      .strict()
+      .optional(),
+    relevantFacts: z
+      .array(z.object({ id: identifier, statement: text }).strict())
+      .max(20)
+      .optional(),
+    constitution: z
+      .object({
+        revision: z.number().int().positive(),
+        technology: text,
+        magic: text,
+        society: text,
+        politics: text,
+        economy: text,
+        taboos: stringList,
+      })
+      .strict()
+      .optional(),
+    generationBudget: z
+      .object({
+        policyVersion: z.literal(1),
+        openQuestLimit: z.number().int().positive(),
+        currentOpenQuests: z.number().int().nonnegative(),
+        remainingSlots: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export const GenerateQuestOutputSchema = z

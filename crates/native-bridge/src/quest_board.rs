@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use rusqlite::{Connection, OptionalExtension, Transaction, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -96,31 +98,31 @@ pub struct QuestGenerationCommit {
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
-struct QuestContent {
-    title: String,
-    summary: String,
-    objective: String,
+pub(crate) struct QuestContent {
+    pub(crate) title: String,
+    pub(crate) summary: String,
+    pub(crate) objective: String,
     #[serde(rename = "failureCost")]
-    failure_cost: String,
+    pub(crate) failure_cost: String,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct QuestOutput {
-    content: QuestContent,
-    risk: String,
-    recommended_attributes: Vec<String>,
-    expected_turns: TurnRange,
-    reward_tier: String,
-    related_npc_ids: Vec<String>,
-    related_fact_ids: Vec<String>,
+pub(crate) struct QuestOutput {
+    pub(crate) content: QuestContent,
+    pub(crate) risk: String,
+    pub(crate) recommended_attributes: Vec<String>,
+    pub(crate) expected_turns: TurnRange,
+    pub(crate) reward_tier: String,
+    pub(crate) related_npc_ids: Vec<String>,
+    pub(crate) related_fact_ids: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct TurnRange {
-    min: i64,
-    max: i64,
+pub(crate) struct TurnRange {
+    pub(crate) min: i64,
+    pub(crate) max: i64,
 }
 
 impl CampaignStore {
@@ -288,16 +290,50 @@ pub(crate) fn load_snapshot(
     campaign_id: &str,
 ) -> Result<QuestBoardSnapshot, CampaignStoreError> {
     let campaign_state = require_tavern_campaign(connection, campaign_id)?;
+    let quests = load_quests(connection, campaign_id)?;
+    let visible_quest_ids = quests
+        .iter()
+        .map(|quest| quest.id.as_str())
+        .collect::<HashSet<_>>();
+    let mut graph = load_quest_graph_snapshot(connection, campaign_id)?;
+    graph.edges.retain(|edge| {
+        visible_quest_ids.contains(edge.target_quest_id.as_str())
+            && (edge.source_kind != "QUEST" || visible_quest_ids.contains(edge.source_id.as_str()))
+    });
+    let visible_edge_ids = graph
+        .edges
+        .iter()
+        .map(|edge| edge.id.as_str())
+        .collect::<HashSet<_>>();
+    graph.evaluations.retain_mut(|evaluation| {
+        if evaluation.trigger_kind == "QUEST_TRANSITION"
+            && !visible_quest_ids.contains(evaluation.trigger_id.as_str())
+        {
+            return false;
+        }
+        evaluation
+            .evaluated_edge_ids
+            .retain(|edge_id| visible_edge_ids.contains(edge_id.as_str()));
+        evaluation
+            .changes
+            .retain(|change| visible_quest_ids.contains(change.quest_id.as_str()));
+        for change in &mut evaluation.changes {
+            change
+                .edge_ids
+                .retain(|edge_id| visible_edge_ids.contains(edge_id.as_str()));
+        }
+        true
+    });
     Ok(QuestBoardSnapshot {
         campaign_id: campaign_id.to_owned(),
         campaign_state,
         source: load_source(connection, campaign_id)?,
-        quests: load_quests(connection, campaign_id)?,
-        graph: load_quest_graph_snapshot(connection, campaign_id)?,
+        quests,
+        graph,
     })
 }
 
-fn load_source(
+pub(crate) fn load_source(
     connection: &Connection,
     campaign_id: &str,
 ) -> Result<QuestGenerationSource, CampaignStoreError> {
@@ -407,7 +443,7 @@ fn load_quests(
          FROM quests q
          JOIN npcs n ON n.id = q.publisher_npc_id
          JOIN quest_pool_states pool ON pool.quest_id=q.id AND pool.campaign_id=q.campaign_id
-         WHERE q.campaign_id = ?1
+         WHERE q.campaign_id = ?1 AND pool.status <> 'HIDDEN'
          ORDER BY q.created_at, q.id",
     )?;
     Ok(statement
@@ -458,7 +494,7 @@ fn require_tavern_campaign(
     }
 }
 
-fn validate_audit(audit: &TavernGenerationAudit) -> Result<(), CampaignStoreError> {
+pub(crate) fn validate_audit(audit: &TavernGenerationAudit) -> Result<(), CampaignStoreError> {
     validate_id(&audit.request_id)?;
     validate_id(&audit.generation_record_id)?;
     validate_id(&audit.idempotency_key)?;
@@ -479,7 +515,7 @@ fn validate_audit(audit: &TavernGenerationAudit) -> Result<(), CampaignStoreErro
     Ok(())
 }
 
-fn validate_output(output: &QuestOutput) -> Result<(), CampaignStoreError> {
+pub(crate) fn validate_output(output: &QuestOutput) -> Result<(), CampaignStoreError> {
     for value in [
         &output.content.title,
         &output.content.summary,
@@ -560,7 +596,7 @@ fn validate_text(value: &str, max: usize) -> Result<(), CampaignStoreError> {
     }
 }
 
-fn insert_generation(
+pub(crate) fn insert_generation(
     transaction: &Transaction<'_>,
     campaign_id: &str,
     audit: &TavernGenerationAudit,
@@ -646,7 +682,9 @@ fn from_json<T: for<'de> Deserialize<'de>>(value: String) -> rusqlite::Result<T>
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::QuestPoolTransitionCommand;
+    use crate::{
+        DynamicQuestCommitCommand, DynamicQuestPrepareCommand, QuestPoolTransitionCommand,
+    };
 
     #[test]
     fn generates_two_quests_accepts_one_and_restores_after_reopen() {
@@ -836,6 +874,220 @@ mod tests {
                 .len(),
             1
         );
+    }
+
+    #[test]
+    fn dynamic_player_and_hidden_consequence_quests_dedupe_and_survive_reopen_privately() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let path = directory.path().join("dynamic-quests.sqlite");
+        let store = CampaignStore::open(&path).expect("open");
+        seed_board(&store);
+        store
+            .connect()
+            .expect("connect")
+            .execute_batch(
+                "INSERT INTO world_constitutions (
+                   campaign_id,schema_version,revision,status,world_type,era,technology,magic,
+                   peoples_json,society,politics,economy,combat_scale,death_rules,career_rules,
+                   equipment_rules,npc_rules,trait_rules,taboos_json,created_at,updated_at,locked_at
+                 ) VALUES (
+                   'campaign-quests',1,1,'LOCKED','Fantasy','Old','Late medieval','Rare','[]',
+                   'Guild towns','Harbor councils','Coin and barter','Local','Mortal','Open',
+                   'Grounded','Persistent','Balanced','[\"No resurrection\"]',
+                   '2026-07-31T06:00:00.000Z','2026-07-31T06:00:00.000Z',
+                   '2026-07-31T06:00:00.000Z'
+                 );
+                 INSERT INTO game_events(id,campaign_id,schema_version,type,payload_json,occurred_at)
+                 VALUES (
+                   'event-player-action','campaign-quests',1,'PLAYER_ACTION_SUBMITTED',
+                   '{\"adventureId\":\"adventure-one\",\"turnId\":\"turn-one\",\"action\":{\"mode\":\"ACTION\",\"text\":\"Protect the beacon road\"}}',
+                   '2026-07-31T06:10:00.000Z'
+                 );
+                 INSERT INTO quest_graph_evaluations(
+                   operation_id,campaign_id,graph_revision,trigger_kind,trigger_id,
+                   evaluated_edge_ids_json,changes_json,occurred_at
+                 ) VALUES (
+                   'consequence-one','campaign-quests',1,'MANUAL_REEVALUATION','world-change-one',
+                   '[]','[{\"questId\":\"future\",\"fromStatus\":\"ACTIVE\",\"toStatus\":\"FAILED\",\"edgeIds\":[]}]',
+                   '2026-07-31T06:11:00.000Z'
+                 );",
+            )
+            .expect("seed dynamic sources");
+
+        let player = store
+            .prepare_dynamic_quest(DynamicQuestPrepareCommand {
+                campaign_id: "campaign-quests".to_owned(),
+                source_kind: "PLAYER_ACTION".to_owned(),
+                occurrence_id: "event-player-action".to_owned(),
+            })
+            .expect("prepare player source");
+        let player_command = dynamic_command(&player, "player", dynamic_output(1));
+        let visible = store
+            .commit_dynamic_quest(player_command)
+            .expect("commit player quest");
+        assert_eq!(visible.quests.len(), 1);
+        assert_eq!(visible.quests[0].status, "ACTIVE");
+        assert_eq!(
+            store
+                .commit_dynamic_quest(dynamic_command(&player, "player", dynamic_output(1)))
+                .expect("replay player source")
+                .quests
+                .len(),
+            1
+        );
+
+        let consequence = store
+            .prepare_dynamic_quest(DynamicQuestPrepareCommand {
+                campaign_id: "campaign-quests".to_owned(),
+                source_kind: "CONSEQUENCE".to_owned(),
+                occurrence_id: "consequence-one".to_owned(),
+            })
+            .expect("prepare consequence");
+        let private = store
+            .commit_dynamic_quest(dynamic_command(
+                &consequence,
+                "consequence",
+                dynamic_output(2),
+            ))
+            .expect("commit hidden consequence");
+        assert_eq!(private.quests.len(), 1);
+        let connection = store.connect().expect("connect after commits");
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM dynamic_quest_sources WHERE campaign_id='campaign-quests'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("provenance count"),
+            2
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM quest_pool_states WHERE campaign_id='campaign-quests' AND status='HIDDEN'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("hidden count"),
+            1
+        );
+        let visible_quest_id: String = connection
+            .query_row(
+                "SELECT quest_id FROM dynamic_quest_sources
+                 WHERE campaign_id='campaign-quests' AND source_kind='PLAYER_ACTION'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("visible quest id");
+        let hidden_quest_id: String = connection
+            .query_row(
+                "SELECT quest_id FROM dynamic_quest_sources
+                 WHERE campaign_id='campaign-quests' AND source_kind='CONSEQUENCE'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("hidden quest id");
+        connection
+            .execute(
+                "INSERT INTO quest_graph_edges(
+                   id,campaign_id,edge_kind,source_kind,source_id,predicate,expected_value,
+                   target_quest_id,satisfied_status,unsatisfied_status,priority,created_at
+                 ) VALUES(
+                   'hidden-edge','campaign-quests','CONSEQUENCE','QUEST',?1,'STATUS_EQUALS','HIDDEN',
+                   ?2,'UPDATED',NULL,1,'2026-07-31T06:12:00.000Z'
+                 )",
+                params![hidden_quest_id, visible_quest_id],
+            )
+            .expect("seed hidden graph edge");
+        drop(connection);
+        assert_eq!(
+            store
+                .quest_graph_snapshot("campaign-quests")
+                .expect("raw local graph")
+                .edges
+                .len(),
+            1
+        );
+        assert!(
+            store
+                .quest_board_snapshot("campaign-quests")
+                .expect("player-safe graph")
+                .graph
+                .edges
+                .is_empty()
+        );
+        drop(store);
+
+        let reopened = CampaignStore::open(&path).expect("reopen");
+        let restored = reopened
+            .quest_board_snapshot("campaign-quests")
+            .expect("restore dynamic board");
+        assert_eq!(restored.quests.len(), 1);
+        assert_eq!(restored.source.recent_quest_titles.len(), 1);
+    }
+
+    fn dynamic_command(
+        preparation: &crate::DynamicQuestPreparation,
+        suffix: &str,
+        output: Value,
+    ) -> DynamicQuestCommitCommand {
+        DynamicQuestCommitCommand {
+            campaign_id: preparation.campaign_id.clone(),
+            source_kind: preparation.source.kind.clone(),
+            occurrence_id: preparation.source.occurrence_id.clone(),
+            expected_context_digest: preparation.context_digest.clone(),
+            generation: TavernGenerationAudit {
+                request_id: format!("dynamic-request-{suffix}"),
+                generation_record_id: format!("dynamic-generation-{suffix}"),
+                idempotency_key: format!("dynamic-key-{suffix}"),
+                prompt_version: 3,
+                input: preparation.input.clone(),
+                context: json!({
+                    "campaignId": preparation.campaign_id,
+                    "sourceKind": preparation.source.kind,
+                    "occurrenceId": preparation.source.occurrence_id,
+                    "contextDigest": preparation.context_digest,
+                }),
+                request: json!({"task":"GENERATE_QUEST"}),
+                raw_response_text: output.to_string(),
+                validated_output: output,
+            },
+        }
+    }
+
+    fn dynamic_output(index: usize) -> Value {
+        if index == 1 {
+            json!({
+                "content": {
+                    "title": "Guard the Beacon Road",
+                    "summary": "Wardens need a path through the storm.",
+                    "objective": "Escort the repair crew to the beacon.",
+                    "failureCost": "The harbor loses its warning light."
+                },
+                "risk": "MODERATE",
+                "recommendedAttributes": ["agility", "knowledge"],
+                "expectedTurns": { "min": 8, "max": 10 },
+                "rewardTier": "NOTABLE",
+                "relatedNpcIds": ["npc-owner"],
+                "relatedFactIds": []
+            })
+        } else {
+            json!({
+                "content": {
+                    "title": "Ash Beneath the Causeway",
+                    "summary": "A silent collapse follows the world change.",
+                    "objective": "Trace the consequence before dawn.",
+                    "failureCost": "The inland passage remains lost."
+                },
+                "risk": "HIGH",
+                "recommendedAttributes": ["physique", "charisma"],
+                "expectedTurns": { "min": 9, "max": 12 },
+                "rewardTier": "RARE",
+                "relatedNpcIds": [],
+                "relatedFactIds": []
+            })
+        }
     }
 
     fn seed_board(store: &CampaignStore) {

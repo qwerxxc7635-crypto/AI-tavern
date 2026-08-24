@@ -108,4 +108,10 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     version: promptVersion(2),
     change: 'Avoid recent quest structures and substantial repeated phrases.',
   }),
+  Object.freeze({
+    task: 'GENERATE_QUEST',
+    version: promptVersion(3),
+    change:
+      'Ground dynamic sources in locked Constitution, visible facts, local provenance and adapter budget.',
+  }),
 ]);

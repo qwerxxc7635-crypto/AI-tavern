@@ -51,6 +51,7 @@ type SnapshotTable =
   | 'quest_graph_edges'
   | 'quest_graph_revisions'
   | 'quest_graph_evaluations'
+  | 'dynamic_quest_sources'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -82,6 +83,8 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     'SELECT * FROM quest_graph_revisions WHERE campaign_id = ? ORDER BY revision',
   quest_graph_evaluations:
     'SELECT * FROM quest_graph_evaluations WHERE campaign_id = ? ORDER BY occurred_at, operation_id',
+  dynamic_quest_sources:
+    'SELECT * FROM dynamic_quest_sources WHERE campaign_id = ? ORDER BY created_at, quest_id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -117,6 +120,7 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'items',
   'world_clocks',
   'game_events',
+  'dynamic_quest_sources',
 ];
 
 export class SnapshotRepository {
@@ -318,6 +322,7 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM dynamic_quest_sources WHERE campaign_id = ?',
       'DELETE FROM quest_graph_evaluations WHERE campaign_id = ?',
       'DELETE FROM quest_graph_revisions WHERE campaign_id = ?',
       'DELETE FROM quest_graph_edges WHERE campaign_id = ?',
@@ -489,7 +494,8 @@ function parsePayload(text: string): SnapshotPayload {
         table === 'quest_graphs' ||
         table === 'quest_graph_edges' ||
         table === 'quest_graph_revisions' ||
-        table === 'quest_graph_evaluations')
+        table === 'quest_graph_evaluations' ||
+        table === 'dynamic_quest_sources')
     ) {
       return [];
     }
@@ -622,6 +628,7 @@ function snapshotTableRecord(
     quest_graph_edges: values('quest_graph_edges'),
     quest_graph_revisions: values('quest_graph_revisions'),
     quest_graph_evaluations: values('quest_graph_evaluations'),
+    dynamic_quest_sources: values('dynamic_quest_sources'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

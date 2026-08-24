@@ -72,11 +72,13 @@ describe('central prompt catalog', () => {
             ? 4
             : task === 'RESOLVE_DICE_RESULT'
               ? 3
-              : task === 'GENERATE_NPCS'
-                ? 4
-                : task === 'NPC_REPLY'
+              : task === 'GENERATE_QUEST'
+                ? 3
+                : task === 'GENERATE_NPCS'
                   ? 4
-                  : expectedVersion,
+                  : task === 'NPC_REPLY'
+                    ? 4
+                    : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }
@@ -87,7 +89,7 @@ describe('central prompt catalog', () => {
       expect.objectContaining({ task: 'GENERATE_NPCS', version: 4 }),
     );
     expect(PROMPT_HISTORY).toContainEqual(
-      expect.objectContaining({ task: 'GENERATE_QUEST', version: 2 }),
+      expect.objectContaining({ task: 'GENERATE_QUEST', version: 3 }),
     );
     expect(PROMPT_HISTORY).toContainEqual(
       expect.objectContaining({ task: 'NPC_REPLY', version: 4 }),

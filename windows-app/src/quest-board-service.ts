@@ -136,19 +136,25 @@ interface RequestIdentity {
 
 export const tauriQuestBoardGateway: QuestBoardGateway = {
   async load(id) {
-    return parseSnapshot(await invoke<unknown>('quest_board_get', { campaignId: id }), id);
+    return parseQuestBoardSnapshot(
+      await invoke<unknown>('quest_board_get', { campaignId: id }),
+      id,
+    );
   },
   async commit(command) {
-    return parseSnapshot(
+    return parseQuestBoardSnapshot(
       await invoke<unknown>('quest_generation_commit', { command }),
       command.campaignId,
     );
   },
   async accept(id, questId) {
-    return parseSnapshot(await invoke<unknown>('quest_accept', { campaignId: id, questId }), id);
+    return parseQuestBoardSnapshot(
+      await invoke<unknown>('quest_accept', { campaignId: id, questId }),
+      id,
+    );
   },
   async transition(command) {
-    return parseSnapshot(
+    return parseQuestBoardSnapshot(
       await invoke<unknown>('quest_pool_transition', { command }),
       command.campaignId,
     );
@@ -332,7 +338,10 @@ function defaultIdentity(): RequestIdentity {
   };
 }
 
-function parseSnapshot(value: unknown, expectedCampaignId: string): QuestBoardSnapshot {
+export function parseQuestBoardSnapshot(
+  value: unknown,
+  expectedCampaignId: string,
+): QuestBoardSnapshot {
   const record = requireRecord(value);
   const source = parseSource(record['source']);
   const quests = Object.freeze(requireArray(record['quests']).map(parseQuest));

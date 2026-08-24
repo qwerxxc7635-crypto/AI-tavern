@@ -137,6 +137,11 @@ const migrations = [
     name: 'quest_graph',
     source: new URL('../../../database/migrations/0024_quest_graph.sql', import.meta.url),
   },
+  {
+    version: 25,
+    name: 'dynamic_quest_sources',
+    source: new URL('../../../database/migrations/0025_dynamic_quest_sources.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

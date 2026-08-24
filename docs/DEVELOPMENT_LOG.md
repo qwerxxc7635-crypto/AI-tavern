@@ -4431,3 +4431,36 @@
 - `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 156个文件/920项通过，另1个文件/1项性能基线按设计跳过；Node 29项通过；Rust workspace 132项通过，另1项需明确API Key授权的真实Provider测试忽略；TypeScript↔Rust archive interop通过。
 - `cargo fmt --check`与全workspace严格Clippy通过；`pnpm --dir windows-app build`生产构建通过，Vite转换264个模块。没有删除测试、降低校验、写死求值结果、忽略错误或让LLM取得规则权限。
 - 本任务不修改Rules Engine、D20硬结果、AI Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure内容合同或存档状态机，也没有进入M8-T03。用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
+
+## 2026-08-24 — M8-T03 完成 Dynamic Quest Sources
+
+### 开始状态与边界
+
+- 在分支 `task/M8-T03-dynamic-quest-sources`、起始提交 `f4e2074` 上继续；未回滚或重做 M0–M8-T02，用户已有 `.gitignore` 修改全程未暂存。
+- 本任务只实现 NPC/Faction/World Event/Discovery/Player Action/Consequence 六类 Quest source adapter。没有进入 M8-T04 World Director 或 M8-T05 Director Budget，也没有自动为每个玩家行为创建任务。
+
+### 实现
+
+- 新增 Dynamic Quest source/provenance、Constitution context、相关事实白名单、同步开放任务安全预算和本地初始状态合同；`PLAYER_ACTION` 显式来源直接进入 `ACTIVE`，Discovery 进入 `DISCOVERED`，隐藏 Faction/Consequence 保持 `HIDDEN`。
+- `GENERATE_QUEST` 输入 Schema 与 Prompt 升至 version 3，可接收本地 source、relevant facts、Constitution 和 generation budget；Core Prompt 明确模型无权决定来源、状态、可见性、provenance 或预算。旧初始化输入保持兼容。
+- schema 25 新增一次性 `quest_pool_creation_intents` 和 append-only `dynamic_quest_sources`。六类 occurrence、Campaign、NPC/Fact、Generation Record 均由唯一约束、外键和 trigger 校验；内部快照捕获并按依赖顺序恢复 provenance。
+- TypeScript Repository 与 Rust Native 均执行来源投影、SHA-256 规范上下文、同源去重、预算门禁、引用白名单和事务提交。Native 额外重验完整 generation input/context、8–12 回合、重复 Quest 结构及 generation audit，失败无部分写入。
+- Windows 新增显式 `dynamic_quest_prepare` / `dynamic_quest_commit` 命令和服务；相同在途来源合并，已有 provenance 直接加载而不再次调用模型。错误保留 cause，idempotency 与 durable occurrence 绑定。
+- NPC adapter 只读取玩家已见的正式提交回复，测试确认 Actor-private Knowledge 不进入输入。Quest Board 的 Quest、最近生成历史和 Windows Quest Graph 投影统一过滤隐藏 Quest；完整 SQLite 图仍供本地规则与内部审计使用。
+- 新增 [`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)、`DEC-138`、V0.3 Spec/Data Model/Migration 索引，并将 M8-T03 标记 DONE。未新增 UI/CSS；视觉手册、Design Token、既有 Game Component 和 M10-T07 迁移边界保持不变。
+
+### 验证
+
+- 首轮共享门禁发现 `GENERATE_QUEST` Schema version 测试仍期望 2，以及 Clippy 建议 `sort_by_key`；均按新 version/惯用 Rust 修正后重验。
+- Prettier、release metadata、zh-CN 玩家语言、ESLint、TypeScript：通过。
+- Vitest：159 files passed、1 skipped；927 tests passed、1 skipped。覆盖六类来源、私有知识隔离、同源并发、重放、Constitution 输入、预算原子拒绝和服务错误 cause。
+- Node：29 tests passed。schema 25 新库、重复启动、旧库升级副本、备份失败与完整性约束均通过。
+- Rustfmt、Clippy `-D warnings`：通过。Rust workspace：133 passed、1 ignored；Native 动态玩家行动/隐藏后果创建、去重、安全图投影和关闭重开通过。
+- archive interoperability：TypeScript 13 + Rust 1 + TypeScript 13 均通过。
+- Desktop production build：通过，Vite 266 modules transformed。
+
+### 结束状态
+
+- `M8-T03` 完成；下一项严格为 `M8-T04 World Director`，本次未开始。
+- portable `.emtavern` format v2 保持不变；schema 25 正式跨版本归档仍留给 M10-T05。12 个开放任务上限仅为本 adapter 的 fail-closed 安全阀，不替代 M8-T05 的持久每日预算和 cooldown。
+- Rules Engine、D20、Provider、Generation Queue、SQLite 真相源、Save/Resume、World Seed/Constitution 与 Quest/NPC/Adventure 核心业务合同未被视觉规范或本任务重构；不 merge、不 push。

@@ -565,3 +565,18 @@ export type {
   KnowledgeId,
   MemoryId,
 } from './foundation.js';
+export {
+  DYNAMIC_QUEST_ENTITY_KINDS,
+  DYNAMIC_QUEST_SOURCE_KINDS,
+  DYNAMIC_QUEST_VISIBILITIES,
+  DynamicQuestSourceContractError,
+  type DynamicQuestBudget,
+  type DynamicQuestConstitutionContext,
+  type DynamicQuestEntityKind,
+  type DynamicQuestPreparation,
+  type DynamicQuestProvenance,
+  type DynamicQuestRelevantFact,
+  type DynamicQuestSourceContext,
+  type DynamicQuestSourceKind,
+  type DynamicQuestVisibility,
+} from './dynamic-quest-source.js';

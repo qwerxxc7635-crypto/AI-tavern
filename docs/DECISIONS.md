@@ -2927,3 +2927,27 @@ schema 23 新增一对一 `quest_pool_states` 作为 V0.3 生命周期唯一真�
 - 内部快照保存schema 24图和审计；portable archive format v2不变，正式升级留给M10-T05。
 - Quest、NPC、Faction、Location、World Fact、Adventure、D20、Rules Engine和Provider既有合同不重构。
 - 页面复用现有Quest组件与Design Token，不新增CSS；Legacy视觉迁移仍由M10-T07统一执行。
+
+## DEC-138：Dynamic Quest 使用 durable occurrence 适配与本地提交裁决
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T03`、`DEC-136`、`DEC-137`与[`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)
+
+### 背景
+
+Quest Pool 和 Quest Graph 已能表达多任务与确定性后果，但 NPC 回复、Faction 行动、世界事件、事实发现、玩家自由行为和图后果仍缺少统一的 Quest 创建入口。若由模型选择来源、可见性、状态或是否超过数量限制，会绕过 SQLite 事实、知识边界和本地状态机；若每次玩家行动都自动生成，又会提前实现 World Director 并制造任务洪水。
+
+### 决定与理由
+
+六类适配器只接受已经提交的 durable occurrence。Native 准备阶段投影公开来源、锁定 Constitution、公开 NPC/Fact 白名单、可见 Quest 历史和开放任务同步安全上限，并对规范 JSON 生成 SHA-256 digest。Windows 只在显式调用时运行 `GENERATE_QUEST`；Native 提交事务重新准备并精确比较 input/context/digest，重验 Schema、引用和重复结构后，原子写 Generation、Quest、Pool 初始转换及 append-only provenance。
+
+schema 25 以唯一 `(campaign, source kind, occurrence)` 去重，并用一次性 creation intent 将 HIDDEN/DISCOVERED/ACTIVE 初始态安全桥接到旧 `quests.status` 兼容列。隐藏 Quest 保留在完整 SQLite 图中，但玩家 Quest Board、生成历史和 Windows 图出口统一过滤。开放任务 12 的上限只是一条适配器 fail-closed 安全阀，不替代 M8-T05 的持久 Director budget/cooldown。
+
+### 影响与边界
+
+- NPC 来源只使用玩家已见的正式回复；Actor-private Knowledge、secret 和未发现事实不进入生成上下文。
+- 玩家行动必须由业务显式选择来源，不自动为每个行动生成 Quest；自动调度严格留给 M8-T04。
+- portable archive format v2 不升级，schema 25 跨版本归档留给 M10-T05。
+- Rules Engine、D20、Provider、Queue、World Seed/Constitution 与 NPC/Quest/Adventure 合同不修改。
+- 本任务不新增 UI/CSS；后续 Quest 视觉迁移仍复用既有组件并由 M10-T07 执行。

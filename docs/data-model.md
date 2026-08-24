@@ -547,3 +547,9 @@ erDiagram
 规格第24.2节的核心表全部覆盖：
 
 `campaigns`、`world_bibles`、`world_facts`、`player_characters`、`taverns`、`npcs`、`npc_knowledge`、`npc_relationships`、`quests`、`adventures`、`adventure_turns`、`conversations`、`messages`、`items`、`world_clocks`、`game_events`、`generation_records`、`pending_ai_requests`、`save_snapshots`、`model_profiles`、`provider_configs`、`app_settings`。
+
+## 8. V0.3 Dynamic Quest 来源扩展
+
+schema 25 的 `dynamic_quest_sources` 以 `quest_id` 为主键，并对 `(campaign_id, source_kind, occurrence_id)` 建唯一约束。它保存六类来源的实体标识、可见性、玩家是否介入、公开摘要、来源快照、相关事实 ID、SHA-256 Context 摘要、Generation Record、预算快照和创建时间；所有引用必须属于同一 Campaign，普通更新和删除被 trigger 拒绝。
+
+`quest_pool_creation_intents` 是同一事务内的一次性表。动态 Quest 插入前写入本地裁定的初始状态、原因和 operation ID，`quests` insert trigger 将其投影为 Quest Pool 初始转换后立即删除。该表在稳定状态必须为空，不是第二个 Quest 状态真相源。详细合同见 [`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)。

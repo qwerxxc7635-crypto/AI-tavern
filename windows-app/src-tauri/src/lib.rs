@@ -22,6 +22,7 @@ use ember_native_bridge::{
     DialogueSuggestionPreparation, DialogueSuggestionPrepareCommand, DialogueSuggestionSet,
     DynamicLocationGenerationCommit, DynamicLocationGenerationRequest,
     DynamicLocationGenerationSnapshot, DynamicLocationSnapshot, DynamicLocationTravelCommand,
+    DynamicQuestCommitCommand, DynamicQuestPreparation, DynamicQuestPrepareCommand,
     FactionActionCommand, ModelCapabilitiesRegistration, ModelSettingsSnapshot,
     ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot, NpcLodGenerationSnapshot,
     NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit, NpcTimelineBegin,
@@ -1425,6 +1426,22 @@ fn quest_generation_commit(
 }
 
 #[tauri::command]
+fn dynamic_quest_prepare(
+    command: DynamicQuestPrepareCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicQuestPreparation, CommandError> {
+    store.prepare_dynamic_quest(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_quest_commit(
+    command: DynamicQuestCommitCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store.commit_dynamic_quest(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn quest_accept(
     campaign_id: String,
     quest_id: String,
@@ -1448,7 +1465,10 @@ fn quest_graph_get(
     campaign_id: String,
     store: State<'_, CampaignStore>,
 ) -> Result<QuestGraphSnapshot, CommandError> {
-    store.quest_graph_snapshot(&campaign_id).map_err(Into::into)
+    store
+        .quest_board_snapshot(&campaign_id)
+        .map(|snapshot| snapshot.graph)
+        .map_err(Into::into)
 }
 
 #[tauri::command]
@@ -1676,6 +1696,8 @@ pub fn run() {
             dialogue_suggestions_commit,
             quest_board_get,
             quest_generation_commit,
+            dynamic_quest_prepare,
+            dynamic_quest_commit,
             quest_accept,
             quest_pool_transition,
             quest_graph_get,

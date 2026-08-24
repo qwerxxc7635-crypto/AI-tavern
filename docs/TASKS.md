@@ -409,12 +409,13 @@
 
 ## M8-T03 Dynamic Quest Sources
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M8-T02。
 - **Deliverable**：NPC/Faction/Event/Discovery/Player Action/Consequence 的 Quest generation adapters。
 - **Acceptance**：来源与 provenance 持久化；任务符合世界和预算；自由行为可产生任务。
 - **Tests**：each source、dedupe、constitution、knowledge visibility、budget rejection。
 - **Do Not**：不为每个行为强行创建任务；不暴露隐藏任务。
+- **Implementation reference**：[`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)。
 
 ## M8-T04 World Director
 

@@ -25,6 +25,7 @@ const coreTables = [
   'credential_cleanup_queue',
   'dialogue_suggestion_cache',
   'dynamic_locations',
+  'dynamic_quest_sources',
   'event_ledger',
   'faction_action_events',
   'game_events',
@@ -50,6 +51,7 @@ const coreTables = [
   'quest_graph_evaluations',
   'quest_graph_revisions',
   'quest_graphs',
+  'quest_pool_creation_intents',
   'quest_pool_restore_sessions',
   'quest_pool_states',
   'quest_pool_transitions',
@@ -484,7 +486,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      24,
+      25,
     );
     const importedKnowledge = database
       .prepare(

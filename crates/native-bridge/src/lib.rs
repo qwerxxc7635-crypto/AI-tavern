@@ -9,6 +9,7 @@ mod career_pool;
 mod character_creation;
 mod dialogue_suggestions;
 mod dynamic_locations;
+mod dynamic_quest_sources;
 #[cfg(test)]
 mod entity_schema_contract;
 mod model_settings;
@@ -39,6 +40,7 @@ pub use career_pool::*;
 pub use character_creation::*;
 pub use dialogue_suggestions::*;
 pub use dynamic_locations::*;
+pub use dynamic_quest_sources::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
 pub use npc_lod::*;
@@ -118,7 +120,9 @@ const MULTI_QUEST_POOL_MIGRATION: &str =
     include_str!("../../../database/migrations/0023_multi_quest_pool.sql");
 const QUEST_GRAPH_MIGRATION: &str =
     include_str!("../../../database/migrations/0024_quest_graph.sql");
-const LATEST_SCHEMA_VERSION: i64 = 24;
+const DYNAMIC_QUEST_SOURCES_MIGRATION: &str =
+    include_str!("../../../database/migrations/0025_dynamic_quest_sources.sql");
+const LATEST_SCHEMA_VERSION: i64 = 25;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -603,6 +607,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         ),
         (23_i64, "multi_quest_pool", MULTI_QUEST_POOL_MIGRATION),
         (24_i64, "quest_graph", QUEST_GRAPH_MIGRATION),
+        (
+            25_i64,
+            "dynamic_quest_sources",
+            DYNAMIC_QUEST_SOURCES_MIGRATION,
+        ),
     ] {
         let applied_name = connection
             .query_row(

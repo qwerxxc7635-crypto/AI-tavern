@@ -64,6 +64,8 @@ export { QuestPoolRepository } from './quest-pool-repository.js';
 export type { TransitionQuestPoolState } from './quest-pool-repository.js';
 export { QuestGraphRepository, loadEntityStates } from './quest-graph-repository.js';
 export type { EvaluateQuestGraph, ReplaceQuestGraph } from './quest-graph-repository.js';
+export { DynamicQuestSourceRepository } from './dynamic-quest-source-repository.js';
+export type { CommitDynamicQuest } from './dynamic-quest-source-repository.js';
 export { TurnTransaction } from './turn-transaction.js';
 export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';

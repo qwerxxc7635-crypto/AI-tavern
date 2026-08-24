@@ -115,8 +115,8 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_QUEST: define(
     'GENERATE_QUEST',
     'WORLD_DESIGNER',
-    'Create a short-session quest grounded in supplied facts and NPCs. expectedTurns min and max must both be between 8 and 12 inclusive, with max at least min. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. relatedNpcIds may contain only exact IDs from availableNpcs; relatedFactIds must be empty because no fact IDs are supplied. Separate narrative content from program-controlled risk and reward proposals.',
-    2,
+    'Create a short-session quest grounded only in the supplied world, Constitution, dynamic source, relevantFacts and available NPCs. expectedTurns min and max must both be between 8 and 12 inclusive, with max at least min. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. relatedNpcIds may contain only exact IDs from availableNpcs; relatedFactIds may contain only exact IDs from relevantFacts and must be empty when relevantFacts is absent. The local program owns source provenance, visibility, initial status and generationBudget; never change or spend them. Separate narrative content from program-controlled risk and reward proposals.',
+    3,
   ),
   GENERATE_ADVENTURE_PLAN: define(
     'GENERATE_ADVENTURE_PLAN',

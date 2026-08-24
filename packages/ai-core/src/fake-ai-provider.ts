@@ -312,6 +312,13 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
   if (request.task === 'GENERATE_QUEST') {
     const input = taskInput(request);
     const recentStructures = input?.['recentQuestStructures'];
+    const relevantFacts = input?.['relevantFacts'];
+    const relatedFactIds = Array.isArray(relevantFacts)
+      ? relevantFacts
+          .slice(0, 1)
+          .map((fact) => (isRecord(fact) && typeof fact['id'] === 'string' ? fact['id'] : null))
+          .filter((id): id is string => id !== null)
+      : [];
     if (Array.isArray(recentStructures) && recentStructures.length > 0) {
       return {
         content: {
@@ -325,8 +332,11 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
         expectedTurns: { min: 9, max: 12 },
         rewardTier: 'RARE',
         relatedNpcIds: [],
-        relatedFactIds: [],
+        relatedFactIds,
       };
+    }
+    if (input?.['dynamicSource'] !== undefined) {
+      return { ...FAKE_TASK_OUTPUTS.GENERATE_QUEST, relatedFactIds };
     }
   }
   if (request.task === 'NPC_REPLY') {
