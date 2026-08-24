@@ -167,6 +167,11 @@ const migrations = [
     name: 'lazy_world_generation',
     source: new URL('../../../database/migrations/0030_lazy_world_generation.sql', import.meta.url),
   },
+  {
+    version: 31,
+    name: 'prefetch',
+    source: new URL('../../../database/migrations/0031_prefetch.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

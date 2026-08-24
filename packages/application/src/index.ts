@@ -97,6 +97,15 @@ export { RulesEngineUseCases } from './rules-engine-use-cases.js';
 export { KnowledgeBoundaryUseCases } from './knowledge-boundary-use-cases.js';
 export { WorldInfoRetrievalService } from './world-info-retrieval-service.js';
 export type { CachedWorldInfoRetrieval } from './world-info-retrieval-service.js';
+export { PrefetchCoordinator, PrefetchCoordinatorError } from './prefetch-coordinator.js';
+export type { PrefetchClock, PrefetchExecutor, PrefetchStore } from './prefetch-coordinator.js';
+export { PrefetchPlanningService } from './prefetch-planning-service.js';
+export type {
+  PlanPrefetchCommand,
+  PrefetchCandidateIdentityFactory,
+  PrefetchPlanSource,
+  PrefetchScheduler,
+} from './prefetch-planning-service.js';
 export type { ExecuteRulesCommand, RulesEventIdentityFactory } from './rules-engine-use-cases.js';
 export { inspectDatabaseStartup, RecoveryCenterUseCases } from './recovery-center-use-cases.js';
 export type {

@@ -137,7 +137,8 @@ const WORLD_INFO_RETRIEVAL_MIGRATION: &str =
     include_str!("../../../database/migrations/0029_world_info_retrieval.sql");
 const LAZY_WORLD_GENERATION_MIGRATION: &str =
     include_str!("../../../database/migrations/0030_lazy_world_generation.sql");
-const LATEST_SCHEMA_VERSION: i64 = 30;
+const PREFETCH_MIGRATION: &str = include_str!("../../../database/migrations/0031_prefetch.sql");
+const LATEST_SCHEMA_VERSION: i64 = 31;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -640,6 +641,7 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             "lazy_world_generation",
             LAZY_WORLD_GENERATION_MIGRATION,
         ),
+        (31_i64, "prefetch", PREFETCH_MIGRATION),
     ] {
         let applied_name = connection
             .query_row(

@@ -4590,3 +4590,28 @@
 
 - `M10-T01`完成；下一项严格为`M10-T02 Prefetch`，本次未开始。
 - 用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T02 完成 Prefetch
+
+### 边界与实现
+
+- 在分支`task/M10-T02-prefetch`、起始提交`5a41eb0`上继续；未回滚或重做M0～M10-T01，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T03，也未新增UI/CSS。
+- 新增Director预取纯Domain预测：只接受同Campaign、已预算admit的run与`BACKGROUND_ELIGIBLE` Location/Faction计划；批准目标升为P1，其余P2受background剩余容量约束，每run最多四项并稳定排序，不复制source snapshot、rationale或private knowledge。
+- 新增Application planning/coordinator：只要存在未完成P0即取消并失效预取；新run supersede旧run；共享Generation Queue保证P0优先、P1高于P2并保留背景lane。队列饱和记录`PREFETCH_QUEUE_REJECTED`而不替换前台任务。
+- 生成候选只保存在当前process memory。精确Campaign/kind/target/context digest命中后才返回给原业务采用；未就绪、未预测、context变化、重启、取消和执行失败均形成明确终态。预取路径没有世界commit port，现有Location/Faction Domain/Native验证与原子事务仍是唯一事实写入路径。
+- schema 31新增`prefetch_candidates`与append-only `prefetch_events`。SQLite复核Director admission/context、approved P1 action及其真实actor/target绑定、P2容量、lazy plan资格、状态机、execution/process ownership、revision和四项上限；表中不保存Prompt、response、output、content或Knowledge。Repository提供命中率及queue/generation平均时间。
+- internal snapshot纳入候选/事件且兼容旧payload；重开必须使无内存body的候选失效。portable`.emtavern`仍为format v2，schema 31正式跨语言升级留给M10-T05。
+- 新增[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)与`DEC-145`，更新V0.3 Spec、Generator Framework、Data Model、migration与任务引用。视觉手册、视觉债务和M10-T07的Token→Primitive→Game Component→Feature→Legacy→Audit边界保持不变。
+
+### 验证
+
+- 专项测试覆盖Director批准/延后、P1/P2、恶意P1目标重绑定拒绝、稳定有界预测、P0门禁、前台优先、queue saturation、ready hit、not-ready/unpredicted miss、context invalidation、P0 cancel、process restart、预算拒绝batch rollback、候选无内容列、指标、整Campaign级联删除和internal snapshot round-trip。
+- 首轮全量Node门发现database startup测试仍固定schema 30；只推进期望到31后，startup/migration专项11项重新通过，没有降低迁移或备份门禁。
+- 最终`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 179 files / 995 tests通过，另1 file / 1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop全部通过。Windows纵向E2E包含删除/重开链并通过；Desktop production build通过，Vite转换278 modules。
+- 不删除测试、不降低SQLite/Schema校验、不忽略错误，也不把M10-T03 Streaming或M10-T05 portable迁移冒充完成。
+
+### 结束状态
+
+- `M10-T02`完成；下一项严格为`M10-T03 Streaming`，本次未开始。
+- 用户`.gitignore`保持未暂存，不merge、不push。

@@ -166,6 +166,7 @@ export {
   buildCoreWorldGenerationPlan,
   LazyWorldGenerationPlanningError,
 } from './lazy-world-generation.js';
+export { predictPrefetch, type PredictPrefetchInput } from './prefetch.js';
 export {
   DIRECTOR_BUDGET_LIMITS,
   DIRECTOR_GAME_DAY_MINUTES,

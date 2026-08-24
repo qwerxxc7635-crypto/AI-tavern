@@ -55,6 +55,8 @@ const coreTables = [
   'npcs',
   'pending_ai_requests',
   'player_characters',
+  'prefetch_candidates',
+  'prefetch_events',
   'provider_configs',
   'quest_graph_edges',
   'quest_graph_evaluations',
@@ -499,7 +501,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      30,
+      31,
     );
     const importedKnowledge = database
       .prepare(

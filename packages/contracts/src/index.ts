@@ -678,3 +678,20 @@ export {
   type LazyWorldGenerationTransition,
   type LazyWorldTransitionReason,
 } from './lazy-world-generation.js';
+export {
+  PREFETCH_EVENT_KINDS,
+  PREFETCH_EVENT_REASONS,
+  PREFETCH_PREDICTION_REASONS,
+  PREFETCH_PRIORITIES,
+  PREFETCH_STATES,
+  PrefetchContractError,
+  type PrefetchCandidate,
+  type PrefetchCandidateSeed,
+  type PrefetchEvent,
+  type PrefetchEventKind,
+  type PrefetchEventReason,
+  type PrefetchMetrics,
+  type PrefetchPredictionReason,
+  type PrefetchPriority,
+  type PrefetchState,
+} from './prefetch.js';

@@ -91,6 +91,7 @@ export {
 } from './memory-layer-repository.js';
 export { WorldInfoRetrievalRepository } from './world-info-retrieval-repository.js';
 export { LazyWorldGenerationRepository } from './lazy-world-generation-repository.js';
+export { PrefetchRepository } from './prefetch-repository.js';
 export type {
   CancelLazyWorldGeneration,
   ClaimLazyWorldGeneration,

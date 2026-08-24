@@ -589,3 +589,9 @@ Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于�
 `lazy_world_generation_plans`以intent key为主键，并对Campaign/kind/target建立唯一约束。它保存按需或后台候选模式、P0/P1/P2优先级、可选依赖、`PLANNED/RUNNING/SUCCEEDED/FAILED/CANCELLED`状态、attempt、active run、真实artifact引用、错误、retryability、revision和时间。插入要求同Campaign已有World Bible、World Seed与锁定Constitution；Location/Faction目标必须来自同Campaign outline投影。
 
 `lazy_world_generation_transitions`按递增ID保存每次revision变化，是append-only生命周期审计。SQLite success trigger按kind检查Career Pool、Tavern、完整Roster、从目标outline扩展出的DETAILED Location或ACTIVE Faction，禁止占位完成。内部snapshot按artifact→plan→transition顺序恢复，并允许旧payload缺失两表；portable format v2不变，正式迁移仍属于M10-T05。完整合同见[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)。
+
+## 15. V0.3 Prefetch（schema 31）
+
+`prefetch_candidates`保存已admit Director run、schema-30 lazy intent、Location/Faction target、P1/P2、批准action证据、context digest、process/execution ownership、闭集状态、错误、revision和时间。SQLite insert trigger复核同Campaign run/context、budget admission、P1批准、P2剩余容量、后台计划资格与每run最多四项；update trigger固定身份并限制生命周期。表中没有Prompt、raw response、validated output、候选内容或Actor Knowledge。
+
+`prefetch_events`以递增ID保存prediction/start/ready/hit/miss/invalidate/cancel/fail与有界queue/generation时间，是append-only指标审计；unpredicted miss允许没有candidate外键。生成体只在进程内，READY重开必须按`PROCESS_RESTART`失效。内部snapshot保存两表且旧payload按空集合兼容；portable format v2保持不变，正式跨语言升级留给M10-T05。完整合同见[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)。

@@ -3091,3 +3091,26 @@ schema 30新增Campaign-scoped materialization plan与append-only transition。�
 - portable `.emtavern`仍为format v2，schema 30的正式跨语言迁移留给M10-T05。
 - 不修改Rules/D20、Provider、Generation Queue、Quest/NPC/Adventure语义，也不进入M10-T02。
 - 不新增UI/CSS；未来状态展示遵循视觉手册，Legacy收敛继续由M10-T07处理。
+
+## DEC-145：预取只持久化审计，生成候选保持进程内
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T02`、`DEC-140`、`DEC-144`与[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)
+
+### 背景
+
+schema 30 已标记可后台具体化的 outline Location/Faction，但直接生成并提交会把玩家尚未选择的路线变成事实；只用内存Promise又无法审计预算、失效、命中率或重启。保存完整候选则会形成第二套内容数据库，并扩大隐藏信息与存档泄漏面。
+
+### 决定与理由
+
+Director预测只读取已admit run、预算结果和有限lazy plan。批准目标为P1，其余按background剩余容量成为P2，总量最多四项；任何未完成P0都抢占并失效预取。Application planning/coordinator复用共享Generation Queue，队列饱和只记录失败，不阻断前台工作。
+
+schema 31只保存候选身份、context digest、process/execution状态、append-only事件和时间指标，不保存Prompt、源snapshot或生成内容。候选体只存在进程内；精确Campaign/kind/target/digest命中后才交给原Feature事务，原有验证与提交仍是唯一具体化路径。重启、Director supersede、P0抢占和context drift均显式失效。
+
+### 影响与边界
+
+- 候选、READY和HIT都不是World Fact或artifact success；未采用玩家行为永不提交。
+- SQLite trigger重复校验Director admission、P1批准、P2容量和schema-30资格；内部snapshot只恢复审计，portable format v2正式升级留给M10-T05。
+- 不修改Rules/D20、Provider、Quest/NPC/Adventure、World Seed/Constitution或已有Feature提交语义。
+- 本任务不新增UI/CSS；后续状态展示遵循视觉手册，Legacy视觉收敛仍由M10-T07执行。

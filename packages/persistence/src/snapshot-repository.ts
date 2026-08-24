@@ -69,6 +69,8 @@ type SnapshotTable =
   | 'memory_artifact_sources'
   | 'lazy_world_generation_plans'
   | 'lazy_world_generation_transitions'
+  | 'prefetch_candidates'
+  | 'prefetch_events'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -132,6 +134,9 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     "SELECT * FROM lazy_world_generation_plans WHERE campaign_id = ? ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 ELSE 2 END, created_at, intent_key",
   lazy_world_generation_transitions:
     'SELECT * FROM lazy_world_generation_transitions WHERE campaign_id = ? ORDER BY id',
+  prefetch_candidates:
+    "SELECT * FROM prefetch_candidates WHERE campaign_id = ? ORDER BY CASE priority WHEN 'P1' THEN 0 ELSE 1 END, predicted_at, id",
+  prefetch_events: 'SELECT * FROM prefetch_events WHERE campaign_id = ? ORDER BY id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -185,6 +190,8 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'director_budget_decisions',
   'lazy_world_generation_plans',
   'lazy_world_generation_transitions',
+  'prefetch_candidates',
+  'prefetch_events',
 ];
 
 export class SnapshotRepository {
@@ -386,6 +393,8 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM prefetch_events WHERE campaign_id = ?',
+      'DELETE FROM prefetch_candidates WHERE campaign_id = ?',
       'DELETE FROM lazy_world_generation_transitions WHERE campaign_id = ?',
       'DELETE FROM lazy_world_generation_plans WHERE campaign_id = ?',
       'DELETE FROM memory_artifact_sources WHERE campaign_id = ?',
@@ -593,7 +602,9 @@ function parsePayload(text: string): SnapshotPayload {
         table === 'world_lore_retrieval_rules' ||
         table === 'memory_artifact_sources' ||
         table === 'lazy_world_generation_plans' ||
-        table === 'lazy_world_generation_transitions')
+        table === 'lazy_world_generation_transitions' ||
+        table === 'prefetch_candidates' ||
+        table === 'prefetch_events')
     ) {
       return [];
     }
@@ -744,6 +755,8 @@ function snapshotTableRecord(
     memory_artifact_sources: values('memory_artifact_sources'),
     lazy_world_generation_plans: values('lazy_world_generation_plans'),
     lazy_world_generation_transitions: values('lazy_world_generation_transitions'),
+    prefetch_candidates: values('prefetch_candidates'),
+    prefetch_events: values('prefetch_events'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

@@ -487,12 +487,13 @@
 
 ## M10-T02 Prefetch
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M10-T01。
 - **Deliverable**：Director 预测、P1/P2 预取、失效和命中指标。
 - **Acceptance**：预取不阻塞 P0、不提交未采用玩家行为、不泄露隐藏信息。
 - **Tests**：prediction hit/miss、priority、cancel/invalidate、budget、privacy。
 - **Do Not**：不无限猜测玩家路线；不将预取候选当事实。
+- **Implementation reference**：[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)。
 
 ## M10-T03 Streaming
 
