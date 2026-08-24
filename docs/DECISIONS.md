@@ -2829,3 +2829,28 @@ schema 21 新增 `npc_timeline_operations` 与 append-only `npc_timeline_attempt
 - 事实变化造成 canonical Context 不匹配时返回 `FACT_CONFLICT`，随后以同一意图在最新授权事实上技术修复；AI 不能直接修改事实。
 - 本决定不改变 Adventure regeneration、Rules Engine、D20、Quest/NPC/Adventure 核心合同、Provider/Queue、World Seed/Constitution 或存档状态机。
 - portable archive 的 schema 21 表升级仍由 M10-T05 统一完成；M7-T04 对话建议及 M10-T07 Legacy UI 迁移没有提前实现。
+
+## DEC-134：对话建议采用公开 Context 的精确派生缓存
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T04`、`DEC-123`、`DEC-132`与`DEC-133`
+
+### 背景
+
+既有单 NPC 回复携带建议话题，但首次进入对话没有建议，多 NPC 页面只按参与者姓名拼出固定按钮。二者都没有独立的当前世界缓存身份；继续显示旧回复携带的话题可能在关系、Quest、场景或世界变化后失真。复用可确认的 `ai_candidates` 又会错误地给派生 UI 建议正式候选权限。
+
+### 决定与理由
+
+新增统一 `GENERATE_DIALOGUE_SUGGESTIONS`，输入只含玩家可见的世界摘要、玩家、参与者公开身份/状态、关系、公开对话与开放 Quest。Secret、私有 Knowledge/Memory 和隐藏事实不进入模型。输出严格为三至五条文本及合法可选点名对象。
+
+schema 22 使用独立 immutable `dialogue_suggestion_cache`。Native 将 Campaign、Scope、公开输入和 NPC/Scene、World Fact、Clock、Faction、Location、Population、Event、Quest 等失效信号计算为 SHA-256 digest；只允许精确 digest 命中。提交前在 immediate transaction 内重建 Context，过期输入 fail closed，generation audit 与缓存原子写入。
+
+### 影响与边界
+
+- 建议是派生 UI 辅助，不是 `ai_candidates`、Message、Scene Turn、Event 或玩家行动；不能自动发送或改事实。
+- 单 NPC 与多人 UI 复用现有 `ActionComposer`。生成失败、取消或无建议不阻塞自由输入；选择后仍需玩家提交。
+- 页面取消后的晚到生成不会提交；世界变化只产生新 digest，不修改或伪装复用旧缓存。
+- M7-T04 不改变 Immutable Timeline、Rules/D20、Provider/Queue、Quest/NPC/Adventure 或存档状态机，也不实现 M7-T05 Prompt Manager。
+- UI 沿用视觉手册、Design Token 与既有 Game Component；不新增 CSS，不提前执行 M10-T07 Legacy 迁移。
+- portable archive format v2 保持不变，schema 22 的正式归档策略由 M10-T05 统一处理。

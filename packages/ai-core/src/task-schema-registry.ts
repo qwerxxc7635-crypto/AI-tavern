@@ -42,6 +42,8 @@ import {
   GenerateWorldOutputSchema,
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
+  DialogueSuggestionInputSchema,
+  DialogueSuggestionOutputSchema,
   ProposeTavernSceneActionInputSchema,
   ProposeTavernSceneActionOutputSchema,
   RefineWorldInputSchema,
@@ -90,6 +92,10 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   GENERATE_TAVERN: definition(GenerateTavernInputSchema, GenerateTavernOutputSchema),
   GENERATE_NPCS: definition(GenerateNpcsInputSchema, GenerateNpcsOutputSchema, 4),
   NPC_REPLY: definition(NpcReplyInputSchema, NpcReplyOutputSchema, 4),
+  GENERATE_DIALOGUE_SUGGESTIONS: definition(
+    DialogueSuggestionInputSchema,
+    DialogueSuggestionOutputSchema,
+  ),
   PROPOSE_TAVERN_SCENE_ACTION: definition(
     ProposeTavernSceneActionInputSchema,
     ProposeTavernSceneActionOutputSchema,

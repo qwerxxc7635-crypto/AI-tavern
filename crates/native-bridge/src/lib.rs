@@ -7,6 +7,7 @@ mod adventure_play;
 mod cache_metrics;
 mod career_pool;
 mod character_creation;
+mod dialogue_suggestions;
 mod dynamic_locations;
 #[cfg(test)]
 mod entity_schema_contract;
@@ -33,6 +34,7 @@ pub use adventure_play::*;
 pub use cache_metrics::*;
 pub use career_pool::*;
 pub use character_creation::*;
+pub use dialogue_suggestions::*;
 pub use dynamic_locations::*;
 pub use model_settings::*;
 pub use npc_dialogue::*;
@@ -104,7 +106,9 @@ const MULTI_NPC_SCENE_MIGRATION: &str =
     include_str!("../../../database/migrations/0020_multi_npc_scene.sql");
 const IMMUTABLE_NPC_TIMELINE_MIGRATION: &str =
     include_str!("../../../database/migrations/0021_immutable_npc_timeline.sql");
-const LATEST_SCHEMA_VERSION: i64 = 21;
+const DIALOGUE_SUGGESTION_CACHE_MIGRATION: &str =
+    include_str!("../../../database/migrations/0022_dialogue_suggestion_cache.sql");
+const LATEST_SCHEMA_VERSION: i64 = 22;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -581,6 +585,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             21_i64,
             "immutable_npc_timeline",
             IMMUTABLE_NPC_TIMELINE_MIGRATION,
+        ),
+        (
+            22_i64,
+            "dialogue_suggestion_cache",
+            DIALOGUE_SUGGESTION_CACHE_MIGRATION,
         ),
     ] {
         let applied_name = connection

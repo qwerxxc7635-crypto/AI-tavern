@@ -19,6 +19,11 @@ import {
 } from './tavern-population-service.js';
 import { tavernSceneService, type TavernSceneService } from './tavern-scene-service.js';
 import type { TavernPopulationSnapshot, TavernSceneSnapshot } from '@ember-tavern/contracts';
+import {
+  dialogueSuggestionService,
+  type DialogueSuggestionSet,
+  type WindowsDialogueSuggestionService,
+} from './dialogue-suggestion-service.js';
 
 type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
 
@@ -26,6 +31,7 @@ interface TavernPageProps {
   readonly service?: TavernActions;
   readonly populationService?: Pick<TavernPopulationService, 'refresh' | 'focus'>;
   readonly sceneService?: Pick<TavernSceneService, 'start' | 'send' | 'retry'>;
+  readonly suggestionService?: Pick<WindowsDialogueSuggestionService, 'load'>;
 }
 
 const RESIDENCY_LABELS: Readonly<Record<TavernNpcView['residency'], string>> = {
@@ -38,6 +44,7 @@ export function TavernPage({
   service = windowsTavernService,
   populationService = tavernPopulationService,
   sceneService = tavernSceneService,
+  suggestionService = dialogueSuggestionService,
 }: TavernPageProps) {
   const [search] = useSearchParams();
   const campaignId = search.get('campaignId');
@@ -50,6 +57,9 @@ export function TavernPage({
   const [sceneIntent, setSceneIntent] = useState('');
   const [sceneBusy, setSceneBusy] = useState(false);
   const [sceneError, setSceneError] = useState<string | undefined>();
+  const [sceneSuggestions, setSceneSuggestions] = useState<DialogueSuggestionSet | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | undefined>();
+  const [suggestionRevision, setSuggestionRevision] = useState(0);
 
   const initialize = () => {
     if (campaignId === null) return;
@@ -92,6 +102,22 @@ export function TavernPage({
       active = false;
     };
   }, [campaignId, populationService, service]);
+
+  useEffect(() => {
+    if (campaignId === null || scene === null) return;
+    const controller = new AbortController();
+    setSceneSuggestions(null);
+    setSuggestionError(undefined);
+    void suggestionService
+      .load(campaignId, 'TAVERN_SCENE', scene.id, controller.signal)
+      .then(setSceneSuggestions)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setSuggestionError(error instanceof Error ? error.message : '场景建议暂时无法生成。');
+        }
+      });
+    return () => controller.abort();
+  }, [campaignId, scene, suggestionRevision, suggestionService]);
 
   const selectedNpc = useMemo(
     () => snapshot?.npcs.find(({ id }) => id === selectedNpcId) ?? null,
@@ -168,6 +194,7 @@ export function TavernPage({
       setSceneBusy(false);
     }
   };
+  const composerError = sceneError ?? suggestionError;
   return (
     <main className="tavern-room">
       <section className="tavern-header">
@@ -283,13 +310,21 @@ export function TavernPage({
               label="向场景行动"
               description="可直接说话、观察或点名回应；每位 NPC 只会收到自己的知识上下文。"
               value={sceneIntent}
-              suggestions={scene.participants
-                .filter(({ status }) => status !== 'LEFT')
-                .map((participant) => ({ id: participant.npcId, label: `问 ${participant.name}` }))}
+              suggestions={(sceneSuggestions?.suggestions ?? []).map((suggestion) => ({
+                id: suggestion.id,
+                label: suggestion.text,
+              }))}
               submitLabel="推进场景"
               submitting={sceneBusy}
-              {...(sceneError === undefined ? {} : { error: sceneError })}
+              {...(composerError === undefined ? {} : { error: composerError })}
+              {...(sceneSuggestions === null && suggestionError === undefined
+                ? { status: '正在整理场景建议…' }
+                : {})}
               onRetry={() => {
+                if (sceneError === undefined) {
+                  setSuggestionRevision((current) => current + 1);
+                  return;
+                }
                 if (campaignId === null || scene === null) return;
                 setSceneBusy(true);
                 setSceneError(undefined);
@@ -301,10 +336,16 @@ export function TavernPage({
                   )
                   .finally(() => setSceneBusy(false));
               }}
-              onChange={setSceneIntent}
+              onChange={(value) => {
+                setSceneIntent(value);
+                setSelectedNpcId(null);
+              }}
               onSuggestion={(suggestion) => {
-                setSelectedNpcId(suggestion.id);
-                setSceneIntent(`我转向${suggestion.label.slice(2)}问道：`);
+                const selected = sceneSuggestions?.suggestions.find(
+                  ({ id }) => id === suggestion.id,
+                );
+                setSelectedNpcId(selected?.addressedNpcId ?? null);
+                setSceneIntent(suggestion.label);
               }}
               onSubmit={() => void sendSceneIntent()}
             />

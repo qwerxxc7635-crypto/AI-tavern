@@ -102,6 +102,11 @@ export const TASK_PROMPTS = Object.freeze({
     'Reply only from this NPC perspective without repeating substantial phrases inside the response. Return 3-5 distinct suggested topics grounded in this NPC knowledge and the conversation; they are optional player suggestions with no extra authority. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
     4,
   ),
+  GENERATE_DIALOGUE_SUGGESTIONS: define(
+    'GENERATE_DIALOGUE_SUGGESTIONS',
+    'GAME_MASTER',
+    'Create 3-5 distinct optional player dialogue suggestions using only the supplied player-visible world, participant, relationship, public transcript, and open-quest context. Every addressedNpcId must be null or exactly one supplied participant ID. Suggestions must fit the immediate conversation, must not reveal private NPC knowledge or hidden facts, must not invent outcomes, and never count as a submitted player action.',
+  ),
   PROPOSE_TAVERN_SCENE_ACTION: define(
     'PROPOSE_TAVERN_SCENE_ACTION',
     'NPC_ACTOR',

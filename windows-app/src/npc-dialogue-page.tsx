@@ -10,13 +10,20 @@ import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
 import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
 import { ActionComposer, DialogueView } from './ui/game-components.js';
+import {
+  dialogueSuggestionService,
+  type DialogueSuggestionSet,
+  type WindowsDialogueSuggestionService,
+} from './dialogue-suggestion-service.js';
 
 type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send' | 'retry'>;
 
 export function NpcDialoguePage({
   service = windowsNpcDialogueService,
+  suggestionService = dialogueSuggestionService,
 }: {
   readonly service?: DialogueActions;
+  readonly suggestionService?: Pick<WindowsDialogueSuggestionService, 'load'>;
 }) {
   const [search] = useSearchParams();
   const campaignId = search.get('campaignId');
@@ -27,6 +34,9 @@ export function NpcDialoguePage({
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
+  const [suggestions, setSuggestions] = useState<DialogueSuggestionSet | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | undefined>();
+  const [suggestionRevision, setSuggestionRevision] = useState(0);
   const sendInFlight = useRef(false);
 
   useEffect(() => {
@@ -44,6 +54,22 @@ export function NpcDialoguePage({
       active = false;
     };
   }, [campaignId, npcId, service]);
+
+  useEffect(() => {
+    if (campaignId === null || npcId === null || snapshot === null) return;
+    const controller = new AbortController();
+    setSuggestions(null);
+    setSuggestionError(undefined);
+    void suggestionService
+      .load(campaignId, 'NPC_DIALOGUE', npcId, controller.signal)
+      .then(setSuggestions)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setSuggestionError(error instanceof Error ? error.message : '对话建议暂时无法生成。');
+        }
+      });
+    return () => controller.abort();
+  }, [campaignId, npcId, snapshot, suggestionRevision, suggestionService]);
 
   async function send() {
     if (
@@ -140,13 +166,17 @@ export function NpcDialoguePage({
             label="你想说什么？"
             description="可以选择建议话题，也可以永久使用自由输入。按住控制键或命令键，再按回车发送。"
             value={draft}
-            suggestions={snapshot.suggestedTopics.map((topic, index) => ({
-              id: `npc-topic-${index + 1}`,
-              label: topic,
+            suggestions={(suggestions?.suggestions ?? []).map((suggestion) => ({
+              id: suggestion.id,
+              label: suggestion.text,
             }))}
             selectedSuggestionId={selectedTopicId}
             disabled={busy}
             submitting={busy}
+            {...(suggestions === null && suggestionError === undefined
+              ? { status: '正在整理对话建议…' }
+              : {})}
+            {...(suggestionError === undefined ? {} : { error: suggestionError })}
             submitLabel="发送"
             onChange={(value) => {
               setDraft(value);
@@ -156,6 +186,7 @@ export function NpcDialoguePage({
               setDraft(suggestion.label);
               setSelectedTopicId(suggestion.id);
             }}
+            onRetry={() => setSuggestionRevision((current) => current + 1)}
             onSubmit={() => void send()}
           />
           {snapshot.timeline === null && aiError === null ? null : (

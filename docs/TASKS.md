@@ -365,12 +365,13 @@
 
 ## M7-T04 Dialogue Suggestions
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M7-T03。
 - **Deliverable**：3–5 对话建议接入 Action Composer 与候选缓存/失效规则。
 - **Acceptance**：建议符合当前 NPC/场景且自由输入永久存在；世界变化后旧建议失效。
 - **Tests**：count、relevance inputs、free input、cache invalidation、cancel/error。
 - **Do Not**：不自动发送建议；不把建议持久化为玩家行动。
+- **Implementation reference**：[`V0.3_DIALOGUE_SUGGESTIONS.md`](V0.3_DIALOGUE_SUGGESTIONS.md)。
 
 ## M7-T05 Prompt Manager
 

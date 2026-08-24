@@ -266,6 +266,22 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       })),
     };
   }
+  if (request.task === 'GENERATE_DIALOGUE_SUGGESTIONS') {
+    const input = taskInput(request);
+    const participants = Array.isArray(input?.['participants']) ? input['participants'] : [];
+    const first = participants.find(isRecord);
+    const addressedNpcId = typeof first?.['id'] === 'string' ? first['id'] : null;
+    return {
+      suggestions: [
+        { text: '询问最近改变酒馆气氛的事情', addressedNpcId },
+        { text: '谈谈眼前任务可能遗漏的线索', addressedNpcId },
+        {
+          text: '观察众人听到当前话题后的反应',
+          addressedNpcId: input?.['scopeKind'] === 'NPC_DIALOGUE' ? addressedNpcId : null,
+        },
+      ],
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;

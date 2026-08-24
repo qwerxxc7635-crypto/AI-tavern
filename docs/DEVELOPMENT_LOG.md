@@ -4355,3 +4355,22 @@
 - `pnpm --dir windows-app build` 生产构建通过，Vite 转换 257 个模块。没有删除测试、降低校验、写死业务结果或忽略错误。
 - portable `.emtavern` 仍为 format v2；schema 21 的正式导入导出升级严格留给 M10-T05。本任务没有修改 Rules Engine、D20、Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心合同或存档状态机，也不进入 M7-T04。
 - 视觉实现继续遵循已持久化手册和渐进迁移策略；没有逐页返工 Legacy UI。用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M7-T04 Dialogue Suggestions
+
+### 公开 Context、精确失效与 Action Composer
+
+- 新增统一 `GENERATE_DIALOGUE_SUGGESTIONS` version 1，严格输出 3–5 条唯一建议和合法可选点名对象。输入只含 World 摘要、玩家、参与者公开身份/状态、单 NPC 关系、公开对话/Scene 行动与开放 Quest；不向模型提供 Secret、私有 Knowledge/Memory 或隐藏事实。
+- schema 22 新增 immutable `dialogue_suggestion_cache`。Rust Native 从 SQLite 重建单 NPC 或多人 Scene 输入，并把 Campaign、Scope、NPC/关系/对话或 Scene revision、World Fact、Clock、Faction、Location、Population、Event 与 Quest 状态纳入 SHA-256 digest。缓存只允许精确 digest 命中，世界变化后旧建议不可取回。
+- Windows `DialogueSuggestionService` 先 prepare，命中缓存时不调用 Provider；未命中才走既有桌面 AI 编排。Native 在 immediate transaction 内再次重建 Context，过期 digest/输入返回 `FACT_CONFLICT`，并原子保存 request audit、generation record 与派生缓存。
+- 单 NPC 与多人 Tavern 页面均复用既有 `ActionComposer`。选择建议只填充可编辑草稿和可选点名 NPC，必须再次明确提交；编辑多人自由输入会清除建议携带的点名。建议加载、取消、错误和重试不禁用自由输入，页面取消后的晚到结果不会提交。
+- 建议缓存不复用可确认 `ai_candidates`，也不写 Message、Scene Turn、Game Event 或玩家行动。Campaign 删除可级联清理派生缓存；取消、结构错误、非法点名和过期提交均不产生部分写入。
+- 新增 [`V0.3_DIALOGUE_SUGGESTIONS.md`](V0.3_DIALOGUE_SUGGESTIONS.md) 与 `DEC-134`，并更新 V0.3 规格、Generator Framework 和任务引用。
+
+### 验证、自审与限制
+
+- 定向测试覆盖 count、公开 relevance input、单/多人 UI、永久自由输入、无自动发送、精确缓存、关系/世界变化失效、stale digest、非法点名、取消、错误 cause、无玩家行动持久化和 Campaign 删除。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 149 个文件/899 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 124 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 258 个模块。门禁后补充的中文动态错误文案与 Campaign cascade 专项测试亦通过 Prettier、ESLint、TypeScript 和对应 Rust 测试。
+- portable `.emtavern` 仍为 format v2；schema 22 派生缓存的正式归档策略留给 M10-T05。本任务没有修改 Rules Engine、D20、Immutable Timeline、Quest/NPC/Adventure 核心合同、Provider/Queue、World Seed/Constitution 或存档状态机，也没有进入 M7-T05。
+- 自然触及 UI 继续复用既有 Design Token、`ActionComposer` 与视觉手册；没有新增 CSS、平行组件体系或提前执行 M10-T07 Legacy 迁移。用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。

@@ -467,6 +467,28 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       relationshipProposal: { trust: 1 },
     },
   },
+  GENERATE_DIALOGUE_SUGGESTIONS: {
+    input: {
+      scopeKind: 'NPC_DIALOGUE',
+      scopeId: 'npc-1',
+      world: { summary: world.summary, currentRegion: world.currentRegion },
+      player: { name: 'Mira', concept: 'Curious scout', personalGoal: 'Find the old road.' },
+      participants: [{ id: 'npc-1', name: 'Ilyra', identity: 'Innkeeper', status: 'ACTIVE' }],
+      relationship: { trust: 1, closeness: 0, awe: 0, obligation: 0 },
+      recentMessages: [
+        { role: 'PLAYER', speakerNpcId: null, content: 'What is below the cellar?' },
+        { role: 'NPC', speakerNpcId: 'npc-1', content: 'An old sealed passage.' },
+      ],
+      openQuests: [{ id: 'quest-1', title: 'The Lantern Below', status: 'AVAILABLE' }],
+    },
+    output: {
+      suggestions: [
+        { text: 'Who sealed the passage?', addressedNpcId: 'npc-1' },
+        { text: 'Ask about the lantern quest.', addressedNpcId: 'npc-1' },
+        { text: 'Offer to inspect the cellar.', addressedNpcId: 'npc-1' },
+      ],
+    },
+  },
   PROPOSE_TAVERN_SCENE_ACTION: {
     input: {
       sceneId: 'scene-1',

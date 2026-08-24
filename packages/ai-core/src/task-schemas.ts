@@ -721,6 +721,88 @@ export const NpcReplyOutputSchema = z
     }
   });
 
+const dialogueSuggestionParticipant = z
+  .object({
+    id: identifier,
+    name: shortText,
+    identity: shortText,
+    status: z.enum(['ACTIVE', 'LISTENING']),
+  })
+  .strict();
+
+export const DialogueSuggestionInputSchema = z
+  .object({
+    scopeKind: z.enum(['NPC_DIALOGUE', 'TAVERN_SCENE']),
+    scopeId: identifier,
+    world: z.object({ summary: text, currentRegion: shortText }).strict(),
+    player: z.object({ name: shortText, concept: text, personalGoal: text }).strict(),
+    participants: z.array(dialogueSuggestionParticipant).min(1).max(6),
+    relationship: relationship.nullable(),
+    recentMessages: z
+      .array(
+        z
+          .object({
+            role: z.enum(['PLAYER', 'NPC', 'SYSTEM']),
+            speakerNpcId: identifier.nullable(),
+            content: text,
+          })
+          .strict(),
+      )
+      .max(18),
+    openQuests: z
+      .array(z.object({ id: identifier, title: shortText, status: shortText }).strict())
+      .max(12),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (
+      (input.scopeKind === 'NPC_DIALOGUE' &&
+        (input.participants.length !== 1 || input.relationship === null)) ||
+      (input.scopeKind === 'TAVERN_SCENE' && input.participants.length < 2)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['participants'],
+        message: 'Dialogue suggestion scope does not match its participants',
+      });
+    }
+    if (new Set(input.participants.map(({ id }) => id)).size !== input.participants.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['participants'],
+        message: 'Dialogue suggestion participants must be unique',
+      });
+    }
+  });
+
+export const DialogueSuggestionOutputSchema = z
+  .object({
+    suggestions: z
+      .array(
+        z
+          .object({
+            text,
+            addressedNpcId: identifier.nullable(),
+          })
+          .strict(),
+      )
+      .min(3)
+      .max(5),
+  })
+  .strict()
+  .superRefine((output, context) => {
+    const normalized = output.suggestions.map(({ text: suggestion }) =>
+      suggestion.normalize('NFKC').toLocaleLowerCase('zh-CN'),
+    );
+    if (new Set(normalized).size !== normalized.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestions'],
+        message: 'Dialogue suggestions must be unique',
+      });
+    }
+  });
+
 export const GenerateQuestInputSchema = z
   .object({
     world: worldContext,

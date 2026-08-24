@@ -18,20 +18,21 @@ use ember_native_bridge::{
     CampaignRecoverySnapshot, CampaignStore, CampaignStoreError, CampaignSummary, CapabilitySource,
     CareerPool, CareerPoolGenerationCommit, CharacterCandidateConfirm, CharacterCompletionCommit,
     CharacterCreationSnapshot, CharacterRulesState, CharacterTraitGenerationCommit,
-    CredentialAction, CredentialCleanupReason, DynamicLocationGenerationCommit,
-    DynamicLocationGenerationRequest, DynamicLocationGenerationSnapshot, DynamicLocationSnapshot,
-    DynamicLocationTravelCommand, FactionActionCommand, ModelCapabilitiesRegistration,
-    ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
-    NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit,
-    NpcTimelineBegin, NpcTimelineFail, NpcTimelineOperation, QuestBoardSnapshot,
-    QuestGenerationCommit, RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand,
-    RulesCommitReceipt, TavernGenerationCommit, TavernPopulationFocusCommand,
-    TavernPopulationProjectCommand, TavernPopulationSnapshot, TavernSceneCommit,
-    TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot, TavernSceneStart,
-    TavernSnapshot, UniversalCharacterCreationConfirm, UniversalCharacterCreationSave,
-    UniversalCharacterCreationSnapshot, UniversalCharacterCreationStart,
-    UniversalCharacterQuickCommit, WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate,
-    model_endpoint_fingerprint, model_probe_fingerprint,
+    CredentialAction, CredentialCleanupReason, DialogueSuggestionCommit,
+    DialogueSuggestionPreparation, DialogueSuggestionPrepareCommand, DialogueSuggestionSet,
+    DynamicLocationGenerationCommit, DynamicLocationGenerationRequest,
+    DynamicLocationGenerationSnapshot, DynamicLocationSnapshot, DynamicLocationTravelCommand,
+    FactionActionCommand, ModelCapabilitiesRegistration, ModelSettingsSnapshot,
+    ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot, NpcLodGenerationSnapshot,
+    NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit, NpcTimelineBegin,
+    NpcTimelineFail, NpcTimelineOperation, QuestBoardSnapshot, QuestGenerationCommit,
+    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt,
+    TavernGenerationCommit, TavernPopulationFocusCommand, TavernPopulationProjectCommand,
+    TavernPopulationSnapshot, TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare,
+    TavernSceneSnapshot, TavernSceneStart, TavernSnapshot, UniversalCharacterCreationConfirm,
+    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
+    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
+    WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint, model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
 use ember_provider_openai_compatible::{
@@ -1336,6 +1337,26 @@ fn npc_dialogue_commit(
 }
 
 #[tauri::command]
+fn dialogue_suggestions_prepare(
+    command: DialogueSuggestionPrepareCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DialogueSuggestionPreparation, CommandError> {
+    store
+        .prepare_dialogue_suggestions(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dialogue_suggestions_commit(
+    command: DialogueSuggestionCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<DialogueSuggestionSet, CommandError> {
+    store
+        .commit_dialogue_suggestions(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn quest_board_get(
     campaign_id: String,
     store: State<'_, CampaignStore>,
@@ -1567,6 +1588,8 @@ pub fn run() {
             tavern_npcs_commit,
             npc_dialogue_get,
             npc_dialogue_commit,
+            dialogue_suggestions_prepare,
+            dialogue_suggestions_commit,
             quest_board_get,
             quest_generation_commit,
             quest_accept,

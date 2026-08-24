@@ -417,6 +417,13 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     memoryCandidate: 'The player asked Ilyra to reveal the cellar door.',
     relationshipProposal: { trust: 1 },
   },
+  GENERATE_DIALOGUE_SUGGESTIONS: {
+    suggestions: [
+      { text: '询问旧隧道最近的动静', addressedNpcId: 'npc-owner' },
+      { text: '谈谈灯塔守望者留下的线索', addressedNpcId: 'npc-owner' },
+      { text: '观察炉边众人对地窖门的反应', addressedNpcId: null },
+    ],
+  },
   PROPOSE_TAVERN_SCENE_ACTION: {
     actorId: 'npc-owner',
     action: 'SPEAK',
