@@ -399,12 +399,13 @@
 
 ## M8-T02 Quest Graph
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M8-T01。
 - **Deliverable**：事实/实体/前置/后果边、依赖重评估和可视/调试投影。
 - **Acceptance**：Quest A 的事实变化能确定性更新 B/C；循环和悬空引用被拒绝；事件可审计。
 - **Tests**：chain/branch/cycle、NPC death/faction/location consequences、rollback、reload。
 - **Do Not**：不让每个任务成为隔离故事；不由 LLM 自行宣告依赖状态。
+- **Implementation reference**：[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)。
 
 ## M8-T03 Dynamic Quest Sources
 

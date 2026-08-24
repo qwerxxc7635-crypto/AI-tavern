@@ -27,6 +27,7 @@ use ember_native_bridge::{
     NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit, NpcTimelineBegin,
     NpcTimelineFail, NpcTimelineOperation, PromptManagerSnapshot, PromptPresetActivateCommand,
     PromptPresetImportCommand, PromptPresetSaveCommand, QuestBoardSnapshot, QuestGenerationCommit,
+    QuestGraphEvaluateCommand, QuestGraphReplaceCommand, QuestGraphSnapshot,
     QuestPoolTransitionCommand, RandomnessSettingsSnapshot, RandomnessSettingsUpdate,
     RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit, TavernPopulationFocusCommand,
     TavernPopulationProjectCommand, TavernPopulationSnapshot, TavernSceneCommit,
@@ -1443,6 +1444,30 @@ fn quest_pool_transition(
 }
 
 #[tauri::command]
+fn quest_graph_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestGraphSnapshot, CommandError> {
+    store.quest_graph_snapshot(&campaign_id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_graph_replace(
+    command: QuestGraphReplaceCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestGraphSnapshot, CommandError> {
+    store.replace_quest_graph(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_graph_evaluate(
+    command: QuestGraphEvaluateCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestGraphSnapshot, CommandError> {
+    store.evaluate_quest_graph(command).map_err(Into::into)
+}
+
+#[tauri::command]
 fn adventure_get(
     campaign_id: String,
     quest_id: Option<String>,
@@ -1653,6 +1678,9 @@ pub fn run() {
             quest_generation_commit,
             quest_accept,
             quest_pool_transition,
+            quest_graph_get,
+            quest_graph_replace,
+            quest_graph_evaluate,
             adventure_get,
             adventure_plan_commit,
             adventure_start,

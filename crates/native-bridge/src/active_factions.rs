@@ -7,6 +7,7 @@ use serde_json::{Value, json};
 use crate::{
     CampaignStore, CampaignStoreError, CharacterGenerationAudit, current_timestamp,
     insert_character_generation,
+    quest_graph::evaluate_after_source_change,
     quest_pool::{
         transition_allowed as legal_quest_transition, transition_quest_pool_in_transaction,
     },
@@ -397,6 +398,14 @@ impl CampaignStore {
             (None, None) => {}
             _ => return Err(CampaignStoreError::InvalidData),
         }
+        evaluate_after_source_change(
+            &transaction,
+            &command.campaign_id,
+            &format!("quest-graph:faction:{}", command.operation_id),
+            "FACTION_CHANGE",
+            &command.proposal.faction_id,
+            &at,
+        )?;
         let after_actor = profiles
             .get(&command.proposal.faction_id)
             .ok_or(CampaignStoreError::InvalidData)?;

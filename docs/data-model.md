@@ -261,6 +261,37 @@ erDiagram
 
 该表是事务级恢复门禁，不是游戏状态。Snapshot Repository在立即事务内先插入、完整重建Quest Pool后删除；提交或回滚后必须为空。只有存在该门禁时，Quest重插入可跳过自动初始化且账本可被完整替换。普通业务路径仍受append-only trigger保护。
 
+### 3.9.4 `quest_graphs` / `quest_graph_edges`（schema 24）
+
+`quest_graphs`以`campaign_id`为主键，保存当前`revision`与`updated_at`。`quest_graph_edges`保存PREREQUISITE/CONSEQUENCE、来源种类与ID、受限谓词和值、目标Quest、满足/不满足状态政策、priority和建立时间。
+
+来源与目标必须属于同一Campaign；数据库trigger拒绝悬空引用与Quest→Quest循环。Repository与Native进一步拒绝语义重复、前置政策冲突和同优先级结果冲突。当前边可替换，但只能通过乐观revision事务替换，不能由模型或UI直接写入。
+
+### 3.9.5 `quest_graph_revisions`（schema 24）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `operation_id` | TEXT PK | 幂等图配置操作 |
+| `campaign_id` | TEXT FK → quest_graphs | 所属Campaign |
+| `revision` | INTEGER UNIQUE per Campaign | 图修订号 |
+| `edges_json` | TEXT JSON array | 该修订的完整边快照 |
+| `occurred_at` | TEXT | 提交时间 |
+
+历史append-only；只允许内部快照恢复事务在`quest_pool_restore_sessions`门禁下完整重建。
+
+### 3.9.6 `quest_graph_evaluations`（schema 24）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `operation_id` | TEXT PK | 幂等求值操作 |
+| `campaign_id` / `graph_revision` | 复合FK → quest_graph_revisions | 使用的图身份 |
+| `trigger_kind` / `trigger_id` | TEXT CHECK / TEXT | Quest、事实、实体或手动触发来源 |
+| `evaluated_edge_ids_json` | TEXT JSON array | 参与求值的边 |
+| `changes_json` | TEXT JSON array | Quest状态变化与决定边 |
+| `occurred_at` | TEXT | 求值时间 |
+
+求值历史append-only；每项变化还会在`quest_pool_transitions`留下`LOCAL_RULE`转换。完整合同见[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)。
+
 ### 3.10 `adventures`
 
 | 字段 | 类型/约束 | 含义 |

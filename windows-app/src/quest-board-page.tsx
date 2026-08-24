@@ -72,6 +72,19 @@ export function QuestBoardPage({
     () => snapshot?.quests.filter(({ status }) => status !== 'HIDDEN') ?? [],
     [snapshot],
   );
+  const visibleQuestIds = useMemo(
+    () => new Set(visibleQuests.map(({ id }) => id)),
+    [visibleQuests],
+  );
+  const visibleGraphEdges = useMemo(
+    () =>
+      snapshot?.graph?.edges.filter(
+        (edge) =>
+          visibleQuestIds.has(edge.targetQuestId) &&
+          (edge.sourceKind !== 'QUEST' || visibleQuestIds.has(edge.sourceId)),
+      ) ?? [],
+    [snapshot, visibleQuestIds],
+  );
 
   async function interveneSelected() {
     if (campaignId === null || selected === null || busy) return;
@@ -232,6 +245,37 @@ export function QuestBoardPage({
           </article>
         )}
       </div>
+
+      {snapshot.graph === undefined ? null : (
+        <details className="quest-detail">
+          <summary>任务关系调试 · 修订 {snapshot.graph.revision}</summary>
+          {visibleGraphEdges.length === 0 ? (
+            <p>当前没有任务关系边。</p>
+          ) : (
+            <ul>
+              {visibleGraphEdges.map((edge) => (
+                <li key={edge.id}>
+                  {edge.sourceKind}:{edge.sourceId} · {edge.predicate}={edge.expectedValue} →{' '}
+                  {visibleQuests.find(({ id }) => id === edge.targetQuestId)?.content.title}
+                  {' · '}
+                  {edge.satisfiedStatus}
+                </li>
+              ))}
+            </ul>
+          )}
+          {snapshot.graph.evaluations[0] === undefined ? null : (
+            <p>
+              最近求值：{snapshot.graph.evaluations[0].triggerKind} ·{' '}
+              {
+                snapshot.graph.evaluations[0].changes.filter(({ questId }) =>
+                  visibleQuestIds.has(questId),
+                ).length
+              }{' '}
+              项可见状态变化
+            </p>
+          )}
+        </details>
+      )}
     </main>
   );
 }

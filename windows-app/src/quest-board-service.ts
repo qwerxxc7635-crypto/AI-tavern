@@ -9,6 +9,10 @@ import {
 } from '@ember-tavern/ai-core';
 import {
   QUEST_STATUSES,
+  QUEST_GRAPH_EDGE_KINDS,
+  QUEST_GRAPH_PREDICATES,
+  QUEST_GRAPH_SOURCE_KINDS,
+  QUEST_GRAPH_TRIGGER_KINDS,
   QUEST_TRANSITION_SOURCES,
   aiRequestId,
   campaignId,
@@ -17,6 +21,7 @@ import {
   isoTimestamp,
   questId as parseQuestId,
   type QuestStatus,
+  type QuestGraphSnapshot,
   type QuestTransitionSource,
 } from '@ember-tavern/contracts';
 import {
@@ -85,6 +90,7 @@ export interface QuestBoardSnapshot {
   readonly campaignState: string;
   readonly source: QuestGenerationSource;
   readonly quests: readonly QuestView[];
+  readonly graph?: QuestGraphSnapshot;
 }
 
 interface GenerationAudit {
@@ -345,11 +351,84 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): QuestBoardSn
   if (JSON.stringify(source.recentQuestStructures) !== JSON.stringify(expectedStructures)) {
     throw new TypeError('Quest repetition history is inconsistent');
   }
+  const graph =
+    record['graph'] === undefined ? undefined : parseGraph(record['graph'], storedCampaignId);
   return Object.freeze({
     campaignId: storedCampaignId,
     campaignState: requireText(record['campaignState']),
     source,
     quests,
+    ...(graph === undefined ? {} : { graph }),
+  });
+}
+
+function parseGraph(value: unknown, expectedCampaignId: string): QuestGraphSnapshot {
+  const record = requireRecord(value);
+  const storedCampaignId = campaignId(requireText(record['campaignId']));
+  if (storedCampaignId !== expectedCampaignId) {
+    throw new TypeError('Quest graph belongs to another campaign');
+  }
+  return Object.freeze({
+    campaignId: storedCampaignId,
+    revision: positiveInteger(record['revision']),
+    updatedAt: isoTimestamp(requireText(record['updatedAt'])),
+    edges: Object.freeze(
+      requireArray(record['edges']).map((item) => {
+        const edge = requireRecord(item);
+        const edgeCampaignId = campaignId(requireText(edge['campaignId']));
+        if (edgeCampaignId !== storedCampaignId) {
+          throw new TypeError('Quest graph edge belongs to another campaign');
+        }
+        return Object.freeze({
+          id: requireText(edge['id']),
+          campaignId: edgeCampaignId,
+          kind: enumValue(QUEST_GRAPH_EDGE_KINDS, edge['kind']),
+          sourceKind: enumValue(QUEST_GRAPH_SOURCE_KINDS, edge['sourceKind']),
+          sourceId: requireText(edge['sourceId']),
+          predicate: enumValue(QUEST_GRAPH_PREDICATES, edge['predicate']),
+          expectedValue: requireText(edge['expectedValue']),
+          targetQuestId: parseQuestId(requireText(edge['targetQuestId'])),
+          satisfiedStatus: enumValue(QUEST_STATUSES, edge['satisfiedStatus']),
+          unsatisfiedStatus:
+            edge['unsatisfiedStatus'] === null
+              ? null
+              : enumValue(QUEST_STATUSES, edge['unsatisfiedStatus']),
+          priority: nonNegativeInteger(edge['priority']),
+          createdAt: isoTimestamp(requireText(edge['createdAt'])),
+        });
+      }),
+    ),
+    evaluations: Object.freeze(
+      requireArray(record['evaluations']).map((item) => {
+        const evaluation = requireRecord(item);
+        const evaluationCampaignId = campaignId(requireText(evaluation['campaignId']));
+        if (evaluationCampaignId !== storedCampaignId) {
+          throw new TypeError('Quest graph evaluation belongs to another campaign');
+        }
+        return Object.freeze({
+          operationId: requireText(evaluation['operationId']),
+          campaignId: evaluationCampaignId,
+          graphRevision: positiveInteger(evaluation['graphRevision']),
+          triggerKind: enumValue(QUEST_GRAPH_TRIGGER_KINDS, evaluation['triggerKind']),
+          triggerId: requireText(evaluation['triggerId']),
+          evaluatedEdgeIds: Object.freeze(
+            requireArray(evaluation['evaluatedEdgeIds']).map(requireText),
+          ),
+          changes: Object.freeze(
+            requireArray(evaluation['changes']).map((item) => {
+              const change = requireRecord(item);
+              return Object.freeze({
+                questId: parseQuestId(requireText(change['questId'])),
+                fromStatus: enumValue(QUEST_STATUSES, change['fromStatus']),
+                toStatus: enumValue(QUEST_STATUSES, change['toStatus']),
+                edgeIds: Object.freeze(requireArray(change['edgeIds']).map(requireText)),
+              });
+            }),
+          ),
+          occurredAt: isoTimestamp(requireText(evaluation['occurredAt'])),
+        });
+      }),
+    ),
   });
 }
 
@@ -452,6 +531,13 @@ function requireText(value: unknown): string {
 
 function positiveInteger(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError('Quest number is invalid');
+  }
+  return value;
+}
+
+function nonNegativeInteger(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw new TypeError('Quest number is invalid');
   }
   return value;

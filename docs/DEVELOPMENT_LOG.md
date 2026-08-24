@@ -4412,3 +4412,22 @@
 - `pnpm --dir windows-app build`生产构建通过，Vite转换262个模块。没有删除测试、降低校验、写死结果、忽略错误或回滚已完成任务。
 - portable`.emtavern`仍为format v2；schema 23正式跨版本归档严格留给M10-T05。M8-T02 Quest Graph、M8-T03动态来源和World Director均未提前实现。
 - 新增UI复用既有Quest页面、组件和Design Token，没有新增CSS或平行组件体系；视觉手册与M10-T07 Legacy迁移门禁保持有效。用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
+
+## 2026-08-24 — M8-T02 Quest Graph
+
+### 本地依赖图、事务重评估与可审计投影
+
+- 新增Quest Graph合同与纯Domain求值器。来源闭集为Quest、World Fact、NPC、Faction和Location；同目标PREREQUISITE采用AND，CONSEQUENCE使用显式priority，相同priority冲突、语义重复、悬空引用、政策冲突和Quest→Quest循环全部fail closed。
+- 求值使用稳定拓扑顺序，并在一次事务内消费前序Quest的新状态，支持A→B→C链式传播和A→B/C分支。所有目标变化继续通过Quest Pool合法转换验证；COMPLETED、FAILED、EXPIRED、ABANDONED终态不可被图重开。
+- schema 24新增`quest_graphs`、当前边、append-only完整图修订和append-only求值事件。TypeScript Repository与Rust Native都验证Campaign引用、revision、幂等operation和当前SQLite实体状态；AI、Generator和UI不能宣告依赖满足或直接写Quest状态。
+- Quest Pool根转换在原事务内触发`QUEST_TRANSITION`重算，Faction行动完成其Profile/World Fact变化后触发`FACTION_CHANGE`重算。Native另提供受验证的World Fact、NPC、Location和手动重算入口，供对应本地事务及M8-T03来源适配器复用，不复制状态机。
+- 内部自动快照保存并精确恢复当前图、图修订与求值历史；schema 24前旧内部快照恢复为空图revision 1。portable`.emtavern`format v2保持不变，schema 24正式跨版本归档仍由M10-T05处理。
+- Quest Board快照新增最近20次求值和边的只读折叠调试投影，显示来源、谓词、目标、结果和变化数。页面复用现有Quest布局与Design Token，没有新增CSS、编辑权限或平行组件体系。
+- 新增[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)与`DEC-137`，并更新V0.3规格、data model和任务引用。此前持久化的视觉手册、视觉债务与M10-T07迁移门禁保持有效；本任务没有逐页返工Legacy UI。
+
+### 验证、自审与限制
+
+- 专项测试覆盖chain、branch、cycle、dangling reference、前置政策/priority冲突、NPC死亡、Faction、Location、World Fact后果、事务回滚、自动快照和关闭重开；Rust集成验证Quest根转换与依赖变化同事务提交并跨重启保持。
+- `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 156个文件/920项通过，另1个文件/1项性能基线按设计跳过；Node 29项通过；Rust workspace 132项通过，另1项需明确API Key授权的真实Provider测试忽略；TypeScript↔Rust archive interop通过。
+- `cargo fmt --check`与全workspace严格Clippy通过；`pnpm --dir windows-app build`生产构建通过，Vite转换264个模块。没有删除测试、降低校验、写死求值结果、忽略错误或让LLM取得规则权限。
+- 本任务不修改Rules Engine、D20硬结果、AI Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure内容合同或存档状态机，也没有进入M8-T03。用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。

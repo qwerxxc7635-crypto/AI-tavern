@@ -13,6 +13,7 @@ import {
 import { assertQuestPoolTransition } from '@ember-tavern/domain';
 
 import { PersistenceDataError } from './campaign-repository.js';
+import { QuestGraphRepository } from './quest-graph-repository.js';
 import {
   requireEnum,
   requireNullableString,
@@ -148,6 +149,13 @@ export class QuestPoolRepository {
     if (Number(changed.changes) !== 1) {
       throw new PersistenceDataError('Quest pool changed during transition');
     }
+    new QuestGraphRepository(this.database).evaluateInCurrentTransaction({
+      operationId: `${input.operationId}:graph`,
+      campaignId: input.campaignId,
+      triggerKind: 'QUEST_TRANSITION',
+      triggerId: input.questId,
+      occurredAt: input.occurredAt,
+    });
     const result = this.get(input.questId);
     if (result === null) throw new PersistenceDataError('Transitioned quest pool state is missing');
     return result;

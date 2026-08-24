@@ -5,8 +5,11 @@ use uuid::Uuid;
 
 use crate::{
     CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
-    quest_pool::transition_quest_pool_in_transaction, repetition::find_repeated_phrase,
-    repetition::quest_structure_signature, validate_id,
+    quest_graph::{QuestGraphSnapshot, load_quest_graph_snapshot},
+    quest_pool::transition_quest_pool_in_transaction,
+    repetition::find_repeated_phrase,
+    repetition::quest_structure_signature,
+    validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -80,6 +83,7 @@ pub struct QuestBoardSnapshot {
     pub campaign_state: String,
     pub source: QuestGenerationSource,
     pub quests: Vec<QuestView>,
+    pub graph: QuestGraphSnapshot,
 }
 
 #[derive(Debug, Deserialize)]
@@ -289,6 +293,7 @@ pub(crate) fn load_snapshot(
         campaign_state,
         source: load_source(connection, campaign_id)?,
         quests: load_quests(connection, campaign_id)?,
+        graph: load_quest_graph_snapshot(connection, campaign_id)?,
     })
 }
 

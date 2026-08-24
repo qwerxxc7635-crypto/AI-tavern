@@ -143,3 +143,4 @@ export {
   QuestPoolRuleError,
   assertQuestPoolTransition,
 } from './quest-pool.js';
+export { QuestGraphRuleError, evaluateQuestGraph, validateQuestGraph } from './quest-graph.js';

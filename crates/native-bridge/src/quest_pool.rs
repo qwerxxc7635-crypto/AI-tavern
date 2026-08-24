@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 use crate::{
     CampaignStore, CampaignStoreError, QuestBoardSnapshot, current_timestamp,
-    quest_board::load_snapshot, validate_id,
+    quest_board::load_snapshot, quest_graph::evaluate_after_quest_transition, validate_id,
 };
 
 const STATUSES: &[&str] = &[
@@ -153,6 +153,7 @@ pub(crate) fn transition_quest_pool_in_transaction(
     if changed != 1 {
         return Err(CampaignStoreError::ConcurrentModification);
     }
+    evaluate_after_quest_transition(connection, campaign_id, operation_id, quest_id, occurred_at)?;
     Ok(before)
 }
 

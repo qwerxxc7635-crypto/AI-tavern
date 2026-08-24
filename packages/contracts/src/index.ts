@@ -192,6 +192,24 @@ export type {
   RumorTruthStatus,
 } from './quest.js';
 export {
+  QUEST_GRAPH_EDGE_KINDS,
+  QUEST_GRAPH_PREDICATES,
+  QUEST_GRAPH_SOURCE_KINDS,
+  QUEST_GRAPH_TRIGGER_KINDS,
+  QuestGraphContractError,
+} from './quest-graph.js';
+export type {
+  QuestGraphEdge,
+  QuestGraphEdgeKind,
+  QuestGraphEntityState,
+  QuestGraphEvaluation,
+  QuestGraphPredicate,
+  QuestGraphSnapshot,
+  QuestGraphSourceKind,
+  QuestGraphStatusChange,
+  QuestGraphTriggerKind,
+} from './quest-graph.js';
+export {
   NPC_KNOWLEDGE_SOURCES,
   NPC_KNOWLEDGE_STATES,
   NpcKnowledgeError,

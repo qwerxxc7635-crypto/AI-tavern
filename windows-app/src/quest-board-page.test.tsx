@@ -4,6 +4,8 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it } from 'vitest';
 
+import { campaignId, isoTimestamp, questId } from '@ember-tavern/contracts';
+
 import { QuestBoardPage } from './quest-board-page.js';
 import type { QuestBoardSnapshot } from './quest-board-service.js';
 
@@ -27,6 +29,9 @@ describe('quest board page', () => {
     expect(screen.getByText('敏捷')).toBeTruthy();
     expect(screen.getByText('Restore the beacon.')).toBeTruthy();
     expect(screen.queryByText('Hidden Thread')).toBeNull();
+    fireEvent.click(screen.getByText('任务关系调试 · 修订 2'));
+    expect(screen.getByText(/QUEST:quest-one/)).toBeTruthy();
+    expect(screen.getByText(/最近求值：QUEST_TRANSITION/)).toBeTruthy();
 
     fireEvent.click(screen.getByRole('button', { name: '介入任务' }));
     expect(await screen.findByRole('link', { name: '进入冒险准备' })).toBeTruthy();
@@ -124,6 +129,39 @@ function boardSnapshot(): QuestBoardSnapshot {
       quest('quest-two', 'The Lost Courier'),
       { ...quest('quest-hidden', 'Hidden Thread'), status: 'HIDDEN' },
     ],
+    graph: {
+      campaignId: campaignId('campaign-tavern'),
+      revision: 2,
+      updatedAt: isoTimestamp('2026-07-31T06:01:00.000Z'),
+      edges: [
+        {
+          id: 'quest-one-two',
+          campaignId: campaignId('campaign-tavern'),
+          kind: 'CONSEQUENCE',
+          sourceKind: 'QUEST',
+          sourceId: 'quest-one',
+          predicate: 'STATUS_EQUALS',
+          expectedValue: 'COMPLETED',
+          targetQuestId: questId('quest-two'),
+          satisfiedStatus: 'AVAILABLE',
+          unsatisfiedStatus: null,
+          priority: 10,
+          createdAt: isoTimestamp('2026-07-31T06:00:00.000Z'),
+        },
+      ],
+      evaluations: [
+        {
+          operationId: 'complete-one:graph',
+          campaignId: campaignId('campaign-tavern'),
+          graphRevision: 2,
+          triggerKind: 'QUEST_TRANSITION',
+          triggerId: 'quest-one',
+          evaluatedEdgeIds: ['quest-one-two'],
+          changes: [],
+          occurredAt: isoTimestamp('2026-07-31T06:01:00.000Z'),
+        },
+      ],
+    },
   };
 }
 

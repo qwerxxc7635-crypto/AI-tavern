@@ -2903,3 +2903,27 @@ schema 23 新增一对一 `quest_pool_states` 作为 V0.3 生命周期唯一真�
 - Quest 内容、NPC发布者、Adventure外键和既有身份不迁移、不重造；portable archive format v2仍不扩展，schema 23正式归档留给M10-T05。
 - M8-T01只提供来源枚举和转换合同；NPC/Event/Discovery/Player Action等创建适配器及细化provenance仍按依赖留给M8-T03。
 - UI隐藏HIDDEN、允许多个Active并直接介入，继续复用既有组件与Design Token；Legacy视觉迁移仍由M10-T07执行。
+
+## DEC-137：Quest Graph 采用本地有向无环图与 append-only 求值审计
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T02`、`DEC-136`、[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)
+
+### 背景
+
+只有多任务状态机仍会让每个Quest成为孤立记录：Quest、NPC、Faction、Location或World Fact改变后，没有统一且可解释的方式更新依赖任务。若把依赖判断交给Generator或LLM，会绕过Quest Pool合法转换、终态保护和SQLite事务，并且同一世界状态可能得到不同结果。
+
+### 决定与理由
+
+每个Campaign使用一个本地有向图。边来源闭集为Quest、World Fact、NPC、Faction和Location；同目标PREREQUISITE使用AND，CONSEQUENCE使用显式priority。Quest→Quest边必须无环；同priority冲突、悬空引用、重复语义和前置政策冲突全部fail closed。
+
+求值按稳定拓扑序执行，并在同一事务内消费前序Quest的新状态，从而确定性传播链与分支。终态保持不可逆，每个目标变化仍由Quest Pool合法转换验证。schema 24将当前边、完整图修订和每次触发/参与边/变化作为SQLite事实，其中修订与求值历史append-only。
+
+### 影响与边界
+
+- Quest根转换和Faction实体变化在原事务内触发重算；后续M8-T03来源适配器必须复用同一Native入口。
+- AI只能生成候选内容，不能声明谓词结果、依赖满足或Quest状态；UI只提供读取和调试投影。
+- 内部快照保存schema 24图和审计；portable archive format v2不变，正式升级留给M10-T05。
+- Quest、NPC、Faction、Location、World Fact、Adventure、D20、Rules Engine和Provider既有合同不重构。
+- 页面复用现有Quest组件与Design Token，不新增CSS；Legacy视觉迁移仍由M10-T07统一执行。

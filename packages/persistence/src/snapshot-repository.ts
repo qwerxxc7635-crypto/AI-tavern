@@ -47,6 +47,10 @@ type SnapshotTable =
   | 'quests'
   | 'quest_pool_states'
   | 'quest_pool_transitions'
+  | 'quest_graphs'
+  | 'quest_graph_edges'
+  | 'quest_graph_revisions'
+  | 'quest_graph_evaluations'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -71,6 +75,13 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
   quest_pool_states: 'SELECT * FROM quest_pool_states WHERE campaign_id = ? ORDER BY quest_id',
   quest_pool_transitions:
     'SELECT * FROM quest_pool_transitions WHERE campaign_id = ? ORDER BY quest_id, after_revision',
+  quest_graphs: 'SELECT * FROM quest_graphs WHERE campaign_id = ? ORDER BY campaign_id',
+  quest_graph_edges:
+    'SELECT * FROM quest_graph_edges WHERE campaign_id = ? ORDER BY priority DESC, id',
+  quest_graph_revisions:
+    'SELECT * FROM quest_graph_revisions WHERE campaign_id = ? ORDER BY revision',
+  quest_graph_evaluations:
+    'SELECT * FROM quest_graph_evaluations WHERE campaign_id = ? ORDER BY occurred_at, operation_id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -95,6 +106,10 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'quests',
   'quest_pool_states',
   'quest_pool_transitions',
+  'quest_graphs',
+  'quest_graph_revisions',
+  'quest_graph_edges',
+  'quest_graph_evaluations',
   'adventures',
   'adventure_turns',
   'conversations',
@@ -282,6 +297,7 @@ export class SnapshotRepository {
       for (const stored of payload.tables[table]) this.insertRow(table, stored);
     }
     this.backfillLegacyQuestPool(snapshot.campaignId);
+    this.backfillLegacyQuestGraph(snapshot.campaignId);
     for (const request of turnRequests) this.restoreTurnRequest(request);
     this.database
       .prepare('DELETE FROM quest_pool_restore_sessions WHERE campaign_id = ?')
@@ -302,6 +318,10 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM quest_graph_evaluations WHERE campaign_id = ?',
+      'DELETE FROM quest_graph_revisions WHERE campaign_id = ?',
+      'DELETE FROM quest_graph_edges WHERE campaign_id = ?',
+      'DELETE FROM quest_graphs WHERE campaign_id = ?',
       'DELETE FROM quest_pool_transitions WHERE campaign_id = ?',
       'DELETE FROM quest_pool_states WHERE campaign_id = ?',
       `DELETE FROM messages WHERE conversation_id IN
@@ -356,6 +376,31 @@ export class SnapshotRepository {
              SELECT 1 FROM quest_pool_transitions
              WHERE quest_pool_transitions.quest_id=quest_pool_states.quest_id
            )`,
+      )
+      .run(campaign);
+  }
+
+  private backfillLegacyQuestGraph(campaign: CampaignId): void {
+    this.database
+      .prepare(
+        `INSERT INTO quest_graphs (campaign_id,revision,updated_at)
+         SELECT id,1,updated_at FROM campaigns
+         WHERE id=? AND NOT EXISTS (
+           SELECT 1 FROM quest_graphs WHERE campaign_id=campaigns.id
+         )`,
+      )
+      .run(campaign);
+    this.database
+      .prepare(
+        `INSERT INTO quest_graph_revisions (
+           operation_id,campaign_id,revision,edges_json,occurred_at
+         )
+         SELECT 'quest-graph:snapshot-migration:' || campaign_id,campaign_id,1,'[]',updated_at
+         FROM quest_graphs
+         WHERE campaign_id=? AND NOT EXISTS (
+           SELECT 1 FROM quest_graph_revisions
+           WHERE quest_graph_revisions.campaign_id=quest_graphs.campaign_id
+         )`,
       )
       .run(campaign);
   }
@@ -439,7 +484,12 @@ function parsePayload(text: string): SnapshotPayload {
     const rows = tableRoot[table];
     if (
       rows === undefined &&
-      (table === 'quest_pool_states' || table === 'quest_pool_transitions')
+      (table === 'quest_pool_states' ||
+        table === 'quest_pool_transitions' ||
+        table === 'quest_graphs' ||
+        table === 'quest_graph_edges' ||
+        table === 'quest_graph_revisions' ||
+        table === 'quest_graph_evaluations')
     ) {
       return [];
     }
@@ -568,6 +618,10 @@ function snapshotTableRecord(
     quests: values('quests'),
     quest_pool_states: values('quest_pool_states'),
     quest_pool_transitions: values('quest_pool_transitions'),
+    quest_graphs: values('quest_graphs'),
+    quest_graph_edges: values('quest_graph_edges'),
+    quest_graph_revisions: values('quest_graph_revisions'),
+    quest_graph_evaluations: values('quest_graph_evaluations'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

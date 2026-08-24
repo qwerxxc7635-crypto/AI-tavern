@@ -132,6 +132,11 @@ const migrations = [
     name: 'multi_quest_pool',
     source: new URL('../../../database/migrations/0023_multi_quest_pool.sql', import.meta.url),
   },
+  {
+    version: 24,
+    name: 'quest_graph',
+    source: new URL('../../../database/migrations/0024_quest_graph.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

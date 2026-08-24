@@ -62,6 +62,8 @@ export { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 export { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 export { QuestPoolRepository } from './quest-pool-repository.js';
 export type { TransitionQuestPoolState } from './quest-pool-repository.js';
+export { QuestGraphRepository, loadEntityStates } from './quest-graph-repository.js';
+export type { EvaluateQuestGraph, ReplaceQuestGraph } from './quest-graph-repository.js';
 export { TurnTransaction } from './turn-transaction.js';
 export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';
