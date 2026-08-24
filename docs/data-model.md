@@ -583,3 +583,9 @@ Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于�
 `world_lore_retrieval_rules`与`world_lore_entries`一对一，保存Campaign、关键词、闭集实体引用、Location/Quest ID、always-active、ANY/ALL、priority、entry token budget、enabled和连续revision。SQLite trigger与Repository共同验证Lore归属、JSON元素形状、不可变身份和revision；Repository额外验证所有引用属于同一Campaign。
 
 规则只是World Lore选择配置，不是Fact、Knowledge或Truth。检索先检查Lore source freshness，再本地计算可解释trigger/score，按priority→score→ID稳定排序并执行entry/total预算。应用层LRU只缓存规范query digest与完整corpus digest对应的结果，SQLite仍是唯一真相。内部snapshot携带schema 29规则且旧payload按空表兼容；portable format v2保持不变，正式升级留给M10-T05。完整合同见[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)。
+
+## 14. V0.3 Lazy World Generation（schema 30）
+
+`lazy_world_generation_plans`以intent key为主键，并对Campaign/kind/target建立唯一约束。它保存按需或后台候选模式、P0/P1/P2优先级、可选依赖、`PLANNED/RUNNING/SUCCEEDED/FAILED/CANCELLED`状态、attempt、active run、真实artifact引用、错误、retryability、revision和时间。插入要求同Campaign已有World Bible、World Seed与锁定Constitution；Location/Faction目标必须来自同Campaign outline投影。
+
+`lazy_world_generation_transitions`按递增ID保存每次revision变化，是append-only生命周期审计。SQLite success trigger按kind检查Career Pool、Tavern、完整Roster、从目标outline扩展出的DETAILED Location或ACTIVE Faction，禁止占位完成。内部snapshot按artifact→plan→transition顺序恢复，并允许旧payload缺失两表；portable format v2不变，正式迁移仍属于M10-T05。完整合同见[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)。

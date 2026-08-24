@@ -327,6 +327,7 @@ impl CampaignStore {
         if locked != 1 {
             return Err(CampaignStoreError::InvalidState);
         }
+        seed_lazy_world_generation(&transaction, campaign_id, &at)?;
         let changed = transaction.execute(
             "UPDATE campaigns
              SET state = 'CREATING_CHARACTER', resume_state = NULL, updated_at = ?1
@@ -339,6 +340,123 @@ impl CampaignStore {
         transaction.commit()?;
         self.world_creation_snapshot(campaign_id)
     }
+}
+
+fn seed_lazy_world_generation(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+    at: &str,
+) -> Result<(), CampaignStoreError> {
+    let tavern_intent = lazy_intent_key(campaign_id, "TAVERN", campaign_id);
+    insert_lazy_plan(
+        transaction,
+        campaign_id,
+        "INITIAL_CAREER_POOL",
+        campaign_id,
+        "ON_DEMAND",
+        "P0",
+        None,
+        at,
+    )?;
+    insert_lazy_plan(
+        transaction,
+        campaign_id,
+        "TAVERN",
+        campaign_id,
+        "ON_DEMAND",
+        "P0",
+        None,
+        at,
+    )?;
+    insert_lazy_plan(
+        transaction,
+        campaign_id,
+        "TAVERN_ROSTER",
+        campaign_id,
+        "ON_DEMAND",
+        "P0",
+        Some(&tavern_intent),
+        at,
+    )?;
+    let location_ids = transaction
+        .prepare("SELECT id FROM dynamic_locations WHERE campaign_id=?1 ORDER BY id")?
+        .query_map([campaign_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for location_id in location_ids {
+        insert_lazy_plan(
+            transaction,
+            campaign_id,
+            "LOCATION_DETAILS",
+            &location_id,
+            "BACKGROUND_ELIGIBLE",
+            "P2",
+            None,
+            at,
+        )?;
+    }
+    let faction_ids = transaction
+        .prepare("SELECT id FROM active_factions WHERE campaign_id=?1 ORDER BY id")?
+        .query_map([campaign_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for faction_id in faction_ids {
+        insert_lazy_plan(
+            transaction,
+            campaign_id,
+            "FACTION_DETAILS",
+            &faction_id,
+            "BACKGROUND_ELIGIBLE",
+            "P2",
+            None,
+            at,
+        )?;
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn insert_lazy_plan(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+    kind: &str,
+    target_id: &str,
+    execution_mode: &str,
+    priority: &str,
+    dependency: Option<&str>,
+    at: &str,
+) -> Result<(), CampaignStoreError> {
+    let intent_key = lazy_intent_key(campaign_id, kind, target_id);
+    transaction.execute(
+        "INSERT INTO lazy_world_generation_plans (
+           intent_key,campaign_id,kind,target_id,execution_mode,priority,state,
+           depends_on_intent_key,attempt_count,active_run_id,artifact_ref,last_error_code,
+           retryable,revision,created_at,started_at,completed_at,updated_at
+         ) VALUES (?1,?2,?3,?4,?5,?6,'PLANNED',?7,0,NULL,NULL,NULL,0,1,?8,NULL,NULL,?8)",
+        params![
+            intent_key,
+            campaign_id,
+            kind,
+            target_id,
+            execution_mode,
+            priority,
+            dependency,
+            at
+        ],
+    )?;
+    transaction.execute(
+        "INSERT INTO lazy_world_generation_transitions (
+           campaign_id,intent_key,from_state,to_state,reason,run_id,before_revision,
+           after_revision,error_code,retryable,occurred_at
+         ) VALUES (?1,?2,NULL,'PLANNED','CORE_BOOTSTRAP',NULL,0,1,NULL,0,?3)",
+        params![campaign_id, intent_key, at],
+    )?;
+    Ok(())
+}
+
+fn lazy_intent_key(campaign_id: &str, kind: &str, target_id: &str) -> String {
+    format!(
+        "lazy:{campaign_id}:{}:{target_id}",
+        kind.to_ascii_lowercase()
+    )
 }
 
 fn validate_generation_command(command: &WorldGenerationCommit) -> Result<(), CampaignStoreError> {
@@ -1003,6 +1121,24 @@ mod tests {
                 .map(|value| value.status.as_str()),
             Some("LOCKED")
         );
+        let connection = reopened.connect().expect("open confirmed world");
+        let plan_count: i64 = connection
+            .query_row(
+                "SELECT count(*) FROM lazy_world_generation_plans WHERE campaign_id='campaign-world'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count lazy plans");
+        assert_eq!(plan_count, 5);
+        let generated_count: i64 = connection
+            .query_row(
+                "SELECT (SELECT count(*) FROM career_pools)+(SELECT count(*) FROM taverns)+
+                        (SELECT count(*) FROM npcs)+(SELECT count(*) FROM quests)",
+                [],
+                |row| row.get(0),
+            )
+            .expect("count deferred entities");
+        assert_eq!(generated_count, 0);
     }
 
     #[test]

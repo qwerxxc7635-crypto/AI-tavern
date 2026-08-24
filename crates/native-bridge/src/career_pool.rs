@@ -143,6 +143,15 @@ impl CampaignStore {
         )? {
             let pool = load_career_pool(&transaction, &command.campaign_id)?
                 .ok_or(CampaignStoreError::InvalidData)?;
+            let at = current_timestamp()?;
+            crate::lazy_world_generation::reconcile_lazy_artifact(
+                &transaction,
+                &command.campaign_id,
+                "INITIAL_CAREER_POOL",
+                &command.campaign_id,
+                &command.campaign_id,
+                &at,
+            )?;
             transaction.commit()?;
             return Ok(pool);
         }
@@ -207,6 +216,14 @@ impl CampaignStore {
             &at,
         )?;
         persist_pool(&transaction, &pool, command.expected_revision)?;
+        crate::lazy_world_generation::reconcile_lazy_artifact(
+            &transaction,
+            &command.campaign_id,
+            "INITIAL_CAREER_POOL",
+            &command.campaign_id,
+            &command.campaign_id,
+            &at,
+        )?;
         transaction.commit()?;
         Ok(pool)
     }

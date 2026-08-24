@@ -31,7 +31,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
 
     assert.equal(result.status, 'MIGRATED');
     assert.equal(result.fromVersion, 0);
-    assert.equal(result.toVersion, 29);
+    assert.equal(result.toVersion, 30);
     assert.notEqual(result.backupPath, null);
     await access(result.backupPath);
 
@@ -75,6 +75,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
         { version: 27, name: 'director_budget' },
         { version: 28, name: 'memory_layers' },
         { version: 29, name: 'world_info_retrieval' },
+        { version: 30, name: 'lazy_world_generation' },
       ],
     );
     assert.equal(migrated.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');

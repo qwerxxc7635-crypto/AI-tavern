@@ -3067,3 +3067,27 @@ schema 29新增一对一版本化rule；Repository和SQLite共同验证结构、
 - 不增加外部向量依赖、不复制Lorebook、不增加Provider或Context旁路，也不修改Rules/D20、Queue、Constitution、Quest/NPC/Adventure业务合同。
 - 内部snapshot保存schema 29 rule；portable format v2不变，正式跨语言迁移仍由M10-T05处理。
 - 本任务不新增UI/CSS；后续World Info/Inspector展示复用现有Token和组件，Legacy视觉收敛仍属于M10-T07。
+
+## DEC-144：核心世界与具体化 Artifact 使用持久计划分离
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T01`、`DEC-116`、`DEC-117`与[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)
+
+### 背景
+
+世界确认已只生成Constitution、Seed、Bible和outline实体，职业池、酒馆、NPC LOD、地点与势力也已有各自按需入口，但缺少一个跨进程的共同计划证明哪些内容尚未生成、哪个run拥有执行权、失败是否可重试，以及模型响应丢失后是否已经提交。只靠页面内Promise去重无法覆盖重启；把outline当成完整内容又会成为占位假数据。
+
+### 决定与理由
+
+schema 30新增Campaign-scoped materialization plan与append-only transition。世界确认在锁定Constitution的同一事务中建立三个P0按需计划和每个outline Location/Faction的P2后台候选；不生成Quest、Item、完整NPC或其他全世界内容。状态机使用run ownership、attempt、CAS revision、dependency、retryability和明确reason，SQLite success trigger只有在真实artifact存在时才允许成功。
+
+职业池、酒馆和阵容沿用现有生成与验证合同，在其SQLite提交事务末尾原子reconcile计划；旧Campaign没有bootstrap计划时保持兼容。重开把已有artifact的RUNNING计划收敛成功，否则标记可重试中断；内部snapshot保存计划与历史。M10-T01只记录后台资格，不执行预测或预取。
+
+### 影响与边界
+
+- SQLite仍是唯一真相；计划不是事实、Quest或内容缓存，AI输出不能直接推进它。
+- 部分失败或取消不回滚核心世界或已成功兄弟artifact；同run幂等，冲突run fail closed。
+- portable `.emtavern`仍为format v2，schema 30的正式跨语言迁移留给M10-T05。
+- 不修改Rules/D20、Provider、Generation Queue、Quest/NPC/Adventure语义，也不进入M10-T02。
+- 不新增UI/CSS；未来状态展示遵循视觉手册，Legacy收敛继续由M10-T07处理。

@@ -659,3 +659,22 @@ export {
   type DirectorBudgetStatus,
   type DirectorBudgetUsage,
 } from './director-budget.js';
+export {
+  LAZY_WORLD_EXECUTION_MODES,
+  LAZY_WORLD_GENERATION_KINDS,
+  LAZY_WORLD_GENERATION_PRIORITIES,
+  LAZY_WORLD_GENERATION_STATES,
+  LAZY_WORLD_TRANSITION_REASONS,
+  LazyWorldGenerationContractError,
+  createLazyWorldGenerationPlanSeed,
+  lazyWorldIntentKey,
+  type CoreWorldGenerationPlanInput,
+  type LazyWorldExecutionMode,
+  type LazyWorldGenerationKind,
+  type LazyWorldGenerationPlan,
+  type LazyWorldGenerationPlanSeed,
+  type LazyWorldGenerationPriority,
+  type LazyWorldGenerationState,
+  type LazyWorldGenerationTransition,
+  type LazyWorldTransitionReason,
+} from './lazy-world-generation.js';

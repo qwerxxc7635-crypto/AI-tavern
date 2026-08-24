@@ -200,6 +200,17 @@ impl CampaignStore {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if generation_replayed(&transaction, &command.campaign_id, &command)? {
             let snapshot = load_snapshot(&transaction, &command.campaign_id)?;
+            if let Some(artifact) = output.locations.first() {
+                let at = current_timestamp()?;
+                crate::lazy_world_generation::reconcile_lazy_artifact(
+                    &transaction,
+                    &command.campaign_id,
+                    "LOCATION_DETAILS",
+                    &command.origin_location_id,
+                    &artifact.id,
+                    &at,
+                )?;
+            }
             transaction.commit()?;
             return Ok(snapshot);
         }
@@ -263,6 +274,18 @@ impl CampaignStore {
             &output.locations,
             origin,
             &command.expansion_mode,
+        )?;
+        let artifact_id = profiles
+            .first()
+            .map(|profile| profile.id.as_str())
+            .ok_or(CampaignStoreError::InvalidData)?;
+        crate::lazy_world_generation::reconcile_lazy_artifact(
+            &transaction,
+            &command.campaign_id,
+            "LOCATION_DETAILS",
+            &command.origin_location_id,
+            artifact_id,
+            &at,
         )?;
         let snapshot = load_snapshot(&transaction, &command.campaign_id)?;
         transaction.commit()?;

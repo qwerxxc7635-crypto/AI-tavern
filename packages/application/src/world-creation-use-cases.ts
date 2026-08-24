@@ -32,6 +32,7 @@ import { assertWorldConstitutionCompliance } from '@ember-tavern/domain';
 import {
   CampaignRepository,
   GenerationRecordRepository,
+  LazyWorldGenerationRepository,
   PendingAiRequestRepository,
   WorldConstitutionRepository,
   WorldRepository,
@@ -79,6 +80,7 @@ export class WorldCreationUseCases {
   private readonly generations: GenerationRecordRepository;
   private readonly constitutions: WorldConstitutionRepository;
   private readonly seeds: WorldSeedRepository;
+  private readonly lazyGeneration: LazyWorldGenerationRepository;
 
   public constructor(
     private readonly database: TransactionalSqliteDatabase,
@@ -94,6 +96,7 @@ export class WorldCreationUseCases {
     this.generations = new GenerationRecordRepository(database);
     this.constitutions = new WorldConstitutionRepository(database);
     this.seeds = new WorldSeedRepository(database);
+    this.lazyGeneration = new LazyWorldGenerationRepository(database);
   }
 
   public createCampaign(id: CampaignId): Campaign {
@@ -170,12 +173,18 @@ export class WorldCreationUseCases {
 
   public confirmWorld(id: CampaignId): Campaign {
     const campaign = this.requireCampaign(id);
-    this.requireWorld(id);
+    const world = this.requireWorld(id);
     const constitution = this.requireConstitution(id);
     const next = transitionCampaign(campaign, 'CREATING_CHARACTER', this.now());
     this.database.exec('BEGIN IMMEDIATE');
     try {
-      this.constitutions.lock(id, constitution.revision, next.updatedAt);
+      const locked = this.constitutions.lock(id, constitution.revision, next.updatedAt);
+      this.lazyGeneration.seedCoreWorldPlan({
+        world,
+        constitution: locked,
+        hasWorldSeed: this.seeds.get(id) !== null,
+        plannedAt: next.updatedAt,
+      });
       this.campaigns.update(next);
       this.database.exec('COMMIT');
     } catch (error) {

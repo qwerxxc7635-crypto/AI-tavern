@@ -477,12 +477,13 @@
 
 ## M10-T01 Lazy World Generation
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M9-T03。
 - **Deliverable**：核心骨架启动、按需具体化和后台生成计划。
 - **Acceptance**：新世界不等待全量 NPC/职业/Quest/地点；骨架足以安全进入；需要时幂等具体化。
 - **Tests**：cold start、partial failure、cancel/reopen、dedupe、no full-world generation。
 - **Do Not**：不以占位假数据冒充生成；不让后台失败破坏核心存档。
+- **Implementation reference**：[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)。
 
 ## M10-T02 Prefetch
 

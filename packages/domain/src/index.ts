@@ -163,6 +163,10 @@ export type {
 } from './world-director.js';
 export { retrieveWorldInfo, WorldInfoRetrievalError } from './world-info-retrieval.js';
 export {
+  buildCoreWorldGenerationPlan,
+  LazyWorldGenerationPlanningError,
+} from './lazy-world-generation.js';
+export {
   DIRECTOR_BUDGET_LIMITS,
   DIRECTOR_GAME_DAY_MINUTES,
   capacityReason,

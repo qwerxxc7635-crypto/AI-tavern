@@ -39,6 +39,8 @@ const coreTables = [
   'items',
   'knowledge_claims',
   'knowledge_memories',
+  'lazy_world_generation_plans',
+  'lazy_world_generation_transitions',
   'location_connections',
   'location_travel_events',
   'memory_artifact_sources',
@@ -497,7 +499,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      29,
+      30,
     );
     const importedKnowledge = database
       .prepare(

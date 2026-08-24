@@ -243,6 +243,17 @@ impl CampaignStore {
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         if generation_replayed(&transaction, &command)? {
             let snapshot = load_snapshot(&transaction, &command.campaign_id)?;
+            let at = current_timestamp()?;
+            for faction_id in &command.requested_faction_ids {
+                crate::lazy_world_generation::reconcile_lazy_artifact(
+                    &transaction,
+                    &command.campaign_id,
+                    "FACTION_DETAILS",
+                    faction_id,
+                    faction_id,
+                    &at,
+                )?;
+            }
             transaction.commit()?;
             return Ok(snapshot);
         }
@@ -304,6 +315,16 @@ impl CampaignStore {
                 updated_at: at.clone(),
             };
             update_profile(&transaction, &profile, current.revision)?;
+        }
+        for faction_id in &command.requested_faction_ids {
+            crate::lazy_world_generation::reconcile_lazy_artifact(
+                &transaction,
+                &command.campaign_id,
+                "FACTION_DETAILS",
+                faction_id,
+                faction_id,
+                &at,
+            )?;
         }
         let saved = load_snapshot(&transaction, &command.campaign_id)?;
         transaction.commit()?;

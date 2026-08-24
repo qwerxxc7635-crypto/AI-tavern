@@ -13,6 +13,7 @@ mod dynamic_locations;
 mod dynamic_quest_sources;
 #[cfg(test)]
 mod entity_schema_contract;
+mod lazy_world_generation;
 mod model_settings;
 mod npc_dialogue;
 mod npc_lod;
@@ -134,7 +135,9 @@ const MEMORY_LAYERS_MIGRATION: &str =
     include_str!("../../../database/migrations/0028_memory_layers.sql");
 const WORLD_INFO_RETRIEVAL_MIGRATION: &str =
     include_str!("../../../database/migrations/0029_world_info_retrieval.sql");
-const LATEST_SCHEMA_VERSION: i64 = 29;
+const LAZY_WORLD_GENERATION_MIGRATION: &str =
+    include_str!("../../../database/migrations/0030_lazy_world_generation.sql");
+const LATEST_SCHEMA_VERSION: i64 = 30;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -631,6 +634,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             29_i64,
             "world_info_retrieval",
             WORLD_INFO_RETRIEVAL_MIGRATION,
+        ),
+        (
+            30_i64,
+            "lazy_world_generation",
+            LAZY_WORLD_GENERATION_MIGRATION,
         ),
     ] {
         let applied_name = connection

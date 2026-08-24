@@ -4565,3 +4565,28 @@
 - `pnpm check:shared`最终通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 172 files/970 tests通过，另1 file/1 test性能基线按设计跳过；Node 29 tests通过。
 - Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换274 modules。
 - M9-T03完成后下一项严格为M10-T01；本次未开始。用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T01 完成 Lazy World Generation
+
+### 边界与实现
+
+- 在分支`task/M10-T01-lazy-world-generation`、起始提交`4f18e42`上继续；未回滚或重做M0～M9-T03，用户已有`.gitignore`修改保持未暂存。本任务没有进入M10-T02 Prefetch，也没有新增UI/CSS。
+- 冻结核心骨架为Campaign、锁定World Constitution、World Seed、World Bible及outline Location/Faction。Application和Native世界确认均在同一事务持久化计划，但不会生成Career Pool、Tavern、NPC、Quest、Item、详细Location或active Faction。
+- schema 30新增唯一materialization plan与append-only transition。三个全局P0按需计划覆盖初始职业池、酒馆和依赖酒馆的阵容；outline Location/Faction只登记P2 `BACKGROUND_ELIGIBLE`，不在本任务执行后台生成。
+- TypeScript合同、纯Domain计划器和Repository实现claim、同run dedupe、冲突run拒绝、dependency、complete、retryable failure、cancel、interrupted recovery、artifact reconciliation和CAS revision。SQLite trigger验证Campaign边界、合法转换并要求真实artifact，无法用占位内容完成。
+- Native职业池、酒馆、阵容、动态Location与主动Faction继续沿用既有Generator、验证与事务，在真实SQLite实体写入后原子reconcile计划；Location计划以outline origin为目标并引用一个新提交的相连/子级DETAILED artifact。旧存档没有bootstrap plan时保持原路径兼容。部分Roster失败不会破坏已提交Tavern。
+- internal snapshot纳入plan/history、旧payload空集合兼容，并使用现有restore session恢复非初始状态和append-only历史。portable`.emtavern`仍为format v2；schema 30正式跨语言升级严格留给M10-T05。
+- 新增[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)、`DEC-144`，更新V0.3 Spec、Data Model、migration与任务引用。视觉规范、视觉债务和M10-T07的Token→Primitive→Game Component→Feature→Legacy→Audit边界保持不变。
+
+### 验证
+
+- 专项测试覆盖cold start、no full-world generation、seed/claim dedupe、并发run拒绝、占位完成拒绝、dependency、partial failure、cancel/reopen、响应丢失reconcile、中断retry、snapshot round-trip与世界确认计划原子创建。
+- 首轮完整门禁的Windows纵向E2E暴露plan dependency使用`ON DELETE RESTRICT`会阻断整Campaign级联删除；改为同Campaign依赖级联后，迁移测试与该E2E专项通过，并从头重跑完整共享门禁。没有绕过外键或削弱删除验收。
+- 最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 175 files/978 tests通过，另1 file/1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换276 modules。
+- 不删除测试、不降低Schema/SQLite约束、不跳过错误，也不把M10-T02预取或M10-T05 portable迁移冒充完成。
+
+### 结束状态
+
+- `M10-T01`完成；下一项严格为`M10-T02 Prefetch`，本次未开始。
+- 用户`.gitignore`保持未暂存，不merge、不push。

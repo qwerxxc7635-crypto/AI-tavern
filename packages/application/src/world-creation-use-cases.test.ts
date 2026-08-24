@@ -16,6 +16,7 @@ import {
 import {
   CampaignRepository,
   GenerationRecordRepository,
+  LazyWorldGenerationRepository,
   PendingAiRequestRepository,
   WorldConstitutionRepository,
   WorldRepository,
@@ -119,6 +120,22 @@ describe('WorldCreationUseCases', () => {
         status: 'LOCKED',
         lockedAt: at,
       });
+      expect(new LazyWorldGenerationRepository(sqlite).list(campaignKey)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'INITIAL_CAREER_POOL', state: 'PLANNED' }),
+          expect.objectContaining({ kind: 'TAVERN', state: 'PLANNED' }),
+          expect.objectContaining({ kind: 'TAVERN_ROSTER', state: 'PLANNED' }),
+          expect.objectContaining({ kind: 'LOCATION_DETAILS', targetId: 'location-0' }),
+          expect.objectContaining({ kind: 'FACTION_DETAILS', targetId: 'faction-0' }),
+        ]),
+      );
+      expect(
+        (sqlite.prepare('SELECT count(*) AS count FROM career_pools').get() as { count: number })
+          .count,
+      ).toBe(0);
+      expect(
+        (sqlite.prepare('SELECT count(*) AS count FROM taverns').get() as { count: number }).count,
+      ).toBe(0);
       expect(() =>
         useCases.refineWorld({
           ...request('after-confirm'),

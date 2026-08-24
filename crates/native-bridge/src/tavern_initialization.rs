@@ -206,6 +206,17 @@ impl CampaignStore {
             "GENERATE_TAVERN",
         )? {
             let result = load_snapshot(&transaction, &command.campaign_id)?;
+            if let Some(tavern) = &result.tavern {
+                let at = current_timestamp()?;
+                crate::lazy_world_generation::reconcile_lazy_artifact(
+                    &transaction,
+                    &command.campaign_id,
+                    "TAVERN",
+                    &command.campaign_id,
+                    &tavern.id,
+                    &at,
+                )?;
+            }
             transaction.commit()?;
             return Ok(result);
         }
@@ -270,6 +281,14 @@ impl CampaignStore {
             &command.generation,
             &at,
         )?;
+        crate::lazy_world_generation::reconcile_lazy_artifact(
+            &transaction,
+            &command.campaign_id,
+            "TAVERN",
+            &command.campaign_id,
+            &tavern_id,
+            &at,
+        )?;
         transaction.commit()?;
         self.tavern_snapshot(&command.campaign_id)
     }
@@ -295,6 +314,17 @@ impl CampaignStore {
             "GENERATE_NPCS",
         )? {
             let result = load_snapshot(&transaction, &command.campaign_id)?;
+            if let Some(tavern) = &result.tavern {
+                let at = current_timestamp()?;
+                crate::lazy_world_generation::reconcile_lazy_artifact(
+                    &transaction,
+                    &command.campaign_id,
+                    "TAVERN_ROSTER",
+                    &command.campaign_id,
+                    &tavern.id,
+                    &at,
+                )?;
+            }
             transaction.commit()?;
             return Ok(result);
         }
@@ -428,6 +458,14 @@ impl CampaignStore {
         if changed != 1 {
             return Err(CampaignStoreError::InvalidState);
         }
+        crate::lazy_world_generation::reconcile_lazy_artifact(
+            &transaction,
+            &command.campaign_id,
+            "TAVERN_ROSTER",
+            &command.campaign_id,
+            &tavern.id,
+            &at,
+        )?;
         transaction.commit()?;
         self.tavern_snapshot(&command.campaign_id)
     }
