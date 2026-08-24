@@ -149,6 +149,7 @@ fn command_error_policy(code: &str) -> CommandErrorPolicy {
         | "CAMPAIGN_ARCHIVED"
         | "CAMPAIGN_DATA_INVALID"
         | "SAVE_ARCHIVE_INVALID"
+        | "SAVE_ARCHIVE_FUTURE"
         | "SAVE_ARCHIVE_CONFLICT"
         | "SAVE_PATH_INVALID" => {
             error_policy("PERSISTENCE", false, false, "ERROR_STATE", &["DISMISS"])
@@ -206,6 +207,10 @@ impl From<CampaignStoreError> for CommandError {
             CampaignStoreError::ArchiveInvalid => Self {
                 code: "SAVE_ARCHIVE_INVALID",
                 message: "存档文件损坏、格式不兼容或未通过安全校验。",
+            },
+            CampaignStoreError::ArchiveTooNew => Self {
+                code: "SAVE_ARCHIVE_FUTURE",
+                message: "该存档来自更新版本；请升级 Ember Tavern 后再导入。",
             },
             CampaignStoreError::ArchiveConflict => Self {
                 code: "SAVE_ARCHIVE_CONFLICT",

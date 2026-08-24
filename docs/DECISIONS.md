@@ -3161,3 +3161,26 @@ DeepSeek usage明确返回的hit/miss是唯一Provider observation，并继续�
 - prefix hash描述应用控制并实际发送的UTF-8稳定内容，不伪造Provider线路角色封装或计费结果。
 - 缓存指标仍是device telemetry，不进入SQLite游戏事实或portable archive；不新增schema。
 - 本任务不修改Rules/D20、Provider协议、Queue、Quest/NPC/Adventure或Save合同；M10-T05仍是下一任务。
+
+## DEC-148：冻结Save Schema 3 / World Schema 1并让Windows启动迁移只切换已验证副本
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T05`、V0.3 Spec 15.3、[`save-format.md`](save-format.md)
+
+### 背景
+
+本地SQLite已演进到schema 31，但Campaign没有独立save/world版本；portable schema 2只携带15张V0.2表，V0.3持久事实散落在本地表中。TypeScript启动工具已有备份、隔离副本、校验和原子切换，Windows实际Rust启动却仍在活动文件直接执行migration。继续这种分叉会让Windows升级失败无法证明原件保持不变，也会让portable round-trip静默缺失V0.3状态。
+
+### 决定与理由
+
+本地migration 32为Campaign增加`save_schema_version=3`和`world_schema_version=1`硬约束；不修改任何业务字段。Windows Rust启动先创建一致完整备份，从备份建立隔离工作文件，在工作文件执行全部历史migration，并完成integrity、foreign key、schema history和Campaign领域重载；仅验证通过后rename原子切换，失败保留原文件字节。
+
+`.emtavern`五文件结构不变，因此`formatVersion`仍为1；portable `databaseSchemaVersion`升到3。schema 3携带69张Campaign持久事实/状态/审计表，包含Event Ledger和已终结AI Candidate；排除设备配置/凭据、pending request、内部snapshot、Dialogue/Prefetch缓存和restore session。v1/v2继续读取，转换只增加Campaign save/world版本并依靠当前业务触发器建立合理兼容投影，不伪造旧档不存在的Constitution等世界事实，也不改写源文件。
+
+### 影响与边界
+
+- TypeScript/Rust使用镜像固定清单，导入后逐表精确重载并继续执行已有领域Repository校验；覆盖导入仍先备份并用单事务提交。
+- 历史TS/Rust v1/v2 fixture永久保留并加入hash门禁；v3使用新fixture，interop双向再生成/交叉导入。
+- UI在导入前显示历史迁移、目标save/world版本及“原文件不改写”；未来版本明确要求升级应用。
+- 不接入云同步/CRDT，不导出设备秘密，不改变Rules/D20、Provider、Queue、Quest/NPC/Adventure业务语义或存档ID。

@@ -102,7 +102,7 @@ describe('exportCampaignSave', () => {
     expect(manifest).toMatchObject({
       application: 'ember-tavern',
       campaignId: campaignKey,
-      databaseSchemaVersion: 2,
+      databaseSchemaVersion: 3,
       formatVersion: 1,
       files: {
         'campaign.json': { records: 1 },
@@ -113,9 +113,11 @@ describe('exportCampaignSave', () => {
     expect(campaignRow['default_model_profile_id']).toBeNull();
     expect(campaignRow['fallback_model_profile_id']).toBeNull();
     expect(campaignRow['task_model_overrides_json']).toBe('{}');
+    expect(campaignRow['save_schema_version']).toBe(3);
+    expect(campaignRow['world_schema_version']).toBe(1);
     expect(requireArray(tables['world_facts'])).toHaveLength(2);
     expect(requireArray(tables['scene_frames'])).toHaveLength(1);
-    expect(Object.keys(tables)).toHaveLength(15);
+    expect(Object.keys(tables)).toHaveLength(69);
     expect(events).toHaveLength(1);
     expect(parseObject(events[0] ?? '')).toMatchObject({
       id: gameEventId('event-export'),
@@ -256,6 +258,25 @@ describe('importCampaignSave', () => {
       campaignId: campaignId('campaign-transfer'),
       kind: 'IMPORT',
     });
+  });
+
+  it('migrates the historical Rust v2 fixture without rewriting it', async () => {
+    const fixtureUrl = new URL('../test-fixtures/rust-export-v2.emtavern', import.meta.url);
+    const before = readFileSync(fixtureUrl);
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
+    const imported = await importCampaignSave(database, new Uint8Array(before), {
+      mode: 'CREATE',
+      importedAt: isoTimestamp('2026-08-01T13:00:31.000Z'),
+      snapshotId: snapshotId('snapshot-rust-v2-interop'),
+    });
+
+    expect(imported.campaign.id).toBe(campaignKey);
+    expect(
+      native
+        .prepare('SELECT save_schema_version, world_schema_version FROM campaigns WHERE id = ?')
+        .get(campaignKey),
+    ).toEqual({ save_schema_version: 3, world_schema_version: 1 });
+    expect(readFileSync(fixtureUrl)).toEqual(before);
   });
 
   it('restores a deleted campaign, creates an IMPORT snapshot and can continue play', async () => {

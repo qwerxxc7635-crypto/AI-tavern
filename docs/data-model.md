@@ -564,7 +564,7 @@ schema 26 的 `world_director_runs` 以 run ID 为主键，并对 `(campaign_id,
 
 schema 27 的 `director_budget_states` 保存由 Rules Engine `game_time_minutes` 推导的游戏日、四类日用量和 revision；`director_budget_admissions` 对每个 Director run 建立幂等标记，即使 run 没有 proposal 也不会重复推进预算。`director_budget_entries` 保存 proposal 的类别、批准/延后状态、原因和下一可用游戏分钟，`director_budget_cooldowns` 保存 Campaign/key 的冷却，`director_budget_decisions` 保存 append-only 求值历史。
 
-批准只是下游容量预约，不是事实提交。每日恢复、优先级 aging 和 cooldown 都由本地代码与 SQLite 事务裁决，Prompt/模型无权放宽；玩家 P0 操作不进入这些表。内部快照按 admission/state/entry/cooldown/decision 外键顺序保存恢复，portable format v2 仍不升级。完整合同见 [`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)。
+批准只是下游容量预约，不是事实提交。每日恢复、优先级 aging 和 cooldown 都由本地代码与 SQLite 事务裁决，Prompt/模型无权放宽；玩家 P0 操作不进入这些表。内部快照按 admission/state/entry/cooldown/decision 外键顺序保存恢复；M10-T05起portable schema 3携带这些持久表。完整合同见 [`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)。
 
 ## 11. V0.3 Unified Context Manifest
 
@@ -576,22 +576,28 @@ Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于�
 
 `historical_summaries`保存Campaign/Actor/Adventure/Conversation范围、摘要文本、覆盖时间、source digest、可选generation record和连续revision。`world_lore_entries`保存来源约束的世界说明，但不具有Truth authority。`memory_artifact_sources`按顺序保存Summary、Long-term Memory与World Lore的source kind/ID/revision/SHA-256/时间；读取时对SQLite当前来源重算，删除为`SOURCE_DELETED`，revision/hash/time变化为`SOURCE_UPDATED`。
 
-原`knowledge_memories`继续是唯一Actor Long-term Memory表；M9-T02新增来源快照而不平行建表。Recent仍是`messages`、`game_events`、`adventure_turns`原行，压缩Summary不会删除原历史。内部snapshot新增schema 12四张知识表和schema 28三张表；旧snapshot缺失时按空集合兼容。portable format v2仍不携带这些表，正式跨语言升级留给M10-T05。完整合同见[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)。
+原`knowledge_memories`继续是唯一Actor Long-term Memory表；M9-T02新增来源快照而不平行建表。Recent仍是`messages`、`game_events`、`adventure_turns`原行，压缩Summary不会删除原历史。内部snapshot新增schema 12四张知识表和schema 28三张表；旧snapshot缺失时按空集合兼容。M10-T05起portable schema 3携带这些持久表。完整合同见[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)。
 
 ## 13. V0.3 World Info Retrieval（schema 29）
 
 `world_lore_retrieval_rules`与`world_lore_entries`一对一，保存Campaign、关键词、闭集实体引用、Location/Quest ID、always-active、ANY/ALL、priority、entry token budget、enabled和连续revision。SQLite trigger与Repository共同验证Lore归属、JSON元素形状、不可变身份和revision；Repository额外验证所有引用属于同一Campaign。
 
-规则只是World Lore选择配置，不是Fact、Knowledge或Truth。检索先检查Lore source freshness，再本地计算可解释trigger/score，按priority→score→ID稳定排序并执行entry/total预算。应用层LRU只缓存规范query digest与完整corpus digest对应的结果，SQLite仍是唯一真相。内部snapshot携带schema 29规则且旧payload按空表兼容；portable format v2保持不变，正式升级留给M10-T05。完整合同见[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)。
+规则只是World Lore选择配置，不是Fact、Knowledge或Truth。检索先检查Lore source freshness，再本地计算可解释trigger/score，按priority→score→ID稳定排序并执行entry/total预算。应用层LRU只缓存规范query digest与完整corpus digest对应的结果，SQLite仍是唯一真相。内部snapshot携带schema 29规则且旧payload按空表兼容；M10-T05起portable schema 3携带规则。完整合同见[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)。
 
 ## 14. V0.3 Lazy World Generation（schema 30）
 
 `lazy_world_generation_plans`以intent key为主键，并对Campaign/kind/target建立唯一约束。它保存按需或后台候选模式、P0/P1/P2优先级、可选依赖、`PLANNED/RUNNING/SUCCEEDED/FAILED/CANCELLED`状态、attempt、active run、真实artifact引用、错误、retryability、revision和时间。插入要求同Campaign已有World Bible、World Seed与锁定Constitution；Location/Faction目标必须来自同Campaign outline投影。
 
-`lazy_world_generation_transitions`按递增ID保存每次revision变化，是append-only生命周期审计。SQLite success trigger按kind检查Career Pool、Tavern、完整Roster、从目标outline扩展出的DETAILED Location或ACTIVE Faction，禁止占位完成。内部snapshot按artifact→plan→transition顺序恢复，并允许旧payload缺失两表；portable format v2不变，正式迁移仍属于M10-T05。完整合同见[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)。
+`lazy_world_generation_transitions`按递增ID保存每次revision变化，是append-only生命周期审计。SQLite success trigger按kind检查Career Pool、Tavern、完整Roster、从目标outline扩展出的DETAILED Location或ACTIVE Faction，禁止占位完成。内部snapshot按artifact→plan→transition顺序恢复，并允许旧payload缺失两表；M10-T05起portable schema 3携带两表。完整合同见[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)。
 
 ## 15. V0.3 Prefetch（schema 31）
 
 `prefetch_candidates`保存已admit Director run、schema-30 lazy intent、Location/Faction target、P1/P2、批准action证据、context digest、process/execution ownership、闭集状态、错误、revision和时间。SQLite insert trigger复核同Campaign run/context、budget admission、P1批准、P2剩余容量、后台计划资格与每run最多四项；update trigger固定身份并限制生命周期。表中没有Prompt、raw response、validated output、候选内容或Actor Knowledge。
 
-`prefetch_events`以递增ID保存prediction/start/ready/hit/miss/invalidate/cancel/fail与有界queue/generation时间，是append-only指标审计；unpredicted miss允许没有candidate外键。生成体只在进程内，READY重开必须按`PROCESS_RESTART`失效。内部snapshot保存两表且旧payload按空集合兼容；portable format v2保持不变，正式跨语言升级留给M10-T05。完整合同见[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)。
+`prefetch_events`以递增ID保存prediction/start/ready/hit/miss/invalidate/cancel/fail与有界queue/generation时间，是append-only指标审计；unpredicted miss允许没有candidate外键。生成体只在进程内，READY重开必须按`PROCESS_RESTART`失效。内部snapshot保存两表且旧payload按空集合兼容；portable schema 3明确排除这两张进程/缓存表。完整合同见[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)。
+
+## 16. V0.3 Save Schema（schema 32）
+
+`campaigns.save_schema_version`固定为3，`campaigns.world_schema_version`固定为1，并由SQLite `NOT NULL`/`CHECK`约束。schema 32不改写任何Rules、Quest、NPC或Adventure业务字段，只冻结恢复协议版本，并让NPC LOD删除保护在既有`quest_pool_restore_sessions`事务边界内支持已验证portable恢复。
+
+`.emtavern`继续使用容器format 1，portable schema升级为3并携带69张Campaign持久表；设备配置、秘密、pending request、内部snapshot与可重建cache排除。历史portable v1/v2只增加上述Campaign版本列，并由当前触发器建立允许的兼容投影；源文件不改写。完整表集、顺序、备份/隔离迁移、精确重载和跨语言fixtures见[`save-format.md`](save-format.md)。

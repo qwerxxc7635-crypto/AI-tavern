@@ -4663,3 +4663,25 @@
 - `pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 181 files / 1015 tests通过，另1 file / 1 test性能runner按设计跳过；Node 29 tests通过。Rust workspace 142 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；archive interop通过。
 - 额外独立复验rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换280 modules。自审确认primary/fallback/repair复用同一稳定assembly、无Prompt/credential持久化、无动态行动进入prefix、无Provider cache虚报。
 - M10-T04完成后下一项严格为M10-T05，本次未开始；用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T05 完成V0.3 Save Schema与隔离迁移
+
+### 范围与迁移
+
+- 在分支`task/M10-T05-save-schema-migration`、起始提交`2bb62ce`上严格执行M10-T05；未回滚或重做M0～M10-T04，未进入M10-T06。用户已有`.gitignore`修改始终保持未暂存。
+- 新增`0032_save_schema.sql`，在`campaigns`以`NOT NULL`/`CHECK`冻结`save_schema_version=3`和`world_schema_version=1`，并只把NPC LOD删除保护接入既有restore session边界；没有改变Rules、D20、Provider、Queue、Quest/NPC/Adventure业务语义。
+- Windows实际Rust启动不再对活动SQLite直接跑migration：先创建并验证完整备份，从备份建立隔离工作文件，执行历史migration，完成integrity、foreign key、schema history和Campaign领域重载后才rename切换；迁移或切换失败保持原文件，专项测试验证schema 31→32与失败原字节不变。TypeScript启动路径补齐foreign key与Campaign领域重载。
+
+### Portable archive与恢复UX
+
+- `.emtavern`五文件容器保持format 1，portable schema从2升到3。新增共享TS清单及Rust镜像，完整携带69张Campaign持久事实、状态和审计表，包括Constitution/Seed、Rules、Knowledge、Universal Character/Career、NPC LOD、动态地点/势力、酒馆人口/场景/时间线、Quest Pool/Graph、Director/Budget、Memory/Lore、Lazy Generation、Event Ledger和已终结AI Candidate。
+- 设备Provider/Model/设置/凭据、pending request、内部snapshot、restore session、Dialogue/Prefetch缓存继续排除；存在`PROPOSED`候选时仍拒绝导出。导入在单一IMMEDIATE事务内按触发器/外键顺序恢复，执行foreign key、69表精确重载和既有Repository领域重载；覆盖仍先做一致完整备份。
+- 历史TS/Rust v1、v2 fixtures未删除或覆盖，新增hash防漂移清单；另增TS/Rust v3 fixtures。v1/v2导入只增加save/world版本和允许的当前兼容投影，不改写源档。未来版本、损坏、资源炸弹和秘密均fail closed。
+- Save Home在检查阶段显示目标save/world版本；历史档明确提示隔离升级且原文件不改写，未来版本明确要求升级应用，本地数据保持原状。UI只自然修改既有导入提示，复用现有组件/CSS，没有借机进行M10-T07视觉重构。
+
+### 文档、决定与验证
+
+- 重写[`save-format.md`](save-format.md)为容器v1/portable schema 3权威规范，更新V0.3 Spec、Tasks、Data Model，并新增`DEC-148`。M10-T05标记DONE；后续严格为M10-T06。
+- `pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 181 files / 1018 tests通过，另1 file / 1 test性能runner按设计跳过；Node 29 tests通过。
+- Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换280 modules；`pnpm build:desktop`复验通过。
+- 未删除测试、降低SQLite/Schema/秘密校验或忽略错误；不merge、不push，不暂存用户`.gitignore`。

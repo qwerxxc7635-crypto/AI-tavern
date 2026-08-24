@@ -1127,7 +1127,7 @@ mod tests {
 
     fn seed_world(store: &CampaignStore) {
         let connection = store.connect().unwrap();
-        let at = "2026-08-20T10:00:00Z";
+        let at = "2026-08-20T10:00:00.000Z";
         connection.execute("INSERT INTO campaigns (id,schema_version,state,created_at,updated_at) VALUES ('campaign-factions-native',1,'REVIEWING_WORLD',?1,?1)", [at]).unwrap();
         connection.execute("INSERT INTO world_bibles (campaign_id,schema_version,name,current_region,summary,core_conflict,technology_level,power_rules_json,factions_json,locations_json,narrative_style,forbidden_elements_json,tavern_reason,story_hooks_json,locked_fields_json,created_at,updated_at) VALUES ('campaign-factions-native',1,'Ember Coast','Ash Harbor','A coast.','Old roads.','Late medieval','[]',?1,?2,'Grounded','[]','Crossroads','[]','[]',?3,?3)", params![
             serde_json::to_string(&json!([

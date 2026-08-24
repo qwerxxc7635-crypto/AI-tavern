@@ -125,6 +125,28 @@ test('migrates a new database to the complete initial schema', async () => {
       database.prepare('SELECT COUNT(*) AS count FROM schema_migrations').get().count,
       migrationCount,
     );
+    database.exec(`
+      INSERT INTO campaigns(id,schema_version,state,created_at,updated_at)
+      VALUES('campaign-save-schema',1,'TAVERN','2026-08-24T00:00:00.000Z','2026-08-24T00:00:00.000Z')
+    `);
+    assert.deepEqual(
+      {
+        ...database
+          .prepare(
+            `SELECT save_schema_version,world_schema_version FROM campaigns
+           WHERE id='campaign-save-schema'`,
+          )
+          .get(),
+      },
+      { save_schema_version: 3, world_schema_version: 1 },
+    );
+    assert.throws(
+      () =>
+        database
+          .prepare("UPDATE campaigns SET save_schema_version=2 WHERE id='campaign-save-schema'")
+          .run(),
+      /CHECK constraint failed/,
+    );
   });
 });
 
@@ -501,7 +523,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      31,
+      32,
     );
     const importedKnowledge = database
       .prepare(

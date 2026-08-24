@@ -517,12 +517,13 @@
 
 ## M10-T05 V0.3 Save Schema & Migration
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M10-T04。
 - **Deliverable**：save/world schema version、SQLite migrations、V0.2→V0.3 转换、导入导出升级和恢复 UI。
 - **Acceptance**：迁移前备份、隔离副本、完整性/领域重载、原子切换；无法转换时原件不变且明确提示。
 - **Tests**：all historical fixtures、cross-language、interrupted/corrupt/future version、secret scan、round-trip。
 - **Do Not**：不静默丢字段或覆盖原档；不删除历史 migrations/fixtures。
+- **Implementation reference**：[`save-format.md`](save-format.md)、[`DEC-148`](DECISIONS.md)。
 
 ## M10-T06 Performance Regression Gate
 

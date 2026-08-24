@@ -10,6 +10,9 @@ export type CampaignArchiveImportMode = 'CREATE' | 'OVERWRITE';
 export interface CampaignArchiveInspection {
   readonly campaignId: string;
   readonly campaignExists: boolean;
+  readonly saveSchemaVersion: number;
+  readonly worldSchemaVersion: number;
+  readonly migrationRequired: boolean;
 }
 
 export interface ImportedCampaignSummary {
@@ -71,7 +74,25 @@ function parseInspection(value: unknown): CampaignArchiveInspection {
   if (typeof record['campaignExists'] !== 'boolean') {
     throw new TypeError('Archive campaign existence flag is invalid');
   }
-  return Object.freeze({ campaignId, campaignExists: record['campaignExists'] });
+  const saveSchemaVersion = requireSchemaVersion(record['saveSchemaVersion'], 'Save schema');
+  const worldSchemaVersion = requireSchemaVersion(record['worldSchemaVersion'], 'World schema');
+  if (typeof record['migrationRequired'] !== 'boolean') {
+    throw new TypeError('Archive migration flag is invalid');
+  }
+  return Object.freeze({
+    campaignId,
+    campaignExists: record['campaignExists'],
+    saveSchemaVersion,
+    worldSchemaVersion,
+    migrationRequired: record['migrationRequired'],
+  });
+}
+
+function requireSchemaVersion(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError(`${label} version is invalid`);
+  }
+  return value;
 }
 
 function parseCampaign(value: unknown): ImportedCampaignSummary {

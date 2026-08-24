@@ -166,6 +166,12 @@ export function SaveHomePage({
     try {
       const inspection = await transferGateway.inspect(path);
       let mode: 'CREATE' | 'OVERWRITE' = 'CREATE';
+      if (inspection.migrationRequired) {
+        const accepted = await confirmPlayerAction(
+          `这是旧版存档。导入时会从原文件的兼容副本升级到存档结构 ${inspection.saveSchemaVersion} / 世界结构 ${inspection.worldSchemaVersion}；原文件不会被改写。确定继续吗？`,
+        );
+        if (!accepted) return;
+      }
       if (inspection.campaignExists) {
         const accepted = await confirmPlayerAction(
           `本地已存在存档 ${inspection.campaignId.slice(0, 8)}。覆盖前会创建完整数据库备份，确定继续吗？`,
@@ -176,12 +182,14 @@ export function SaveHomePage({
       const imported = await transferGateway.importArchive(path, mode);
       await reload();
       setTransferNotice(
-        imported.state === 'ARCHIVED'
-          ? `已导入归档存档 ${imported.id.slice(0, 8)}；它仍保留归档状态。`
-          : `已导入存档 ${imported.id.slice(0, 8)}，现在可以继续游玩。`,
+        inspection.migrationRequired
+          ? `旧版存档 ${imported.id.slice(0, 8)} 已在隔离导入事务中升级；原文件保持不变。`
+          : imported.state === 'ARCHIVED'
+            ? `已导入归档存档 ${imported.id.slice(0, 8)}；它仍保留归档状态。`
+            : `已导入存档 ${imported.id.slice(0, 8)}，现在可以继续游玩。`,
       );
-    } catch {
-      setError('导入失败：文件未通过校验或无法写入；本地存档保持原状。');
+    } catch (importError) {
+      setError(importArchiveErrorMessage(importError));
     } finally {
       markBusy(null);
     }
@@ -364,6 +372,25 @@ export function SaveHomePage({
       </footer>
     </main>
   );
+}
+
+function importArchiveErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    try {
+      return importArchiveErrorMessage(JSON.parse(error) as unknown);
+    } catch {
+      return '导入失败：文件未通过校验或无法写入；本地存档保持原状。';
+    }
+  }
+  if (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'SAVE_ARCHIVE_FUTURE'
+  ) {
+    return '该存档来自更新版本；请升级 Ember Tavern 后再导入。本地存档保持原状。';
+  }
+  return '导入失败：文件未通过校验或无法写入；本地存档保持原状。';
 }
 
 function formatLastPlayed(value: string): string {

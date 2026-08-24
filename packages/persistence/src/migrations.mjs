@@ -172,6 +172,11 @@ const migrations = [
     name: 'prefetch',
     source: new URL('../../../database/migrations/0031_prefetch.sql', import.meta.url),
   },
+  {
+    version: 32,
+    name: 'save_schema',
+    source: new URL('../../../database/migrations/0032_save_schema.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

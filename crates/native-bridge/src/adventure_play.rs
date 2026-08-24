@@ -2672,7 +2672,7 @@ mod tests {
         assert_eq!(
             imported_transaction
                 .query_row(
-                    "SELECT revision FROM event_ledger
+                    "SELECT MAX(revision) FROM event_ledger
                      WHERE aggregate_type = 'SCENE' AND aggregate_id = ?1",
                     [&adventure_id],
                     |row| row.get::<_, i64>(0),

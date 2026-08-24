@@ -1,8 +1,8 @@
-# Ember Tavern `.emtavern` 存档格式 v1
+# Ember Tavern `.emtavern` 容器 v1 / Campaign Archive Schema 3
 
 ## 1. 范围
 
-`.emtavern` 是 Ember Tavern 在 Windows 与 iOS 之间手动迁移单个 Campaign 的可移植存档。v1 是 ZIP 容器，固定包含五个 UTF-8 文件：
+`.emtavern` 是 Windows 与未来 iOS 之间手动迁移单个 Campaign 的可移植存档。它不是活动 SQLite 文件的副本，也不能替代完整数据库备份。ZIP 容器固定包含五个 UTF-8 文件：
 
 ```text
 <campaign-id>.emtavern
@@ -13,300 +13,140 @@
 └─ checksum.json
 ```
 
-本格式保存完整游戏事实、事件和生成审计，但不迁移设备级模型配置、秘密或恢复缓存。它不是活动 SQLite 文件的副本，也不是数据库完整备份的替代品。
+schema 3保存完整游戏事实、持久状态、事件及生成/规则/Director审计；设备配置、秘密、未完成请求、内部快照和可重建缓存不得进入档案。
 
-本文中的“必须”“不得”“应”是格式 v1 的规范要求。
+## 2. 独立版本
 
-## 2. 版本
+- `formatVersion`：ZIP及五文件结构，当前固定为`1`。
+- `databaseSchemaVersion`：可移植Campaign行集合。当前写入`3`，读取历史`1`、`2`。
+- `campaigns.save_schema_version`：恢复后的可移植存档语义版本，当前固定为`3`。
+- `campaigns.world_schema_version`：恢复后的世界数据语义版本，当前固定为`1`。
+- 各行原有`schema_version`：领域对象协议版本，必须原样保留，不能代替上述版本。
 
-格式使用两个独立版本：
+活动SQLite迁移版本当前为32，可以高于portable schema。设备表或缓存表变化不得隐式抬高portable版本。schema 1含原14类事实；schema 2增加`scene_frames`；schema 3加入V0.3的持久世界、Rules、Knowledge、动态实体、Quest、Director、Memory和Lazy Generation状态。
 
-- `formatVersion`：`.emtavern` 容器及文件结构版本；本文固定为 `1`。
-- `databaseSchemaVersion`：可移植 Campaign 行集合的Schema版本。当前写入 `2`；读取方继续接受旧版 `1`。
+高于自身支持值的容器或portable schema必须明确拒绝。历史转换只能在隔离数据上完成，验证通过后才能写入正式SQLite事务；不得改写源`.emtavern`。
 
-活动设备的 SQLite 迁移版本可以高于档案的 `databaseSchemaVersion`。例如凭据清理队列与 Event Ledger 属于设备级状态，不进入档案，也不得仅因它们新增本地迁移就改变档案版本。Campaign archive schema 2在schema 1的14类事实之上增加`scene_frames`；写入方必须先确认活动数据库已经迁移到自己支持的最新本地版本，再按本文定义的可移植投影导出。
+## 3. 容器与资源规则
 
-Campaign、世界圣经和事件行中已有的 `schema_version` 是各领域对象的协议版本，必须原样保留，不能替代上述两个版本。
+- 条目名必须与第1节完全一致；禁止目录、重复项、绝对路径、反斜杠、`..`、符号链接或额外文件。
+- 条目仅允许`STORE`或`DEFLATE`。所有文本为UTF-8、无BOM、LF换行；JSON禁止重复键、非有限数字和尾随内容。
+- 四个JSON文件末尾有一个LF。`events.ndjson`每个非空行各含一个规范JSON对象和LF；零事件时文件为空。
+- 压缩包最多32 MiB，全部展开最多64 MiB，非空条目展开/压缩比最多100:1。
+- 条目上限：manifest/checksum各64 KiB，campaign 32 MiB，events/generations各16 MiB。
+- JSON深度最多64，数组最多100,000项，单字符串最多1,048,576 UTF-8字节。事件最多100,000条，Generation最多20,000条，每表最多20,000行，总记录最多200,000条。
+- 读取方先验证ZIP中央目录和全部预算，再有界展开、校验、解析；任何失败都发生在正式写事务之前。
 
-读取方必须拒绝高于自身支持值的 `formatVersion` 或档案 `databaseSchemaVersion`。档案数据的版本迁移必须在隔离数据上完成，全部验证通过后才能写入已经就绪的正式 SQLite。
+规范JSON按对象键Unicode升序、数组原顺序、无无意义空白、标准转义和有限数字编码。SQLite `*_json`列先解析、资源/秘密验证并规范化，再作为外层JSON字符串保存。
 
-## 3. 容器规则
+## 4. Manifest与Checksum
 
-- ZIP 条目名必须与第1节完全一致，不得有目录、重复条目、绝对路径、反斜杠、`..`、符号链接或额外文件。
-- 条目可使用 ZIP `STORE` 或 `DEFLATE`；ZIP CRC 不是本格式的内容校验依据。
-- 所有文本使用 UTF-8、无 BOM、LF 换行。JSON 不允许重复键、`NaN`、`Infinity` 或尾随内容。
-- `manifest.json`、`campaign.json`、`generations.json` 和 `checksum.json` 文件末尾必须有一个 LF。
-- `events.ndjson` 每个非空行是一个完整 JSON 对象并以 LF 结束；没有事件时文件长度为0。
-- 压缩包最多32 MiB，全部条目展开总量最多64 MiB；任一非空条目的展开/压缩比不得超过100:1。
-- 条目上限固定为：`manifest.json` 64 KiB、`checksum.json` 64 KiB、`campaign.json` 32 MiB、`events.ndjson` 16 MiB、`generations.json` 16 MiB。
-- JSON最大深度64，单数组最多100,000项，单字符串最多1,048,576字符/UTF-8字节。事件最多100,000条，GenerationRecord最多20,000条，每个Campaign事实表最多20,000行，档案总记录最多200,000条。
-- 读取方必须先扫描ZIP中央目录并验证所有预算，再按条目有界展开、校验和解析；不得同时保留五个展开条目。任何上限命中都在正式SQLite事务前整体拒绝。
-
-### 3.1 规范 JSON
-
-需要稳定字节表示的 JSON 文件和 NDJSON 行按以下规则编码：
-
-1. 对象键按 Unicode 码点升序排列；
-2. 数组保持本文件规定的稳定顺序；
-3. 不写无意义空白；
-4. 字符串使用标准 JSON 转义；
-5. 数字必须是有限 JSON 数字；
-6. 最外层值后写一个 LF，NDJSON 则每行各写一个 LF。
-
-SQLite 的 `*_json` 文本列仍以字符串字段保存。导出前必须解析并按相同规则重新序列化该列，拒绝非法 JSON，再把规范 JSON 文本作为外层 JSON 字符串写出。
-
-## 4. `manifest.json`
-
-`manifest.json` 描述档案身份、版本、导出时间和文件数量，不包含展示用的可变标题。
+`manifest.json`字段必须精确为：
 
 ```json
 {
   "application": "ember-tavern",
   "campaignId": "campaign-01",
   "createdAt": "2026-08-01T13:00:00.000Z",
-  "databaseSchemaVersion": 2,
+  "databaseSchemaVersion": 3,
   "files": {
     "campaign.json": { "mediaType": "application/json", "records": 1 },
     "events.ndjson": { "mediaType": "application/x-ndjson", "records": 42 },
     "generations.json": { "mediaType": "application/json", "records": 18 }
   },
   "formatVersion": 1,
-  "generatorVersion": "0.1.0"
+  "generatorVersion": "0.3.0"
 }
 ```
 
-字段约束：
+`application`固定为`ember-tavern`；`campaignId`在所有文件一致；时间必须是规范UTC RFC3339；三项record计数必须与解析结果一致。
 
-| 字段 | 约束 |
-| --- | --- |
-| `application` | 必须等于 `ember-tavern` |
-| `formatVersion` | v1必须等于 `1` |
-| `databaseSchemaVersion` | 正整数；当前写入 Campaign archive schema `2`，读取兼容 `1`，不等于设备级迁移上限 |
-| `campaignId` | 非空不透明ID，并与其余四个文件一致 |
-| `createdAt` | UTC RFC3339时间 |
-| `generatorVersion` | 生成该文件的应用版本，非兼容性判断依据 |
-| `files` | 必须恰好列出三个数据文件；`records` 是对应记录数 |
+`checksum.json`精确包含`algorithm: "SHA-256"`、`formatVersion: 1`以及其余四文件原始字节的64位小写十六进制摘要。它用于发现损坏/中断传输，不是数字签名。
 
-`campaign.json` 的 `records` 固定为1；其余计数必须与解析结果一致。
+## 5. SQLite行表示
 
-## 5. SQLite 行表示
+- 字段名是对应portable schema的准确SQLite列名。
+- `TEXT`写JSON字符串，`INTEGER`写JSON整数，有限`REAL`写JSON数字，`NULL`写`null`；SQLite布尔仍为`0`/`1`。
+- `*_json`保持规范JSON文本字符串，不在外层展开。
+- portable数据文件不允许BLOB；`save_snapshots.payload`不进入档案。
+- 每行必须与其portable schema列集合精确匹配。读取方使用固定标识符清单和绑定值写入，禁止归档内容提供SQL。
 
-数据文件使用可迁移的 SQLite 行表示，目的是在同一Schema版本下无损恢复：
+## 6. Campaign数据
 
-- 字段名使用对应 Campaign archive schema 所列本地迁移中的准确列名；schema 2的`scene_frames`来自`database/migrations/0006_scene_frames.sql`。
-- SQLite `TEXT` 写为 JSON 字符串，`INTEGER` 写为 JSON 整数，`NULL` 写为 JSON `null`。
-- SQLite布尔值保持 `0` 或 `1`，不得转换成 JSON布尔值。
-- `*_json` 字段保持“规范 JSON 文本字符串”，不得在外层展开。
-- v1数据文件不允许 BLOB 字段；`save_snapshots.payload` 因此不进入档案。
-- 每行必须只含该 `databaseSchemaVersion` 定义的列，不得缺列或增加未知列。
+`campaign.json`精确包含`campaign`、`campaignId`、`databaseSchemaVersion`、`formatVersion`和`tables`。schema 3 Campaign行必须带`save_schema_version: 3`和`world_schema_version: 1`。
 
-读取方必须先验证行形状和标量类型，再通过当前 Repository/领域协议验证 JSON 列、枚举、范围、Campaign 归属和外键，不能把归档行直接拼接成 SQL。
+Provider/model属于设备配置，因此导出行固定归一化为`default_model_profile_id: null`、`fallback_model_profile_id: null`、`task_model_overrides_json: "{}"`。
 
-## 6. `campaign.json`
+schema 1的14项表与schema 2的15项表保持历史精确形状。schema 2增加`scene_frames`。schema 3必须恰好包含69项表；权威名称、顺序和查询范围由[`portable-save-schema.ts`](../packages/persistence/src/portable-save-schema.ts)及Rust镜像清单锁定。
 
-该文件保存一个 Campaign 行和除事件、生成记录之外的全部持久游戏事实：
+69项覆盖：
 
-```json
-{
-  "campaign": {
-    "archived_at": null,
-    "created_at": "2026-08-01T10:00:00.000Z",
-    "default_model_profile_id": null,
-    "fallback_model_profile_id": null,
-    "id": "campaign-01",
-    "model_switch_policy": "ASK",
-    "resume_state": null,
-    "schema_version": 1,
-    "state": "TAVERN",
-    "task_model_overrides_json": "{}",
-    "updated_at": "2026-08-01T12:59:00.000Z"
-  },
-  "campaignId": "campaign-01",
-  "databaseSchemaVersion": 2,
-  "formatVersion": 1,
-  "tables": {
-    "adventure_turns": [],
-    "adventures": [],
-    "conversations": [],
-    "items": [],
-    "messages": [],
-    "npc_knowledge": [],
-    "npc_relationships": [],
-    "npcs": [],
-    "player_characters": [],
-    "quests": [],
-    "scene_frames": [],
-    "taverns": [],
-    "world_bibles": [],
-    "world_clocks": [],
-    "world_facts": []
-  }
-}
-```
+- V0.2基础世界、角色、酒馆、NPC、Quest、Adventure、对话、物品、时间与SceneFrame；
+- World Constitution、Seed、随机流、Rules状态/事件、Knowledge与Memory；
+- Universal Character、创建会话、Career Pool、NPC LOD、动态地点/势力；
+- 酒馆人口、多NPC场景、不可变NPC时间线、Quest Pool/Graph/动态来源；
+- World Director/Budget、Historical Summary、World Lore、检索规则；
+- Lazy World Generation、Campaign Event Ledger和已终结AI候选。
 
-schema 2的`tables`必须恰好包含以下15项：
+所有行必须属于同一Campaign。直接表检查`campaign_id`，间接表通过父记录闭包检查。双语言实现必须稳定排序，导入后逐表精确重载比较。
 
-`world_bibles`、`world_facts`、`player_characters`、`taverns`、`npcs`、`npc_knowledge`、`npc_relationships`、`quests`、`adventures`、`scene_frames`、`adventure_turns`、`conversations`、`messages`、`items`、`world_clocks`。
+### 6.1 SceneFrame与Event Ledger
 
-schema 1档案仍必须恰好包含原14项且不得伪造`scene_frames`；读取后将其解释为“尚无持久SceneFrame”，由Adventure恢复逻辑从已提交事实派生兼容视图。当前写入方只生成schema 2。
+schema 1/2不携带`event_ledger`，允许从SceneFrame revision建立兼容审计基线。schema 3携带完整Campaign Event Ledger，幂等操作及revision历史必须原样恢复，后续revision严格连续。SceneFrame的`returnPoint.eventId`必须存在于同档案`game_events`。
 
-所有行必须属于 `campaignId`。直接含 `campaign_id` 的表按该列验证；其余表通过父记录关系验证。数组按主键升序；`adventure_turns` 按 `adventure_id, turn_number, id`，`messages` 按 `conversation_id, sequence_number, id`。
+## 7. 事件与生成审计
 
-### 6.1 SceneFrame投影
+`events.ndjson`每行是完整`game_events`行，按稳定顺序保存；`payload_json`必须通过共享GameEvent协议。空文件不写占位对象。
 
-`scene_frames`每个Adventure最多一行，保存最近完整提交的场景恢复点：`scene_id`、`location`、参与者、压力、可执行项、待决后果、`return_point_json`和单调递增`revision`。导入必须严格验证嵌套字段、集合上限、Campaign/Adventure归属以及`returnPoint.eventId`确实存在于同一档案的`game_events`中。
+`generations.json`精确包含`campaignId`、`databaseSchemaVersion`、`formatVersion`和`records`。全部Campaign `generation_records`均保存，包括失败/修复审计；`model_profile_id`固定为`null`，其余请求、原响应、验证输出及错误仍受资源与秘密扫描约束。
 
-SceneFrame是可移植的当前投影；`event_ledger`是本机审计控制面，不进入档案。导入后可从SceneFrame和可移植事件继续恢复，不能要求源设备的ledger行存在；目标设备首次继续该场景时，以导入revision建立本地SCENE审计基线，后续revision继续严格连续。
+## 8. 包含与排除边界
 
-### 6.2 模型绑定归一化
+必须包含目标Campaign的归一化行、portable schema全部表、全部`game_events`和`generation_records`。存在未确认`PROPOSED`候选时导出必须失败；只有在候选全部终结后，schema 3才携带其审计行。
 
-Provider和模型档案是设备级配置，不属于可移植游戏事实。导出时 Campaign 行必须写：
+必须排除：
 
-- `default_model_profile_id: null`
-- `fallback_model_profile_id: null`
-- `task_model_overrides_json: "{}"`
+- `provider_configs`、`model_profiles`、`app_settings`、`schema_migrations`；
+- API Key、Authorization、Cookie、令牌、密码、安全存储内容和`credential_ref`；
+- `pending_ai_requests`、`credential_cleanup_queue`；
+- `dialogue_suggestion_cache`、`prefetch_candidates`、`prefetch_events`等可重建/进程缓存；
+- `quest_pool_restore_sessions`等事务控制行；
+- `save_snapshots`及BLOB payload、SQLite/WAL/SHM、完整备份、日志和临时文件。
 
-`model_switch_policy` 可以保留。导入完成后，玩家在目标设备重新选择已配置模型；不得凭同名ID自动关联另一台设备的Provider。
+字段名、所有字符串、嵌套JSON、请求/响应/错误、四个数据文件和最终ZIP字节都必须经过共享秘密扫描。命中即整体失败，不得静默删字段后生成看似完整的档案。
 
-## 7. `events.ndjson`
+## 9. 一致导出与原子发布
 
-每行是 `game_events` 的一个完整 SQLite 行对象，例如：
+导出在单个只读一致事务内完成：SQLite `integrity_check`、`foreign_key_check`、本地schema 32、Campaign存在、行归属、JSON/领域协议、资源预算和秘密扫描全部通过后，才编码五文件并原子发布最终路径。任何失败都不得替换已有目标或留下正式扩展名半成品。
 
-```json
-{"campaign_id":"campaign-01","id":"event-01","occurred_at":"2026-08-01T11:00:00.000Z","payload_json":"{\"worldName\":\"Ember Coast\"}","schema_version":1,"type":"WORLD_CREATED"}
-```
-
-规则：
-
-- 只允许目标 Campaign 的事件；
-- 按 `occurred_at, id` 升序；
-- `payload_json` 必须匹配 `type` 的共享 `GameEvent` 协议；
-- 空文件表示没有事件，不写头行或空 JSON 对象；
-- `manifest.files["events.ndjson"].records` 必须等于非空行数。
-
-## 8. `generations.json`
-
-该文件保存 Campaign 的完整 `generation_records` 审计行：
-
-```json
-{
-  "campaignId": "campaign-01",
-  "databaseSchemaVersion": 2,
-  "formatVersion": 1,
-  "records": [
-    {
-      "campaign_id": "campaign-01",
-      "completed_at": "2026-08-01T11:00:01.000Z",
-      "id": "generation-01",
-      "model_profile_id": null,
-      "prompt_version": 2,
-      "raw_response_text": "{\"name\":\"Ember Coast\"}",
-      "request_id": "request-01",
-      "request_json": "{\"modelName\":\"ember-fake-v1\"}",
-      "started_at": "2026-08-01T11:00:00.000Z",
-      "task": "GENERATE_WORLD",
-      "validated_output_json": "{\"name\":\"Ember Coast\"}",
-      "validation_error_json": null
-    }
-  ]
-}
-```
-
-记录按 `started_at, id` 升序。`request_json`、验证结果和错误继续保留，以便审计模型生成来源；`raw_response_text` 也原样保留，但仍受秘密扫描规则约束。
-
-`model_profile_id` 在导出表示中必须为 `null`。实际模型名和生成参数由现有 `request_json` 保留，目标设备不得把源设备模型ID连接到本机配置。消息和冒险结局对 `generation_records.id` 的引用保持不变。
-
-## 9. `checksum.json`
-
-校验和对其余四个文件的原始、含末尾 LF 的 UTF-8 字节计算：
-
-```json
-{
-  "algorithm": "SHA-256",
-  "files": {
-    "campaign.json": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "events.ndjson": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "generations.json": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-    "manifest.json": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
-  },
-  "formatVersion": 1
-}
-```
-
-- `algorithm` 必须等于 `SHA-256`。
-- 每个摘要必须是64个小写十六进制字符。
-- `files` 必须恰好包含上述四项；`checksum.json` 不自校验，避免循环依赖。
-- 摘要用于发现损坏和不完整传输，不是数字签名，不能证明文件作者或抵抗主动篡改。
-
-## 10. 包含与排除边界
-
-### 10.1 必须包含
-
-- `campaigns` 中目标 Campaign 的归一化行；
-- `campaign.json` 第6节列出的15类完整游戏事实（schema 1旧档案为14类）；
-- 该 Campaign 的全部 `game_events`；
-- 该 Campaign 的全部 `generation_records`，包括失败和修复审计；
-- 五个文件自身的格式、Schema和完整性元数据。
-
-### 10.2 必须排除
-
-- `provider_configs`、`model_profiles`、`app_settings`；
-- API Key、Authorization头、Cookie、登录令牌和安全密钥仓库内容；
-- `credential_ref` 及其他设备安全存储引用；
-- `pending_ai_requests`；导入后由现有回合和Campaign状态重新派生恢复操作；
-- `ai_candidates`；存在未确认PROPOSED候选时导出必须失败，避免静默丢失待确认进度；
-- `event_ledger`；它是设备级审计控制面，SceneFrame通过可移植`game_events`保存恢复锚点；
-- `save_snapshots` 及其 BLOB payload；成功导入后创建新的 `IMPORT` 快照；
-- SQLite文件、WAL/SHM、完整备份、应用日志、临时文件和缓存。
-
-写入方必须扫描字段名、所有字符串字段值、嵌套JSON、`request_json`、`validation_error_json`、`raw_response_text`、四个待导出数据文件及最终ZIP字节。字段名至少拒绝 `api_key`、`apiKey`、`authorization`、`cookie`、`token`、`password`、`secretKey` 和 `credential_ref`；值扫描至少识别 Bearer/Basic Authorization、常见 `sk-` Provider Key、JWT、Google/AWS/GitHub/Slack高置信前缀、不透明credential引用和显式测试密钥。命中时导出整体失败，不得静默删字段后生成看似完整的档案。
-
-诊断展示若处理同类文本必须走共享 redaction 函数，以 `[REDACTED]` 替换命中值。高置信扫描不能识别没有结构或已被任意变形的所有秘密；玩家仍不应把凭据输入叙事字段，分享前应把存档视为私人内容。
-
-## 11. 一致性快照
-
-导出方必须在单个只读一致性事务中读取全部数据，并在封装ZIP前完成以下检查：
-
-1. 数据库通过完整性检查，目标 Campaign 存在；
-2. 所有导出行均属于目标 Campaign；
-3. 外键和领域引用闭合，JSON列及共享协议有效；
-4. Campaign模型绑定与生成记录模型绑定已按本文归一化；
-5. 事件、生成记录和各表顺序稳定；
-6. `manifest` 数量与实际内容一致；
-7. 四个数据文件的SHA-256与 `checksum.json` 一致；
-8. ZIP 仅在全部步骤成功后原子发布到最终路径。
-
-任一步失败都不得留下正式扩展名的半成品。
-
-## 12. 导入验证顺序
-
-M8-T03 的读取方必须按以下顺序处理，且在最终提交前只操作隔离临时数据：
+## 10. 导入与迁移顺序
 
 ```text
-检查ZIP结构、条目名和大小上限
-→ 最小解析manifest与checksum
-→ 校验四个文件的SHA-256
-→ 验证formatVersion和databaseSchemaVersion
-→ 严格解析全部文件、数量、行形状和Campaign归属
-→ 执行必要Schema迁移
-→ 通过共享协议、领域规则、外键与秘密扫描
-→ 选择新建或明确覆盖目标
-→ 单一SQLite事务写入
-→ 创建IMPORT快照
-→ 提交
+验证ZIP结构和资源预算
+→ 校验四文件SHA-256
+→ 验证容器/portable版本
+→ 严格解析行形状、计数、归属、JSON和秘密
+→ 把schema 1/2投影转换为schema 3 Campaign行
+→ 选择CREATE或用户明确OVERWRITE
+→ OVERWRITE先创建一致完整数据库备份
+→ 单一IMMEDIATE事务按外键/触发器顺序写入
+→ foreign-key/逐表精确重载与领域Repository重载
+→ 创建IMPORT快照并提交
 ```
 
-覆盖导入必须在事务开始前创建可恢复的数据库完整备份。任何解析、迁移、校验、写入或IMPORT快照失败都必须回滚，不得留下部分Campaign。
+任一步失败必须回滚；源档案和原Campaign保持不变。未来portable版本以“需要升级应用”明确拒绝。历史迁移不得猜测或伪造缺失的世界事实，只做当前规则允许的确定性兼容投影。
 
-## 13. v1 容器兼容性规则
+## 11. 活动SQLite V0.2→V0.3迁移
 
-- 写入方只生成自己完整支持的 `formatVersion` 和 Campaign archive schema；设备级迁移不得隐式抬高档案版本。
-- 读取方不得忽略未知顶层字段、缺失固定表或额外ZIP条目；格式升级必须显式增加迁移。
-- ID在新建导入中默认保持不变。若与本地其他Campaign内容冲突，必须整体拒绝或执行覆盖模式，v1不得局部改写ID。
-- 同一 `campaignId` 已存在时必须由用户明确选择“新建副本”或“覆盖”；新建副本若需要重写ID属于M8-T03的显式全图迁移，不在格式层隐式发生。
-- 导入成功后模型绑定为空是预期状态，不代表游戏事实缺失；继续AI生成前必须选择目标设备的模型。
-- Campaign archive schema 1读取后允许没有SceneFrame；schema 2必须携带精确的`scene_frames`表键，且每行在写入正式SQLite前完成结构和恢复锚点校验。
+Windows实际使用的Rust启动路径与TypeScript工具路径都必须：
 
-## 14. M8-T01 边界
+1. 创建并验证迁移前完整备份；
+2. 从一致副本建立隔离工作文件；
+3. 在工作文件执行历史migration至schema 32；
+4. 执行`integrity_check`、`foreign_key_check`、schema history和Campaign领域重载；
+5. 仅在全部通过后用rename原子切换；
+6. 切换失败恢复原文件；任何失败都清理工作副本并保持原文件字节不变。
 
-本任务只定义格式。ZIP读写、导出服务、导入事务、文件选择器和拖放交互分别属于 M8-T02、M8-T03 和 M8-T04，不在本文实现。
+## 12. Fixtures与互操作门禁
+
+历史TS/Rust v1、v2 fixtures永久保留并由SHA-256清单防漂移；当前TS/Rust v3 fixtures另行生成。`pnpm archive:interop`验证历史hash、TS v3再生成一致、Rust导入TS、Rust v3再生成一致及TS导入Rust。禁止删除历史migration或fixture来让门禁通过。

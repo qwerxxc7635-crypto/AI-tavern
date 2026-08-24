@@ -39,6 +39,8 @@ async function createNewFile(databasePath) {
     database = new DatabaseSync(databasePath);
     await applyMigrations(database);
     assertIntegrity(database);
+    assertForeignKeys(database);
+    assertDomainReload(database);
     const version = inspectSchemaVersion(database);
     database.close();
     return Object.freeze({
@@ -67,6 +69,8 @@ async function migrateExistingFile(databasePath, options) {
     const fromVersion = inspectSchemaVersion(database);
     assertCompatibleVersion(fromVersion);
     if (fromVersion === currentSchemaVersion) {
+      assertForeignKeys(database);
+      assertDomainReload(database);
       database.close();
       database = undefined;
       await rm(workingPath, { force: true });
@@ -84,6 +88,8 @@ async function migrateExistingFile(databasePath, options) {
     });
     await applyMigrations(database);
     assertIntegrity(database);
+    assertForeignKeys(database);
+    assertDomainReload(database);
     const toVersion = inspectSchemaVersion(database);
     if (toVersion !== currentSchemaVersion) {
       throw new DatabaseStartupError(
@@ -100,13 +106,17 @@ async function migrateExistingFile(databasePath, options) {
     } catch (error) {
       await restoreOriginal(rollbackPath, databasePath, error);
     }
-    await rm(rollbackPath, { force: true });
+    // The verified migrated file is active and the separately retained full
+    // backup remains recoverable. A stale rollback copy must not turn a
+    // successful atomic switch into a false migration failure.
+    const cleanupPath = await removeObsoleteRollback(rollbackPath);
     return Object.freeze({
       status: 'MIGRATED',
       databasePath,
       fromVersion,
       toVersion,
       backupPath: backup.backupPath,
+      cleanupPath,
     });
   } catch (error) {
     let startupError = closeAfterFailure(database, asStartupError(error, 'MIGRATION_FAILED'));
@@ -176,6 +186,84 @@ function assertIntegrity(database) {
   }
 }
 
+function assertForeignKeys(database) {
+  if (database.prepare('PRAGMA foreign_key_check').all().length !== 0) {
+    throw new DatabaseStartupError(
+      'FOREIGN_KEY_CHECK_FAILED',
+      'SQLite foreign-key check failed during database startup',
+    );
+  }
+}
+
+function assertDomainReload(database) {
+  const allowedStates = new Set([
+    'CREATING_WORLD',
+    'REVIEWING_WORLD',
+    'CREATING_CHARACTER',
+    'GENERATING_TAVERN',
+    'TAVERN',
+    'ADVENTURE',
+    'SETTLEMENT',
+    'GENERATION_FAILED',
+    'WAITING_FOR_MODEL',
+    'RECOVERY_REQUIRED',
+    'ARCHIVED',
+  ]);
+  const allowedResumeStates = new Set([
+    'CREATING_WORLD',
+    'REVIEWING_WORLD',
+    'CREATING_CHARACTER',
+    'GENERATING_TAVERN',
+    'TAVERN',
+    'ADVENTURE',
+    'SETTLEMENT',
+  ]);
+  const rows = database
+    .prepare(
+      `SELECT id,state,resume_state,task_model_overrides_json,created_at,updated_at,
+              save_schema_version,world_schema_version
+       FROM campaigns ORDER BY id`,
+    )
+    .all();
+  for (const row of rows) {
+    if (
+      typeof row.id !== 'string' ||
+      row.id.length === 0 ||
+      row.id.trim() !== row.id ||
+      !allowedStates.has(row.state) ||
+      (row.resume_state !== null && !allowedResumeStates.has(row.resume_state)) ||
+      row.save_schema_version !== 3 ||
+      row.world_schema_version !== 1 ||
+      !isCanonicalTimestamp(row.created_at) ||
+      !isCanonicalTimestamp(row.updated_at) ||
+      row.updated_at < row.created_at
+    ) {
+      throw new DatabaseStartupError(
+        'DOMAIN_RELOAD_FAILED',
+        `Campaign domain reload failed after migration: ${String(row.id)}`,
+      );
+    }
+    try {
+      const overrides = JSON.parse(row.task_model_overrides_json);
+      if (overrides === null || typeof overrides !== 'object' || Array.isArray(overrides)) {
+        throw new TypeError('model overrides must be an object');
+      }
+    } catch (error) {
+      throw new DatabaseStartupError(
+        'DOMAIN_RELOAD_FAILED',
+        `Campaign model policy could not reload after migration: ${row.id}`,
+        { cause: error },
+      );
+    }
+  }
+}
+
+function isCanonicalTimestamp(value) {
+  if (typeof value !== 'string') return false;
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString() === value;
+}
+
 async function existingSidecars(databasePath) {
   const candidates = [`${databasePath}-journal`, `${databasePath}-wal`, `${databasePath}-shm`];
   const checks = await Promise.all(
@@ -199,6 +287,15 @@ async function restoreOriginal(backupPath, databasePath, switchError) {
     'Migrated database could not replace the original; original was restored',
     { cause: switchError },
   );
+}
+
+async function removeObsoleteRollback(rollbackPath) {
+  try {
+    await rm(rollbackPath, { force: true });
+    return null;
+  } catch {
+    return rollbackPath;
+  }
 }
 
 function asStartupError(error, fallbackCode) {

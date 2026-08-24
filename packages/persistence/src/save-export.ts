@@ -5,6 +5,12 @@ import type { CampaignId, IsoTimestamp } from '@ember-tavern/contracts';
 import { PersistenceDataError } from './campaign-repository.js';
 import { currentSchemaVersion } from './migrations.mjs';
 import {
+  PORTABLE_CAMPAIGN_TABLES,
+  PORTABLE_SAVE_SCHEMA_VERSION,
+  portableTableQuery,
+  type PortableCampaignTable,
+} from './portable-save-schema.js';
+import {
   MAX_ARCHIVE_BYTES,
   MAX_EVENT_RECORDS,
   MAX_GENERATION_RECORDS,
@@ -25,7 +31,7 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 const FORMAT_VERSION = 1;
 // Device-only schema migrations (for example, credential cleanup bookkeeping)
 // must not change the portable campaign archive contract.
-const ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_SAVE_SCHEMA_VERSION;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -40,51 +46,6 @@ const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, index) => {
   }
   return value >>> 0;
 });
-
-type CampaignTable =
-  | 'world_bibles'
-  | 'world_facts'
-  | 'player_characters'
-  | 'taverns'
-  | 'npcs'
-  | 'npc_knowledge'
-  | 'npc_relationships'
-  | 'quests'
-  | 'adventures'
-  | 'scene_frames'
-  | 'adventure_turns'
-  | 'conversations'
-  | 'messages'
-  | 'items'
-  | 'world_clocks';
-
-const TABLE_QUERIES: Readonly<Record<CampaignTable, string>> = {
-  world_bibles: 'SELECT * FROM world_bibles WHERE campaign_id = ? ORDER BY campaign_id',
-  world_facts: 'SELECT * FROM world_facts WHERE campaign_id = ? ORDER BY id',
-  player_characters: 'SELECT * FROM player_characters WHERE campaign_id = ? ORDER BY id',
-  taverns: 'SELECT * FROM taverns WHERE campaign_id = ? ORDER BY id',
-  npcs: 'SELECT * FROM npcs WHERE campaign_id = ? ORDER BY id',
-  npc_knowledge: `SELECT npc_knowledge.* FROM npc_knowledge
-    JOIN npcs ON npcs.id = npc_knowledge.npc_id
-    WHERE npcs.campaign_id = ? ORDER BY npc_knowledge.npc_id`,
-  npc_relationships: `SELECT npc_relationships.* FROM npc_relationships
-    JOIN npcs ON npcs.id = npc_relationships.npc_id
-    WHERE npcs.campaign_id = ? ORDER BY npc_relationships.npc_id`,
-  quests: 'SELECT * FROM quests WHERE campaign_id = ? ORDER BY id',
-  adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
-  scene_frames: 'SELECT * FROM scene_frames WHERE campaign_id = ? ORDER BY adventure_id',
-  adventure_turns: `SELECT adventure_turns.* FROM adventure_turns
-    JOIN adventures ON adventures.id = adventure_turns.adventure_id
-    WHERE adventures.campaign_id = ?
-    ORDER BY adventure_turns.adventure_id, adventure_turns.turn_number, adventure_turns.id`,
-  conversations: 'SELECT * FROM conversations WHERE campaign_id = ? ORDER BY id',
-  messages: `SELECT messages.* FROM messages
-    JOIN conversations ON conversations.id = messages.conversation_id
-    WHERE conversations.campaign_id = ?
-    ORDER BY messages.conversation_id, messages.sequence_number, messages.id`,
-  items: 'SELECT * FROM items WHERE campaign_id = ? ORDER BY id',
-  world_clocks: 'SELECT * FROM world_clocks WHERE campaign_id = ? ORDER BY id',
-};
 
 const JSON_COLUMNS: Readonly<Record<string, ReadonlySet<string>>> = {
   campaigns: new Set(['task_model_overrides_json']),
@@ -234,7 +195,7 @@ function captureSave(
   const tables = campaignTableRecord((table) =>
     Object.freeze(
       database
-        .prepare(TABLE_QUERIES[table])
+        .prepare(portableTableQuery(table))
         .all(campaignId)
         .map((row) => normalizeRow(table, row)),
     ),
@@ -374,7 +335,7 @@ function normalizeRow(table: string, value: unknown): StoredRow {
   return Object.freeze(
     Object.fromEntries(
       Object.entries(source).map(([column, entry]) => {
-        if (jsonColumns.has(column) && entry !== null) {
+        if ((jsonColumns.has(column) || column.endsWith('_json')) && entry !== null) {
           if (typeof entry !== 'string') {
             throw new PersistenceDataError(`${table}.${column} must be JSON text`);
           }
@@ -467,25 +428,11 @@ function safeFileStem(campaignId: string): string {
 }
 
 function campaignTableRecord(
-  values: (table: CampaignTable) => readonly StoredRow[],
-): Record<CampaignTable, readonly StoredRow[]> {
-  return {
-    world_bibles: values('world_bibles'),
-    world_facts: values('world_facts'),
-    player_characters: values('player_characters'),
-    taverns: values('taverns'),
-    npcs: values('npcs'),
-    npc_knowledge: values('npc_knowledge'),
-    npc_relationships: values('npc_relationships'),
-    quests: values('quests'),
-    adventures: values('adventures'),
-    scene_frames: values('scene_frames'),
-    adventure_turns: values('adventure_turns'),
-    conversations: values('conversations'),
-    messages: values('messages'),
-    items: values('items'),
-    world_clocks: values('world_clocks'),
-  };
+  values: (table: PortableCampaignTable) => readonly StoredRow[],
+): Record<PortableCampaignTable, readonly StoredRow[]> {
+  return Object.fromEntries(
+    PORTABLE_CAMPAIGN_TABLES.map((table) => [table, values(table)]),
+  ) as Record<PortableCampaignTable, readonly StoredRow[]>;
 }
 
 function canonicalJson(value: unknown): string {

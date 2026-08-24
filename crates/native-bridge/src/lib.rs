@@ -138,7 +138,9 @@ const WORLD_INFO_RETRIEVAL_MIGRATION: &str =
 const LAZY_WORLD_GENERATION_MIGRATION: &str =
     include_str!("../../../database/migrations/0030_lazy_world_generation.sql");
 const PREFETCH_MIGRATION: &str = include_str!("../../../database/migrations/0031_prefetch.sql");
-const LATEST_SCHEMA_VERSION: i64 = 31;
+const SAVE_SCHEMA_MIGRATION: &str =
+    include_str!("../../../database/migrations/0032_save_schema.sql");
+const LATEST_SCHEMA_VERSION: i64 = 32;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -204,6 +206,8 @@ pub enum CampaignStoreError {
     Io(#[from] std::io::Error),
     #[error("save archive is invalid")]
     ArchiveInvalid,
+    #[error("save archive schema is newer than this application")]
+    ArchiveTooNew,
     #[error("save archive conflicts with local state")]
     ArchiveConflict,
     #[error("save archive path is invalid")]
@@ -234,14 +238,17 @@ impl CampaignStore {
         ))?);
         let _guard = operation_lock.acquire()?;
         if database_path.exists() {
-            create_consistent_backup(&database_path)?;
+            migrate_existing_database(&database_path)?;
         }
         let store = Self {
             database_path,
             operation_lock,
         };
-        let mut connection = store.connect()?;
-        apply_migrations(&mut connection)?;
+        if !store.database_path.exists() {
+            let mut connection = store.connect()?;
+            apply_migrations(&mut connection)?;
+            validate_migrated_database(&connection)?;
+        }
         Ok(store)
     }
 
@@ -557,7 +564,116 @@ fn assert_database_integrity(connection: &Connection) -> Result<(), CampaignStor
     }
 }
 
+fn migrate_existing_database(database_path: &Path) -> Result<(), CampaignStoreError> {
+    let backup_path = create_consistent_backup(database_path)?;
+    let token = Uuid::new_v4();
+    let working_path = database_path.with_extension(format!("migration-{token}.tmp"));
+    let rollback_path = database_path.with_extension(format!("switch-{token}.tmp"));
+    let result = (|| {
+        std::fs::copy(&backup_path, &working_path)?;
+        let mut working = Connection::open(&working_path)?;
+        assert_database_integrity(&working)?;
+        let from_version = schema_version(&working)?;
+        apply_migrations(&mut working)?;
+        validate_migrated_database(&working)?;
+        drop(working);
+        if from_version == LATEST_SCHEMA_VERSION {
+            std::fs::remove_file(&working_path)?;
+            return Ok(());
+        }
+        std::fs::rename(database_path, &rollback_path)?;
+        if let Err(switch_error) = std::fs::rename(&working_path, database_path) {
+            let restore = std::fs::rename(&rollback_path, database_path);
+            return match restore {
+                Ok(()) => Err(CampaignStoreError::Io(switch_error)),
+                Err(restore_error) => Err(CampaignStoreError::Io(std::io::Error::other(format!(
+                    "database switch failed ({switch_error}); original remains at {} because restore failed ({restore_error})",
+                    rollback_path.display()
+                )))),
+            };
+        }
+        // The verified migrated file is already active and the separately
+        // retained full backup is authoritative. A stale rollback copy is a
+        // cleanup issue, not a failed migration or a reason to switch again.
+        let _ = std::fs::remove_file(&rollback_path);
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&working_path);
+    }
+    result
+}
+
+fn schema_version(connection: &Connection) -> Result<i64, CampaignStoreError> {
+    let has_history = connection
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'",
+            [],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if !has_history {
+        return Ok(0);
+    }
+    let version = connection.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM schema_migrations",
+        [],
+        |row| row.get(0),
+    )?;
+    if version > LATEST_SCHEMA_VERSION {
+        return Err(CampaignStoreError::IncompatibleSchema);
+    }
+    Ok(version)
+}
+
+fn validate_migrated_database(connection: &Connection) -> Result<(), CampaignStoreError> {
+    assert_database_integrity(connection)?;
+    if schema_version(connection)? != LATEST_SCHEMA_VERSION {
+        return Err(CampaignStoreError::IncompatibleSchema);
+    }
+    if connection
+        .prepare("PRAGMA foreign_key_check")?
+        .query([])?
+        .next()?
+        .is_some()
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut statement = connection.prepare(
+        "SELECT id, state, created_at, updated_at, save_schema_version, world_schema_version
+         FROM campaigns ORDER BY id",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            CampaignSummary {
+                id: row.get(0)?,
+                state: row.get(1)?,
+                created_at: row.get(2)?,
+                updated_at: row.get(3)?,
+            },
+            row.get::<_, i64>(4)?,
+            row.get::<_, i64>(5)?,
+        ))
+    })?;
+    for row in rows {
+        let (campaign, save_schema_version, world_schema_version) = row?;
+        validate_campaign(campaign)?;
+        if save_schema_version != 3 || world_schema_version != 1 {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    Ok(())
+}
+
 fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreError> {
+    apply_migrations_through(connection, LATEST_SCHEMA_VERSION)
+}
+
+fn apply_migrations_through(
+    connection: &mut Connection,
+    target_version: i64,
+) -> Result<(), CampaignStoreError> {
     connection.execute_batch(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
            version INTEGER PRIMARY KEY,
@@ -570,11 +686,11 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
         [],
         |row| row.get::<_, i64>(0),
     )?;
-    if latest_version > LATEST_SCHEMA_VERSION {
+    if latest_version > target_version {
         return Err(CampaignStoreError::IncompatibleSchema);
     }
 
-    for (version, name, sql) in [
+    let migration_definitions = [
         (1_i64, "initial", INITIAL_MIGRATION),
         (
             2_i64,
@@ -642,7 +758,28 @@ fn apply_migrations(connection: &mut Connection) -> Result<(), CampaignStoreErro
             LAZY_WORLD_GENERATION_MIGRATION,
         ),
         (31_i64, "prefetch", PREFETCH_MIGRATION),
-    ] {
+        (32_i64, "save_schema", SAVE_SCHEMA_MIGRATION),
+    ];
+    let history = {
+        let mut statement = connection.prepare(
+            "SELECT version,name FROM schema_migrations WHERE version <= ?1 ORDER BY version",
+        )?;
+        statement
+            .query_map([target_version], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })?
+            .collect::<Result<Vec<_>, _>>()?
+    };
+    for (index, (version, name)) in history.iter().enumerate() {
+        let expected = migration_definitions.get(index);
+        if expected.is_none_or(|expected| expected.0 != *version || expected.1 != name) {
+            return Err(CampaignStoreError::IncompatibleSchema);
+        }
+    }
+    for (version, name, sql) in migration_definitions {
+        if version > target_version {
+            break;
+        }
         let applied_name = connection
             .query_row(
                 "SELECT name FROM schema_migrations WHERE version = ?1",
@@ -1027,5 +1164,102 @@ mod tests {
             CampaignStore::open(database_path),
             Err(CampaignStoreError::IncompatibleSchema)
         ));
+    }
+
+    #[test]
+    fn native_startup_migrates_schema_31_on_a_verified_copy() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("schema-31.sqlite");
+        let mut old = Connection::open(&database_path).expect("open old database");
+        apply_migrations_through(&mut old, 31).expect("apply schema 31");
+        old.execute(
+            "INSERT INTO campaigns (id,schema_version,state,created_at,updated_at)
+             VALUES ('campaign-migration',1,'TAVERN',?1,?1)",
+            [FIRST_TIME],
+        )
+        .expect("seed campaign");
+        drop(old);
+
+        let store = CampaignStore::open(&database_path).expect("migrate database");
+        let migrated = store.connect().expect("open migrated database");
+        assert_eq!(schema_version(&migrated).expect("schema version"), 32);
+        assert_eq!(
+            migrated
+                .query_row(
+                    "SELECT save_schema_version,world_schema_version FROM campaigns
+                     WHERE id='campaign-migration'",
+                    [],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+                )
+                .expect("schema columns"),
+            (3, 1)
+        );
+        drop(migrated);
+
+        let backup = std::fs::read_dir(backup_directory(&database_path))
+            .expect("read backups")
+            .next()
+            .expect("migration backup")
+            .expect("backup entry")
+            .path();
+        let backup = Connection::open_with_flags(backup, OpenFlags::SQLITE_OPEN_READ_ONLY)
+            .expect("open backup");
+        assert_eq!(schema_version(&backup).expect("backup schema"), 31);
+        assert_eq!(
+            backup
+                .query_row(
+                    "SELECT COUNT(*) FROM pragma_table_info('campaigns')
+                     WHERE name IN ('save_schema_version','world_schema_version')",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("old columns"),
+            0
+        );
+    }
+
+    #[test]
+    fn native_startup_migrates_an_existing_schema_zero_file() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("schema-zero.sqlite");
+        let old = Connection::open(&database_path).expect("open old database");
+        old.execute_batch(
+            "CREATE TABLE legacy_notes(id TEXT PRIMARY KEY,note TEXT NOT NULL);
+             INSERT INTO legacy_notes VALUES('note-1','keep me');",
+        )
+        .expect("seed legacy database");
+        drop(old);
+
+        let store = CampaignStore::open(&database_path).expect("migrate schema zero");
+        let migrated = store.connect().expect("open migrated database");
+        assert_eq!(schema_version(&migrated).expect("schema version"), 32);
+        assert_eq!(
+            migrated
+                .query_row(
+                    "SELECT note FROM legacy_notes WHERE id='note-1'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .expect("legacy note"),
+            "keep me"
+        );
+    }
+
+    #[test]
+    fn native_migration_failure_leaves_original_bytes_unchanged() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let database_path = directory.path().join("broken-schema-31.sqlite");
+        let mut old = Connection::open(&database_path).expect("open old database");
+        apply_migrations_through(&mut old, 31).expect("apply schema 31");
+        old.execute_batch("DROP TRIGGER npc_lod_delete_guard; DROP TABLE npc_lod_profiles;")
+            .expect("break required schema");
+        drop(old);
+        let before = std::fs::read(&database_path).expect("read original");
+
+        assert!(CampaignStore::open(&database_path).is_err());
+        assert_eq!(
+            std::fs::read(&database_path).expect("read preserved original"),
+            before
+        );
     }
 }
