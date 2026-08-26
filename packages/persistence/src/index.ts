@@ -13,6 +13,12 @@ export type {
   DatabaseBackupOptions,
   DatabaseBackupResult,
 } from './database-backup.mjs';
+export {
+  findSecretInJson,
+  findSecretInText,
+  redactSecretsForDiagnostics,
+} from './save-secret-scanner.js';
+export type { SecretDetection } from './save-secret-scanner.js';
 export { AdventureSettlementRepository } from './adventure-settlement-repository.js';
 export type {
   AdventureSettlementCommit,

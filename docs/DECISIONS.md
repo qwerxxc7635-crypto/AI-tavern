@@ -3230,3 +3230,26 @@ Primitive 冻结原始暖黑、深木、羊皮纸、余烬金、功能色、字�
 - 四个既定视口继续沿用 860×600、1180×760、1366×768、1920×1080；不改变已有里程碑、门禁或页面业务合同。
 - media breakpoint、运行时几何宽高、百分比和 keyframe transform 不是可主题化视觉值，不包装成无意义 Token；其余差异必须通过静态门或进入 M12 findings ledger。
 - 本决定不修改 Rules Engine、AI Provider、Generator/Queue、SQLite、Persistence、Save/Resume、World Seed/Constitution、D20 硬结果或 Quest/NPC/Adventure 核心语义。
+
+## DEC-151：三世界长测使用不可变场景 Hash、独立 SQLite 与显式 Evidence 状态机
+
+- 日期：2026-08-26
+- 状态：已采纳
+- 依据：`M11-T01`、V0.3 Spec 16.2、[`V0.3_PLAYTEST_HARNESS.md`](V0.3_PLAYTEST_HARNESS.md)
+
+### 背景
+
+仓库已有三种世界的局部领域测试，但没有一个可被 M11 长测共同复用的运行身份、隔离目录、动作顺序、重置/回放语义或证据格式。若各长测临时自建 fixture，容易把三个世界做成换名样本、交叉污染 SQLite、复制上次结果，或把 Fake 单元测试误写成真实模型证据。
+
+### 决定与理由
+
+在既有 `@ember-tavern/test-fixtures` 包建立三个 `SYNTHETIC_M11` 场景。每世界拥有不同 Constitution、Career、Equipment、Trait、NPC、Quest 和 Extension 结构，以及 32 个不预判结果的有序玩家动作。Manifest 分别计算 fixture/script SHA-256，再组合为 scenario hash，并绑定 source commit。
+
+每个世界使用独立目录和 `campaign.sqlite3`。Reset 只删除目标世界的已知 SQLite/WAL/SHM 与动作证据文件，保留不可变场景；Replay 以新 run ID 从 `NOT_RUN` 开始，但相同输入保持相同 hash。Evidence v1 按动作追加 outcome、latency、持久化和要求的观察类型，并保存 P0–P3 finding；只有完成全部脚本才允许标记 `COMPLETE`，但完整执行不等于通过。
+
+### 影响与边界
+
+- fixture 和 evidence 复用 portable save 秘密扫描；只记录 Provider/Model 显示身份，不记录 Credential、API Key、Prompt 或正式用户数据。
+- 结构差异门检查 Technology/Magic/Economy、装备类别、Trait 点型、Quest 风险和扩展 schema，禁止只换名称。
+- M11-T02～T04 负责把 production 服务接入独立 SQLite 并形成真实长测证据；M11-T01 不预填剧情结果、不冒充真实模型验证。
+- 本决定不改变 Rules Engine、Provider、Generator/Queue、SQLite schema、Save、D20 或 Quest/NPC/Adventure 业务合同。

@@ -551,12 +551,13 @@
 
 ## M11-T01 Three-World Test Harness
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-26）
 - **Dependency**：M10-T07。
 - **Deliverable**：奇幻、调查/COC、Cyberpunk 三世界的隔离测试配置、行为脚本和证据格式。
 - **Acceptance**：三世界 Constitution/职业/装备/Trait/NPC/Quest/扩展字段明显不同；不使用正式用户数据。
 - **Tests**：fixture validity、isolation、reset/replay、secret scan。
 - **Do Not**：不把三个世界做成换名 fixture；不预判测试结果。
+- **Implementation reference**：[`V0.3_PLAYTEST_HARNESS.md`](V0.3_PLAYTEST_HARNESS.md)、[`DEC-151`](DECISIONS.md)。
 
 ## M11-T02 Fantasy Long Playtest
 

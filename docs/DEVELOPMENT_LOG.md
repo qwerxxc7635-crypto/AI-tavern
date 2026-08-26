@@ -4728,3 +4728,24 @@
 - `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 183 files / 1038 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；Windows纵向E2E与TypeScript↔Rust archive interop全部通过。
 - `pnpm build:desktop`最终通过，Vite转换281 modules；构建产物只用于本地验证，没有作为源码提交。
 - M10-T07完成后下一项严格为M11-T01；本次不进入M11，不merge、不push，用户`.gitignore`继续保持未暂存。
+
+## 2026-08-26 — M11-T01 完成 Three-World Test Harness
+
+### 范围与配置
+
+- 在分支`task/M11-T01-three-world-harness`、起始提交`2b67ffc`上严格执行M11-T01；未回滚或重做M0～M10-T07，用户已有`.gitignore`修改保持未暂存。本任务未执行Fantasy/Investigation/Cyberpunk长测，也未进入M11-T02。
+- 在既有`@ember-tavern/test-fixtures`包增加三套`SYNTHETIC_M11`配置。Fantasy、Investigation与Cyberpunk分别拥有不同的Constitution、3项Career、3项Equipment、2项Trait、3名NPC、3条Quest和3/4/5个世界扩展字段；调查世界不复制受版权保护规则文本。
+- 每世界提供32个有序行为，覆盖创建、酒馆、NPC/传闻、多Quest、自由输入、旅行/时间、D20、装备/交易、两次Save/Reopen和状态审阅。动作只声明输入与必采证据，不预填剧情结果。
+
+### 隔离与证据
+
+- 每个run保存来源commit、fixture/script SHA-256及组合scenario hash；三个世界使用独立目录和SQLite路径。相同输入replay保持hash但从空evidence开始；reset只删除目标世界已知SQLite/WAL/SHM与动作流，其他世界不受影响。
+- 新增`EMBER_PLAYTEST_EVIDENCE` v1状态机：`NOT_RUN/IN_PROGRESS/COMPLETE/BLOCKED`、Provider模式与显示身份、有序action outcome/latency/persistence/observations，以及P0～P3 finding ledger。Provider身份在首个动作后冻结，缺失必采证据或未完成32步不能声称COMPLETE。
+- fixture、manifest和evidence复用portable save秘密扫描；保留Campaign ID与`SYNTHETIC_M11`来源证明没有使用正式用户数据。新增[`V0.3_PLAYTEST_HARNESS.md`](V0.3_PLAYTEST_HARNESS.md)与`DEC-151`，更新Spec和Tasks。
+
+### 验证与结束状态
+
+- 定向7项测试覆盖fixture/业务合同、结构差异、目录与数据库隔离、reset/replay、动作顺序、证据完整性、Provider冻结、秘密扫描及hash篡改。
+- `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 184 files / 1045 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；Windows纵向E2E与TypeScript↔Rust archive interop全部通过。
+- `pnpm build:desktop`最终通过，Vite转换281 modules；本任务没有调用真实Provider，三世界长测状态仍诚实保持NOT_RUN。
+- M11-T01完成后下一项严格为M11-T02；本次不进入长测、不merge、不push，用户`.gitignore`继续保持未暂存。
