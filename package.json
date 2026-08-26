@@ -17,6 +17,7 @@
     "archive:interop": "node scripts/archive-interop.mjs",
     "performance:baseline": "node scripts/performance-baseline.mjs",
     "performance:gate": "node scripts/performance-regression.mjs",
+    "playtest:fantasy": "vitest run packages/test-fixtures/src/fantasy-long-playtest-runner.test.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
