@@ -7,6 +7,8 @@ mod adventure_play;
 mod cache_metrics;
 mod career_pool;
 mod character_creation;
+#[cfg(test)]
+mod cyberpunk_e2e;
 mod dialogue_suggestions;
 mod director_budget;
 mod dynamic_locations;

@@ -19,6 +19,7 @@
     "performance:gate": "node scripts/performance-regression.mjs",
     "playtest:fantasy": "vitest run packages/test-fixtures/src/fantasy-long-playtest-runner.test.ts",
     "playtest:investigation": "vitest run packages/test-fixtures/src/investigation-long-playtest-runner.test.ts",
+    "playtest:cyberpunk": "vitest run packages/test-fixtures/src/cyberpunk-long-playtest-runner.test.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
