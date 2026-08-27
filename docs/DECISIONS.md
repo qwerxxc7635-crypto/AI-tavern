@@ -3279,3 +3279,27 @@ Provider 身份固定为 `FAKE`。它验证生产编排、结构校验、事务�
 - 性能数字是 32 项生产流总墙钟时间的摊销观察，不是 Provider billing latency，也不替代 M10 回归门。
 - Investigation、Cyberpunk、free-input stress 和 M12 必须独立执行；本决定不提前进入 M11-T03。
 - 除修复既有 NPC LOD 查询外，不改变 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同。
+
+## DEC-153：Investigation 长测以扩展隔离、可追踪误导和确定失败推进取证
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T03`、V0.3 Spec 16.2、[`audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md`](audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md)
+
+### 背景
+
+调查世界不能只证明奇幻流程换名可跑；它必须验证世界扩展、有限认知、误导信息、失败推进和多 Quest 一致性，同时避免复制受版权保护的商业 TRPG 规则。随机 D20 又不能稳定提供“失败后继续”的回归证据。
+
+### 决定与理由
+
+使用原创架空一九二〇年代雾港场景，在单一 SQLite Campaign 上顺序执行 32 项生产行为。`investigation-resilience` 以现有 world extension schema 表达镇定、机运、信用和线索负荷；初始 fixture 仅以局部 `json_set` 写入 extensions/revision/time，继续经过现有 revision 与基础属性不可变触发器，不新增调查专用核心 schema。
+
+传闻分别持久化 FALSE/PARTIAL/TRUE 与来源；NPC 回复明确区分亲历、传闻和未知。失败推进使用合法 difficulty 17、体魄 1 和 Rules Engine 的 `-5` 临时状态，使自然 20 的总计也低于门槛；D20 仍由既有本地硬结果逻辑投掷和持久化，测试不写入骰值、不重骰。失败回合之后仍提交七个回合、线索、结算和第二条开放 Quest。
+
+### 影响与边界
+
+- Fake Provider 只验证生产编排、结构校验、事务和持久化；真实模型继续 `NOT_RUN`，不外推叙事质量、网络延迟、token 或计费缓存。
+- 初始 extension definition/value 是合成 fixture 输入；AI 输出仍不能直接修改游戏状态。后续 Rules、Quest、Adventure、Director、恢复和 archive 全部使用生产服务。
+- 不引入 COC 品牌、专有角色、文本或规则；“调查”“信用”“幸运”等一般概念不映射商业规则表。
+- 本次开放 finding 为 0。夹具编写时被既有白名单、防重复和不可变触发器拒绝的无效值只修正夹具，不降低产品校验。
+- 不修改 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同；Cyberpunk、free-input stress 与 M12 必须独立执行。

@@ -4772,3 +4772,27 @@
 - Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。显式Windows纵向E2E再次通过。
 - `pnpm playtest:fantasy`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run此前已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
 - 本任务形成`9f640d6`、`e8f3a3c`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T03，本次未进入。
+
+## 2026-08-27 — M11-T03 完成 Investigation Long Playtest
+
+### 范围与生产纵切
+
+- 在分支`task/M11-T03-investigation-long-playtest`、起始提交`90bf26b`上严格执行M11-T03；未回滚或重做M0～M11-T02，未进入M11-T04。用户已有`.gitignore`修改全程保持未暂存。
+- 以`0779808`新增独立Investigation production native slice和环境门控runner，在同一Campaign顺序完成32项行为：锁定Constitution、3项Career、角色/2项Trait、`investigation-resilience`扩展、酒馆/4 NPC/三种真实性传闻、有限认知对话、两NPC scene、2 Quest、8回合Adventure、7次D20、8项Rules事件、装备/现金/时间、地点/旅行、Director、正常重开、失败恢复与portable overwrite import。
+- 最终镇定/机运/信用/线索负荷为62/48/35/0，cash为9、game time为660分钟、装备1件。扩展fixture只局部更新`extensions/revision/updatedAt`并继续经过既有触发器；没有修改基础属性、schema或业务合同。
+- 以difficulty 17、体魄1和`-5`雨寒状态保证首个检查失败，仍由本地D20硬结果逻辑实际投掷并先持久化；失败后其余回合、线索和结算继续，最终一项Quest完成、一项保持ACCEPTED。没有写死骰值或让一次失败锁死线索。
+
+### 认知、发现与证据
+
+- FALSE/PARTIAL/TRUE传闻各1条并保留source basis、置信度与NPC provenance；连续对话明确区分亲历、转述和未知。最终4条NPC knowledge、4条message和一项双NPC scene turn在重开/import后保留。
+- 最终run`m11-t03-investigation-0779808`绑定来源提交`077980887a4b705f6fda214af56f9355d7c15b15`，32/32`COMPLETE`、开放finding 0。夹具编写期被既有enum白名单、防重复、Quest和基础属性不可变校验拒绝的无效值均只修正夹具，没有降低产品门禁，故不冒充产品finding。
+- Provider明确为Fake；真实Provider保持`NOT_RUN`，未读取Credential或调用网络模型。生产流墙钟2578.118 ms、32项摊销80.566 ms只作为harness观察，不替代M10性能门。
+- SQLite 1,777,664 bytes、archive 190,889 bytes；`integrity_check=ok`、foreign key violation 0、unfinished request 0、Save Schema 3、World Schema 1。提交逐动作evidence、数据库、archive、summary、manifest、1440×1000浏览器壳截图与SHA-256。
+- 浏览器壳覆盖boot、Saves、My和Quest route guard且无console error；Vite下native不可用/loading/缺Campaign是预期安全状态，不替代Native证据。视觉保持既有冻结体系，没有借长测修改UI、CSS或业务组件。
+
+### 文档、门禁与结束状态
+
+- 新增[`audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md`](audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md)和`DEC-153`，更新Spec、Tasks与Harness。M11-T03开放finding为0；Cyberpunk、free-input stress、真实模型、M11-T06与M12仍未执行。
+- 最终`pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 186 files / 1047 tests通过，另2 files / 4 tests按设计skip；Node 29 tests通过。Rust workspace 148 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。
+- 显式Windows纵向E2E再次通过；`pnpm playtest:investigation`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run此前已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
+- 本任务形成`0779808`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T04，本次不进入。

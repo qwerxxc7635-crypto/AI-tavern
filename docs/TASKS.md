@@ -571,12 +571,13 @@
 
 ## M11-T03 Investigation Long Playtest
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-27）
 - **Dependency**：M11-T02。
 - **Deliverable**：30–50 个调查世界行为、证据、发现与修复。
 - **Acceptance**：理智/幸运/信用等扩展、有限认知、误导信息、失败推进和多 Quest 一致。
 - **Tests**：全量适用门禁 + 该世界回归。
 - **Do Not**：不复制 COC 受版权保护文本/规则；不让一次失败锁死线索。
+- **Implementation reference**：[`audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md`](audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md)、[`DEC-153`](DECISIONS.md)。
 
 ## M11-T04 Cyberpunk Long Playtest
 
