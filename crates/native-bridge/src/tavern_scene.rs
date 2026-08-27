@@ -173,7 +173,7 @@ impl CampaignStore {
         let at = current_timestamp()?;
         tx.execute("INSERT INTO tavern_scenes(id,operation_id,campaign_id,tavern_id,revision,status,created_at,updated_at) VALUES(?1,?2,?3,?4,1,'ACTIVE',?5,?5)", params![command.scene_id,command.operation_id,command.campaign_id,tavern_id,at])?;
         for npc_id in &command.participant_npc_ids {
-            let (name, role):(String,String)=tx.query_row("SELECT COALESCE(json_extract(profile_json,'$.name'),'Unknown'),population_role FROM npc_lod_profiles WHERE id=?1 AND campaign_id=?2 AND lod>=1", params![npc_id,command.campaign_id], |r| Ok((r.get(0)?,r.get(1)?)))?;
+            let (name, role):(String,String)=tx.query_row("SELECT COALESCE(json_extract(profile_json,'$.name'),'Unknown'),json_extract(profile_json,'$.populationRole') FROM npc_lod_profiles WHERE id=?1 AND campaign_id=?2 AND lod>=1", params![npc_id,command.campaign_id], |r| Ok((r.get(0)?,r.get(1)?)))?;
             let status = if command.listening_npc_ids.contains(npc_id) {
                 "LISTENING"
             } else {

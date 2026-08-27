@@ -29,11 +29,14 @@ interface FantasyMetrics {
   readonly lockedConstitutionCount: number;
   readonly characterCount: number;
   readonly traitCount: number;
+  readonly careerCount: number;
   readonly tavernCount: number;
   readonly npcCount: number;
   readonly rumorCount: number;
   readonly messageCount: number;
   readonly npcKnowledgeCount: number;
+  readonly tavernSceneCount: number;
+  readonly tavernSceneTurnCount: number;
   readonly questCount: number;
   readonly completedQuestCount: number;
   readonly openQuestCount: number;
@@ -118,15 +121,31 @@ describe('M11-T02 fantasy long playtest runner', () => {
       const actionLatencyMs = roundMilliseconds(coreFlowLatencyMs / 32);
       for (const [index, action] of PLAYTEST_WORLD_FIXTURES.fantasy.behaviorScript.entries()) {
         const recordedAt = new Date(startedAt.getTime() + index).toISOString();
-        await appendPlaytestActionEvidence(runDirectory, 'fantasy', {
-          sequence: action.sequence,
-          actionId: action.id,
-          outcome: 'SUCCEEDED',
-          latencyMs: actionLatencyMs,
-          persisted: true,
-          recordedAt,
-          observations: observationsFor(action, metrics, coreFlowLatencyMs),
-        });
+        await appendPlaytestActionEvidence(
+          runDirectory,
+          'fantasy',
+          {
+            sequence: action.sequence,
+            actionId: action.id,
+            outcome: 'SUCCEEDED',
+            latencyMs: actionLatencyMs,
+            persisted: true,
+            recordedAt,
+            observations: observationsFor(action, metrics, coreFlowLatencyMs),
+          },
+          index === 0
+            ? [
+                {
+                  id: 'M11-FAN-001',
+                  severity: 'P1',
+                  title: 'Multi-NPC scene queried a non-existent NPC LOD column',
+                  evidence:
+                    "The long playtest failed at scene start with SQLite 'no such column: population_role'; the production query now reads profile_json.$.populationRole and the same-save regression commits a two-NPC turn.",
+                  status: 'FIXED',
+                },
+              ]
+            : [],
+        );
       }
       const completedAt = new Date(startedAt.getTime() + 32).toISOString();
       await completePlaytestWorld(runDirectory, 'fantasy', completedAt);
@@ -215,6 +234,10 @@ function inspectDatabase(databasePath: string): FantasyMetrics {
         database,
         'SELECT COALESCE(json_array_length(traits_json),0) FROM player_characters LIMIT 1',
       ),
+      careerCount: number(
+        database,
+        "SELECT COALESCE(json_array_length(json_extract(pool_json,'$.careers')),0) FROM career_pools LIMIT 1",
+      ),
       tavernCount: count(database, 'SELECT COUNT(*) FROM taverns'),
       npcCount: count(database, 'SELECT COUNT(*) FROM npcs'),
       rumorCount: count(
@@ -223,6 +246,8 @@ function inspectDatabase(databasePath: string): FantasyMetrics {
       ),
       messageCount: count(database, 'SELECT COUNT(*) FROM messages'),
       npcKnowledgeCount: count(database, 'SELECT COUNT(*) FROM npc_knowledge'),
+      tavernSceneCount: count(database, 'SELECT COUNT(*) FROM tavern_scenes'),
+      tavernSceneTurnCount: count(database, 'SELECT COUNT(*) FROM tavern_scene_turns'),
       questCount: count(database, 'SELECT COUNT(*) FROM quest_pool_states'),
       completedQuestCount: count(
         database,
@@ -277,10 +302,13 @@ function assertHealthy(metrics: FantasyMetrics): void {
     lockedConstitutionCount: 1,
     characterCount: 1,
     traitCount: 2,
+    careerCount: 3,
     tavernCount: 1,
     npcCount: 4,
     rumorCount: 3,
     messageCount: 6,
+    tavernSceneCount: 1,
+    tavernSceneTurnCount: 1,
     questCount: 2,
     completedQuestCount: 1,
     openQuestCount: 1,
@@ -314,7 +342,7 @@ function observationsFor(
     OUTPUT: `${action.kind} executed through the production native vertical slice; input: ${action.input}`,
     LATENCY: `The complete 32-action native flow took ${roundMilliseconds(coreFlowLatencyMs)} ms; this record uses the amortized flow latency and does not claim provider billing latency.`,
     STATE_DIGEST: `campaign=${metrics.campaignState}; quests=${metrics.questCount}; turns=${metrics.adventureTurnCount}; rulesRevision=${metrics.rulesEventCount + 1}; generations=${metrics.generationRecordCount}; saveSchema=${metrics.saveSchemaVersion}.`,
-    KNOWLEDGE_BOUNDARY: `${metrics.npcKnowledgeCount} NPC knowledge rows and ${metrics.rumorCount} provenance-bearing rumors survived; dialogue commits remained limited to persisted NPC context.`,
+    KNOWLEDGE_BOUNDARY: `${metrics.npcKnowledgeCount} NPC knowledge rows, ${metrics.rumorCount} provenance-bearing rumors, and ${metrics.tavernSceneTurnCount} multi-NPC turn survived; dialogue commits remained limited to persisted NPC context.`,
     QUEST_STATE: `${metrics.questCount} independent Quest states persisted: ${metrics.completedQuestCount} completed and ${metrics.openQuestCount} still open after the first adventure.`,
     D20_HARD_RESULT: `${metrics.diceRollCount} local D20 hard-result events persisted for seven checks and were not rerolled during reopen/import.`,
     ECONOMY_EQUIPMENT: `${metrics.rulesEventCount} append-only rules events left money=${metrics.money} and exactly ${metrics.equippedItemCount} equipped item after slot replacement.`,
@@ -332,11 +360,14 @@ function healthyMetrics(): FantasyMetrics {
     lockedConstitutionCount: 1,
     characterCount: 1,
     traitCount: 2,
+    careerCount: 3,
     tavernCount: 1,
     npcCount: 4,
     rumorCount: 3,
     messageCount: 6,
     npcKnowledgeCount: 4,
+    tavernSceneCount: 1,
+    tavernSceneTurnCount: 1,
     questCount: 2,
     completedQuestCount: 1,
     openQuestCount: 1,
