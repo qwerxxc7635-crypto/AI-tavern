@@ -4820,3 +4820,27 @@
 - 最终`pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 187 files / 1048 tests通过，另2 files / 5 tests按设计skip；Node 29 tests通过。Rust workspace 149 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。
 - 显式Windows纵向E2E再次通过；`pnpm playtest:cyberpunk`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
 - 本任务形成`d42bae2`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T05，本次不进入。
+
+## 2026-08-27 — M11-T05 完成 Free-Input Stress Test
+
+### 范围与执行方式
+
+- 在分支`task/M11-T05-free-input-stress`、起始提交`c3c4a29`上严格执行M11-T05；未回滚或重做M0～M11-T04，未进入M11-T06。用户已有`.gitignore`修改全程保持未暂存。
+- 以`2432d18`新增八类精确自由输入合同、环境门控runner和Rust production native stress slice。运行器校验三份已提交Fantasy/Investigation/Cyberpunk长测数据库SHA-256后复制到不可覆盖的新run，不读取或修改正式用户存档。
+- 八类行为为拒绝Quest、欺骗发布者、购买酒馆、偷窃、离城、与路人长期交流、出售绑定Quest道具和投靠敌对势力；结果为4项`SUCCEEDED`、2项`FAILED`、2项`REJECTED`。全部精确输入与回复持久化，均不依赖推荐项且不含默认“无法解析”。
+- 对话使用既有validated `NpcDialogueCommit`；状态后果复用既有Quest transition、dynamic location travel和faction action事务。只以只读SQLite查询推导实际结果，没有为测试写死数据库结果、增加命令语言或绕开业务合同。
+
+### 一致性、证据与发现
+
+- Fantasy最终Quest abandoned 1、owner trust 2、money 12；Investigation旅行至海雾观测站、travel event 3、路人6条message且relationship为1/1/1；Cyberpunk保留绑定奖励和15信用点，同时企业关系为`ALLIED`、势力行动2、公开投敌后果事实1。
+- 三个Campaign在最终重开后均为`TAVERN`，`integrity_check=ok`、foreign key violation 0、unfinished request 0；各自产出SQLite与portable archive。正式run`m11-t05-free-input-2432d18`绑定来源提交，逐项evidence为8/8 `COMPLETE`、开放finding 0。
+- 首次完整门禁暴露新增Rust测试在无环境变量时错误强制执行，这是测试接线问题；修正为四个路径全部未配置时普通门禁安全返回、部分配置时fail closed、全部配置时执行真实压力流程。初次浏览器截图使用非Hash路径导致路由未切换，改用`/#/...`并逐图重采；两者均未降低产品校验，也不记为产品finding。
+- Provider明确为Fake；真实Provider保持`NOT_RUN`，未读取Credential或调用网络模型。生产事务墙钟2291.522 ms、八项摊销286.44 ms只作为harness观察，不替代M10性能门。
+- 浏览器壳在1440×1000覆盖Saves、My和Quest route guard，最终三图逐一检查且无console error；native不可用/loading/缺Campaign是预期安全状态，不替代Native证据。
+
+### 文档、门禁与结束状态
+
+- 新增[`audit/V0_3_FREE_INPUT_STRESS_TEST.md`](audit/V0_3_FREE_INPUT_STRESS_TEST.md)和`DEC-155`，更新Spec、Tasks与Harness。M11-T05开放finding为0；真实模型、M11-T06与M12仍未执行。
+- `pnpm check:shared`在测试基础提交后通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 188 files / 1049 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过。Rust workspace 150 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、严格Clippy与TypeScript↔Rust archive interop均通过。
+- 最终文档/证据工作树已复跑并通过完整共享门禁、显式Windows纵向E2E、普通`pnpm playtest:free-input`、desktop build与14项SHA-256复验；Vite生产构建转换281 modules。
+- 本任务不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T06，本次不进入。

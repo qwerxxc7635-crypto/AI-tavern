@@ -3326,3 +3326,26 @@ Cyberpunk 长测不能是 Fantasy 的名称替换。它必须同时验证义体�
 - 最终 32/32 `COMPLETE`、开放 finding 为 0；义体扩展、跨地点、双 Quest、失败推进、势力行动和 archive 恢复均有数据库证据。
 - 不新增 Cyberpunk 专用表，不修改 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同。
 - 三世界固定长测均已完成；free-input stress、综合可玩性报告和 M12 必须独立执行，本决定不提前进入 M11-T05。
+
+## DEC-155：自由输入压力复用既有领域事务并以持久状态判定结果
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T05`、V0.3 Spec 16.3、[`audit/V0_3_FREE_INPUT_STRESS_TEST.md`](audit/V0_3_FREE_INPUT_STRESS_TEST.md)
+
+### 背景
+
+三世界固定脚本已经证明主要纵向流程可以运行，但不能证明玩家拒绝、欺骗、越界交易、离开推荐路线或改变阵营时仍有合理后果。若为八个测试输入增加专用解析器、直接写数据库或复制预期标签，会形成第二套状态机并产生虚假证据；若改用正式用户存档，又会破坏数据边界。
+
+### 决定与理由
+
+从三份已提交 `SYNTHETIC_M11` 长测数据库按固定 SHA-256 复制隔离运行，保留其长期状态而不修改原证据。八个精确输入都经过既有 NPC 对话校验与提交；需要改变游戏状态时只调用现有 `QuestPoolTransitionCommand`、`DynamicLocationTravelCommand` 或 `FactionActionCommand`。失败和拒绝同样提交可解释回复与必要关系后果，不把未知输入折叠为“无法解析”。
+
+运行器从重开后的 SQLite 指标推导实际 `SUCCEEDED/FAILED/REJECTED`，再与脚本预期比较；不把预期结果直接当作实际结果。三个数据库必须保持 `TAVERN`、完整性正常、无外键错误和无未完成请求，并各自产出 portable archive。证据目录不可覆盖，manifest 记录来源哈希、source commit 和 Fake Provider 身份。
+
+### 影响与边界
+
+- 八类行为得到四项成功、两项失败和两项规则拒绝；全部精确输入和回复持久化，`suggestionRequired=false`，开放 finding 为 0。
+- Fake Provider 只验证结构、生产编排、后果事务和持久化；真实模型继续 `NOT_RUN`，不外推开放式叙事质量或网络延迟。
+- 不新增自由输入命令语言、专用表或预设动作路由，不修改 Rules、D20、Provider、Generator/Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 合同。
+- M11-T06 必须独立复算并汇总 M11 全部证据；本决定不提前进入报告或 M12。

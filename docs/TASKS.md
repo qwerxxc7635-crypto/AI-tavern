@@ -591,12 +591,13 @@
 
 ## M11-T05 Free-Input Stress Test
 
-- **Status**：TODO
+- **Status**：DONE
 - **Dependency**：M11-T04。
 - **Deliverable**：至少八类非推荐行为的跨世界压力证据与修复。
 - **Acceptance**：系统可合理成功/失败/拒绝，但不崩溃、丢档、跳过后果或强迫预设路线。
 - **Tests**：拒绝/欺骗/购买/偷窃/离城/路人长期交流/卖任务道具/投敌；重开与一致性。
 - **Do Not**：不为测试写死结果；不把“无法解析”当默认回应。
+- **Implementation reference**：[`audit/V0_3_FREE_INPUT_STRESS_TEST.md`](audit/V0_3_FREE_INPUT_STRESS_TEST.md)、[`DEC-155`](DECISIONS.md)。
 
 ## M11-T06 Playability Report
 
