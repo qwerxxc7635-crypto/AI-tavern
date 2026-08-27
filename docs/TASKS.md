@@ -561,12 +561,13 @@
 
 ## M11-T02 Fantasy Long Playtest
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-27）
 - **Dependency**：M11-T01。
 - **Deliverable**：30–50 个有效行为、自动/人工证据、发现与修复。
 - **Acceptance**：覆盖完整 V0.3 核心功能、保存重启、知识/一致性/性能观察。
 - **Tests**：全量适用门禁 + 该世界回归。
 - **Do Not**：不只点候选；不忽略失败发现。
+- **Implementation reference**：[`audit/V0_3_FANTASY_LONG_PLAYTEST.md`](audit/V0_3_FANTASY_LONG_PLAYTEST.md)、[`DEC-152`](DECISIONS.md)。
 
 ## M11-T03 Investigation Long Playtest
 

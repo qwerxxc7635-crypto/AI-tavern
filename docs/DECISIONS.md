@@ -3253,3 +3253,29 @@ Primitive 冻结原始暖黑、深木、羊皮纸、余烬金、功能色、字�
 - 结构差异门检查 Technology/Magic/Economy、装备类别、Trait 点型、Quest 风险和扩展 schema，禁止只换名称。
 - M11-T02～T04 负责把 production 服务接入独立 SQLite 并形成真实长测证据；M11-T01 不预填剧情结果、不冒充真实模型验证。
 - 本决定不改变 Rules Engine、Provider、Generator/Queue、SQLite schema、Save、D20 或 Quest/NPC/Adventure 业务合同。
+
+## DEC-152：Fantasy 长测以单存档生产纵切和显式 Fake 身份取证
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T02`、V0.3 Spec 16.2、[`audit/V0_3_FANTASY_LONG_PLAYTEST.md`](audit/V0_3_FANTASY_LONG_PLAYTEST.md)
+
+### 背景
+
+M11-T01 只冻结了场景、动作与证据合同，不能证明生产应用服务、SQLite 事务、恢复和 portable archive 在长序列中能共同工作。若用多个临时数据库拼接 32 项结果，会掩盖状态漂移和外键问题；若把 Fake Provider 的确定性结果表述为真实模型质量，又会产生错误发布证据。
+
+### 决定与理由
+
+Fantasy 32 项行为通过 Windows production native bridge 在一个保留路径的 SQLite Campaign 上顺序执行。Career、角色/Trait、酒馆/NPC/知识、多 NPC scene、Quest/Adventure、D20/Rules、装备/经济、时间/旅行、Director、正常重开、失败恢复和 portable overwrite import 都必须产生可查询的持久事实；run 绑定 source commit，并提交数据库、archive、逐动作 evidence、summary、截图和 SHA-256。
+
+Provider 身份固定为 `FAKE`。它验证生产编排、结构校验、事务和持久化，不外推真实模型的叙事质量、网络延迟、token 或计费缓存；真实 Provider 保持 `NOT_RUN`。浏览器壳截图只验证视觉与安全状态，不能替代 Tauri/SQLite 证据。
+
+长测发现 `npc_lod_profiles` 不存在 `population_role` 列，而角色实际位于 `profile_json.$.populationRole`。修复只让 scene 查询遵循既有 LOD 存储合同，并以人口投影、两名 focus NPC 和已提交 scene turn 回归；不新增 schema 或第二套 scene 状态。
+
+### 影响与边界
+
+- `COMPLETE` 表示 32 项执行完整；finding 仍必须保留状态和严重度。本次 `M11-FAN-001` 为 P1/FIXED，开放 finding 为 0。
+- archive 恢复使用生产 `Overwrite` 路径，不用原始 SQL 删除 Campaign 绕开外键和领域重载。
+- 性能数字是 32 项生产流总墙钟时间的摊销观察，不是 Provider billing latency，也不替代 M10 回归门。
+- Investigation、Cyberpunk、free-input stress 和 M12 必须独立执行；本决定不提前进入 M11-T03。
+- 除修复既有 NPC LOD 查询外，不改变 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同。

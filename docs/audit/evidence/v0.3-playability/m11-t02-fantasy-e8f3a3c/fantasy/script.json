@@ -1,0 +1,381 @@
+[
+  {
+    "sequence": 1,
+    "id": "fantasy-01",
+    "kind": "START_CAMPAIGN",
+    "input": "以“灰烬潮下的烛湾”为世界种子创建新战役并确认世界宪章。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 2,
+    "id": "fantasy-02",
+    "kind": "CREATE_CHARACTER",
+    "input": "创建一名雾钟抄契人，保留契约职业、余烬听觉与誓债特质。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 3,
+    "id": "fantasy-03",
+    "kind": "ENTER_TAVERN",
+    "input": "进入断梁酒馆，观察当前住客、传闻与酒馆时钟。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 4,
+    "id": "fantasy-04",
+    "kind": "TALK_NPC",
+    "input": "询问玛菈为何把东门巡夜表藏在酒桶夹层。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 5,
+    "id": "fantasy-05",
+    "kind": "INSPECT_RUMOR",
+    "input": "核对“灰潮会在第三声钟响后倒流”的来源与可信度。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 6,
+    "id": "fantasy-06",
+    "kind": "ACCEPT_QUEST",
+    "input": "接受《找回失火的潮汐账册》，但先不离开酒馆。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "QUEST_STATE"
+    ]
+  },
+  {
+    "sequence": 7,
+    "id": "fantasy-07",
+    "kind": "FREE_INPUT",
+    "input": "公开质疑巡钟人奥尔德伪造了昨夜的点灯记录。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 8,
+    "id": "fantasy-08",
+    "kind": "D20_ACTION",
+    "input": "用知识检定辨认账册封蜡是否来自河港行会。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 9,
+    "id": "fantasy-09",
+    "kind": "EQUIP_ITEM",
+    "input": "装备缺口银灯，并检查它只影响既定可见规则。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 10,
+    "id": "fantasy-10",
+    "kind": "TRAVEL",
+    "input": "前往被潮水淹没的旧盐门，记录地点连接和耗时。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 11,
+    "id": "fantasy-11",
+    "kind": "TALK_NPC",
+    "input": "向守门人索要昨夜放行名单，不透露玛菈的怀疑。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 12,
+    "id": "fantasy-12",
+    "kind": "FREE_INPUT",
+    "input": "尝试用一份未来收益承诺换取盐门钥匙。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 13,
+    "id": "fantasy-13",
+    "kind": "D20_ACTION",
+    "input": "在涨潮前攀上断裂钟塔，接受失败造成的时间后果。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 14,
+    "id": "fantasy-14",
+    "kind": "INSPECT_RUMOR",
+    "input": "比较奥尔德、玛菈和守门人对第三声钟的不同认知。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 15,
+    "id": "fantasy-15",
+    "kind": "ADVANCE_TIME",
+    "input": "在旧盐门等待一刻钟，观察酒馆与任务是否同步推进。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 16,
+    "id": "fantasy-16",
+    "kind": "ACCEPT_QUEST",
+    "input": "发现并激活《钟塔下的无名誓约》支线。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "QUEST_STATE"
+    ]
+  },
+  {
+    "sequence": 17,
+    "id": "fantasy-17",
+    "kind": "TRADE",
+    "input": "向旧物商出售一枚普通铜扣，确认价格不受传说文案膨胀。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 18,
+    "id": "fantasy-18",
+    "kind": "EQUIP_ITEM",
+    "input": "改穿荆纹短披风，确认同槽位装备替换而非叠加。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 19,
+    "id": "fantasy-19",
+    "kind": "FREE_INPUT",
+    "input": "把找到账册的消息只告诉玛菈，不通知巡钟人。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 20,
+    "id": "fantasy-20",
+    "kind": "TALK_NPC",
+    "input": "追问奥尔德对旧盐门火灾的个人记忆与未知部分。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 21,
+    "id": "fantasy-21",
+    "kind": "D20_ACTION",
+    "input": "用魅力检定说服奥尔德交出半张烧焦的巡夜图。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 22,
+    "id": "fantasy-22",
+    "kind": "TRAVEL",
+    "input": "返回断梁酒馆，验证路程时间与 NPC 当前状态。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 23,
+    "id": "fantasy-23",
+    "kind": "SAVE_REOPEN",
+    "input": "保存并重启，复核任务、装备、金钱、时钟和 NPC 认知。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "REOPEN_STATE"
+    ]
+  },
+  {
+    "sequence": 24,
+    "id": "fantasy-24",
+    "kind": "REVIEW_STATE",
+    "input": "审阅角色、Trait、D20 历史与两条任务的当前状态。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 25,
+    "id": "fantasy-25",
+    "kind": "FREE_INPUT",
+    "input": "拒绝把账册交给任一行会，提出在酒馆当众宣读。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 26,
+    "id": "fantasy-26",
+    "kind": "D20_ACTION",
+    "input": "用体魄检定保护账册免受抢夺，保留同一次硬结果。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 27,
+    "id": "fantasy-27",
+    "kind": "ADVANCE_TIME",
+    "input": "让酒馆时钟跨过午夜，观察每日预算与传闻变化。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 28,
+    "id": "fantasy-28",
+    "kind": "TALK_NPC",
+    "input": "询问新到访旅人是否亲眼见过灰潮倒流。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 29,
+    "id": "fantasy-29",
+    "kind": "TRADE",
+    "input": "购买一份普通灯油，核对库存、金钱与消耗品用途。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 30,
+    "id": "fantasy-30",
+    "kind": "FREE_INPUT",
+    "input": "把缺口银灯借给玛菈并要求她独自验证封蜡。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 31,
+    "id": "fantasy-31",
+    "kind": "SAVE_REOPEN",
+    "input": "再次保存重启，检查借出物品和隐秘信息没有回滚。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "REOPEN_STATE"
+    ]
+  },
+  {
+    "sequence": 32,
+    "id": "fantasy-32",
+    "kind": "REVIEW_STATE",
+    "input": "记录世界、人格、知识、Quest、装备、Director 与 Context 观察。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  }
+]

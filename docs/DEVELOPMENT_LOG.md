@@ -4749,3 +4749,26 @@
 - `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 184 files / 1045 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；Windows纵向E2E与TypeScript↔Rust archive interop全部通过。
 - `pnpm build:desktop`最终通过，Vite转换281 modules；本任务没有调用真实Provider，三世界长测状态仍诚实保持NOT_RUN。
 - M11-T01完成后下一项严格为M11-T02；本次不进入长测、不merge、不push，用户`.gitignore`继续保持未暂存。
+
+## 2026-08-27 — M11-T02 完成 Fantasy Long Playtest
+
+### 范围与生产纵切
+
+- 在分支`task/M11-T02-fantasy-long-playtest`、起始提交`8a85be5`上严格执行M11-T02；未回滚或重做M0～M11-T01，未进入M11-T03。用户已有`.gitignore`修改全程保持未暂存。
+- 以`9f640d6`建立Fantasy runner和保留数据库/archive路径的Windows production native vertical slice；随后自审发现Career Pool与多NPC scene未实际覆盖，废弃该提交绑定的初版证据，不把覆盖不完整的运行当作完成结果。
+- 在同一Campaign顺序执行32项行为，覆盖锁定Constitution、3项Career、角色/2项Trait、酒馆/4名NPC/3条传闻、知识与连续对话、两NPC scene、2项Quest、8回合Adventure、7次D20、7项Rules事件、装备/金钱/时间、地点/旅行、Director、正常重开、失败恢复和portable overwrite import。最终money为12、game time为765分钟、装备1件，所有动作持久化并记录必需observation。
+- Provider明确为Fake；真实Provider保持`NOT_RUN`，没有读取Credential或调用网络模型。总生产流墙钟2298.712 ms、32项摊销71.835 ms只作为harness观察，不冒充Provider billing latency或M10性能门。
+
+### 发现、修复与证据
+
+- 长测首次进入多NPC scene时暴露`M11-FAN-001`（P1）：`tavern_scene.rs`查询不存在的`npc_lod_profiles.population_role`列。根因为既有schema把该值存于`profile_json.$.populationRole`；在`e8f3a3c`修正查询，并以population projection、两名focus NPC、scene prepare/commit和最终scene/turn计数回归。
+- archive恢复改用生产`CampaignArchiveImportMode::Overwrite`，不以原始SQL删除Campaign绕过外键和领域重载。最终SQLite `integrity_check=ok`、foreign key violation=0、unfinished request=0、Save Schema 3、World Schema 1。
+- 最终run`m11-t02-fantasy-e8f3a3c`绑定完整来源提交；提交逐动作evidence、SQLite、`.emtavern`、summary、manifest、三张1366×768浏览器壳截图和SHA-256。浏览器壳三页无console error；Tauri/SQLite不可用、loading和无Campaign route guard是预期状态，不替代Native证据。
+- 新增[`audit/V0_3_FANTASY_LONG_PLAYTEST.md`](audit/V0_3_FANTASY_LONG_PLAYTEST.md)与`DEC-152`，更新Spec、Tasks和Harness。M11-T02开放finding为0；Investigation、Cyberpunk、free-input stress、真实模型和M12均未执行。
+
+### 最终门禁与结束状态
+
+- `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 185 files / 1046 tests通过，另2 files / 3 tests按设计跳过；Node 29 tests通过。
+- Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。显式Windows纵向E2E再次通过。
+- `pnpm playtest:fantasy`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run此前已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
+- 本任务形成`9f640d6`、`e8f3a3c`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T03，本次未进入。
