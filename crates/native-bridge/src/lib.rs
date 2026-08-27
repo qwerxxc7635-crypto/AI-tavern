@@ -16,6 +16,8 @@ mod dynamic_quest_sources;
 #[cfg(test)]
 mod entity_schema_contract;
 #[cfg(test)]
+mod free_input_stress_e2e;
+#[cfg(test)]
 mod investigation_e2e;
 mod lazy_world_generation;
 mod model_settings;

@@ -45,3 +45,13 @@ export type {
   PlaytestWorldFixture,
   PlaytestWorldKey,
 } from './playability-worlds.js';
+export {
+  FREE_INPUT_STRESS_ACTIONS,
+  FREE_INPUT_STRESS_CATEGORIES,
+  validateFreeInputStressActions,
+} from './free-input-stress.js';
+export type {
+  FreeInputStressAction,
+  FreeInputStressCategory,
+  FreeInputStressOutcome,
+} from './free-input-stress.js';
