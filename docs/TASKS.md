@@ -601,12 +601,13 @@
 
 ## M11-T06 Playability Report
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-27）
 - **Dependency**：M11-T05。
 - **Deliverable**：`docs/V0.3_PLAYABILITY_REPORT.md`。
 - **Acceptance**：逐世界记录行为数、模型、延迟、知识/人格/Quest/World/Trait/Equipment/Director/Context、发现/修复/剩余和评分。
 - **Tests**：证据链接与统计复算；报告格式；最终回归。
 - **Do Not**：不把 Fake 测试冒充真实模型；不省略失败或 BLOCKED。
+- **Implementation reference**：[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)、[`DEC-156`](DECISIONS.md)。
 
 ---
 

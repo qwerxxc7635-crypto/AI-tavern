@@ -21,6 +21,7 @@
     "playtest:investigation": "vitest run packages/test-fixtures/src/investigation-long-playtest-runner.test.ts",
     "playtest:cyberpunk": "vitest run packages/test-fixtures/src/cyberpunk-long-playtest-runner.test.ts",
     "playtest:free-input": "vitest run packages/test-fixtures/src/free-input-stress-runner.test.ts",
+    "playtest:report": "vitest run packages/test-fixtures/src/playability-report.test.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",

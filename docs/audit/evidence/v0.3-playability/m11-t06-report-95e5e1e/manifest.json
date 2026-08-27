@@ -1,0 +1,21 @@
+{
+  "format": "EMBER_PLAYABILITY_REPORT_RUN",
+  "formatVersion": 1,
+  "runId": "m11-t06-report-95e5e1e",
+  "sourceCommit": "95e5e1e7bfbdf73bcb5ed286164a37938c843048",
+  "dataOrigin": "SYNTHETIC_M11_AGGREGATE",
+  "reportPath": "docs/V0.3_PLAYABILITY_REPORT.md",
+  "summaryPath": "report-summary.json",
+  "summarySha256": "86d43ea289d4bd23039a7e4b4fccdc9c06e4f03f1bccb58e7707b06c38c70b70",
+  "inputRuns": [
+    "docs/audit/evidence/v0.3-playability/m11-t02-fantasy-e8f3a3c",
+    "docs/audit/evidence/v0.3-playability/m11-t03-investigation-0779808",
+    "docs/audit/evidence/v0.3-playability/m11-t04-cyberpunk-d42bae2",
+    "docs/audit/evidence/v0.3-playability/m11-t05-free-input-2432d18"
+  ],
+  "fixedWorldBehaviorCount": 96,
+  "freeInputBehaviorCount": 8,
+  "totalBehaviorCount": 104,
+  "providerMode": "FAKE_ONLY",
+  "v03RealProviderStatus": "NOT_EVALUATED"
+}

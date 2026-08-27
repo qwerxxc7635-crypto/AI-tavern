@@ -3349,3 +3349,26 @@ Cyberpunk 长测不能是 Fantasy 的名称替换。它必须同时验证义体�
 - Fake Provider 只验证结构、生产编排、后果事务和持久化；真实模型继续 `NOT_RUN`，不外推开放式叙事质量或网络延迟。
 - 不新增自由输入命令语言、专用表或预设动作路由，不修改 Rules、D20、Provider、Generator/Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 合同。
 - M11-T06 必须独立复算并汇总 M11 全部证据；本决定不提前进入报告或 M12。
+
+## DEC-156：可玩性报告从已哈希证据复算，并将 Fake 可玩性与真实模型质量分离
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T06`、V0.3 Spec 16、[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)
+
+### 背景
+
+M11-T02～T05 分别保存了长测和自由输入证据，但人工汇总容易漏记失败、混淆同一存档上的额外行为、错误相加不同计时方法，或把 Fake Provider 的稳定结果外推成真实模型质量。仅在 Markdown 中手填统计也无法证明报告仍与已提交证据一致。
+
+### 决定与理由
+
+新增 `playtest:report` 复算门，直接读取四个权威证据目录并验证各自 `SHA256SUMS`。测试重新计算三世界 96 项固定行为、8 项自由输入、Provider/Model 身份、延迟、outcome、findings 和持久化健康状态，再与不可覆盖的 `EMBER_PLAYABILITY_REPORT_SUMMARY` 逐字段比较；同时检查报告章节、证据链接和必须披露的限制。
+
+评分使用五个显式维度，每项最高 2 分：执行/恢复、知识/人格、Quest/世界一致性、系统/Context、玩家能动性。三个固定世界每个都有 32 项行为，因此等行为权重；Fantasy/Investigation/Cyberpunk 为 8.6/8.8/8.9，综合 8.8，置信度 MEDIUM。评分不包含真实模型文风、网络性能、token 或计费缓存；这些项目在本轮统一标为 `NOT_EVALUATED`。
+
+### 影响与边界
+
+- M11 共 104 项已执行行为；唯一 `M11-FAN-001` 为已修复 P1，当前开放 P0/P1/P2/P3 均为 0。失败与规则拒绝仍保留为自由输入 outcome，不伪装成全部成功。
+- 不把四个运行的不同计时方法合并成 Provider SLA；固定长测与压力事务分别报告。
+- V0.2 真实 DeepSeek 证据只作为历史背景，不能替代 V0.3 M11 真实模型验证。
+- 本决定不改变任何游戏、Provider、Rules、SQLite、Save 或 UI 合同；M11 完成只允许进入 M12 第一轮完整审计，不提前给出发布或 `READY FOR SECOND AUDIT` 判断。

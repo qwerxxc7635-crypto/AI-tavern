@@ -1,0 +1,328 @@
+{
+  "format": "EMBER_PLAYABILITY_REPORT_SUMMARY",
+  "formatVersion": 1,
+  "sourceCommit": "95e5e1e",
+  "generatedFrom": [
+    "docs/audit/evidence/v0.3-playability/m11-t02-fantasy-e8f3a3c",
+    "docs/audit/evidence/v0.3-playability/m11-t03-investigation-0779808",
+    "docs/audit/evidence/v0.3-playability/m11-t04-cyberpunk-d42bae2",
+    "docs/audit/evidence/v0.3-playability/m11-t05-free-input-2432d18"
+  ],
+  "worlds": [
+    {
+      "task": "M11-T02",
+      "world": "fantasy",
+      "evidenceDirectory": "docs/audit/evidence/v0.3-playability/m11-t02-fantasy-e8f3a3c",
+      "sourceCommit": "e8f3a3c6d23e79af88935bab914c25893946ea70",
+      "providerMode": "FAKE",
+      "modelName": "ember-fake-v1",
+      "behaviorCount": 32,
+      "coreFlowLatencyMs": 2298.712,
+      "amortizedActionLatencyMs": 71.835,
+      "scoreDimensions": {
+        "executionRecovery": 2,
+        "knowledgePersonality": 1.6,
+        "questWorldConsistency": 1.8,
+        "systemsContext": 1.7,
+        "agency": 1.5
+      },
+      "score": 8.6,
+      "findings": [
+        {
+          "id": "M11-FAN-001",
+          "severity": "P1",
+          "title": "Multi-NPC scene queried a non-existent NPC LOD column",
+          "evidence": "The long playtest failed at scene start with SQLite 'no such column: population_role'; the production query now reads profile_json.$.populationRole and the same-save regression commits a two-NPC turn.",
+          "status": "FIXED"
+        }
+      ],
+      "metrics": {
+        "campaignState": "TAVERN",
+        "campaignCount": 1,
+        "lockedConstitutionCount": 1,
+        "characterCount": 1,
+        "traitCount": 2,
+        "careerCount": 3,
+        "tavernCount": 1,
+        "npcCount": 4,
+        "rumorCount": 3,
+        "messageCount": 6,
+        "npcKnowledgeCount": 4,
+        "tavernSceneCount": 1,
+        "tavernSceneTurnCount": 1,
+        "questCount": 2,
+        "completedQuestCount": 1,
+        "openQuestCount": 1,
+        "adventureArchiveCount": 1,
+        "adventureTurnCount": 8,
+        "diceRollCount": 7,
+        "rulesEventCount": 7,
+        "equippedItemCount": 1,
+        "money": 12,
+        "gameTimeMinutes": 765,
+        "locationCount": 2,
+        "travelCount": 2,
+        "directorRunCount": 1,
+        "generationRecordCount": 33,
+        "unfinishedRequestCount": 0,
+        "maxContextBytes": 48,
+        "integrityCheck": "ok",
+        "foreignKeyViolationCount": 0,
+        "saveSchemaVersion": 3,
+        "worldSchemaVersion": 1
+      }
+    },
+    {
+      "task": "M11-T03",
+      "world": "investigation",
+      "evidenceDirectory": "docs/audit/evidence/v0.3-playability/m11-t03-investigation-0779808",
+      "sourceCommit": "0779808",
+      "providerMode": "FAKE",
+      "modelName": "ember-fake-v1",
+      "behaviorCount": 32,
+      "coreFlowLatencyMs": 2578.118,
+      "amortizedActionLatencyMs": 80.566,
+      "scoreDimensions": {
+        "executionRecovery": 2,
+        "knowledgePersonality": 1.7,
+        "questWorldConsistency": 1.8,
+        "systemsContext": 1.8,
+        "agency": 1.5
+      },
+      "score": 8.8,
+      "findings": [],
+      "metrics": {
+        "campaignState": "TAVERN",
+        "campaignCount": 1,
+        "lockedConstitutionCount": 1,
+        "extensionDefinitionCount": 1,
+        "composure": 62,
+        "fortune": 48,
+        "credit": 35,
+        "clueLoad": 0,
+        "characterCount": 1,
+        "traitCount": 2,
+        "careerCount": 3,
+        "tavernCount": 1,
+        "npcCount": 4,
+        "falseRumorCount": 1,
+        "partialRumorCount": 1,
+        "trueRumorCount": 1,
+        "messageCount": 4,
+        "npcKnowledgeCount": 4,
+        "tavernSceneCount": 1,
+        "tavernSceneTurnCount": 1,
+        "questCount": 2,
+        "completedQuestCount": 1,
+        "openQuestCount": 1,
+        "adventureArchiveCount": 1,
+        "adventureTurnCount": 8,
+        "diceRollCount": 7,
+        "failedDiceRollCount": 2,
+        "rulesEventCount": 8,
+        "equippedItemCount": 1,
+        "money": 9,
+        "gameTimeMinutes": 660,
+        "locationCount": 2,
+        "travelCount": 2,
+        "directorRunCount": 1,
+        "generationRecordCount": 32,
+        "unfinishedRequestCount": 0,
+        "maxContextBytes": 0,
+        "integrityCheck": "ok",
+        "foreignKeyViolationCount": 0,
+        "saveSchemaVersion": 3,
+        "worldSchemaVersion": 1
+      }
+    },
+    {
+      "task": "M11-T04",
+      "world": "cyberpunk",
+      "evidenceDirectory": "docs/audit/evidence/v0.3-playability/m11-t04-cyberpunk-d42bae2",
+      "sourceCommit": "d42bae2f4e8c111a293420afbd4412d83f501eb9",
+      "providerMode": "FAKE",
+      "modelName": "ember-fake-v1",
+      "behaviorCount": 32,
+      "coreFlowLatencyMs": 2938.837,
+      "amortizedActionLatencyMs": 91.839,
+      "scoreDimensions": {
+        "executionRecovery": 2,
+        "knowledgePersonality": 1.7,
+        "questWorldConsistency": 1.9,
+        "systemsContext": 1.8,
+        "agency": 1.5
+      },
+      "score": 8.9,
+      "findings": [],
+      "metrics": {
+        "campaignState": "TAVERN",
+        "campaignCount": 1,
+        "lockedConstitutionCount": 1,
+        "extensionDefinitionCount": 1,
+        "neuralLoad": 2,
+        "streetReputation": 8,
+        "traceHeat": 0,
+        "implantSlotCount": 1,
+        "networkAccess": "社区",
+        "characterCount": 1,
+        "traitCount": 2,
+        "careerCount": 3,
+        "tavernCount": 1,
+        "npcCount": 4,
+        "falseRumorCount": 1,
+        "partialRumorCount": 1,
+        "trueRumorCount": 1,
+        "messageCount": 4,
+        "npcKnowledgeCount": 4,
+        "tavernSceneCount": 1,
+        "tavernSceneTurnCount": 1,
+        "questCount": 2,
+        "completedQuestCount": 1,
+        "openQuestCount": 1,
+        "adventureArchiveCount": 1,
+        "adventureTurnCount": 8,
+        "diceRollCount": 7,
+        "failedDiceRollCount": 2,
+        "rulesEventCount": 8,
+        "equippedItemCount": 1,
+        "money": 15,
+        "gameTimeMinutes": 525,
+        "locationCount": 2,
+        "travelCount": 2,
+        "activeFactionCount": 2,
+        "factionActionCount": 1,
+        "friendlyFactionCount": 1,
+        "factionWorldFactCount": 1,
+        "rewardItemCount": 1,
+        "maximumRewardPrice": 0,
+        "directorRunCount": 1,
+        "generationRecordCount": 33,
+        "unfinishedRequestCount": 0,
+        "maxContextBytes": 0,
+        "integrityCheck": "ok",
+        "foreignKeyViolationCount": 0,
+        "saveSchemaVersion": 3,
+        "worldSchemaVersion": 1
+      }
+    }
+  ],
+  "freeInput": {
+    "task": "M11-T05",
+    "evidenceDirectory": "docs/audit/evidence/v0.3-playability/m11-t05-free-input-2432d18",
+    "sourceCommit": "2432d18",
+    "providerMode": "FAKE",
+    "modelName": "ember-fake-v1",
+    "behaviorCount": 8,
+    "outcomes": {
+      "SUCCEEDED": 4,
+      "FAILED": 2,
+      "REJECTED": 2
+    },
+    "categories": [
+      "REFUSE_QUEST",
+      "DECEIVE_PUBLISHER",
+      "BUY_TAVERN",
+      "STEAL",
+      "LEAVE_TOWN",
+      "LONG_TERM_PASSERBY",
+      "SELL_QUEST_ITEM",
+      "DEFECT_TO_ENEMY"
+    ],
+    "findings": [],
+    "metrics": {
+      "fantasy": {
+        "campaignState": "TAVERN",
+        "integrityCheck": "ok",
+        "foreignKeyViolationCount": 0,
+        "unfinishedRequestCount": 0,
+        "playerMessageCount": 3,
+        "generatedReplyCount": 3,
+        "abandonedQuestCount": 1,
+        "ownerTrust": 2,
+        "money": 12
+      },
+      "investigation": {
+        "campaignState": "TAVERN",
+        "integrityCheck": "ok",
+        "foreignKeyViolationCount": 0,
+        "unfinishedRequestCount": 0,
+        "playerMessageCount": 3,
+        "generatedReplyCount": 5,
+        "ownerTrust": 2,
+        "travelCount": 3,
+        "currentLocationName": "海雾观测站",
+        "passerbyMessageCount": 6,
+        "passerbyTrust": 1,
+        "passerbyCloseness": 1,
+        "passerbyObligation": 1
+      },
+      "cyberpunk": {
+        "campaignState": "TAVERN",
+        "integrityCheck": "ok",
+        "foreignKeyViolationCount": 0,
+        "unfinishedRequestCount": 0,
+        "playerMessageCount": 2,
+        "generatedReplyCount": 2,
+        "money": 15,
+        "rewardItemCount": 1,
+        "corporatePlayerRelation": "ALLIED",
+        "factionActionCount": 2,
+        "defectionFactCount": 1
+      }
+    }
+  },
+  "fixedWorldBehaviorCount": 96,
+  "freeInputBehaviorCount": 8,
+  "totalBehaviorCount": 104,
+  "provider": {
+    "observedModes": [
+      "FAKE"
+    ],
+    "observedModelNames": [
+      "ember-fake-v1"
+    ],
+    "v03RealProviderStatus": "NOT_EVALUATED"
+  },
+  "findings": {
+    "total": {
+      "P0": 0,
+      "P1": 1,
+      "P2": 0,
+      "P3": 0
+    },
+    "fixed": {
+      "P0": 0,
+      "P1": 1,
+      "P2": 0,
+      "P3": 0
+    },
+    "open": {
+      "P0": 0,
+      "P1": 0,
+      "P2": 0,
+      "P3": 0
+    },
+    "ledger": [
+      {
+        "id": "M11-FAN-001",
+        "severity": "P1",
+        "title": "Multi-NPC scene queried a non-existent NPC LOD column",
+        "evidence": "The long playtest failed at scene start with SQLite 'no such column: population_role'; the production query now reads profile_json.$.populationRole and the same-save regression commits a two-NPC turn.",
+        "status": "FIXED"
+      }
+    ]
+  },
+  "performance": {
+    "longPlayCoreFlowLatencyMs": 7815.667,
+    "longPlayAmortizedActionLatencyMs": 81.413,
+    "stressCoreFlowLatencyMs": 2291.522,
+    "stressAmortizedActionLatencyMs": 286.44
+  },
+  "scoring": {
+    "scale": 10,
+    "confidence": "MEDIUM",
+    "method": "Five evidence-backed dimensions worth two points each; aggregate is behavior-weighted across the three fixed-world runs. Real-model prose quality is explicitly outside this score.",
+    "aggregateScore": 8.8
+  },
+  "evidenceHashesVerified": true
+}

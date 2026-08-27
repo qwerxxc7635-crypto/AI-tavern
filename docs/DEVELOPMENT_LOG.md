@@ -4844,3 +4844,26 @@
 - `pnpm check:shared`在测试基础提交后通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 188 files / 1049 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过。Rust workspace 150 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、严格Clippy与TypeScript↔Rust archive interop均通过。
 - 最终文档/证据工作树已复跑并通过完整共享门禁、显式Windows纵向E2E、普通`pnpm playtest:free-input`、desktop build与14项SHA-256复验；Vite生产构建转换281 modules。
 - 本任务不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T06，本次不进入。
+
+## 2026-08-27 — M11-T06 完成 Playability Report
+
+### 范围与统计复算
+
+- 在分支`task/M11-T05-free-input-stress`、起始提交`95e5e1e`上严格执行M11-T06；未回滚或重做M0～M11-T05，未进入M12。用户已有`.gitignore`修改全程保持未暂存。
+- 新增`playtest:report`复算门，直接读取M11-T02 Fantasy、M11-T03 Investigation、M11-T04 Cyberpunk和M11-T05自由输入的已提交evidence/summary，并逐文件复验四个来源目录`SHA256SUMS`。测试不从报告正文复制统计。
+- 复算得到三世界固定行为96项、自由输入8项，总计104项；固定流总墙钟7815.667 ms、按行为摊销81.413 ms，自由输入事务2291.522 ms、摊销286.44 ms。两种计时方法分别披露，不冒充Provider latency。
+- 唯一finding为Fantasy的`M11-FAN-001`（P1/FIXED）；当前开放P0/P1/P2/P3均为0。自由输入仍明确保留4次成功、2次失败、2次规则拒绝，不把合理失败删成“全成功”。
+
+### 报告、评分与边界
+
+- 新增[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)，逐世界记录行为数、Fake Provider/`ember-fake-v1`、延迟、Knowledge/Personality/Quest/World/Trait/Equipment/Director/Context、发现/修复/剩余和评分。
+- 五项显式维度各2分，Fantasy/Investigation/Cyberpunk为8.6/8.8/8.9；三个世界均为32项行为，等行为权重综合8.8/10，置信度MEDIUM。评分只覆盖确定性生产harness，不包含真实模型文风或网络质量。
+- 四个M11 run全部为Fake。V0.3真实Provider、真实token/计费cache、网络latency明确为`NOT_EVALUATED`；V0.2 DeepSeek结果只作历史背景，未计入104项行为、评分或findings。
+- 机器摘要run`m11-t06-report-95e5e1e`绑定M11-T06起始提交，记录全部来源、统计、逐世界metrics、评分和Provider边界；manifest与SHA-256防止静默漂移。新增`DEC-156`并更新Tasks、Spec与Harness。
+
+### 门禁与结束状态
+
+- `pnpm playtest:report`通过3项测试：四源证据/hash/统计/评分复算、提交摘要逐字段一致、Markdown章节与链接合同。
+- 最终工作树`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 189 files / 1052 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过。Rust workspace 150 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、严格Clippy与TypeScript↔Rust archive interop均通过。
+- 三世界普通入口、自由输入入口、`pnpm playtest:report`、显式Windows纵向E2E、desktop build与M11-T06 evidence hash全部通过；Vite生产构建转换281 modules。普通长测入口按设计只运行合同测试并跳过需要新run目录的证据生成，权威已提交run由report门重新哈希和复算。
+- M11-T06完成后M11全部任务结束；本任务不merge、不push，不暂存用户`.gitignore`。下一项严格为M12-T01，本次不进入。
