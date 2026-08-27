@@ -3303,3 +3303,26 @@ Provider 身份固定为 `FAKE`。它验证生产编排、结构校验、事务�
 - 不引入 COC 品牌、专有角色、文本或规则；“调查”“信用”“幸运”等一般概念不映射商业规则表。
 - 本次开放 finding 为 0。夹具编写时被既有白名单、防重复和不可变触发器拒绝的无效值只修正夹具，不降低产品校验。
 - 不修改 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同；Cyberpunk、free-input stress 与 M12 必须独立执行。
+
+## DEC-154：Cyberpunk 长测以通用扩展、动态势力后果和有界经济取证
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T04`、V0.3 Spec 16.2、[`audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md`](audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md)
+
+### 背景
+
+Cyberpunk 长测不能是 Fantasy 的名称替换。它必须同时验证义体负荷、声望与权限等世界扩展，动态势力的激活和跨地点后果，以及信用点、装备与奖励不会因科幻题材产生数值膨胀；同时不得为该世界新增专用核心 schema 或绕过既有生产事务。
+
+### 决定与理由
+
+使用原创 2089 年霓虹堤岸断网场景，在单一 SQLite Campaign 上顺序执行 32 项生产行为。`cyberpunk-augmentation` 继续通过通用 extension definition/value 表达神经负荷、街区声望、追踪热度、植入插槽和网络权限；初始合成 fixture 只局部更新 extensions/revision/time，不修改基础属性。
+
+动态势力由既有 Active Faction 生成、校验和提交链激活。一次生产势力行动扩展七码头互助网领地、将玩家关系更新为 `FRIENDLY` 并写入可追踪世界事实；正常重开和 portable overwrite import 后仍保留两个活跃势力和同一行动。经济取证同时检查 Rules Engine 信用点余额、显式装备替换、Adventure 语义奖励数量和奖励价格上界，禁止用单纯抬高数值制造科幻感。
+
+### 影响与边界
+
+- Fake Provider 只验证生产编排、结构校验、事务与持久化；真实模型继续 `NOT_RUN`，不外推叙事质量、网络延迟、token 或计费缓存。
+- 最终 32/32 `COMPLETE`、开放 finding 为 0；义体扩展、跨地点、双 Quest、失败推进、势力行动和 archive 恢复均有数据库证据。
+- 不新增 Cyberpunk 专用表，不修改 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同。
+- 三世界固定长测均已完成；free-input stress、综合可玩性报告和 M12 必须独立执行，本决定不提前进入 M11-T05。

@@ -4796,3 +4796,27 @@
 - 最终`pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 186 files / 1047 tests通过，另2 files / 4 tests按设计skip；Node 29 tests通过。Rust workspace 148 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。
 - 显式Windows纵向E2E再次通过；`pnpm playtest:investigation`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run此前已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
 - 本任务形成`0779808`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T04，本次不进入。
+
+## 2026-08-27 — M11-T04 完成 Cyberpunk Long Playtest
+
+### 范围与生产纵切
+
+- 在分支`task/M11-T04-cyberpunk-long-playtest`、起始提交`c17e5c8`上严格执行M11-T04；未回滚或重做M0～M11-T03，未进入M11-T05。用户已有`.gitignore`修改全程保持未暂存。
+- 以`d42bae2`新增独立Cyberpunk production native slice和环境门控runner，在同一Campaign顺序完成32项行为：无超自然魔法Constitution、3项Career、角色/2项Trait、`cyberpunk-augmentation`扩展、余温中继站/4 NPC/三种真实性传闻、有限认知对话、两NPC scene、2 Quest、8回合Adventure、7次D20、8项Rules事件、装备/信用点/时间、动态地点、2个活跃势力/1次势力行动、Director、正常重开、失败恢复与portable overwrite import。
+- 最终神经负荷/街区声望/追踪热度为2/8/0，植入插槽1、网络权限“社区”，信用点15、game time 525分钟、装备1件。扩展fixture只局部更新`extensions/revision/updatedAt`并继续经过既有触发器；没有修改基础属性、schema或业务合同。
+- 动态势力使用既有生产生成/校验/提交链激活七码头互助网与栖桥公司；一次势力行动扩展到新生成的七码头离线节点、建立`FRIENDLY`关系并写入后果事实，重开和archive import后仍保留。
+
+### 平衡、发现与证据
+
+- 首个difficulty 17体魄检查叠加`-5`神经回响状态，保证自然20也失败，但仍由本地D20硬结果逻辑实际投掷并先持久化；最终7次D20含2次失败，后续回合、密钥交付、结算和第二项Quest继续完成或保持开放。
+- 经济/装备断言同时覆盖8项append-only Rules事件、显式unequip/equip替换、1件语义CLUE奖励和最高奖励价格0；没有用数值膨胀制造科幻差异。
+- 最终run`m11-t04-cyberpunk-d42bae2`绑定来源提交`d42bae2f4e8c111a293420afbd4412d83f501eb9`，32/32`COMPLETE`、开放finding 0。Provider明确为Fake；真实Provider保持`NOT_RUN`，未读取Credential或调用网络模型。
+- 生产流墙钟2938.837 ms、32项摊销91.839 ms只作为harness观察，不替代M10性能门。SQLite 1,806,336 bytes、archive 211,913 bytes；`integrity_check=ok`、foreign key violation 0、unfinished request 0、Save Schema 3、World Schema 1。
+- 浏览器壳在1440×1000覆盖Saves、My和Quest route guard，逐图人工查看且无console error；native不可用/loading/缺Campaign是预期安全状态，不替代Native证据。没有借长测修改UI、CSS或业务组件。
+
+### 文档、门禁与结束状态
+
+- 新增[`audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md`](audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md)和`DEC-154`，更新Spec、Tasks与Harness。三世界固定长测均已独立完成；free-input stress、真实模型、M11-T06与M12仍未执行。
+- 最终`pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 187 files / 1048 tests通过，另2 files / 5 tests按设计skip；Node 29 tests通过。Rust workspace 149 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。
+- 显式Windows纵向E2E再次通过；`pnpm playtest:cyberpunk`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
+- 本任务形成`d42bae2`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T05，本次不进入。

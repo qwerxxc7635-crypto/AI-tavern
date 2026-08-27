@@ -1,0 +1,956 @@
+{
+  "format": "EMBER_PLAYTEST_EVIDENCE",
+  "formatVersion": 1,
+  "runId": "m11-t04-cyberpunk-d42bae2",
+  "worldKey": "cyberpunk",
+  "scenarioHash": "6bf3a3663f67f8723f009c30f83371e19748f4c2f3294d9438be5dac4f7dfa50",
+  "sourceCommit": "d42bae2f4e8c111a293420afbd4412d83f501eb9",
+  "provider": {
+    "mode": "FAKE",
+    "providerName": "Ember deterministic fixture provider",
+    "modelName": "ember-fake-v1"
+  },
+  "status": "COMPLETE",
+  "resetCount": 0,
+  "startedAt": "2026-08-27T07:01:35.870Z",
+  "completedAt": "2026-08-27T07:01:35.902Z",
+  "actions": [
+    {
+      "sequence": 1,
+      "actionId": "cyberpunk-01",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.870Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "START_CAMPAIGN executed through the production native cyberpunk slice; input: 以“霓虹堤岸的断网夜”为世界种子创建赛博都市战役。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        }
+      ]
+    },
+    {
+      "sequence": 2,
+      "actionId": "cyberpunk-02",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.871Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "CREATE_CHARACTER executed through the production native cyberpunk slice; input: 创建一名网格快递员，填写神经负荷、街区声望和追踪热度。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        }
+      ]
+    },
+    {
+      "sequence": 3,
+      "actionId": "cyberpunk-03",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.872Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ENTER_TAVERN executed through the production native cyberpunk slice; input: 进入余温中继站，记录在线住客、委托墙和区域断电倒计时。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        }
+      ]
+    },
+    {
+      "sequence": 4,
+      "actionId": "cyberpunk-04",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.873Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native cyberpunk slice; input: 询问修补师岚为什么拒绝接入市政备用网。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 permission-bounded NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 5,
+      "actionId": "cyberpunk-05",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.874Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "INSPECT_RUMOR executed through the production native cyberpunk slice; input: 核对“栖桥公司正在回收免费义体”背后的传播链。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 permission-bounded NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 6,
+      "actionId": "cyberpunk-06",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.875Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ACCEPT_QUEST executed through the production native cyberpunk slice; input: 接受《送达离线密钥》，但不立即选择公司路线。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "QUEST_STATE",
+          "status": "PASS",
+          "detail": "2 independent Quest states persisted: 1 completed and 1 still open after settlement."
+        }
+      ]
+    },
+    {
+      "sequence": 7,
+      "actionId": "cyberpunk-07",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.876Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native cyberpunk slice; input: 提议把密钥拆分给三个街区节点共同保管。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and a faction action expanded territory with 1 friendly faction relation and 1 persisted consequence fact."
+        }
+      ]
+    },
+    {
+      "sequence": 8,
+      "actionId": "cyberpunk-08",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.877Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native cyberpunk slice; input: 用知识检定识别密钥壳体上的追踪固件。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 9,
+      "actionId": "cyberpunk-09",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.878Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "EQUIP_ITEM executed through the production native cyberpunk slice; input: 装备低温信号隔离套，确认负荷和插槽限制。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left credits=15, exactly 1 equipped item, and 1 bounded reward item with maximum price=0."
+        }
+      ]
+    },
+    {
+      "sequence": 10,
+      "actionId": "cyberpunk-10",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.879Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRAVEL executed through the production native cyberpunk slice; input: 穿过断电磁轨前往七码头，记录区域连接与时间。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, 2 active factions, 1 faction action, gameTime=525, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 11,
+      "actionId": "cyberpunk-11",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.880Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native cyberpunk slice; input: 向街医询问密钥原主人，但不暴露当前携带者。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 permission-bounded NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 12,
+      "actionId": "cyberpunk-12",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.881Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native cyberpunk slice; input: 尝试用未来街区声望换取一次匿名义体扫描。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and a faction action expanded territory with 1 friendly faction relation and 1 persisted consequence fact."
+        }
+      ]
+    },
+    {
+      "sequence": 13,
+      "actionId": "cyberpunk-13",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.882Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native cyberpunk slice; input: 用敏捷检定避开巡检无人机，接受失败带来的热度。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 14,
+      "actionId": "cyberpunk-14",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.883Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "INSPECT_RUMOR executed through the production native cyberpunk slice; input: 比较公司公告、街医记录与修补师说法的权限差异。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 permission-bounded NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 15,
+      "actionId": "cyberpunk-15",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.884Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ADVANCE_TIME executed through the production native cyberpunk slice; input: 等待备用电网切换，观察派系和委托状态推进。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, 2 active factions, 1 faction action, gameTime=525, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 16,
+      "actionId": "cyberpunk-16",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.885Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ACCEPT_QUEST executed through the production native cyberpunk slice; input: 发现并激活《失联节点的最后心跳》支线。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "QUEST_STATE",
+          "status": "PASS",
+          "detail": "2 independent Quest states persisted: 1 completed and 1 still open after settlement."
+        }
+      ]
+    },
+    {
+      "sequence": 17,
+      "actionId": "cyberpunk-17",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.886Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRADE executed through the production native cyberpunk slice; input: 出售一块普通废旧电池，确认价格不受高科技描述膨胀。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left credits=15, exactly 1 equipped item, and 1 bounded reward item with maximum price=0."
+        }
+      ]
+    },
+    {
+      "sequence": 18,
+      "actionId": "cyberpunk-18",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.887Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "EQUIP_ITEM executed through the production native cyberpunk slice; input: 切换到折叠电弧扳手，检查同插槽工具不会叠加。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left credits=15, exactly 1 equipped item, and 1 bounded reward item with maximum price=0."
+        }
+      ]
+    },
+    {
+      "sequence": 19,
+      "actionId": "cyberpunk-19",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.888Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native cyberpunk slice; input: 把公司追踪证据公开给街区频道，但隐去街医身份。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and a faction action expanded territory with 1 friendly faction relation and 1 persisted consequence fact."
+        }
+      ]
+    },
+    {
+      "sequence": 20,
+      "actionId": "cyberpunk-20",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.889Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native cyberpunk slice; input: 追问岚对备用网后门的已知事实与个人猜测。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 permission-bounded NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 21,
+      "actionId": "cyberpunk-21",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.890Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native cyberpunk slice; input: 用魅力检定争取中继站管理员延迟日志上传。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 22,
+      "actionId": "cyberpunk-22",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.891Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRAVEL executed through the production native cyberpunk slice; input: 返回余温中继站，验证路线耗时和动态派系变化。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, 2 active factions, 1 faction action, gameTime=525, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 23,
+      "actionId": "cyberpunk-23",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.892Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "SAVE_REOPEN executed through the production native cyberpunk slice; input: 保存并重启，复核义体负荷、声望、热度、装备和任务。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "REOPEN_STATE",
+          "status": "PASS",
+          "detail": "Normal reopen, interrupted-request recovery and archive overwrite import retained implants/dialogue/adventure/faction state with integrity=ok and 0 foreign-key violations."
+        }
+      ]
+    },
+    {
+      "sequence": 24,
+      "actionId": "cyberpunk-24",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.893Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "REVIEW_STATE executed through the production native cyberpunk slice; input: 审阅角色扩展、NPC 认知、派系、经济与 D20 历史。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        }
+      ]
+    },
+    {
+      "sequence": 25,
+      "actionId": "cyberpunk-25",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.894Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native cyberpunk slice; input: 拒绝把密钥卖给最高出价者，提出开源审计后再决定。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and a faction action expanded territory with 1 friendly faction relation and 1 persisted consequence fact."
+        }
+      ]
+    },
+    {
+      "sequence": 26,
+      "actionId": "cyberpunk-26",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.895Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native cyberpunk slice; input: 用体魄检定拖开断电闸门，保留失败造成的资源消耗。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 27,
+      "actionId": "cyberpunk-27",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.896Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ADVANCE_TIME executed through the production native cyberpunk slice; input: 让城市时钟跨过公司换班点，观察预算和冷却。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, 2 active factions, 1 faction action, gameTime=525, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 28,
+      "actionId": "cyberpunk-28",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.897Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native cyberpunk slice; input: 询问新上线的外卖骑手是否见过公司回收队。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 permission-bounded NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 29,
+      "actionId": "cyberpunk-29",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.898Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRADE executed through the production native cyberpunk slice; input: 购买标准散热凝胶，核对库存、信用点与消耗用途。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left credits=15, exactly 1 equipped item, and 1 bounded reward item with maximum price=0."
+        }
+      ]
+    },
+    {
+      "sequence": 30,
+      "actionId": "cyberpunk-30",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.899Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native cyberpunk slice; input: 把隔离套借给街医进行离线拆检并约定归还条件。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and a faction action expanded territory with 1 friendly faction relation and 1 persisted consequence fact."
+        }
+      ]
+    },
+    {
+      "sequence": 31,
+      "actionId": "cyberpunk-31",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.900Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "SAVE_REOPEN executed through the production native cyberpunk slice; input: 再次保存重启，确认借出装备、声望和派系后果未回滚。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        },
+        {
+          "kind": "REOPEN_STATE",
+          "status": "PASS",
+          "detail": "Normal reopen, interrupted-request recovery and archive overwrite import retained implants/dialogue/adventure/faction state with integrity=ok and 0 foreign-key violations."
+        }
+      ]
+    },
+    {
+      "sequence": 32,
+      "actionId": "cyberpunk-32",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 91.839,
+      "persisted": true,
+      "recordedAt": "2026-08-27T07:01:35.901Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "REVIEW_STATE executed through the production native cyberpunk slice; input: 记录世界、Quest、Trait、Equipment、Director、Context 与缓存观察。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2938.837 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; neuralLoad=2; reputation=8; traceHeat=0; implantSlots=1; network=社区; quests=2; turns=8; generations=33."
+        }
+      ]
+    }
+  ],
+  "findings": [],
+  "blockedReason": null
+}

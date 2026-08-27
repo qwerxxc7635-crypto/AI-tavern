@@ -581,12 +581,13 @@
 
 ## M11-T04 Cyberpunk Long Playtest
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-27）
 - **Dependency**：M11-T03。
 - **Deliverable**：30–50 个科幻世界行为、证据、发现与修复。
 - **Acceptance**：义体/负荷/声望、动态势力、经济/装备平衡、跨地点和多任务后果稳定。
 - **Tests**：全量适用门禁 + 该世界回归。
 - **Do Not**：不把奇幻内容换皮；不允许数值膨胀。
+- **Implementation reference**：[`audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md`](audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md)、[`DEC-154`](DECISIONS.md)。
 
 ## M11-T05 Free-Input Stress Test
 

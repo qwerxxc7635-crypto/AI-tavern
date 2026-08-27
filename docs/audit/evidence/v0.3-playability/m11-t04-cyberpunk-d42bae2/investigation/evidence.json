@@ -1,0 +1,20 @@
+{
+  "format": "EMBER_PLAYTEST_EVIDENCE",
+  "formatVersion": 1,
+  "runId": "m11-t04-cyberpunk-d42bae2",
+  "worldKey": "investigation",
+  "scenarioHash": "828b249efe7a49e7860037d667ae8d77088345ca30572214a1b62ff2d9a7ac9d",
+  "sourceCommit": "d42bae2f4e8c111a293420afbd4412d83f501eb9",
+  "provider": {
+    "mode": "NOT_SET",
+    "providerName": null,
+    "modelName": null
+  },
+  "status": "NOT_RUN",
+  "resetCount": 0,
+  "startedAt": null,
+  "completedAt": null,
+  "actions": [],
+  "findings": [],
+  "blockedReason": null
+}
