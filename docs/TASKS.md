@@ -615,12 +615,13 @@
 
 ## M12-T01 First Full Audit
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-27）
 - **Dependency**：M11-T06。
 - **Deliverable**：Architecture、Code、Security、Credential、Provider、AI、Rules、SQLite、Save/Migration、Performance/Cache、UI/UX/A11y、Regression、Playability 的 findings ledger。
 - **Acceptance**：每项含证据、P0–P3、状态、影响、修复建议；不采信 DONE 标签本身。UI/UX 审查必须逐页复核视觉手册、Token 唯一来源、共享组件复用、Feature/Legacy 迁移完成度和视觉一致性，不得把“已换色”视为通过。
 - **Tests**：全量静态/动态检查和证据复核；视觉部分复算 M10-T07 页面/状态/视口矩阵并抽查原始视觉值、对比度、焦点与 reduced-motion。
 - **Do Not**：不边审边降低标准；不遗漏外部环境限制。
+- **Implementation reference**：[`audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md`](audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md)。
 
 ## M12-T02 Fix Audit Findings
 

@@ -4867,3 +4867,25 @@
 - 最终工作树`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 189 files / 1052 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过。Rust workspace 150 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、严格Clippy与TypeScript↔Rust archive interop均通过。
 - 三世界普通入口、自由输入入口、`pnpm playtest:report`、显式Windows纵向E2E、desktop build与M11-T06 evidence hash全部通过；Vite生产构建转换281 modules。普通长测入口按设计只运行合同测试并跳过需要新run目录的证据生成，权威已提交run由report门重新哈希和复算。
 - M11-T06完成后M11全部任务结束；本任务不merge、不push，不暂存用户`.gitignore`。下一项严格为M12-T01，本次不进入。
+
+## 2026-08-27 — M12-T01 完成 First Full Audit
+
+### 审计范围与独立证据
+
+- 在分支`task/M11-T05-free-input-stress`、起始提交`d41e99b`上执行M12-T01；没有采信历史DONE标签，没有修改生产业务代码，也没有边审边修复。用户已有`.gitignore`修改全程保持未暂存。
+- 新增[`audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md`](audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md)，逐项复核Architecture、Code、Security、Credential、Provider、AI、Rules、SQLite、Save/Migration、Performance/Cache、UI/UX/A11y、Regression和Playability。
+- 冻结6项开放finding：P2四项（无Campaign本地导航、Vite开发服务器公告、CI Action可移动tag、V0.3仍标识0.2.0）与P3两项（Vitest/传递开发工具公告、Linux GTK3条件依赖维护/unsound告警）；开放P0/P1均为0。独立安全复核确认CI风险存在可执行artifact投毒路径，但只读token、无secret/write/OIDC/自动发布使其不构成P0/P1。
+- 当前与git历史秘密扫描只命中故意的假秘密测试夹具；CSP、最小Tauri capability、OS Keyring、opaque CredentialRef、HTTPS公开地址/loopback HTTP、解析地址固定、禁redirect、超时和响应上限继续通过。`cargo-audit 0.22.2`用当日RustSec库审计499项依赖，报告0个vulnerability、16个unmaintained和1个Linux GTK3路径unsound informational warning。
+- 仅使用官方当前文档复核Provider：DeepSeek、Qwen与OpenRouter endpoint/model/API仍有效；Qwen 3.7 Max已列为旧版但仍可调用，不误报为下架。没有读取Credential或调用真实计费Provider。
+
+### UI、性能与外部边界
+
+- 真实Chromium重新覆盖12个核心页面族、unknown/route guard、错误/loading/selected代表状态与860×600、1180×760、1366×768、1920×1080四个既定视口；横向溢出0、console error 0。保存页面证据、finding点击前后图与SHA-256。
+- 重新验证Design Token唯一来源、Primitive/Game Component复用、Feature/Legacy收敛、raw visual value、WCAG对比度、2px焦点、forced-colors和reduced-motion静态/测试合同；没有第二套组件体系。视觉评级B+，扣分来自无Campaign导航语义，不来自样式体系分裂。
+- 性能门绑定审计基线提交并通过：SQLite增长541.582 bytes/turn，Unified Context在100→1000回合为377→383 tokens、增长1.016，GenerationQueue压力P95为5ms。Fake Provider不报告真实token/cache，保持NOT_EVALUATED。
+- 当前macOS主机不能证明V0.3 NSIS/Credential Manager/WebView2/安装启动卸载；真实Provider叙事、网络、token和计费cache也未获授权。两项明确记为BLOCKED_EXTERNAL/NOT_EVALUATED，旧V0.2或Fake证据不冒充通过。
+
+### 门禁与结束状态
+
+- `pnpm check`完整通过：Prettier、release metadata同步、zh-CN、ESLint、TypeScript；Vitest 189 files / 1052 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过；Rust workspace 150 tests通过，另1项真实DeepSeek测试ignored；rustfmt、严格Clippy和archive interop通过。
+- `pnpm test:windows-e2e`、`pnpm build:desktop`（281 modules）、`pnpm performance:gate`和`pnpm playtest:report`均通过。M12-T01只冻结finding和证据，不修复、不进入M12-T03；下一项严格为M12-T02。
