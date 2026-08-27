@@ -13,6 +13,8 @@ mod dynamic_locations;
 mod dynamic_quest_sources;
 #[cfg(test)]
 mod entity_schema_contract;
+#[cfg(test)]
+mod investigation_e2e;
 mod lazy_world_generation;
 mod model_settings;
 mod npc_dialogue;
