@@ -4,9 +4,9 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 macOS 的单人 AI 文
 
 ## 当前状态
 
-当前开发候选为 v0.3.0（Ember Rebuild）。M0～M11 的架构、动态世界、Rules Engine、Character Creation 2.0、统一 Context/Memory、视觉体系和长流程可玩性工作已经完成；M12 第一轮完整审计已冻结 findings，正在逐项修复并准备重新生成平台发布证据。正式范围见 [`docs/V0.3_SPEC.md`](docs/V0.3_SPEC.md)，严格任务顺序见 [`docs/TASKS.md`](docs/TASKS.md)，当前审计账本见 [`docs/audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md`](docs/audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md)。
+当前开发候选为 v0.3.0（Ember Rebuild）。M0～M12 的架构、动态世界、Rules Engine、Character Creation 2.0、统一 Context/Memory、视觉体系、长流程可玩性和第一轮完整审计均已完成；当前开放 P0/P1/P2/P3 均为 0，结论为 `READY FOR SECOND AUDIT`，但尚非公开发布候选。正式范围见 [`docs/V0.3_SPEC.md`](docs/V0.3_SPEC.md)，严格任务顺序见 [`docs/TASKS.md`](docs/TASKS.md)，最终结论见 [`docs/V0.3_FIRST_AUDIT_REPORT.md`](docs/V0.3_FIRST_AUDIT_REPORT.md)。
 
-v0.3.0 继续采用 Windows 纵向切片优先、macOS 共享门禁的桌面策略。Tauri 2 客户端具备世界与通用角色创建、动态酒馆/NPC/Quest、8～12 回合冒险、本地 D20、规则事务、原子结算、档案、V0.2→V0.3 存档迁移和“我的”设备设置。Windows NSIS 与 macOS app 的最终 V0.3 生命周期证据仍必须在 M12 发布门重新生成；iOS 仍不在当前开发范围内。
+v0.3.0 继续采用 Windows 纵向切片优先、macOS 共享门禁的桌面策略。Tauri 2 客户端具备世界与通用角色创建、动态酒馆/NPC/Quest、8～12 回合冒险、本地 D20、规则事务、原子结算、档案、V0.2→V0.3 存档迁移和“我的”设备设置。macOS 0.3.0 `.app` 已完成编译、身份、哈希和系统 WebKit 检查；Windows NSIS 生命周期与临时 macOS 真实启动生命周期因当前主机限制明确为 `BLOCKED_EXTERNAL`，不能视为已验证。iOS 仍不在当前开发范围内。
 
 模型设置中的默认/备用 Provider、模型、端点和系统安全凭据已经进入统一桌面 AI 编排路径；世界、车卡、酒馆、NPC、任务、冒险和结算共用同一套模型选择、Prompt、结构校验、错误和缓存机制。当前 V0.3 可玩性与性能证据使用 Fake Provider，真实模型文风、网络延迟、token 成本和计费缓存保持 `NOT_EVALUATED`，不得沿用 V0.2 的真实 DeepSeek 结果冒充 V0.3 结论。
 
@@ -67,6 +67,9 @@ cargo test --workspace
 - [Windows 0.1 最终验收记录](docs/WINDOWS_ACCEPTANCE_0.1.md)
 - [v0.2 第一轮技术审查](docs/V0.2_FIRST_AUDIT_REPORT.md)
 - [v0.2 第一轮可玩性报告](docs/V0.2_PLAYABILITY_REPORT.md)
+- [v0.3 第一轮完整审计报告](docs/V0.3_FIRST_AUDIT_REPORT.md)
+- [v0.3 可玩性报告](docs/V0.3_PLAYABILITY_REPORT.md)
+- [v0.3 发布门报告](docs/audit/V0_3_RELEASE_GATES.md)
 
 ## 本地开发缓存
 

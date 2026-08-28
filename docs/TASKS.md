@@ -645,9 +645,10 @@
 
 ## M12-T04 Reports & Final Verdict
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-28）
 - **Dependency**：M12-T03。
 - **Deliverable**：`docs/V0.3_FIRST_AUDIT_REPORT.md`、最终版 Playability Report、README/Tasks/Log/Decisions 和完整 Final Verdict。
 - **Acceptance**：明确 P0/P1/P2/P3、评分、测试、真实模型、性能、缓存、起止 commit、新增 commits、branch/status/clean、push/merge、Remaining Risks 和 `READY FOR SECOND AUDIT` 判断。
 - **Tests**：报告统计与证据一致；文档/链接/格式；最终 `git diff`/status/secret review。
 - **Do Not**：P0/P1 未清零时不得判定 READY；不隐瞒 dirty tree 或用户原有修改；不自动开始第二轮审计。
+- **Implementation reference**：[`V0.3_FIRST_AUDIT_REPORT.md`](V0.3_FIRST_AUDIT_REPORT.md)、[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md) 与 [`audit/V0_3_RELEASE_GATES.md`](audit/V0_3_RELEASE_GATES.md)。

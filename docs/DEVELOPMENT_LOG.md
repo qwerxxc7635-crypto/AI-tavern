@@ -4927,3 +4927,23 @@
 - 对当前tracked tree及全部reachable Git revisions执行秘密模式扫描，只保存文件名和计数、不回显疑似值；10个唯一命中文件全部为测试文件或Rust`cfg(test)`模块内的故意假夹具，未解释命中为0。保存/导出秘密扫描2 files / 17 tests通过。未读取OS Credential Store或用户未跟踪文件。
 - 性能门通过：SQLite增长541.582 bytes/turn、Unified Context 377→383 tokens、增长1.016、GenerationQueue压力P95 3ms。证据明确为Fake Provider；真实Provider token预算和计费cache hit仍为`NOT_EVALUATED`，未读取Credential、未调用网络模型。
 - M12-T03所有当前主机适用门禁均通过，Windows生命周期与macOS生命周期两个外部环境项显式阻塞，真实Provider两项保持未评价。下一项严格为M12-T04 Reports & Final Verdict。
+
+## 2026-08-28 — M12-T04 完成 Reports & Final Verdict
+
+### 最终报告与复算
+
+- 从M12-T03证据提交`d5c5fe0`进入最后一项任务；未重做M0～M12-T03，也未自动开始第二轮审计。新增[`V0.3_FIRST_AUDIT_REPORT.md`](V0.3_FIRST_AUDIT_REPORT.md)，并将[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)更新为含M12最终附录的版本；同步README、Spec、Tasks、Decisions与本日志。
+- 最终开放finding为P0=0/P1=0/P2=0/P3=0。M12第一轮六项finding为4个P2全部FIXED、2个P3中1个FIXED/1个Linux-only`DEFERRED_ACCEPTED`；M11历史`M11-FAN-001` P1已修复并回归，不计为开放项。
+- 可玩性证据复算仍为三世界固定96项+自由输入8项=104项；Fantasy/Investigation/Cyberpunk评分8.6/8.8/8.9，综合8.8/10、MEDIUM confidence。自由输入保持4 success/2 failed/2 rules-rejected，没有删除合理失败。
+
+### Final Verdict 与边界
+
+- 最终判断为`READY FOR SECOND AUDIT`：P0/P1清零，核心架构、Rules/D20、SQLite/Save/Migration、Credential边界、三世界可玩性和所有当前主机适用门禁均有可信证据。
+- 同时明确`NOT READY FOR PUBLIC RELEASE`：Windows NSIS/Credential Manager/WebView2/install-launch-uninstall和临时macOS Keychain/launch/database/cleanup生命周期仍为`BLOCKED_EXTERNAL`；真实Provider长测、token、network latency和计费cache仍为`NOT_EVALUATED`；产物未签名、notarize或发布。
+- 新增`DEC-157`把第二轮审计准入与公开发布批准分离，防止平台阻塞、Fake性能或V0.2历史证据被误写为V0.3发布验证。没有修改任何产品代码、schema、状态机或视觉合同。
+- 最终文档完成态再次扫描当前tree和全部reachable revisions，只记录文件名：10个既有假夹具文件外，新增命中仅为已提交`secret-review.json`自身的模式类别标签，未解释命中仍为0；未读取或回显任何真实Credential。
+
+### Git 与结束状态
+
+- V0.3起始基线为`0af183391a5d83406874db326ed02b175ba24e6e`，第一项提交为`01030e1`，最终审计产品源码为`a77eb03`，M12-T03证据提交为`d5c5fe0`。截至M12-T03共新增67 commits（46 feat / 9 test / 4 fix / 8 docs），无merge commit；最终M12-T04文档commit在交接中作为ending HEAD报告。
+- 用户已有`.gitignore`修改始终保持未暂存，因此工作树会如实报告为not clean；所有agent-owned M12-T04修改独立提交。不push、不merge、不签名、不发布，也不自动开始第二轮审计。

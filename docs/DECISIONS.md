@@ -3372,3 +3372,29 @@ M11-T02～T05 分别保存了长测和自由输入证据，但人工汇总容易
 - 不把四个运行的不同计时方法合并成 Provider SLA；固定长测与压力事务分别报告。
 - V0.2 真实 DeepSeek 证据只作为历史背景，不能替代 V0.3 M11 真实模型验证。
 - 本决定不改变任何游戏、Provider、Rules、SQLite、Save 或 UI 合同；M11 完成只允许进入 M12 第一轮完整审计，不提前给出发布或 `READY FOR SECOND AUDIT` 判断。
+
+## DEC-157：第二轮审计准入与公开发布批准必须分离
+
+- 日期：2026-08-28
+- 状态：已采纳
+- 依据：`M12-T01`～`M12-T04`、[`V0.3_FIRST_AUDIT_REPORT.md`](V0.3_FIRST_AUDIT_REPORT.md)、[`audit/V0_3_RELEASE_GATES.md`](audit/V0_3_RELEASE_GATES.md)
+
+### 背景
+
+V0.3 第一轮 findings 已关闭或按非发布平台范围显式接受，当前开放 P0/P1/P2/P3 均为0；核心纵向、三世界可玩性和当前主机适用门禁有证据。但当前没有临时Windows runner执行NSIS/Credential Manager/WebView2/安装启动卸载，也没有临时macOS runner执行完整Keychain/启动/数据库/清理生命周期；真实Provider长测、真实token与计费cache同样没有授权证据。若把“可以接受第二轮独立审计”与“可以公开发布”合并为一个布尔结论，会把这些外部未知错误地写成已验证。
+
+### 决定与理由
+
+将最终状态明确拆成两层：
+
+1. `READY FOR SECOND AUDIT`：要求P0/P1为0，核心架构、Rules/D20、SQLite/迁移、Credential边界、三世界可玩性和所有当前适用质量/构建门有可信证据；平台不可用项必须明确`BLOCKED_EXTERNAL`。
+2. `NOT READY FOR PUBLIC RELEASE`：在绑定最终候选commit的Windows与macOS生命周期、真实Provider验收，以及所需签名/notarization/发布授权完成前保持该状态。
+
+Fake Provider性能和可玩性只证明确定性生产编排、规则、事务与持久化。真实Provider的token、计费cache、网络与叙事质量继续为`NOT_EVALUATED`；本地prefix reuse不冒充计费cache hit。V0.2的历史真实DeepSeek或平台证据不替代V0.3。
+
+### 影响与边界
+
+- 第二轮审计可以立即从当前提交和已哈希证据开始，不需要重复M0～M12第一轮任务。
+- 第二轮审计不得把两个`BLOCKED_EXTERNAL`、真实Provider未知或unsigned状态改写为PASS；公开发布门仍需独立完成。
+- Linux GTK3/glib告警保持`DEFERRED_ACCEPTED`，只在V0.3不发布Linux的范围内成立；未来Linux发行前必须重审。
+- 本决定只定义审计/发布状态，不改变Rules、D20、Provider、Generator/Queue、SQLite、Save/Resume、World、Quest/NPC/Adventure或视觉组件合同。
