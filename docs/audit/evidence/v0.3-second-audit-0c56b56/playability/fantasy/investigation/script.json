@@ -1,0 +1,381 @@
+[
+  {
+    "sequence": 1,
+    "id": "investigation-01",
+    "kind": "START_CAMPAIGN",
+    "input": "以“雾港失踪电台”为世界种子创建调查战役并锁定宪章。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 2,
+    "id": "investigation-02",
+    "kind": "CREATE_CHARACTER",
+    "input": "创建一名夜渡档案员，填写镇定、机运、信用与线索负荷。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 3,
+    "id": "investigation-03",
+    "kind": "ENTER_TAVERN",
+    "input": "进入潮痕咖啡馆，记录雨夜来客、公告和闭店时间。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 4,
+    "id": "investigation-04",
+    "kind": "TALK_NPC",
+    "input": "询问伊芙琳最后一次听见失踪电台呼号的时间。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 5,
+    "id": "investigation-05",
+    "kind": "INSPECT_RUMOR",
+    "input": "区分“地下室有第二台发报机”是目击、推测还是误导。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 6,
+    "id": "investigation-06",
+    "kind": "ACCEPT_QUEST",
+    "input": "接受《凌晨两点的空白频段》，保留其他调查线索。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "QUEST_STATE"
+    ]
+  },
+  {
+    "sequence": 7,
+    "id": "investigation-07",
+    "kind": "FREE_INPUT",
+    "input": "要求查看咖啡馆电话账单，而不是立刻前往电台。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 8,
+    "id": "investigation-08",
+    "kind": "D20_ACTION",
+    "input": "用知识检定比对账单号码与旧港务名录。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 9,
+    "id": "investigation-09",
+    "kind": "EQUIP_ITEM",
+    "input": "携带折叠式板盒相机，确认它是证据工具而非武器加成。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 10,
+    "id": "investigation-10",
+    "kind": "TRAVEL",
+    "input": "前往停用的海雾观测站，记录交通时间和天气变化。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 11,
+    "id": "investigation-11",
+    "kind": "TALK_NPC",
+    "input": "向值夜员询问噪声记录，但不透露伊芙琳的姓名。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 12,
+    "id": "investigation-12",
+    "kind": "FREE_INPUT",
+    "input": "故意给值夜员一个错误日期，观察其是否纠正或附和。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 13,
+    "id": "investigation-13",
+    "kind": "D20_ACTION",
+    "input": "用敏捷检定在不破坏封条的情况下进入记录室。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 14,
+    "id": "investigation-14",
+    "kind": "INSPECT_RUMOR",
+    "input": "交叉检查电话账单、噪声日志与值夜员陈述的矛盾。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 15,
+    "id": "investigation-15",
+    "kind": "ADVANCE_TIME",
+    "input": "等待下一次整点广播，允许失败继续产生新线索。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 16,
+    "id": "investigation-16",
+    "kind": "ACCEPT_QUEST",
+    "input": "发现并激活《被涂黑的潮位表》关联调查。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "QUEST_STATE"
+    ]
+  },
+  {
+    "sequence": 17,
+    "id": "investigation-17",
+    "kind": "TRADE",
+    "input": "支付合理费用复制档案，确认信用与现金记录分离。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 18,
+    "id": "investigation-18",
+    "kind": "EQUIP_ITEM",
+    "input": "使用封口证物袋保存磁带碎片，记录证据链。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 19,
+    "id": "investigation-19",
+    "kind": "FREE_INPUT",
+    "input": "把一条未经证实的推论告诉报社，观察社会后果。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 20,
+    "id": "investigation-20",
+    "kind": "TALK_NPC",
+    "input": "再次询问伊芙琳，检查她只回应已知或相信的内容。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 21,
+    "id": "investigation-21",
+    "kind": "D20_ACTION",
+    "input": "用魅力检定让报社暂缓刊登，失败也不锁死调查。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 22,
+    "id": "investigation-22",
+    "kind": "TRAVEL",
+    "input": "返回潮痕咖啡馆，验证 NPC 时序和地点记忆。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 23,
+    "id": "investigation-23",
+    "kind": "SAVE_REOPEN",
+    "input": "保存并重启，复核线索、误导信息、Quest 与扩展数值。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "REOPEN_STATE"
+    ]
+  },
+  {
+    "sequence": 24,
+    "id": "investigation-24",
+    "kind": "REVIEW_STATE",
+    "input": "审阅镇定、机运、信用、知识边界和调查图谱。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 25,
+    "id": "investigation-25",
+    "kind": "FREE_INPUT",
+    "input": "拒绝把磁带交给警署，提议由三方共同封存。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 26,
+    "id": "investigation-26",
+    "kind": "D20_ACTION",
+    "input": "用体魄检定搬开记录室倒柜，记录压力与失败代价。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 27,
+    "id": "investigation-27",
+    "kind": "ADVANCE_TIME",
+    "input": "让调查跨过清晨，观察有限认知与任务时效变化。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 28,
+    "id": "investigation-28",
+    "kind": "TALK_NPC",
+    "input": "询问早班邮差是否见过携带发报箱的陌生人。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 29,
+    "id": "investigation-29",
+    "kind": "TRADE",
+    "input": "购买普通显影药剂，核对价格、用途和库存。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 30,
+    "id": "investigation-30",
+    "kind": "FREE_INPUT",
+    "input": "尝试把无关旧照片当作筹码交换观测站钥匙。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 31,
+    "id": "investigation-31",
+    "kind": "SAVE_REOPEN",
+    "input": "再次保存重启，确认失败线索和已公开误导仍可追溯。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "REOPEN_STATE"
+    ]
+  },
+  {
+    "sequence": 32,
+    "id": "investigation-32",
+    "kind": "REVIEW_STATE",
+    "input": "记录人格、线索、Quest、World、Trait、Equipment 与 Context 观察。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  }
+]

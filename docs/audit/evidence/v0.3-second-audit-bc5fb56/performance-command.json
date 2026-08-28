@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "pnpm",
+    "performance:gate",
+    "--output-dir",
+    "docs/audit/evidence/v0.3-second-audit-bc5fb56/performance"
+  ],
+  "startedAt": "2026-08-28T02:56:08.606Z",
+  "endedAt": "2026-08-28T02:56:10.886Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\n RUN  v4.1.11 /Users/mac/Desktop/item/4D\n\n\n Test Files  1 passed (1)\n      Tests  1 passed (1)\n   Start at  10:56:09\n   Duration  910ms (transform 269ms, setup 0ms, import 372ms, tests 446ms, environment 0ms)\n\nPerformance regression gate passed; reports written to /Users/mac/Desktop/item/4D/docs/audit/evidence/v0.3-second-audit-bc5fb56/performance\n",
+  "stderr": "$ node scripts/performance-regression.mjs --output-dir docs/audit/evidence/v0.3-second-audit-bc5fb56/performance\n"
+}

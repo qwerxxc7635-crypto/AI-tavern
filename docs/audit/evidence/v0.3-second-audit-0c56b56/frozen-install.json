@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "zsh",
+    "-lc",
+    "pnpm install --frozen-lockfile"
+  ],
+  "startedAt": "2026-08-28T09:21:20.390Z",
+  "endedAt": "2026-08-28T09:21:21.251Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "Scope: all 11 workspace projects\nAlready up to date\nDone in 285ms using pnpm v11.9.0\n",
+  "stderr": ""
+}

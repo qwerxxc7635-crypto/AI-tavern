@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "dataOrigin": "SYNTHETIC_M11",
+  "key": "investigation",
+  "campaignId": "playtest-m11-investigation",
+  "displayName": "雾港失踪电台",
+  "constitution": {
+    "worldType": "近代都市调查与心理悬疑",
+    "era": "架空的一九二〇年代海港工业城",
+    "technology": "有线电话、真空管电台、胶片摄影与燃油交通",
+    "magic": "异常现象稀少、暧昧且不能替代证据链",
+    "peoples": [
+      "港城居民",
+      "外来船员",
+      "山地移民"
+    ],
+    "society": "警署、报社、工会和私人社团交错影响公共叙事",
+    "politics": "港务财团与市议会围绕无线电牌照相互施压",
+    "economy": "现金、工资与社会信用共同限制调查资源",
+    "combatScale": "危险短促且代价高，调查和撤退通常优先",
+    "deathRules": "死亡永久；精神与身体后果分开记录",
+    "careerRules": "职业由教育、执照、雇佣机构和社会网络决定",
+    "equipmentRules": "时代工具脆弱且用途具体，证据物不得变成通用加成",
+    "npcRules": "证词可能错误、隐瞒或受误导，但知识来源必须可追踪",
+    "traitRules": "调查优势必须伴随压力、偏见或社会代价",
+    "taboos": [
+      "照搬受版权保护规则文本",
+      "一次失败永久锁死核心线索",
+      "现代数字设备"
+    ]
+  },
+  "careers": [
+    {
+      "id": "night-archive-clerk",
+      "name": "夜渡档案员",
+      "role": "整理港务与电台历史记录",
+      "skills": [
+        "档案检索",
+        "密码抄录"
+      ],
+      "equipmentTags": [
+        "文书",
+        "证物"
+      ],
+      "socialPosition": "低薪但可接触官方记录"
+    },
+    {
+      "id": "signal-inspector",
+      "name": "民用信号检验员",
+      "role": "检查电台牌照与设备故障",
+      "skills": [
+        "无线电",
+        "电气维修"
+      ],
+      "equipmentTags": [
+        "仪表",
+        "执照"
+      ],
+      "socialPosition": "受市政技术处监管"
+    },
+    {
+      "id": "harbor-stringer",
+      "name": "港区特约记者",
+      "role": "追踪城市边缘新闻",
+      "skills": [
+        "采访",
+        "摄影"
+      ],
+      "equipmentTags": [
+        "相机",
+        "通讯录"
+      ],
+      "socialPosition": "依赖报社信用和匿名线人"
+    }
+  ],
+  "equipment": [
+    {
+      "id": "folding-plate-camera",
+      "name": "折叠式板盒相机",
+      "category": "TOOL",
+      "description": "需要稳定支撑和显影时间的便携相机。",
+      "ruleHook": "生成可追溯影像证据，不提供战斗加成"
+    },
+    {
+      "id": "sealed-evidence-notebook",
+      "name": "封线证物簿",
+      "category": "CLUE",
+      "description": "逐页编号并可记录交接人的簿册。",
+      "ruleHook": "维持线索来源与交接链"
+    },
+    {
+      "id": "portable-valve-tester",
+      "name": "便携电子管测试器",
+      "category": "TOOL",
+      "description": "用于检测真空管状态的指针仪表。",
+      "ruleHook": "只适用于电台设备诊断"
+    }
+  ],
+  "traits": [
+    {
+      "id": "trait-playtest-cold-reading",
+      "name": "冷读习惯",
+      "description": "善于捕捉谈话细节，却容易把巧合误当成模式。",
+      "pointProfile": {
+        "type": "MIXED",
+        "positiveEffect": "冷读习惯的明确优势",
+        "negativeEffect": "冷读习惯的明确代价",
+        "buffPoints": -2,
+        "debuffPoints": 2
+      }
+    },
+    {
+      "id": "trait-playtest-recurring-static-dream",
+      "name": "静电梦魇",
+      "description": "反复梦见相同呼号，但无法确认它是真实记忆。",
+      "pointProfile": {
+        "type": "NARRATIVE",
+        "positiveEffect": null,
+        "negativeEffect": null,
+        "buffPoints": 0,
+        "debuffPoints": 0
+      }
+    }
+  ],
+  "npcs": [
+    {
+      "id": "evelyn",
+      "name": "伊芙琳",
+      "identity": "潮痕咖啡馆夜班经理",
+      "personality": "敏锐而防备媒体",
+      "goal": "找回失踪的弟弟",
+      "hiddenMotive": "她删去了一次私人电话记录",
+      "knowledgeBoundary": "不知道观测站封条被替换"
+    },
+    {
+      "id": "rhodes",
+      "name": "罗兹",
+      "identity": "海雾观测站值夜员",
+      "personality": "拘谨、依赖程序",
+      "goal": "保住即将裁撤的岗位",
+      "hiddenMotive": "他把异常噪声归档到错误日期",
+      "knowledgeBoundary": "不知道伊芙琳的家庭关系"
+    },
+    {
+      "id": "min",
+      "name": "敏恩",
+      "identity": "地方晚报记者",
+      "personality": "急切但重视可核实来源",
+      "goal": "抢在竞争报社前发表调查",
+      "hiddenMotive": "她收到过匿名资助",
+      "knowledgeBoundary": "不知道磁带原始录制地点"
+    }
+  ],
+  "quests": [
+    {
+      "id": "blank-frequency",
+      "title": "凌晨两点的空白频段",
+      "objective": "确定异常呼号的设备、时间与传播路径",
+      "failureCost": "关键设备会在牌照审查前被转移",
+      "risk": "MODERATE",
+      "publisherNpcId": "evelyn"
+    },
+    {
+      "id": "blacked-tide-table",
+      "title": "被涂黑的潮位表",
+      "objective": "恢复被覆盖的潮位记录并验证动机",
+      "failureCost": "一名证人将因错误时间线被指控",
+      "risk": "HIGH",
+      "publisherNpcId": "rhodes"
+    },
+    {
+      "id": "missing-contact-sheet",
+      "title": "消失的照片接触印样",
+      "objective": "找回报社暗房遗失的完整印样",
+      "failureCost": "未经核实的照片会先行刊登",
+      "risk": "LOW",
+      "publisherNpcId": "min"
+    }
+  ],
+  "extension": {
+    "namespace": "investigation-resilience",
+    "displayName": "调查状态",
+    "fields": [
+      {
+        "key": "composure",
+        "label": "镇定",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 100
+      },
+      {
+        "key": "fortune",
+        "label": "机运",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 100
+      },
+      {
+        "key": "credit",
+        "label": "信用",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 100
+      },
+      {
+        "key": "clueLoad",
+        "label": "线索负荷",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 20
+      }
+    ],
+    "initialValues": {
+      "composure": 62,
+      "fortune": 48,
+      "credit": 35,
+      "clueLoad": 0
+    }
+  }
+}

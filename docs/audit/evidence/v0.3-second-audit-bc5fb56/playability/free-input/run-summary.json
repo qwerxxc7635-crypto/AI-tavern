@@ -1,0 +1,75 @@
+{
+  "format": "EMBER_FREE_INPUT_STRESS_SUMMARY",
+  "formatVersion": 1,
+  "sourceCommit": "bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+  "behaviorCount": 8,
+  "coreFlowLatencyMs": 2545.034,
+  "amortizedActionLatencyMs": 318.129,
+  "latencyMethod": "Production transaction wall time divided by the fixed eight-action script; not Provider billing latency.",
+  "metrics": {
+    "fantasy": {
+      "campaignState": "TAVERN",
+      "integrityCheck": "ok",
+      "foreignKeyViolationCount": 0,
+      "unfinishedRequestCount": 0,
+      "playerMessageCount": 3,
+      "generatedReplyCount": 3,
+      "abandonedQuestCount": 1,
+      "ownerTrust": 2,
+      "money": 12
+    },
+    "investigation": {
+      "campaignState": "TAVERN",
+      "integrityCheck": "ok",
+      "foreignKeyViolationCount": 0,
+      "unfinishedRequestCount": 0,
+      "playerMessageCount": 3,
+      "generatedReplyCount": 5,
+      "ownerTrust": 2,
+      "travelCount": 3,
+      "currentLocationName": "海雾观测站",
+      "passerbyMessageCount": 6,
+      "passerbyTrust": 1,
+      "passerbyCloseness": 1,
+      "passerbyObligation": 1
+    },
+    "cyberpunk": {
+      "campaignState": "TAVERN",
+      "integrityCheck": "ok",
+      "foreignKeyViolationCount": 0,
+      "unfinishedRequestCount": 0,
+      "playerMessageCount": 2,
+      "generatedReplyCount": 2,
+      "money": 15,
+      "rewardItemCount": 1,
+      "corporatePlayerRelation": "ALLIED",
+      "factionActionCount": 2,
+      "defectionFactCount": 1
+    }
+  },
+  "files": [
+    {
+      "world": "fantasy",
+      "databaseBytes": 1777664,
+      "databaseSha256": "1d0f7239c23b297efefa9bd2e0ff5f784157158fcf14ccee0e8f581b257753fc",
+      "archiveBytes": 183375,
+      "archiveSha256": "b6e9763529deeb51433bf536b1a8cae57ef5d9dc6bbbb3296031bf0eae22489b"
+    },
+    {
+      "world": "investigation",
+      "databaseBytes": 1794048,
+      "databaseSha256": "b0128dc5a29fc24d9c7092e5a5b76fe4c8290051dfc8998ec01c199be51ef897",
+      "archiveBytes": 200372,
+      "archiveSha256": "de9327b02fe73a49d22e460c89376f03751224184c8772741d2465653ea53d4b"
+    },
+    {
+      "world": "cyberpunk",
+      "databaseBytes": 1818624,
+      "databaseSha256": "1fef0e47be4f0acccf49c2e2ff87b8b3214f9e93a8aac6b434c8749f078e0abf",
+      "archiveBytes": 219991,
+      "archiveSha256": "ea935dbbad1653147f9c9f2f26976f2bc8d5993c2805c4a33e79d13049982c70"
+    }
+  ],
+  "cargoCommand": "cargo test -p ember-native-bridge free_input_stress_e2e::persists_cross_world_free_input_success_failure_and_refusal -- --exact --nocapture",
+  "cargoStdout": "running 1 test\ntest free_input_stress_e2e::persists_cross_world_free_input_success_failure_and_refusal ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 1.82s"
+}

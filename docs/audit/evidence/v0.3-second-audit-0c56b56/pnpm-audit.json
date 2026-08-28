@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "zsh",
+    "-lc",
+    "pnpm audit --registry=https://registry.npmjs.org --json"
+  ],
+  "startedAt": "2026-08-28T09:22:13.772Z",
+  "endedAt": "2026-08-28T09:22:15.240Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "{\n  \"advisories\": {},\n  \"metadata\": {\n    \"vulnerabilities\": {\n      \"info\": 0,\n      \"low\": 0,\n      \"moderate\": 0,\n      \"high\": 0,\n      \"critical\": 0\n    },\n    \"dependencies\": 10,\n    \"devDependencies\": 304,\n    \"optionalDependencies\": 77,\n    \"totalDependencies\": 314\n  }\n}\n",
+  "stderr": ""
+}

@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "zsh",
+    "-lc",
+    "env EMBER_CYBERPUNK_PLAYTEST_RUN_DIRECTORY='/Users/mac/Desktop/item/4D/docs/audit/evidence/v0.3-second-audit-0c56b56/playability/cyberpunk' EMBER_CYBERPUNK_PLAYTEST_SOURCE_COMMIT='0c56b56f174e07ffcfe01a7d4b52ff741273c88c' pnpm playtest:cyberpunk"
+  ],
+  "startedAt": "2026-08-28T09:21:58.296Z",
+  "endedAt": "2026-08-28T09:22:02.381Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\n RUN  v4.1.11 /Users/mac/Desktop/item/4D\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  17:21:59\n   Duration  3.01s (transform 543ms, setup 0ms, import 662ms, tests 2.25s, environment 0ms)\n\n",
+  "stderr": "$ vitest run packages/test-fixtures/src/cyberpunk-long-playtest-runner.test.ts\n"
+}

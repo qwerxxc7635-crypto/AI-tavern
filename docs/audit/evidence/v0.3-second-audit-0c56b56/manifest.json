@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T09:28:57Z",
+  "audit": "V0.3 Second Full Audit",
+  "releaseVersion": "0.3.0",
+  "sourceCommit": "0c56b56f174e07ffcfe01a7d4b52ff741273c88c",
+  "originalProductHead": "bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+  "branch": "audit/v0.3-second-full-audit",
+  "host": { "platform": "darwin", "architecture": "arm64" },
+  "summary": { "pass": 15, "blockedExternal": 2, "notEvaluated": 2, "fail": 0 },
+  "findings": {
+    "P0": { "found": 0, "fixed": 0, "deferred": 0, "open": 0 },
+    "P1": { "found": 0, "fixed": 0, "deferred": 0, "open": 0 },
+    "P2": { "found": 1, "fixed": 1, "deferred": 0, "open": 0 },
+    "P3": { "found": 1, "fixed": 1, "deferred": 0, "open": 0 }
+  },
+  "gates": [
+    { "id": "frozen-install", "status": "PASS", "evidence": "frozen-install.json" },
+    { "id": "shared-quality-gate", "status": "PASS", "evidence": "shared-check.json" },
+    { "id": "desktop-production-build", "status": "PASS", "evidence": "desktop-build.json" },
+    { "id": "windows-production-vertical-slice", "status": "PASS", "evidence": "windows-e2e.json" },
+    { "id": "windows-installer-lifecycle", "status": "BLOCKED_EXTERNAL", "evidence": "windows-lifecycle-blocked.json" },
+    { "id": "macos-app-bundle-build", "status": "PASS", "evidence": "macos-app-build.json" },
+    { "id": "macos-app-identity-and-exact-root-hashes", "status": "PASS", "evidence": "macos-info-plist.json, macos-release-files.json" },
+    { "id": "macos-system-webkit-link", "status": "PASS", "evidence": "macos-webkit-link.txt" },
+    { "id": "macos-installed-lifecycle", "status": "BLOCKED_EXTERNAL", "evidence": "macos-lifecycle.json" },
+    { "id": "npm-dependency-vulnerabilities", "status": "PASS", "evidence": "pnpm-audit.json" },
+    { "id": "rustsec-vulnerabilities", "status": "PASS", "evidence": "cargo-audit.json" },
+    { "id": "secret-review", "status": "PASS", "evidence": "secret-review.json, secret-scan-tests.json" },
+    { "id": "performance-regression", "status": "PASS", "evidence": "performance/performance-regression.json" },
+    { "id": "three-world-long-playtests", "status": "PASS", "evidence": "fantasy-run.json, investigation-run.json, cyberpunk-run.json" },
+    { "id": "free-input-stress", "status": "PASS", "evidence": "free-input-run.json" },
+    { "id": "database-integrity", "status": "PASS", "evidence": "database-integrity.json" },
+    { "id": "browser-ui-ux-a11y", "status": "PASS", "evidence": "browser-audit.json, browser/*.png" },
+    { "id": "real-provider-token-budget", "status": "NOT_EVALUATED", "evidence": "performance/performance-regression.json" },
+    { "id": "real-provider-cache-hit-ratio", "status": "NOT_EVALUATED", "evidence": "performance/performance-regression.json" }
+  ],
+  "playability": { "providerMode": "FAKE", "threeWorldBehaviorCount": 96, "freeInputBehaviorCount": 8, "totalBehaviorCount": 104, "databaseCount": 6 },
+  "artifactIntegrity": { "macosBundleFileCount": 3, "exactBundleRoot": "target/release/bundle/macos/Ember Tavern.app", "evidenceChecksums": "SHA256SUMS", "signatureStatus": "NOT_RUN_NOT_AUTHORIZED", "publicationStatus": "NOT_RUN_NOT_AUTHORIZED" },
+  "acceptedWarnings": { "rustsecVulnerabilities": 0, "rustsecUnmaintained": 16, "rustsecUnsound": 1, "scope": "Linux-only GTK3/glib dependency graph; V0.3 does not ship Linux", "decision": "DEFERRED_ACCEPTED_FROM_FIRST_AUDIT" },
+  "providerBoundary": { "playabilityProvider": "FAKE", "realProvider": "NOT_EVALUATED", "credentialRead": false, "networkModelCalled": false }
+}

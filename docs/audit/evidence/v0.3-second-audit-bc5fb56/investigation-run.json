@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "env",
+    "EMBER_INVESTIGATION_PLAYTEST_RUN_DIRECTORY=/Users/mac/Desktop/item/4D/docs/audit/evidence/v0.3-second-audit-bc5fb56/playability/investigation",
+    "EMBER_INVESTIGATION_PLAYTEST_SOURCE_COMMIT=bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+    "pnpm",
+    "playtest:investigation"
+  ],
+  "startedAt": "2026-08-28T02:55:23.779Z",
+  "endedAt": "2026-08-28T02:55:27.908Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\n RUN  v4.1.11 /Users/mac/Desktop/item/4D\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  10:55:24\n   Duration  3.10s (transform 565ms, setup 0ms, import 688ms, tests 2.31s, environment 0ms)\n\n",
+  "stderr": "$ vitest run packages/test-fixtures/src/investigation-long-playtest-runner.test.ts\n"
+}

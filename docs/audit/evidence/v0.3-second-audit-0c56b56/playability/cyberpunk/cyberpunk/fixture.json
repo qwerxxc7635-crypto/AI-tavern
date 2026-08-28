@@ -1,0 +1,239 @@
+{
+  "schemaVersion": 1,
+  "dataOrigin": "SYNTHETIC_M11",
+  "key": "cyberpunk",
+  "campaignId": "playtest-m11-cyberpunk",
+  "displayName": "霓虹堤岸的断网夜",
+  "constitution": {
+    "worldType": "社区视角的近未来赛博都市",
+    "era": "二〇八九年海堤巨城的企业自治年代",
+    "technology": "神经接口、自治无人机、局域网格与模块化义体",
+    "magic": "不存在超自然魔法；异常必须有技术、社会或认知来源",
+    "peoples": [
+      "自然人",
+      "义体适配者",
+      "离线社区居民"
+    ],
+    "society": "企业辖区、互助街区和平台劳工依赖不稳定基础设施",
+    "politics": "栖桥公司、市政残余与社区节点争夺网络控制权",
+    "economy": "信用点、配额、声望交换和维修债务共同流通",
+    "combatScale": "个人和小队行动；热度、弹药、负荷与医疗成本持续累积",
+    "deathRules": "死亡永久；人格备份不能等同本人复活",
+    "careerRules": "职业由接入权限、平台评级、街区关系和技能认证决定",
+    "equipmentRules": "义体占用插槽并累积负荷；装备价格和功率受本地规则约束",
+    "npcRules": "NPC 拥有分层访问权限、派系利益和可追踪的信息来源",
+    "traitRules": "技术优势必须绑定热度、负荷、维护或关系代价",
+    "taboos": [
+      "无成本全能黑客",
+      "无限义体插槽",
+      "数字人格无代价复活"
+    ]
+  },
+  "careers": [
+    {
+      "id": "mesh-courier",
+      "name": "网格快递员",
+      "role": "在断续网络间运送实体密钥",
+      "skills": [
+        "路线规划",
+        "反追踪"
+      ],
+      "equipmentTags": [
+        "运输",
+        "隔离"
+      ],
+      "socialPosition": "依赖街区信誉的独立承包者"
+    },
+    {
+      "id": "clinic-patch-tech",
+      "name": "街诊修补师",
+      "role": "维护低配义体与离线医疗设备",
+      "skills": [
+        "义体维修",
+        "创伤处置"
+      ],
+      "equipmentTags": [
+        "医疗",
+        "工具"
+      ],
+      "socialPosition": "受社区保护也背负物资债"
+    },
+    {
+      "id": "civic-spectrum-auditor",
+      "name": "市频审计员",
+      "role": "追查无线频谱和企业授权滥用",
+      "skills": [
+        "信号分析",
+        "合规取证"
+      ],
+      "equipmentTags": [
+        "扫描",
+        "凭证"
+      ],
+      "socialPosition": "持有过期但仍有影响力的市政身份"
+    }
+  ],
+  "equipment": [
+    {
+      "id": "cryogenic-signal-sleeve",
+      "name": "低温信号隔离套",
+      "category": "ARMOR",
+      "description": "包裹实体密钥并抑制短程追踪的冷却套。",
+      "ruleHook": "占用一个携行槽并降低一次追踪暴露"
+    },
+    {
+      "id": "folding-arc-wrench",
+      "name": "折叠电弧扳手",
+      "category": "TOOL",
+      "description": "可维修电力节点的低功率绝缘工具。",
+      "ruleHook": "只影响电力与义体维修检定"
+    },
+    {
+      "id": "scrubbed-access-shard",
+      "name": "净化访问片",
+      "category": "CLUE",
+      "description": "保留部分权限签名的离线存储片。",
+      "ruleHook": "可证明访问来源但会增加追踪热度"
+    }
+  ],
+  "traits": [
+    {
+      "id": "trait-playtest-hot-swap-instinct",
+      "name": "热插拔直觉",
+      "description": "能快速切换接口协议，但会积累短时神经回响。",
+      "pointProfile": {
+        "type": "MIXED",
+        "positiveEffect": "热插拔直觉的明确优势",
+        "negativeEffect": "热插拔直觉的明确代价",
+        "buffPoints": -3,
+        "debuffPoints": 3
+      }
+    },
+    {
+      "id": "trait-playtest-neighborhood-debts",
+      "name": "街区欠账",
+      "description": "许多人愿意提供小帮助，也会要求兑现旧人情。",
+      "pointProfile": {
+        "type": "NARRATIVE",
+        "positiveEffect": null,
+        "negativeEffect": null,
+        "buffPoints": 0,
+        "debuffPoints": 0
+      }
+    }
+  ],
+  "npcs": [
+    {
+      "id": "lan",
+      "name": "岚",
+      "identity": "余温中继站修补师",
+      "personality": "务实、对企业承诺怀疑",
+      "goal": "让街区在断网后保持自治",
+      "hiddenMotive": "她留有一份备用网后门映射",
+      "knowledgeBoundary": "不知道密钥原主仍然在线"
+    },
+    {
+      "id": "sato",
+      "name": "佐藤",
+      "identity": "七码头街医",
+      "personality": "温和但严格计算风险",
+      "goal": "维持诊所的冷却配额",
+      "hiddenMotive": "他替一名公司逃员更换过身份芯片",
+      "knowledgeBoundary": "不知道中继站后门位置"
+    },
+    {
+      "id": "kite",
+      "name": "鸢",
+      "identity": "平台外卖骑手与消息掮客",
+      "personality": "健谈、会保护长期客户",
+      "goal": "提高街区声望以脱离平台债务",
+      "hiddenMotive": "他向两个派系出售过同一条路线",
+      "knowledgeBoundary": "不知道访问片真实权限"
+    }
+  ],
+  "quests": [
+    {
+      "id": "deliver-offline-key",
+      "title": "送达离线密钥",
+      "objective": "在不泄露持有者的前提下完成密钥交接",
+      "failureCost": "公司回收队将锁死社区备用网",
+      "risk": "HIGH",
+      "publisherNpcId": "lan"
+    },
+    {
+      "id": "last-node-heartbeat",
+      "title": "失联节点的最后心跳",
+      "objective": "确认节点失联是故障、封锁还是背叛",
+      "failureCost": "街区间互信和配额分配恶化",
+      "risk": "EXTREME",
+      "publisherNpcId": "sato"
+    },
+    {
+      "id": "ghost-route-ledger",
+      "title": "幽灵路线账本",
+      "objective": "找出平台重复收费与路线篡改证据",
+      "failureCost": "骑手债务继续自动增长",
+      "risk": "MODERATE",
+      "publisherNpcId": "kite"
+    }
+  ],
+  "extension": {
+    "namespace": "cyberpunk-augmentation",
+    "displayName": "义体与街区状态",
+    "fields": [
+      {
+        "key": "neuralLoad",
+        "label": "神经负荷",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 12
+      },
+      {
+        "key": "streetReputation",
+        "label": "街区声望",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": -100,
+        "maximum": 100
+      },
+      {
+        "key": "traceHeat",
+        "label": "追踪热度",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 10
+      },
+      {
+        "key": "implantSlots",
+        "label": "义体插槽",
+        "required": true,
+        "type": "TEXT_LIST",
+        "maxItems": 6,
+        "itemMaxLength": 48
+      },
+      {
+        "key": "networkAccess",
+        "label": "网络权限",
+        "required": true,
+        "type": "ENUM",
+        "options": [
+          "离线",
+          "社区",
+          "市政",
+          "企业"
+        ]
+      }
+    ],
+    "initialValues": {
+      "neuralLoad": 2,
+      "streetReputation": 8,
+      "traceHeat": 0,
+      "implantSlots": [
+        "神经桥"
+      ],
+      "networkAccess": "社区"
+    }
+  }
+}

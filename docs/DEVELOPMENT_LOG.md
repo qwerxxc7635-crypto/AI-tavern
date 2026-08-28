@@ -4947,3 +4947,23 @@
 
 - V0.3起始基线为`0af183391a5d83406874db326ed02b175ba24e6e`，第一项提交为`01030e1`，最终审计产品源码为`a77eb03`，M12-T03证据提交为`d5c5fe0`。截至M12-T03共新增67 commits（46 feat / 9 test / 4 fix / 8 docs），无merge commit；最终M12-T04文档commit在交接中作为ending HEAD报告。
 - 用户已有`.gitignore`修改始终保持未暂存，因此工作树会如实报告为not clean；所有agent-owned M12-T04修改独立提交。不push、不merge、不签名、不发布，也不自动开始第二轮审计。
+
+## 2026-08-28 — V0.3 第二轮独立完整审计完成
+
+### 独立复核与 Findings
+
+- 从最终产品HEAD `bc5fb56`建立`audit/v0.3-second-full-audit`，不采信第一轮DONE/PASS标签，重新检查Git范围、Architecture、Security/Credential、Provider/AI、Rules/D20、SQLite/Save/Migration、Performance、UI/UX/A11y、Regression和Playability。用户`.gitignore`修改全程保持未暂存。
+- 在修复前提交`f763f08`冻结2项发现：`V03-SA-001`（P2）为macOS CI哈希父目录会吸收陈旧同级`.app`；`V03-SA-002`（P3）为缺失稳定的`docs/ARCHITECTURE.md`入口。P0/P1均为0。
+- 修复提交`0c56b56`把macOS evidence root锁定到唯一候选`.app`并增加6/6 workflow回归；新增只描述当前已实现边界的架构索引。第二轮P2 1/1 FIXED、P3 1/1 FIXED，开放P0/P1/P2/P3均为0。
+
+### 新 Evidence 与完整门禁
+
+- 修复后`pnpm check`通过：Vitest 189 files / 1054 tests，另2 files / 6 tests按显式环境合同skip；Node 30/30；Rust 150/150，另1项真实DeepSeek测试按授权边界ignored；Prettier、release sync、zh-CN、ESLint、TypeScript、rustfmt、strict Clippy和archive interop全绿。
+- Frozen install、Windows生产纵向E2E 1/1、desktop build 281 modules、macOS `.app` build/Info.plist/system WebKit/精确3文件hash、npm 0 advisories、RustSec 0 vulnerabilities和秘密扫描均通过。Linux-only 16 unmaintained + 1 unsound informational warning继续按第一轮裁决`DEFERRED_ACCEPTED`。
+- 重新生成Fantasy/Investigation/Cyberpunk各32项与自由输入8项，共104项Fake生产harness行为；六份隔离SQLite均`integrity_check=ok`、外键违规0、未完成请求0。确定性性能门SQLite 541.582 bytes/turn、Context 377→383、增长1.016、Queue P95 2ms，真实token/cache仍`NOT_EVALUATED`。
+- Chromium覆盖13个路由和860×600、1366×768、1920×1080矩阵；16张截图逐张查看，横向溢出0、console error 0、首个Tab正确聚焦skip link。浏览器无Tauri bridge时的原生错误态按设计降级，不冒充原生生命周期。
+
+### Final Verdict 与边界
+
+- 新增[`V0.3_SECOND_AUDIT_REPORT.md`](V0.3_SECOND_AUDIT_REPORT.md)、第二轮findings/fixes账本、修复前与修复后独立evidence、manifest和逐文件SHA-256。
+- 最终判断为`SECOND AUDIT PASS — READY FOR RELEASE CANDIDATE VALIDATION`，同时明确`NOT READY FOR PUBLIC RELEASE`。Windows NSIS/Credential Manager/WebView2/install-launch-uninstall和macOS临时环境Keychain/launch/database/cleanup仍为`BLOCKED_EXTERNAL`；真实Provider、token、网络latency和计费cache仍为`NOT_EVALUATED`；未签名、notarize、发布、push或merge。
