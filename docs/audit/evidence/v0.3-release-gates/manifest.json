@@ -1,0 +1,121 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T02:16:04Z",
+  "task": "M12-T03",
+  "releaseVersion": "0.3.0",
+  "releaseChannel": "development",
+  "releaseStatus": "unreleased",
+  "sourceCommit": "a77eb03530ab2f90e635a18b513994b1b4dca1af",
+  "sourceCommitShort": "a77eb03",
+  "host": {
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "summary": {
+    "pass": 12,
+    "blockedExternal": 2,
+    "notEvaluated": 2,
+    "fail": 0
+  },
+  "gates": [
+    {
+      "id": "frozen-install",
+      "status": "PASS",
+      "evidence": "frozen-install.json"
+    },
+    {
+      "id": "shared-quality-gate",
+      "status": "PASS",
+      "evidence": "shared-check.json"
+    },
+    {
+      "id": "desktop-production-build",
+      "status": "PASS",
+      "evidence": "desktop-build.json"
+    },
+    {
+      "id": "windows-production-vertical-slice",
+      "status": "PASS",
+      "evidence": "windows-e2e.json"
+    },
+    {
+      "id": "windows-installer-lifecycle",
+      "status": "BLOCKED_EXTERNAL",
+      "evidence": "windows-release-blocked.json"
+    },
+    {
+      "id": "macos-app-bundle-build",
+      "status": "PASS",
+      "evidence": "macos-app-build.json"
+    },
+    {
+      "id": "macos-app-identity-and-hashes",
+      "status": "PASS",
+      "evidence": "macos-info-plist.json, macos-release-files.json"
+    },
+    {
+      "id": "macos-system-webkit-link",
+      "status": "PASS",
+      "evidence": "macos-webkit-link.json"
+    },
+    {
+      "id": "macos-installed-lifecycle",
+      "status": "BLOCKED_EXTERNAL",
+      "evidence": "macos-lifecycle-blocked.json"
+    },
+    {
+      "id": "npm-dependency-vulnerabilities",
+      "status": "PASS",
+      "evidence": "pnpm-audit.json"
+    },
+    {
+      "id": "rustsec-vulnerabilities",
+      "status": "PASS",
+      "evidence": "cargo-audit.json"
+    },
+    {
+      "id": "secret-review",
+      "status": "PASS",
+      "evidence": "secret-review.json, secret-scan-tests.json"
+    },
+    {
+      "id": "performance-regression",
+      "status": "PASS",
+      "evidence": "performance-command.json, performance/performance-regression.json"
+    },
+    {
+      "id": "playability-report-recalculation",
+      "status": "PASS",
+      "evidence": "playability-report.json"
+    },
+    {
+      "id": "real-provider-token-budget",
+      "status": "NOT_EVALUATED",
+      "evidence": "performance/performance-regression.json"
+    },
+    {
+      "id": "real-provider-cache-hit-ratio",
+      "status": "NOT_EVALUATED",
+      "evidence": "performance/performance-regression.json"
+    }
+  ],
+  "artifactIntegrity": {
+    "macosBundleFileCount": 3,
+    "macosBundleEvidence": "macos-release-files.json",
+    "evidenceChecksums": "SHA256SUMS",
+    "signatureStatus": "NOT_RUN_NOT_AUTHORIZED",
+    "publicationStatus": "NOT_RUN_NOT_AUTHORIZED"
+  },
+  "acceptedWarnings": {
+    "rustsecUnmaintained": 16,
+    "rustsecUnsound": 1,
+    "scope": "Linux-only GTK3/glib dependency graph; V0.3 does not ship Linux",
+    "decision": "DEFERRED_ACCEPTED"
+  },
+  "providerBoundary": {
+    "playabilityProvider": "FAKE",
+    "realProvider": "NOT_EVALUATED",
+    "credentialRead": false,
+    "networkModelCalled": false
+  }
+}

@@ -635,12 +635,13 @@
 
 ## M12-T03 Release Gates
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-28）
 - **Dependency**：M12-T02。
 - **Deliverable**：Formatter、lint、typecheck、TS/Node/Rust、rustfmt/clippy、interop、desktop/release build、平台适用门禁和结构化证据。
 - **Acceptance**：所有适用门禁通过；平台不可用项明确 BLOCKED；产物来源 commit 与哈希可追溯。
 - **Tests**：门禁本身的自测、产物哈希、秘密扫描。
 - **Do Not**：不复用旧版本证据冒充 V0.3；不签名/发布/push，除非用户授权。
+- **Implementation reference**：[`audit/V0_3_RELEASE_GATES.md`](audit/V0_3_RELEASE_GATES.md) 与 [`audit/evidence/v0.3-release-gates/manifest.json`](audit/evidence/v0.3-release-gates/manifest.json)。
 
 ## M12-T04 Reports & Final Verdict
 

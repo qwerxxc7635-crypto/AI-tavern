@@ -4906,3 +4906,24 @@
 - 完整`pnpm check`通过：Vitest 189 files / 1054 tests，另2 files / 6 tests按设计skip；Node 30/30；Rust 150/150，另1项真实DeepSeek测试按授权边界ignored；Prettier、release 0.3.0同步、zh-CN、ESLint、TypeScript、rustfmt、严格Clippy和archive interop均通过。
 - `pnpm test:windows-e2e` 1/1、`pnpm build:desktop` 281 modules、性能门和`playtest:report`均通过。性能门绑定实现提交`d1b5a30`；Fake数据为SQLite 541.582 bytes/turn、Context 377→383 tokens、增长1.016、Queue P95 2ms；真实token/cache保持NOT_EVALUATED。
 - M12-T02结束时开放P0/P1/P2/P3均为0，另有1项仅Linux条件依赖的显式延期风险。未读取真实Credential、未调用计费Provider，不push、不merge、不签名、不发布。下一项严格为M12-T03 Release Gates。
+
+## 2026-08-28 — M12-T03 完成 Release Gates
+
+### 门禁实现与来源绑定
+
+- 在分支`task/M11-T05-free-input-stress`上严格执行M12-T03；未回滚或重做M0～M12-T02，也未提前进入M12-T04。用户已有`.gitignore`修改保持未暂存。
+- 首先修复发布门禁仍硬编码0.2.0的问题：Windows与macOS生命周期脚本改为读取并校验`release-info.json`的0.3.0，测试锁定不得重新引入旧版本字面量；实现提交为`a77eb03`。全部构建、测试、性能与发布元数据证据绑定完整来源提交`a77eb03530ab2f90e635a18b513994b1b4dca1af`。
+- 新增[`audit/V0_3_RELEASE_GATES.md`](audit/V0_3_RELEASE_GATES.md)和结构化manifest。证据目录包含20个受`SHA256SUMS`覆盖的文件；逐项SHA-256复验全部通过。没有签名、notarize、发布、push或merge。
+
+### 适用平台结果与外部阻塞
+
+- Frozen install与完整`pnpm check`通过：Vitest 189 files / 1054 tests通过，另2 files / 6 tests按显式环境合同skip；Node 30/30；Rust 150/150，另1项需显式Credential授权的真实DeepSeek测试ignored；Prettier、0.3.0 release sync、zh-CN、ESLint、TypeScript、rustfmt、严格Clippy和archive interop全绿。
+- Desktop production build与显式Windows生产纵向切片通过：Vite 7.3.6转换281 modules，Windows E2E 1/1。当前macOS不能构建和执行Windows NSIS、Credential Manager、WebView2、安装/启动/卸载生命周期，因此该项明确为`BLOCKED_EXTERNAL`，没有复用V0.2证据冒充V0.3。
+- 当前主机构建`Ember Tavern.app`成功；Info.plist的产品名、identifier、可执行文件与版本0.3.0通过检查，三个bundle文件记录SHA-256，二进制确认链接系统WebKit。Keychain、真实启动、数据库创建与清理门只允许临时macOS CI；本机运行被脚本在触碰用户路径前拒绝，`cleanup.authorized=false`，故生命周期明确为`BLOCKED_EXTERNAL`而非VERIFIED。
+
+### 安全、性能与真实性边界
+
+- `pnpm audit`为0 advisories；RustSec为0 vulnerability，并继续诚实披露16个unmaintained与1个仅Linux GTK3/glib图可达的unsound warning，维持M12-T02的`DEFERRED_ACCEPTED`裁决。
+- 对当前tracked tree及全部reachable Git revisions执行秘密模式扫描，只保存文件名和计数、不回显疑似值；10个唯一命中文件全部为测试文件或Rust`cfg(test)`模块内的故意假夹具，未解释命中为0。保存/导出秘密扫描2 files / 17 tests通过。未读取OS Credential Store或用户未跟踪文件。
+- 性能门通过：SQLite增长541.582 bytes/turn、Unified Context 377→383 tokens、增长1.016、GenerationQueue压力P95 3ms。证据明确为Fake Provider；真实Provider token预算和计费cache hit仍为`NOT_EVALUATED`，未读取Credential、未调用网络模型。
+- M12-T03所有当前主机适用门禁均通过，Windows生命周期与macOS生命周期两个外部环境项显式阻塞，真实Provider两项保持未评价。下一项严格为M12-T04 Reports & Final Verdict。
