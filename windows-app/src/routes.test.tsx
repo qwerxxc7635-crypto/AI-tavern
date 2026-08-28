@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -70,6 +70,48 @@ describe('Windows application shell', () => {
 
     fireEvent.click(screen.getByRole('link', { name: '任务' }));
     expect(screen.getByText('/quests?campaignId=campaign-deep-link')).toBeTruthy();
+  });
+
+  it('routes campaign-only navigation through save selection in a local session', async () => {
+    render(
+      <MemoryRouter initialEntries={['/my']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="my" element={<main>我的页面</main>} />
+            <Route path="saves" element={<main>存档页面</main>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const navigation = screen.getByRole('navigation', { name: '主导航' });
+    expect(within(navigation).getByRole('link', { name: '我的' }).getAttribute('href')).toBe('/my');
+    expect(within(navigation).getByRole('link', { name: '酒馆' }).getAttribute('href')).toBe(
+      '/saves',
+    );
+
+    fireEvent.click(within(navigation).getByRole('link', { name: '酒馆' }));
+    expect(await screen.findByText('存档页面')).toBeTruthy();
+  });
+
+  it('keeps the settings breadcrumb pointed at My without campaign context', async () => {
+    render(
+      <MemoryRouter initialEntries={['/settings']}>
+        <Routes>
+          <Route element={<AppShell />}>
+            <Route path="settings" element={<main>设置页面</main>} />
+            <Route path="my" element={<main>我的页面</main>} />
+          </Route>
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    const breadcrumbs = screen.getByRole('navigation', { name: '当前位置' });
+    const myLink = within(breadcrumbs).getByRole('link', { name: '我的' });
+    expect(myLink.getAttribute('href')).toBe('/my');
+
+    fireEvent.click(myLink);
+    expect(await screen.findByText('我的页面')).toBeTruthy();
   });
 
   it.each([

@@ -49,7 +49,7 @@ describe('My page information architecture', () => {
         <MyPage
           versionGateway={{
             async getVersion() {
-              return '0.2.0';
+              return '0.3.0';
             },
           }}
           randomnessGateway={randomnessGateway()}
@@ -68,7 +68,7 @@ describe('My page information architecture', () => {
     expect(screen.getByRole('link', { name: '打开模型设置' }).getAttribute('href')).toBe(
       '/settings',
     );
-    expect(await screen.findByText('当前版本：0.2.0')).toBeTruthy();
+    expect(await screen.findByText('当前版本：0.3.0')).toBeTruthy();
     expect(screen.getByText('发布状态：开发频道 / 未发布')).toBeTruthy();
     expect(
       screen.getByRole('list', { name: '当前版本更新记录' }).querySelectorAll('li'),
@@ -85,7 +85,7 @@ describe('My page information architecture', () => {
         <MyPage
           versionGateway={{
             async getVersion() {
-              return '0.2.0';
+              return '0.3.0';
             },
           }}
           randomnessGateway={randomnessGateway()}
@@ -125,7 +125,7 @@ describe('My page information architecture', () => {
         <MyPage
           versionGateway={{
             async getVersion() {
-              return '0.2.0';
+              return '0.3.0';
             },
           }}
           randomnessGateway={randomnessGateway()}
@@ -176,7 +176,7 @@ describe('My page information architecture', () => {
         <MyPage
           versionGateway={{
             async getVersion() {
-              return '0.2.0';
+              return '0.3.0';
             },
           }}
           randomnessGateway={randomnessGateway()}

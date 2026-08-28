@@ -4,11 +4,11 @@ Ember Tavern（炉火酒馆）是一款面向 Windows 和 macOS 的单人 AI 文
 
 ## 当前状态
 
-当前发布基线为 v0.2.0；V0.3（Ember Rebuild）已进入设计冻结与参考审计阶段。V0.3 将在保留现有 Tauri、共享领域层、统一 AI 编排、SQLite 事实库、安全凭据、恢复与发布门禁的基础上，逐步加入动态世界实体、多任务图、Rules Engine 扩展、Character Creation 2.0、统一 Context/Memory、全新 UI/UX 和长流程可玩性验证。正式范围见 [`docs/V0.3_SPEC.md`](docs/V0.3_SPEC.md)，严格任务顺序见 [`docs/TASKS.md`](docs/TASKS.md)。
+当前开发候选为 v0.3.0（Ember Rebuild）。M0～M11 的架构、动态世界、Rules Engine、Character Creation 2.0、统一 Context/Memory、视觉体系和长流程可玩性工作已经完成；M12 第一轮完整审计已冻结 findings，正在逐项修复并准备重新生成平台发布证据。正式范围见 [`docs/V0.3_SPEC.md`](docs/V0.3_SPEC.md)，严格任务顺序见 [`docs/TASKS.md`](docs/TASKS.md)，当前审计账本见 [`docs/audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md`](docs/audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md)。
 
-v0.2.0 采用桌面端优先策略。Tauri 2 客户端已具备世界与角色创建、酒馆、NPC 对话、任务、8～12 回合冒险、本地 D20、原子结算、档案、存档迁移和“我的”设备设置；Windows NSIS 与 macOS app 都有 CI 构建及生命周期门禁。iOS 仍不在当前开发范围内。
+v0.3.0 继续采用 Windows 纵向切片优先、macOS 共享门禁的桌面策略。Tauri 2 客户端具备世界与通用角色创建、动态酒馆/NPC/Quest、8～12 回合冒险、本地 D20、规则事务、原子结算、档案、V0.2→V0.3 存档迁移和“我的”设备设置。Windows NSIS 与 macOS app 的最终 V0.3 生命周期证据仍必须在 M12 发布门重新生成；iOS 仍不在当前开发范围内。
 
-第一轮审查整改后，模型设置中的默认/备用 Provider、模型、端点和系统安全凭据已经进入统一桌面 AI 编排路径；世界、车卡、酒馆、NPC、任务、冒险和结算共用同一套模型选择、Prompt、结构校验、错误和缓存机制。DeepSeek 真实 API、缓存命中、保存/重开和针对性可玩性验证已经完成，当前状态为 `READY FOR SECOND AUDIT`。详见 [`docs/V0.2_FIRST_AUDIT_REPORT.md`](docs/V0.2_FIRST_AUDIT_REPORT.md) 与 [`docs/V0.2_PLAYABILITY_REPORT.md`](docs/V0.2_PLAYABILITY_REPORT.md)。
+模型设置中的默认/备用 Provider、模型、端点和系统安全凭据已经进入统一桌面 AI 编排路径；世界、车卡、酒馆、NPC、任务、冒险和结算共用同一套模型选择、Prompt、结构校验、错误和缓存机制。当前 V0.3 可玩性与性能证据使用 Fake Provider，真实模型文风、网络延迟、token 成本和计费缓存保持 `NOT_EVALUATED`，不得沿用 V0.2 的真实 DeepSeek 结果冒充 V0.3 结论。
 
 历史 v0.1 产品规格见 [`docs/spec.md`](docs/spec.md)，v0.2 历史任务见 [`docs/TASKS_V0.2.md`](docs/TASKS_V0.2.md)。
 

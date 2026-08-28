@@ -133,7 +133,7 @@ export async function syncReleaseVersion() {
     'windows-app/src/generated-release-info.ts',
     renderGeneratedReleaseInfo(releaseInfo),
   );
-  execFileSync('cargo', ['metadata', '--no-deps', '--format-version', '1'], {
+  execFileSync('cargo', ['metadata', '--format-version', '1'], {
     cwd: root,
     stdio: 'ignore',
   });

@@ -61,6 +61,13 @@ export const WINDOWS_NAVIGATION = [
   { path: APP_PATHS.my, label: playerText.navigation.my, marker: 'M' },
 ] as const;
 
+function navigationDestination(path: string, campaignId: string | null): string {
+  if (path === APP_PATHS.my) {
+    return campaignId === null ? APP_PATHS.my : campaignRoute(APP_PATHS.my, campaignId);
+  }
+  return campaignId === null ? APP_PATHS.saves : campaignRoute(path, campaignId);
+}
+
 export function AppRoutes() {
   return (
     <Routes>
@@ -139,7 +146,7 @@ export function AppShell() {
         </div>
         <nav className="navigation" aria-label={playerText.navigation.ariaLabel}>
           {WINDOWS_NAVIGATION.map(({ path, label, marker }) => (
-            <NavLink key={path} to={campaignId === null ? path : campaignRoute(path, campaignId)}>
+            <NavLink key={path} to={navigationDestination(path, campaignId)}>
               <span className="navigation__marker" aria-hidden="true">
                 {marker}
               </span>
@@ -269,7 +276,7 @@ function breadcrumbsFor(pathname: string, campaignId: string | null): readonly B
   }
   if (pathname === APP_PATHS.settings) {
     return [
-      { label: playerText.navigation.my, path: withCampaign(APP_PATHS.my) },
+      { label: playerText.navigation.my, path: navigationDestination(APP_PATHS.my, campaignId) },
       { label: playerText.navigation.modelSettings },
     ];
   }

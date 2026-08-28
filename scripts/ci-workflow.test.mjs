@@ -41,12 +41,25 @@ test('builds, hashes and uploads Windows NSIS and macOS app evidence', () => {
     'tauri build --bundles app',
     'run-with-evidence.mjs',
     'collect-release-evidence.mjs',
-    'actions/upload-artifact@v4',
+    'actions/upload-artifact@',
     'windows-release-files.json',
     'macos-release-files.json',
   ]) {
     assert.ok(workflow.includes(required), `CI is missing: ${required}`);
   }
+});
+
+test('pins every CI action and does not persist checkout credentials', () => {
+  const actionReferences = [...workflow.matchAll(/^\s*uses:\s*([^\s#]+)/gmu)].map(
+    ([, reference]) => reference,
+  );
+  assert.equal(actionReferences.length, 14);
+  for (const reference of actionReferences) {
+    assert.match(reference, /@[0-9a-f]{40}$/u, `CI action is not commit-pinned: ${reference}`);
+  }
+
+  assert.equal((workflow.match(/persist-credentials:\s*false/gu) ?? []).length, 3);
+  assert.equal((workflow.match(/toolchain:\s*stable/gu) ?? []).length, 3);
 });
 
 test('requires an ephemeral Windows install lifecycle gate with system integrations', () => {
