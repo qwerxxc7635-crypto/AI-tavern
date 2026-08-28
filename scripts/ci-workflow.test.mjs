@@ -85,6 +85,8 @@ test('requires an ephemeral Windows install lifecycle gate with system integrati
     '$webViewInstallations = @(Get-WebView2Installations)',
     '$registrations = @(Get-ProductRegistrations)',
     '@(Get-ProductRegistrations).Count -eq 0',
+    'Get-Content -LiteralPath $releaseInfoPath',
+    '[regex]::Escape($expectedVersion)',
     "Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue |",
     'ForEach-Object { $_.Id }',
   ]) {
@@ -113,6 +115,7 @@ test('requires an ephemeral macOS app lifecycle gate with system integrations', 
     'databaseObserved: true',
     'Refusing to touch pre-existing application path',
     'if (cleanupAuthorized)',
+    "new URL('../release-info.json', import.meta.url)",
   ]) {
     assert.ok(macosReleaseGate.includes(required), `macOS release gate is missing: ${required}`);
   }

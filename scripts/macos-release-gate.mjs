@@ -24,7 +24,15 @@ const appBundle = resolve(process.argv[appFlag + 1]);
 const evidenceOutput = resolve(process.argv[outputFlag + 1]);
 const identifier = 'com.embertavern.windows';
 const productName = 'Ember Tavern';
-const expectedVersion = '0.2.0';
+const expectedVersion = JSON.parse(
+  readFileSync(new URL('../release-info.json', import.meta.url), 'utf8'),
+).version;
+if (
+  typeof expectedVersion !== 'string' ||
+  !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/u.test(expectedVersion)
+) {
+  throw new Error('release-info.json does not contain a valid release version.');
+}
 const startedAt = new Date().toISOString();
 const userHome = homedir();
 const platformPaths = {
