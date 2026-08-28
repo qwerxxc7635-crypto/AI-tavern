@@ -4889,3 +4889,20 @@
 
 - `pnpm check`完整通过：Prettier、release metadata同步、zh-CN、ESLint、TypeScript；Vitest 189 files / 1052 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过；Rust workspace 150 tests通过，另1项真实DeepSeek测试ignored；rustfmt、严格Clippy和archive interop通过。
 - `pnpm test:windows-e2e`、`pnpm build:desktop`（281 modules）、`pnpm performance:gate`和`pnpm playtest:report`均通过。M12-T01只冻结finding和证据，不修复、不进入M12-T03；下一项严格为M12-T02。
+
+## 2026-08-28 — M12-T02 完成 First Audit Findings 修复
+
+### 逐项处理
+
+- 从findings冻结提交`c5b7e74`开始，仅处理M12-T01登记的6项问题；实现提交`d1b5a30`。用户已有`.gitignore`修改保持未暂存，没有修改Rules/D20、Provider业务合同、Generator/Queue、SQLite schema、存档格式或Quest/NPC/Adventure状态机。
+- 修复无Campaign导航：设备级“我的”保持`/my`，酒馆/任务/冒险/角色/档案入口统一回存档选择；设置包屑不再以“我的”标签进入Saves。新增两个点击级回归，导航定向2 files / 23 tests通过。
+- Vite升级到7.3.6、plugin-react到5.2.0、Vitest到4.1.11，刷新传递图并用workspace override固定`brace-expansion` 5.0.9。npm官方registry audit从8条降为0；仍保持非交互`vitest run`。
+- 14个CI `uses:`全部固定到5个当前上游完整commit SHA并保留版本旁注；三处checkout设置`persist-credentials: false`，三处Rust setup显式`toolchain: stable`。新增workflow门锁定SHA数量/格式和安全配置，6/6通过。
+- 所有npm workspace、Cargo workspace/lock、Tauri、release-info、生成版本、CHANGELOG和README统一到未发布的0.3.0候选；release sync移除会漏刷Cargo.lock workspace版本的`--no-deps`，连续sync/check与frozen install通过。
+- RustSec依旧为0 vulnerability、16 unmaintained/1 unsound informational warning。三目标`cargo tree`证明glib/GTK3只在Linux图，macOS arm64与Windows x64均不可达；V0.3不发布Linux，故P3记为`DEFERRED_ACCEPTED`，任何未来Linux发布前必须重审，不把告警伪装成消失。
+
+### 门禁与边界
+
+- 完整`pnpm check`通过：Vitest 189 files / 1054 tests，另2 files / 6 tests按设计skip；Node 30/30；Rust 150/150，另1项真实DeepSeek测试按授权边界ignored；Prettier、release 0.3.0同步、zh-CN、ESLint、TypeScript、rustfmt、严格Clippy和archive interop均通过。
+- `pnpm test:windows-e2e` 1/1、`pnpm build:desktop` 281 modules、性能门和`playtest:report`均通过。性能门绑定实现提交`d1b5a30`；Fake数据为SQLite 541.582 bytes/turn、Context 377→383 tokens、增长1.016、Queue P95 2ms；真实token/cache保持NOT_EVALUATED。
+- M12-T02结束时开放P0/P1/P2/P3均为0，另有1项仅Linux条件依赖的显式延期风险。未读取真实Credential、未调用计费Provider，不push、不merge、不签名、不发布。下一项严格为M12-T03 Release Gates。

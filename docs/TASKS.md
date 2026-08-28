@@ -625,12 +625,13 @@
 
 ## M12-T02 Fix Audit Findings
 
-- **Status**：TODO
+- **Status**：DONE（2026-08-28）
 - **Dependency**：M12-T01。
 - **Deliverable**：逐项修复、回归、Decision/Log 更新和原子 commits。
 - **Acceptance**：P0/P1 全部关闭；P2/P3 明确关闭、延期理由和风险；无新回归。
 - **Tests**：每项定向回归 + 全量质量门 + 适用 build。
 - **Do Not**：不删测试/跳验证/吞错误使门禁通过；不将 BLOCKED 写成 VERIFIED。
+- **Implementation reference**：[`audit/V0_3_FIRST_FULL_AUDIT_FIXES.md`](audit/V0_3_FIRST_FULL_AUDIT_FIXES.md)。
 
 ## M12-T03 Release Gates
 

@@ -1,6 +1,6 @@
 # Ember Tavern V0.3 第一轮完整审计 Findings Ledger
 
-状态：M12-T01 COMPLETE（审计冻结，尚未执行 M12-T02 修复）
+状态：M12-T01 COMPLETE；M12-T02 处理状态已更新至 `d1b5a30`
 
 审计基线：`d41e99b35e7efb9d47f2a500b236ff3251d68b07`
 
@@ -14,82 +14,90 @@
 
 - 开放 P0：0
 - 开放 P1：0
-- 开放 P2：4
-- 开放 P3：2
+- 开放 P2：0
+- 开放 P3：0
+- 已修复：5
+- 延期并接受风险：1（仅 Linux 条件依赖，不进入 V0.3 Windows/macOS 发布图）
 - 外部限制 / `NOT_EVALUATED`：2
-- 第一轮结论：核心数据、规则、存档和安全边界没有发现阻断级回归，但依赖、CI 供应链、发布身份与本地会话导航仍需在 M12-T02 处理；当前不能进入最终发布结论。
+- M12-T02 结论：五项可执行 finding 已修复并通过回归；Linux 条件依赖项按当前平台范围延期。Windows 发布生命周期与真实 Provider 仍是外部未评价项，必须继续由 M12-T03/T04 如实处理。
 
 | ID | 类别 | 优先级 | 状态 | 摘要 |
 | --- | --- | --- | --- | --- |
-| M12-AUD-001 | UI/UX / Navigation | P2 | OPEN | 无 Campaign 的“我的/设置”导航会指向错误或无效目标 |
-| M12-AUD-002 | Security / Dependency | P2 | OPEN | Windows 前端直接锁定 Vite 7.2.4，开发服务器命中 5 条已修复公告 |
-| M12-AUD-003 | Code / Test Tooling | P3 | OPEN | Vitest 与传递开发工具依赖命中 3 条公告，但默认门禁不暴露 Vitest UI/API |
-| M12-AUD-004 | Security / CI Supply Chain | P2 | OPEN | 5 个唯一 GitHub Action 使用可移动 tag，发布 artifact 存在上游接管投毒路径 |
-| M12-AUD-005 | Release / Regression | P2 | OPEN | V0.3 实现仍由所有发布元数据标识为 0.2.0 |
-| M12-AUD-006 | Dependency Maintenance | P3 | OPEN | Rust 锁文件保留 Linux GTK3 旧依赖维护/unsound 警告 |
+| M12-AUD-001 | UI/UX / Navigation | P2 | FIXED | 无 Campaign 的“我的/设置”导航会指向错误或无效目标 |
+| M12-AUD-002 | Security / Dependency | P2 | FIXED | Windows 前端直接锁定 Vite 7.2.4，开发服务器命中 5 条已修复公告 |
+| M12-AUD-003 | Code / Test Tooling | P3 | FIXED | Vitest 与传递开发工具依赖命中 3 条公告，但默认门禁不暴露 Vitest UI/API |
+| M12-AUD-004 | Security / CI Supply Chain | P2 | FIXED | 5 个唯一 GitHub Action 使用可移动 tag，发布 artifact 存在上游接管投毒路径 |
+| M12-AUD-005 | Release / Regression | P2 | FIXED | V0.3 实现仍由所有发布元数据标识为 0.2.0 |
+| M12-AUD-006 | Dependency Maintenance | P3 | DEFERRED_ACCEPTED | Rust 锁文件保留 Linux GTK3 旧依赖维护/unsound 警告 |
 
 ## 2. Findings
 
 ### M12-AUD-001 — 无 Campaign 的本地会话导航目标错误
 
 - 优先级：P2
-- 状态：OPEN
+- 状态：FIXED（M12-T02）
 - 类别：UI/UX、Accessibility、Regression
 - 触发条件：直接打开 `#/settings` 或 `#/my`，当前 URL 不含 `campaignId`。
 - 证据：`windows-app/src/routes.tsx:255-273` 的 `withCampaign()` 在没有 Campaign 时统一退回 `/saves`，所以设置页面包屑中标为“我的”的链接实际进入存档首页。设备级 `/my` 页面侧栏仍暴露酒馆、任务、冒险、角色和档案直达项，点击后进入缺少存档信息的 route guard。
 - 浏览器复现：[`finding-nav-before.png`](evidence/v0.3-first-audit/browser/finding-nav-before.png) → [`finding-nav-after.png`](evidence/v0.3-first-audit/browser/finding-nav-after.png)；[`finding-local-nav-before.png`](evidence/v0.3-first-audit/browser/finding-local-nav-before.png) → [`finding-local-nav-after.png`](evidence/v0.3-first-audit/browser/finding-local-nav-after.png)。
 - 影响：不破坏数据，但标签与目的地不一致，并让设备级页面暴露不可完成的 Campaign 导航路径；键盘用户也会得到同一错误目的地。
 - 建议：设置页“我的”面包屑在无 Campaign 时固定指向 `/my`；设备级页面的 Campaign 导航应回到存档选择、禁用并解释，或使用经过验证的最近 Campaign。增加无 Campaign 的点击级路由回归。
+- M12-T02 处理：`navigationDestination()` 让设备级“我的”保持 `/my`，Campaign 专属侧栏项在无上下文时统一进入 `/saves`；新增两个真实点击回归，定向 23/23 通过。
 
 ### M12-AUD-002 — Vite 7.2.4 开发服务器公告未修复
 
 - 优先级：P2
-- 状态：OPEN
+- 状态：FIXED（M12-T02）
 - 类别：Security、Dependency、Developer Environment
 - 证据：`windows-app/package.json:29-31` 声明 Vite `^7.2.4`，锁文件解析为 7.2.4。`pnpm audit --registry=https://registry.npmjs.org` 命中 GHSA-4w7w-66w2-5vf9、GHSA-v2wj-q39q-566r、GHSA-p9ff-h696-f583、GHSA-v6wh-96g9-6wx3、GHSA-fx2h-pf6j-xcff；最高修复下限为 7.3.5。
 - 暴露边界：Vite 是 devDependency，生产 Tauri 使用预构建 `dist`；本仓库开发 URL 绑定 `127.0.0.1:1420`，所以不是生产 WebView 漏洞。风险集中在 Windows/macOS 开发机上运行受攻击页面或恶意请求时的文件读取、deny 绕过和 Windows UNC/NTLM 行为。
 - 影响：开发机本地文件和 Windows 凭据材料可能在特定开发服务器攻击条件下暴露；不直接改变游戏存档。
 - 建议：升级直接 Vite 及 plugin-react 解析图到 Vite `>=7.3.5`，冻结锁文件并复跑前端、浏览器和桌面构建门禁。
+- M12-T02 处理：直接 Vite 升至 7.3.6、plugin-react 升至 5.2.0；生产构建继续转换 281 modules，npm audit 中五条 Vite 公告清零。
 
 ### M12-AUD-003 — Vitest 与传递开发工具依赖公告
 
 - 优先级：P3
-- 状态：OPEN
+- 状态：FIXED（M12-T02）
 - 类别：Code、Security、Test Tooling
 - 证据：`package.json:39` 和锁文件使用 Vitest 4.0.18，命中 GHSA-5xrq-8626-4rwp；传递的 `nanoid` 3.3.16 命中 GHSA-2v37-7h3g-55p8，ESLint 路径的 `brace-expansion` 5.0.8 命中 GHSA-rgw5-rvv9-x895。
 - 暴露边界：仓库脚本只执行 `vitest run`，没有安装 `@vitest/ui`，也没有启动 Vitest UI/API server；Vitest 自身传递的 Vite 已是 7.3.6。`nanoid` 与 `brace-expansion` 均位于开发/测试工具路径。独立复核据此否定“生产 critical RCE”的表述，但版本债务仍真实存在。
 - 影响：正常发布运行时不可达；在额外开启测试 UI 或让不受信任输入进入开发工具时扩大风险。
 - 建议：升级 Vitest 到 `>=4.1.0`，刷新 `nanoid`、ESLint/minimatch/brace-expansion 的锁文件解析，并保留非交互 `vitest run` 门禁。
+- M12-T02 处理：Vitest 升至 4.1.11，刷新开发依赖图，并由 workspace override 将仍受 ESLint 约束的 `brace-expansion` 固定为 5.0.9；`pnpm audit` 为 0 advisories，门禁仍只使用 `vitest run`。
 
 ### M12-AUD-004 — CI Action 使用可移动 tag
 
 - 优先级：P2
-- 状态：OPEN
+- 状态：FIXED（M12-T02）
 - 类别：Security、CI Supply Chain、Release Evidence
 - 证据：`.github/workflows/ci.yml` 的 14 个 `uses:` 归并为 5 个可移动引用：`actions/checkout@v4`、`pnpm/action-setup@v4`、`actions/setup-node@v4`、`dtolnay/rust-toolchain@stable`、`actions/upload-artifact@v4`；checkout 未设置 `persist-credentials: false`。
 - 独立复核：workflow 只由 `push`/`pull_request` 触发，权限为 `contents: read`，没有 secrets、OIDC、write 权限、自动签名或发布，因此不能评为 P0/P1。但上游 Action tag 被接管后，可修改同一 job 的构建输入并让 Windows NSIS/macOS `.app` 作为正常 artifact 上传；项目历史确实会人工消费这些产物。
 - 影响：无法写回仓库，但可伪造门禁或投毒可执行 artifact，破坏发布证据可信度。
 - 建议：把 5 个唯一 Action 固定到完整 40 字符 commit SHA并旁注版本；checkout 设置 `persist-credentials: false`；`dtolnay/rust-toolchain` 固定 Action SHA后显式配置 `toolchain: stable`。可用 Dependabot 维护 SHA 更新。
+- M12-T02 处理：14 个 `uses:` 已全部固定为五个上游完整 commit SHA并保留版本旁注；三处 checkout 关闭凭据持久化，三处 Rust setup 显式指定 stable。新增 CI workflow 回归锁定数量、SHA 格式和安全配置。
 
 ### M12-AUD-005 — V0.3 发布身份仍为 0.2.0
 
 - 优先级：P2
-- 状态：OPEN
+- 状态：FIXED（M12-T02）
 - 类别：Release、Code、Regression、Documentation
 - 证据：`package.json:3`、`windows-app/package.json:3`、`Cargo.toml:6`、`windows-app/src-tauri/tauri.conf.json:4`、`release-info.json:3` 均为 `0.2.0`；`CHANGELOG.md:7` 仍是 `[0.2.0] - 未发布`，README 仍称 V0.3 处于设计冻结与参考审计阶段。
 - 边界：`pnpm release:check` 通过，只证明多个 0.2.0 镜像彼此同步，不能证明它们是当前 V0.3 候选的正确发布身份。
 - 影响：若直接构建，安装器、应用版本、运行时展示与审计目标错标为 V0.2，证据无法作为 V0.3 发布候选使用。
 - 建议：M12-T02 统一把发布权威和镜像推进到 0.3.0，更新 changelog/README，再由 M12-T03 生成绑定新 commit 的平台产物。
+- M12-T02 处理：根 npm、全部 workspace package、Cargo workspace/lock、Tauri、生成版本信息、release-info、changelog 与 README 已统一为 0.3.0；同步脚本移除会漏刷 workspace lock 版本的 `cargo metadata --no-deps`，连续 `release:sync`/`release:check` 通过。
 
 ### M12-AUD-006 — Linux GTK3 传递依赖维护与 unsound 警告
 
 - 优先级：P3
-- 状态：OPEN
+- 状态：DEFERRED_ACCEPTED（M12-T02，当前发布平台不适用）
 - 类别：Dependency Maintenance、Security
 - 证据：本地安装的 `cargo-audit 0.22.2` 使用 2026-08-27 RustSec 数据库审计 499 个锁定依赖：可利用 vulnerability 为 0，但报告 16 项 unmaintained 和 1 项 unsound。后者是 `glib 0.18.5` 的 RUSTSEC-2024-0429，限定于 `VariantStrIter` 的五个迭代方法；其余主要是 GTK3、旧 `unic-*` 与 `proc-macro-error` 维护警告。
 - 暴露边界：这些包来自 Tauri 的 Linux GTK/WebKit 条件依赖，不在当前 Windows 优先或已验证 macOS 构建图中；代码扫描也未发现项目调用受影响的 `VariantStrIter`。因此不将它们误报为 Windows/macOS 发布漏洞。
 - 影响：当前目标平台没有已证实运行时影响；若未来恢复 Linux 发布，旧 GTK3 图会成为维护和潜在稳定性风险。
 - 建议：在依赖升级任务中评估 Tauri/Wry 可达的新依赖图；M12-T02 至少记录目标平台裁决，并为未来 Linux 发布建立 target-specific RustSec gate。
+- M12-T02 处理：`cargo tree -i glib@0.18.5` 在 `x86_64-unknown-linux-gnu` 显示 Tauri/Wry→GTK3 路径，在 `aarch64-apple-darwin` 与 `x86_64-pc-windows-msvc` 均为 `nothing to print`。V0.3 不发布 Linux，故不为清理条件依赖强行迁移 Tauri；风险延期至任何 Linux 发布恢复之前。RustSec 仍为 0 vulnerability，16 unmaintained/1 unsound informational warning不会被静默写成 0。
 
 ## 3. 分领域审计结果
 
