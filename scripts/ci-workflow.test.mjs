@@ -47,6 +47,12 @@ test('builds, hashes and uploads Windows NSIS and macOS app evidence', () => {
   ]) {
     assert.ok(workflow.includes(required), `CI is missing: ${required}`);
   }
+
+  assert.match(
+    workflow,
+    /collect-release-evidence\.mjs --root 'target\/release\/bundle\/macos\/Ember Tavern\.app' --output artifacts\/evidence\/macos-release-files\.json/u,
+    'macOS hashes must be scoped to the candidate app rather than its possibly stale parent directory',
+  );
 });
 
 test('pins every CI action and does not persist checkout credentials', () => {

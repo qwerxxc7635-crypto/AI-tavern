@@ -146,7 +146,7 @@ jobs:
       - name: Keychain, WKWebView, app launch and PlatformPaths evidence
         run: node scripts/run-with-evidence.mjs --output artifacts/evidence/macos-lifecycle-gate-command.json -- node scripts/macos-release-gate.mjs --app 'target/release/bundle/macos/Ember Tavern.app' --output artifacts/evidence/macos-lifecycle.json
       - name: Hash macOS app bundle
-        run: node scripts/collect-release-evidence.mjs --root target/release/bundle/macos --output artifacts/evidence/macos-release-files.json
+        run: node scripts/collect-release-evidence.mjs --root 'target/release/bundle/macos/Ember Tavern.app' --output artifacts/evidence/macos-release-files.json
       - name: Upload macOS build evidence
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
