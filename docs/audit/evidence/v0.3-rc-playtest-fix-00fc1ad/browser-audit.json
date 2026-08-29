@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "runtime": "GStack Chromium against the production Vite preview",
+  "nativeBoundary": "Controlled Tauri IPC responses replace only the bridge unavailable in Chromium; native persistence is verified separately by Rust E2E and retained SQLite evidence.",
+  "viewports": [
+    { "width": 860, "height": 600, "horizontalOverflow": false },
+    { "width": 1366, "height": 768, "horizontalOverflow": false },
+    { "width": 1920, "height": 1080, "horizontalOverflow": false }
+  ],
+  "navigation": {
+    "synchronousClicks": 2,
+    "campaignCreateCalls": 1,
+    "worldLoadCalls": 1,
+    "destination": "#/world?campaignId=rc-browser-campaign-0001",
+    "authoritativeHeading": "给炉火一张地图。"
+  },
+  "timeoutAndRecovery": {
+    "timeoutCodeVisible": true,
+    "retryVisible": true,
+    "retryBusyButtonDisabled": true,
+    "cancelVisibleWhileBusy": true,
+    "cancelCalls": 1,
+    "worldCommitCalls": 0
+  },
+  "accessibility": {
+    "firstTabTarget": "← 存档首页",
+    "focusOutline": "rgb(145, 166, 131) solid 2px"
+  },
+  "consoleErrors": 0
+}

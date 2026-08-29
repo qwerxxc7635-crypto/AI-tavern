@@ -4967,3 +4967,22 @@
 
 - 新增[`V0.3_SECOND_AUDIT_REPORT.md`](V0.3_SECOND_AUDIT_REPORT.md)、第二轮findings/fixes账本、修复前与修复后独立evidence、manifest和逐文件SHA-256。
 - 最终判断为`SECOND AUDIT PASS — READY FOR RELEASE CANDIDATE VALIDATION`，同时明确`NOT READY FOR PUBLIC RELEASE`。Windows NSIS/Credential Manager/WebView2/install-launch-uninstall和macOS临时环境Keychain/launch/database/cleanup仍为`BLOCKED_EXTERNAL`；真实Provider、token、网络latency和计费cache仍为`NOT_EVALUATED`；未签名、notarize、发布、push或merge。
+
+## 2026-08-29 — V0.3 RC 实测问题修复完成
+
+### 两项阻塞修复
+
+- 从第二轮审计完成提交`00fc1ad`建立`fix/v0.3-rc-playtest-issues`，完整读取用户提供的`12.docx`文本与三张截图，先冻结`RC-PLAYTEST-001/002`，再提交代码与测试`760b5a24c7c806e8f30eb49c4251f8c1ae6cc62b`。用户已有`.gitignore`修改保持未暂存且diff哈希不变。
+- 世界生成根因为世界构筑绕过GenerationQueue，且最大8,000 token任务被单一约60秒传输时限覆盖。修复后使用DNS 10秒、连接15秒、Provider 120秒、世界操作270秒的分层有界预算；Queue按Campaign/Task意图去重并分离排队/执行时间，AbortSignal贯穿UI到原生HTTP，失败/取消/无效输出不进入SQLite commit。
+- 新建存档根因为成功后只刷新列表而不导航，且React disabled前存在同tick双击窗口。修复后同步ref防重入，并按`campaign_create`返回的权威状态直接进入世界构筑。截图中的八个创建中存档未被证明为无效幽灵草稿，因此没有删除、隐藏或改写用户数据。
+
+### 回归、Chromium 与 SQLite
+
+- 新增回归覆盖旧60秒边界后的合法响应、永久挂起、TIMEOUT后重试、同意图并发、AUTH分类、取消、Queue等待计时、直接导航、同步双击与现有归档流程。定向55项通过；世界页面取消测试确认退出loading且不发布world。
+- 真实Chromium在860×600、1366×768、1920×1080复测：同步双击产生一次`campaign_create`，直接进入`#/world?campaignId=...`并显示权威第01步；TIMEOUT、重试busy/disabled和取消态均可见，commit调用为0；横向溢出0、console error 0、键盘焦点outline可见。
+- 显式保留Windows E2E主SQLite、三个自动完整备份和portable archive。四库均`integrity_check=ok`、外键违规0、重复idempotency/request/world 0、孤儿world 0；活动主库未完成请求0。一个恢复前不可变备份按测试设计保留`SENDING`请求和`RECOVERY_REQUIRED → TAVERN`恢复点，活动主库已恢复为`TAVERN`。
+
+### 完整门禁与结束状态
+
+- Frozen install、`pnpm check`、`pnpm test:windows-e2e`、`pnpm build:desktop`和macOS `.app`构建全部通过。完整门为Vitest 189 files / 1063 tests、Node 30/30、Rust 150 tests，另1项需真实Credential的DeepSeek测试ignored；Vite构建281 modules。npm/RustSec vulnerability均为0。
+- 新增[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)、`DEC-158`与独立证据目录。两项结论均为`FIXED`；真实Provider、Windows安装生命周期、签名/notarization/发布仍不在授权和本机证明范围，因此不宣称`PUBLIC RELEASE READY`。未push、merge、签名或发布，也未进入V0.4。

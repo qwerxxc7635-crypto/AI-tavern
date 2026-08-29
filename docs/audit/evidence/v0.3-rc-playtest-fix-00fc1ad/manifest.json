@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-29T12:45:00+08:00",
+  "verdict": "FIXED",
+  "baselineCommit": "00fc1adb2d3ffc9c290d52a108b122e080c074f6",
+  "implementationCommit": "760b5a24c7c806e8f30eb49c4251f8c1ae6cc62b",
+  "branch": "fix/v0.3-rc-playtest-issues",
+  "findings": [
+    { "id": "RC-PLAYTEST-001", "severity": "P1", "status": "FIXED" },
+    { "id": "RC-PLAYTEST-002", "severity": "P1", "status": "FIXED" }
+  ],
+  "realProvider": "NOT_EVALUATED_NO_CREDENTIAL_OR_NETWORK_MODEL_AUTHORIZATION",
+  "publicRelease": "NOT_AUTHORIZED_NOT_CLAIMED",
+  "checksums": "SHA256SUMS"
+}

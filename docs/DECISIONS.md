@@ -3398,3 +3398,26 @@ Fake Provider性能和可玩性只证明确定性生产编排、规则、事务�
 - 第二轮审计不得把两个`BLOCKED_EXTERNAL`、真实Provider未知或unsigned状态改写为PASS；公开发布门仍需独立完成。
 - Linux GTK3/glib告警保持`DEFERRED_ACCEPTED`，只在V0.3不发布Linux的范围内成立；未来Linux发行前必须重审。
 - 本决定只定义审计/发布状态，不改变Rules、D20、Provider、Generator/Queue、SQLite、Save/Resume、World、Quest/NPC/Adventure或视觉组件合同。
+
+## DEC-158：世界生成使用分层有界时限、统一队列意图与端到端取消
+
+- 日期：2026-08-29
+- 状态：已采纳
+- 依据：V0.3 RC 实测 `RC-PLAYTEST-001`、[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)
+
+### 背景
+
+世界构筑是最大 8,000 输出 token 的结构化任务。旧实现绕过 `GenerationQueue`，并把 DNS、连接、发送和完整响应体压进约 60 秒的统一传输时限；正常但较慢的真实 Provider 响应会被误判为 `TIMEOUT`。仅放大或删除超时会失去故障边界，也不能解决同一 Campaign 并发、取消和重复提交。
+
+### 决定与理由
+
+世界生成与局部重绘统一进入单并发 `GenerationQueue`，按 `world:<campaignId>:<task>` 去重。队列等待和真正执行分开计时；外层操作预算为 270 秒，用于容纳一个 120 秒 Provider 请求加一次结构修复或获准 fallback，以及有界校验/事务提交。secure HTTP 同时保留 DNS 10 秒、连接 15 秒和单次完整传输 120 秒上限，因此任何层都不会无限等待。
+
+`AbortSignal` 从 UI 贯穿 Queue、Desktop orchestrator、Tauri 非流式命令和 secure HTTP cancellation token。Provider 错误分类不改写；只有真实超时映射为 `TIMEOUT`。结构与业务校验完成前不进入 SQLite commit；相同意图并发共享结果，取消、超时和失败均不产生部分写入。
+
+### 影响与边界
+
+- 该预算只适用于 V0.3 世界生成/重绘，不把所有 AI 任务统一扩大到 270 秒。
+- fallback 仍由 Desktop orchestrator 的既有政策决定，Queue 不额外重试或叠加 fallback。
+- 不修改 Provider 业务合同、SQLite schema、Save 格式、Rules/D20 或世界状态机。
+- 真实 Provider SLA、token 与计费 cache 仍需独立授权验证；本决定不构成公开发布批准。
