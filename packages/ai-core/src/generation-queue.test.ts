@@ -121,6 +121,23 @@ describe('GenerationQueue', () => {
     expect(metrics).toContainEqual(expect.objectContaining({ status: 'TIMED_OUT', attempts: 1 }));
   });
 
+  it('does not consume provider execution timeout while a job is waiting in the queue', async () => {
+    vi.useFakeTimers();
+    const blocker = deferred<string>();
+    const queue = createQueue({ concurrency: 1 });
+    const running = queue.submit(job('queue-blocker', 'P0', () => blocker.promise));
+    const queued = queue.submit(
+      job('queue-wait-isolated', 'P0', async () => 'completed after queue wait', {
+        timeoutMs: 50,
+      }),
+    );
+
+    await vi.advanceTimersByTimeAsync(100);
+    blocker.resolve('released');
+    await expect(running.promise).resolves.toBe('released');
+    await expect(queued.promise).resolves.toBe('completed after queue wait');
+  });
+
   it('uses fallback only for eligible failures and preserves the hard result identity', async () => {
     const executions: { route: string; hardResultKey: string | null }[] = [];
     const queue = createQueue();
@@ -223,6 +240,7 @@ describe('GenerationQueue', () => {
         finalRoute: 'PRIMARY',
         attempts: 1,
         queueWaitMs: 10,
+        executionMs: 10,
         durationMs: 20,
         errorCode: null,
       },

@@ -32,6 +32,7 @@ export interface GenerationQueueMetric {
   readonly finalRoute: GenerationRoute;
   readonly attempts: number;
   readonly queueWaitMs: number;
+  readonly executionMs: number;
   readonly durationMs: number;
   readonly errorCode: string | null;
 }
@@ -288,6 +289,7 @@ export class GenerationQueue {
         finalRoute: entry.finalRoute,
         attempts: entry.attempts,
         queueWaitMs: boundedDuration((entry.startedAt ?? endedAt) - entry.queuedAt),
+        executionMs: boundedDuration(endedAt - (entry.startedAt ?? endedAt)),
         durationMs: boundedDuration(endedAt - entry.queuedAt),
         errorCode: contract?.code ?? null,
       }),

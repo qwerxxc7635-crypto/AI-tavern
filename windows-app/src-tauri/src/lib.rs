@@ -555,10 +555,17 @@ fn valid_stream_request_id(request_id: &str) -> bool {
 async fn ai_generate(
     request: RuntimeGenerateRequest,
     store: State<'_, CampaignStore>,
+    streams: State<'_, AiStreamRegistry>,
 ) -> Result<RuntimeGenerateResponse, CommandError> {
-    execute_ai_generate(request, store.inner()).await
+    let request_id = request.request_id.clone();
+    let cancellation = streams.register(&request_id)?;
+    let result =
+        execute_ai_generate_inner(request, store.inner(), cancellation, false, |_| Ok(())).await;
+    streams.remove(&request_id);
+    result
 }
 
+#[cfg(test)]
 async fn execute_ai_generate(
     request: RuntimeGenerateRequest,
     store: &CampaignStore,

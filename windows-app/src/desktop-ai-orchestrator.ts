@@ -8,6 +8,7 @@ import {
   classifyApplicationError,
   validateAIOutput,
   type AIProvider,
+  type AIRequestOptions,
   type AIStreamChunk,
   type AITask,
   type Generator,
@@ -56,6 +57,7 @@ export interface DesktopAIExecuteOptions {
   readonly temperature: number;
   readonly maxOutputTokens: number;
   readonly timeoutMs: number;
+  readonly signal?: AbortSignal;
   readonly stream?: DesktopAIStreamControl;
 }
 
@@ -319,6 +321,7 @@ class DesktopStructuredGenerator implements Generator<
 
   public async generate(prepared: DesktopPreparedPrompt): Promise<DesktopRawGeneration> {
     const stream = prepared.options.stream;
+    const signal = stream?.signal ?? prepared.options.signal;
     let expectedSequence = 1;
     let streamedContent = '';
     const generateStream = this.provider.generateStream?.bind(this.provider);
@@ -339,7 +342,11 @@ class DesktopStructuredGenerator implements Generator<
               stream.onChunk(chunk);
             },
           })
-        : await this.provider.generate(prepared.request, prepared.providerConfig);
+        : await this.provider.generate(
+            prepared.request,
+            prepared.providerConfig,
+            signal === undefined ? undefined : { signal },
+          );
     if (useStream && generateStream !== undefined && response.content !== streamedContent) {
       throw new DesktopAIOrchestrationError('STREAM_FINAL_MISMATCH');
     }
@@ -394,7 +401,12 @@ class DesktopStructuredGenerator implements Generator<
       responseFormat: repair.responseFormat,
     };
     this.lastRequest = request;
-    const response = await this.provider.generate(request, prepared.providerConfig);
+    const signal = prepared.options.stream?.signal ?? prepared.options.signal;
+    const response = await this.provider.generate(
+      request,
+      prepared.providerConfig,
+      signal === undefined ? undefined : { signal },
+    );
     this.lastRaw = response.content;
     return Object.freeze({ prepared, request, response });
   }
@@ -481,17 +493,29 @@ class TauriNativeAIProvider implements AIProvider {
   public async generate(
     request: NormalizedAIRequest,
     config: ProviderConfig,
+    options?: AIRequestOptions,
   ): Promise<NormalizedAIResponse> {
     const { selectedProfileId, cachePrefixHash } = nativeGenerationOptions(config);
+    const signal = options?.signal;
+    if (isAborted(signal)) throw new DesktopAIOrchestrationError('CANCELLED');
+    const cancel = () => {
+      void invoke('ai_stream_cancel', { requestId: request.requestId });
+    };
+    signal?.addEventListener('abort', cancel, { once: true });
     try {
-      return parseNativeResponse(
+      const response = parseNativeResponse(
         await invoke<unknown>('ai_generate', {
           request: { ...request, selectedProfileId, cachePrefixHash },
         }),
       );
+      if (isAborted(signal)) throw new DesktopAIOrchestrationError('CANCELLED');
+      return response;
     } catch (error) {
+      if (isAborted(signal)) throw new DesktopAIOrchestrationError('CANCELLED');
       const code = tauriCommandErrorCode(error);
       throw code === null ? error : new DesktopAIOrchestrationError(code);
+    } finally {
+      signal?.removeEventListener('abort', cancel);
     }
   }
 
@@ -564,6 +588,10 @@ function nativeGenerationOptions(config: ProviderConfig): {
     throw new DesktopAIOrchestrationError('MODEL_NOT_CONFIGURED');
   }
   return { selectedProfileId, cachePrefixHash };
+}
+
+function isAborted(signal: AbortSignal | undefined): boolean {
+  return signal?.aborted === true;
 }
 
 function parseNativeStreamEvent(value: unknown): AIStreamChunk & { readonly requestId: string } {

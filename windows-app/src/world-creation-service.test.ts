@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { GenerationQueue } from '@ember-tavern/ai-core';
 
 import {
   WindowsWorldCreationService,
@@ -8,6 +10,8 @@ import {
   type WorldDraft,
 } from './world-creation-service.js';
 import type { DesktopAIEngine } from './desktop-ai-orchestrator.js';
+
+afterEach(() => vi.useRealTimers());
 
 describe('WindowsWorldCreationService', () => {
   it('uses the unified Fake Provider and commits schema-validated generation and refinement', async () => {
@@ -121,7 +125,151 @@ describe('WindowsWorldCreationService', () => {
     expect(generated.world?.summary).toBe(draft.summary);
     expect(gateway.commits).toHaveLength(1);
   });
+
+  it('allows a valid long world response past the legacy timeout while keeping a finite provider cap', async () => {
+    vi.useFakeTimers();
+    const gateway = new FakeWorldGateway();
+    const delayed = deferred<undefined>();
+    let requestedTimeout = 0;
+    const engine: DesktopAIEngine = {
+      async execute(_task, _input, options) {
+        requestedTimeout = options.timeoutMs;
+        await delayed.promise;
+        return execution(options.requestId, worldDraft());
+      },
+    };
+    const service = serviceWithQueue(gateway, engine);
+    const generated = service.generate('campaign-world', defaultOptions());
+
+    await vi.advanceTimersByTimeAsync(60_001);
+    expect(gateway.commits).toHaveLength(0);
+    expect(requestedTimeout).toBe(120_000);
+    delayed.resolve(undefined);
+    await expect(generated).resolves.toMatchObject({ campaignState: 'REVIEWING_WORLD' });
+    expect(gateway.commits).toHaveLength(1);
+  });
+
+  it('cancels a permanently hung generation at the overall cap without a partial commit', async () => {
+    vi.useFakeTimers();
+    const gateway = new FakeWorldGateway();
+    let executionSignal: AbortSignal | undefined;
+    const engine: DesktopAIEngine = {
+      execute(_task, _input, options) {
+        executionSignal = options.signal;
+        return new Promise(() => {});
+      },
+    };
+    const service = serviceWithQueue(gateway, engine);
+    const generated = service.generate('campaign-world', defaultOptions());
+    const rejected = expect(generated).rejects.toMatchObject({ code: 'TIMEOUT' });
+
+    await vi.advanceTimersByTimeAsync(270_000);
+    await rejected;
+    expect(executionSignal?.aborted).toBe(true);
+    expect(gateway.commits).toHaveLength(0);
+  });
+
+  it('retries from a clean request after timeout and persists exactly one world', async () => {
+    vi.useFakeTimers();
+    const gateway = new FakeWorldGateway();
+    let calls = 0;
+    const engine: DesktopAIEngine = {
+      execute(_task, _input, options) {
+        calls += 1;
+        return calls === 1
+          ? new Promise(() => {})
+          : Promise.resolve(execution(options.requestId, worldDraft()));
+      },
+    };
+    const service = serviceWithQueue(gateway, engine);
+    const first = service.generate('campaign-world', defaultOptions());
+    const rejected = expect(first).rejects.toMatchObject({ code: 'TIMEOUT' });
+    await vi.advanceTimersByTimeAsync(270_000);
+    await rejected;
+
+    await expect(service.generate('campaign-world', defaultOptions())).resolves.toMatchObject({
+      campaignState: 'REVIEWING_WORLD',
+    });
+    expect(calls).toBe(2);
+    expect(gateway.commits).toHaveLength(1);
+  });
+
+  it('deduplicates concurrent world intent and commits one successful result', async () => {
+    const gateway = new FakeWorldGateway();
+    const delayed = deferred<undefined>();
+    const execute = vi.fn(async (_task, _input, options) => {
+      await delayed.promise;
+      return execution(options.requestId, worldDraft());
+    });
+    const service = serviceWithQueue(gateway, { execute } as DesktopAIEngine);
+
+    const first = service.generate('campaign-world', defaultOptions());
+    const second = service.generate('campaign-world', defaultOptions());
+    delayed.resolve(undefined);
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(execute).toHaveBeenCalledOnce();
+    expect(gateway.commits).toHaveLength(1);
+  });
+
+  it('preserves provider errors and cleans up explicit cancellation without committing', async () => {
+    const authenticationGateway = new FakeWorldGateway();
+    const authentication = serviceWithQueue(authenticationGateway, {
+      async execute() {
+        throw Object.freeze({ code: 'AUTHENTICATION_FAILED' });
+      },
+    });
+    await expect(authentication.generate('campaign-world', defaultOptions())).rejects.toMatchObject(
+      { code: 'AUTHENTICATION_FAILED' },
+    );
+    expect(authenticationGateway.commits).toHaveLength(0);
+
+    const cancelledGateway = new FakeWorldGateway();
+    let executionSignal: AbortSignal | undefined;
+    const cancelled = serviceWithQueue(cancelledGateway, {
+      execute(_task, _input, options) {
+        executionSignal = options.signal;
+        return new Promise(() => {});
+      },
+    });
+    const controller = new AbortController();
+    const pending = cancelled.generate('campaign-world', defaultOptions(), {
+      signal: controller.signal,
+      onChunk() {},
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(executionSignal?.aborted).toBe(true);
+    expect(cancelledGateway.commits).toHaveLength(0);
+  });
 });
+
+function serviceWithQueue(gateway: FakeWorldGateway, engine: DesktopAIEngine) {
+  return new WindowsWorldCreationService(
+    gateway,
+    engine,
+    undefined,
+    undefined,
+    new GenerationQueue({ concurrency: 1, maxPending: 8 }),
+  );
+}
+
+function execution(requestId: string, draft: WorldDraft) {
+  return {
+    request: { requestId, promptVersion: 2 },
+    response: { content: JSON.stringify(draft) },
+    validatedOutput: draft,
+  } as never;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+}
 
 class FakeWorldGateway implements WorldCreationGateway {
   public snapshot: WorldCreationSnapshot = {

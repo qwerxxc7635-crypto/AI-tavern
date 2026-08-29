@@ -65,6 +65,29 @@ describe('world creation page', () => {
     expect(await screen.findByText('进入车卡 campaign-world')).toBeTruthy();
     expect(service.confirmCalls).toEqual(['campaign-world']);
   });
+
+  it('cancels generation and clears the loading state without publishing a world', async () => {
+    const service = new FakeWorldService({
+      campaignState: 'CREATING_WORLD',
+      world: null,
+      constitution: null,
+    });
+    service.generateAction = (_campaignId, _options, stream) =>
+      new Promise((_resolve, reject) => {
+        stream?.signal.addEventListener(
+          'abort',
+          () => reject(Object.freeze({ code: 'CANCELLED' })),
+          { once: true },
+        );
+      });
+    renderWorldPage(service);
+
+    fireEvent.click(await screen.findByRole('button', { name: '使用默认模型生成' }));
+    fireEvent.click(await screen.findByRole('button', { name: '取消生成' }));
+
+    expect(await screen.findByRole('button', { name: '使用默认模型生成' })).toBeTruthy();
+    expect(screen.queryByDisplayValue('Ember Coast')).toBeNull();
+  });
 });
 
 function renderWorldPage(service: FakeWorldService) {
@@ -86,6 +109,13 @@ class FakeWorldService {
   }> = [];
   public readonly refineInstructions: Array<readonly string[]> = [];
   public readonly confirmCalls: string[] = [];
+  public generateAction:
+    | ((
+        campaignId: string,
+        options: GenerateWorldOptions,
+        stream?: { readonly signal: AbortSignal },
+      ) => Promise<WorldCreationSnapshot>)
+    | null = null;
 
   public constructor(private snapshot: WorldCreationSnapshot) {}
 
@@ -94,10 +124,12 @@ class FakeWorldService {
   }
 
   public async generate(
-    _campaignId: string,
+    campaignId: string,
     options: GenerateWorldOptions,
+    stream?: { readonly signal: AbortSignal },
   ): Promise<WorldCreationSnapshot> {
     this.generateOptions = options;
+    if (this.generateAction !== null) return this.generateAction(campaignId, options, stream);
     this.snapshot = {
       campaignState: 'REVIEWING_WORLD',
       world: worldView(),

@@ -152,6 +152,10 @@ export interface AIStreamOptions {
   readonly onChunk: (chunk: AIStreamChunk) => void;
 }
 
+export interface AIRequestOptions {
+  readonly signal?: AbortSignal;
+}
+
 export type ConnectionErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'AUTHENTICATION'
@@ -175,7 +179,11 @@ export interface AIProvider {
   readonly id: string;
   listModels(): Promise<readonly ModelInfo[]>;
   testConnection(config: ProviderConfig): Promise<TestResult>;
-  generate(request: NormalizedAIRequest, config: ProviderConfig): Promise<NormalizedAIResponse>;
+  generate(
+    request: NormalizedAIRequest,
+    config: ProviderConfig,
+    options?: AIRequestOptions,
+  ): Promise<NormalizedAIResponse>;
   generateStream?(
     request: NormalizedAIRequest,
     config: ProviderConfig,

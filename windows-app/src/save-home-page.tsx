@@ -88,10 +88,11 @@ export function SaveHomePage({
   }, [transferGateway]);
 
   async function createCampaign() {
+    if (busyIdRef.current !== null) return;
     markBusy('new');
     try {
-      await gateway.create();
-      await reload();
+      const created = await gateway.create();
+      navigate(destinationForCampaign(created));
     } catch {
       setError('新存档没有创建成功，本地数据未被修改。');
     } finally {

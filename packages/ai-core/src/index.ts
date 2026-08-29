@@ -86,6 +86,7 @@ export type { AITaskSchemaDefinition } from './task-schema-registry.js';
 export * from './task-schemas.js';
 export type {
   AIProvider,
+  AIRequestOptions,
   AIStreamChunk,
   AIStreamOptions,
   AITask,

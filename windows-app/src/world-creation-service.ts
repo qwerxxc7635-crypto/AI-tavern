@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   GenerateWorldInputSchema,
   GenerateWorldOutputSchema,
+  GenerationQueue,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
   StructuredJsonStreamProjector,
@@ -74,6 +75,13 @@ export interface WorldGenerationStreamOptions {
   readonly onReset?: () => void;
 }
 
+// The transport retains a strict 120s ceiling. The outer operation budget allows either one
+// schema-repair request or one authorized Provider fallback plus bounded local validation/commit.
+export const WORLD_PROVIDER_TIMEOUT_MS = 120_000;
+export const WORLD_OPERATION_TIMEOUT_MS = 270_000;
+
+const worldGenerationQueue = new GenerationQueue({ concurrency: 1, maxPending: 32 });
+
 export interface WorldCreationGateway {
   load(campaignId: string): Promise<WorldCreationSnapshot>;
   commit(command: WorldGenerationCommit): Promise<WorldCreationSnapshot>;
@@ -136,6 +144,7 @@ export class WindowsWorldCreationService {
       task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     ) => WorldRequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
+    private readonly generationQueue: GenerationQueue = worldGenerationQueue,
   ) {
     this.ai = desktopAIEngine(provider);
   }
@@ -198,53 +207,75 @@ export class WindowsWorldCreationService {
     stream?: WorldGenerationStreamOptions,
   ): Promise<WorldCreationSnapshot> {
     const identity = this.createIdentity(task);
-    const temperature = await this.randomness.resolveTemperature();
-    let projector = stream === undefined ? null : new StructuredJsonStreamProjector('summary');
-    let rawChunks = 0;
-    const generated = await this.ai.execute(task, input, {
-      requestId: identity.requestId,
-      temperature,
-      maxOutputTokens: 8_000,
-      timeoutMs: 5_000,
-      ...(stream === undefined
-        ? {}
-        : {
-            stream: {
-              signal: stream.signal,
-              onChunk(chunk: { readonly content: string }) {
-                rawChunks += 1;
-                const visible = projector?.push(chunk.content) ?? '';
-                if (visible.length > 0) stream.onChunk(visible);
-              },
-              onReset() {
-                projector = new StructuredJsonStreamProjector('summary');
-                rawChunks = 0;
-                stream.onReset?.();
-              },
-            },
-          }),
-    });
-    if (projector !== null && rawChunks > 0) {
-      const visible = projector.finish(generated.response.content);
-      if (visible.length > 0) stream?.onChunk(visible);
-    }
-    const world =
-      task === 'GENERATE_WORLD'
-        ? GenerateWorldOutputSchema.parse(generated.validatedOutput)
-        : RefineWorldOutputSchema.parse(generated.validatedOutput).world;
-    return this.gateway.commit({
-      campaignId: campaignIdValue,
+    const handle = this.generationQueue.submit({
+      id: identity.requestId,
+      intentKey: `world:${campaignIdValue}:${task}`,
       task,
-      requestId: identity.requestId,
-      generationRecordId: identity.generationRecordId,
-      idempotencyKey: identity.idempotencyKey,
-      promptVersion: generated.request.promptVersion,
-      input,
-      request: generated.request,
-      rawResponseText: generated.response.content,
-      validatedOutput: generated.validatedOutput,
-      world,
+      priority: 'P0',
+      timeoutMs: WORLD_OPERATION_TIMEOUT_MS,
+      maxRetries: 0,
+      allowFallback: false,
+      execute: async ({ signal }) => {
+        const temperature = await this.randomness.resolveTemperature();
+        let projector = stream === undefined ? null : new StructuredJsonStreamProjector('summary');
+        let rawChunks = 0;
+        const generated = await this.ai.execute(task, input, {
+          requestId: identity.requestId,
+          temperature,
+          maxOutputTokens: 8_000,
+          timeoutMs: WORLD_PROVIDER_TIMEOUT_MS,
+          signal,
+          ...(stream === undefined
+            ? {}
+            : {
+                stream: {
+                  signal,
+                  onChunk(chunk: { readonly content: string }) {
+                    rawChunks += 1;
+                    const visible = projector?.push(chunk.content) ?? '';
+                    if (visible.length > 0) stream.onChunk(visible);
+                  },
+                  onReset() {
+                    projector = new StructuredJsonStreamProjector('summary');
+                    rawChunks = 0;
+                    stream.onReset?.();
+                  },
+                },
+              }),
+        });
+        if (signal.aborted) throw new WorldCreationServiceError('CANCELLED');
+        if (projector !== null && rawChunks > 0) {
+          const visible = projector.finish(generated.response.content);
+          if (visible.length > 0) stream?.onChunk(visible);
+        }
+        const world =
+          task === 'GENERATE_WORLD'
+            ? GenerateWorldOutputSchema.parse(generated.validatedOutput)
+            : RefineWorldOutputSchema.parse(generated.validatedOutput).world;
+        if (signal.aborted) throw new WorldCreationServiceError('CANCELLED');
+        return this.gateway.commit({
+          campaignId: campaignIdValue,
+          task,
+          requestId: identity.requestId,
+          generationRecordId: identity.generationRecordId,
+          idempotencyKey: identity.idempotencyKey,
+          promptVersion: generated.request.promptVersion,
+          input,
+          request: generated.request,
+          rawResponseText: generated.response.content,
+          validatedOutput: generated.validatedOutput,
+          world,
+        });
+      },
     });
+    const cancel = () => handle.cancel();
+    stream?.signal.addEventListener('abort', cancel, { once: true });
+    if (stream?.signal.aborted === true) handle.cancel();
+    try {
+      return await handle.promise;
+    } finally {
+      stream?.signal.removeEventListener('abort', cancel);
+    }
   }
 }
 

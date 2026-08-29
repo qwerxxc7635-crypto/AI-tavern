@@ -23,6 +23,8 @@ use tokio_util::sync::CancellationToken;
 
 const MIN_TIMEOUT: Duration = Duration::from_millis(100);
 const MAX_TIMEOUT: Duration = Duration::from_secs(120);
+const DNS_TIMEOUT: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,7 +69,10 @@ impl ApprovedEndpoint {
             .map_err(|_| TransportError::InvalidRequest)
     }
 
-    async fn pinned_client(&self) -> Result<reqwest::Client, TransportError> {
+    async fn pinned_client(
+        &self,
+        connect_timeout: Duration,
+    ) -> Result<reqwest::Client, TransportError> {
         let host = self
             .base_url
             .host_str()
@@ -85,6 +90,7 @@ impl ApprovedEndpoint {
         validate_resolved_addresses(self.base_url.scheme(), &addresses)?;
         reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(connect_timeout)
             .resolve_to_addrs(host, &addresses)
             .build()
             .map_err(|_| TransportError::Configuration)
@@ -268,9 +274,11 @@ impl SecureHttpTransport {
         validate_request(&request)?;
         let url = endpoint.resolve(&request.relative_path)?;
         let deadline = Instant::now() + request.timeout;
+        let dns_deadline = Instant::now() + request.timeout.min(DNS_TIMEOUT);
+        let connect_timeout = request.timeout.min(CONNECT_TIMEOUT);
         let client = tokio::select! {
             () = cancellation.cancelled() => return Err(TransportError::Cancelled),
-            result = timeout_at(deadline, endpoint.pinned_client()) => {
+            result = timeout_at(dns_deadline, endpoint.pinned_client(connect_timeout)) => {
                 result.map_err(|_| TransportError::Timeout)??
             }
         };
