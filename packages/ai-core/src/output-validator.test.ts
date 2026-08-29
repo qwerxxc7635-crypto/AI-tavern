@@ -10,9 +10,45 @@ describe('AI output structure validation', () => {
     expect(result.ok).toBe(true);
     expect(result.rawResponseText).toBe(raw);
     if (result.ok) {
+      expect(result.normalization).toBe('EXACT_JSON');
       expect(result.validatedOutput).toEqual(FAKE_TASK_OUTPUTS.GENERATE_WORLD);
       expect(result.validatedOutput).not.toBe(FAKE_TASK_OUTPUTS.GENERATE_WORLD);
     }
+  });
+
+  it('normalizes one JSON markdown fence before running the complete schema', () => {
+    const raw = `\`\`\`json\n${JSON.stringify(FAKE_TASK_OUTPUTS.GENERATE_WORLD)}\n\`\`\``;
+    const result = validateAIOutput('GENERATE_WORLD', raw);
+
+    expect(result).toMatchObject({
+      ok: true,
+      rawResponseText: raw,
+      normalization: 'MARKDOWN_FENCE',
+      validatedOutput: FAKE_TASK_OUTPUTS.GENERATE_WORLD,
+    });
+  });
+
+  it('extracts one unambiguous JSON object from short surrounding prose', () => {
+    const raw = `这是生成结果：\n${JSON.stringify(FAKE_TASK_OUTPUTS.GENERATE_WORLD)}\n以上。`;
+    const result = validateAIOutput('GENERATE_WORLD', raw);
+
+    expect(result).toMatchObject({ ok: true, normalization: 'UNIQUE_JSON_OBJECT' });
+  });
+
+  it('does not guess when a response contains multiple JSON objects', () => {
+    const valid = JSON.stringify(FAKE_TASK_OUTPUTS.GENERATE_WORLD);
+    const result = validateAIOutput('GENERATE_WORLD', `${valid}\n${valid}`);
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: { code: 'AMBIGUOUS_JSON', issues: [{ code: 'ambiguous_json' }] },
+    });
+  });
+
+  it('does not treat an incomplete fenced object as repair-free valid JSON', () => {
+    const result = validateAIOutput('GENERATE_WORLD', '```json\n{"name":\n```');
+
+    expect(result).toMatchObject({ ok: false, error: { code: 'INVALID_JSON' } });
   });
 
   it('rejects invalid JSON with a stable root-level location and keeps the source', () => {
@@ -98,6 +134,19 @@ describe('AI output structure validation', () => {
       error: {
         code: 'SCHEMA_VALIDATION_FAILED',
         issues: [expect.objectContaining({ path: ['risk'] })],
+      },
+    });
+  });
+
+  it('rejects a wrong field type without coercion', () => {
+    const invalid = { ...FAKE_TASK_OUTPUTS.GENERATE_WORLD, storyHooks: 'one hook' };
+    const result = validateAIOutput('GENERATE_WORLD', JSON.stringify(invalid));
+
+    expect(result).toMatchObject({
+      ok: false,
+      error: {
+        code: 'SCHEMA_VALIDATION_FAILED',
+        issues: [expect.objectContaining({ path: ['storyHooks'] })],
       },
     });
   });

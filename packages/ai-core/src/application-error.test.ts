@@ -23,8 +23,11 @@ describe('application error architecture', () => {
   it.each([
     ['AUTHENTICATION_FAILED', 'PROVIDER', false, false, ['OPEN_SETTINGS'], 'ERROR_STATE'],
     ['RATE_LIMITED', 'PROVIDER', true, true, ['RETRY', 'CANCEL', 'USE_FALLBACK'], 'TOAST'],
+    ['PROVIDER_UNAVAILABLE', 'PROVIDER', true, true, ['RETRY', 'CANCEL', 'USE_FALLBACK'], 'TOAST'],
     ['TIMEOUT', 'NETWORK', true, true, ['RETRY', 'CANCEL', 'USE_FALLBACK'], 'TOAST'],
+    ['NETWORK_FAILED', 'NETWORK', true, true, ['RETRY', 'CANCEL', 'USE_FALLBACK'], 'TOAST'],
     ['INVALID_OUTPUT', 'VALIDATION', true, false, ['RETRY', 'CANCEL'], 'ERROR_STATE'],
+    ['RESPONSE_TRUNCATED', 'VALIDATION', true, false, ['RETRY', 'CANCEL'], 'ERROR_STATE'],
     ['LOCAL_STORAGE_UNAVAILABLE', 'PERSISTENCE', true, false, ['RETRY', 'CANCEL'], 'ERROR_STATE'],
     ['DOMAIN_RULE_REJECTED', 'RULE', false, false, ['DISMISS'], 'ERROR_STATE'],
     ['UNKNOWN', 'GENERATION', false, false, ['OPEN_SETTINGS'], 'ERROR_STATE'],

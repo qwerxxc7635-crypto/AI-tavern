@@ -162,6 +162,10 @@ function isValidationCode(code: string): boolean {
     code === 'INVALID_OUTPUT' ||
     code === 'PROBE_STALE' ||
     code === 'REPETITION_DETECTED' ||
+    code === 'AMBIGUOUS_JSON' ||
+    code === 'RESPONSE_TRUNCATED' ||
+    code === 'CONTENT_FILTERED' ||
+    code === 'PROVIDER_RESPONSE_INCOMPLETE' ||
     code.startsWith('STREAM_') ||
     code.startsWith('SCHEMA_') ||
     code.endsWith('_OUTPUT_MISMATCH') ||

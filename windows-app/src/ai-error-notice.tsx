@@ -37,7 +37,7 @@ const PRESENTATIONS: Readonly<Record<StandardAIErrorCode, ErrorPresentation>> = 
   },
   INVALID_OUTPUT: {
     title: '模型输出没有通过验证',
-    detail: '不合规内容未写入存档。技术重试不会改变已锁定的硬结果。',
+    detail: '不合规内容未写入存档。可以重新生成，已提交的存档状态没有改变。',
   },
   NETWORK_FAILED: {
     title: '无法连接模型服务',
@@ -58,7 +58,7 @@ const KIND_PRESENTATIONS: Readonly<Record<ApplicationErrorKind, ErrorPresentatio
     GENERATION: PRESENTATIONS.UNKNOWN,
     VALIDATION: {
       title: '生成内容未通过验证',
-      detail: '不合规内容未写入存档；技术重试不会改变已锁定的硬结果。',
+      detail: '不合规内容未写入存档；可以重新生成，已提交的存档状态没有改变。',
     },
     PERSISTENCE: {
       title: '本地存档操作没有完成',
@@ -90,10 +90,15 @@ export function AIErrorNotice({
   const [search] = useSearchParams();
   const classified = classifyApplicationError(error);
   const standardized = standardizeAIError(error);
+  const failure =
+    classified.kind === 'VALIDATION' || classified.kind === 'RULE'
+      ? inspectOutputFailure(error)
+      : null;
   const presentation =
-    standardized.code === 'UNKNOWN'
+    outputFailurePresentation(failure) ??
+    (standardized.code === 'UNKNOWN'
       ? KIND_PRESENTATIONS[classified.kind]
-      : PRESENTATIONS[standardized.code];
+      : PRESENTATIONS[standardized.code]);
   return (
     <section
       className={`inline-error ai-error-notice ai-error-notice--${classified.surface.toLowerCase()}`}
@@ -101,9 +106,11 @@ export function AIErrorNotice({
       data-error-code={classified.code}
       data-error-kind={classified.kind}
       data-error-surface={classified.surface}
+      data-error-reason={failure?.reason}
     >
       <strong>{presentation.title}</strong>
       <p>{presentation.detail}</p>
+      {failure === null ? null : <small>失败层级：{failure.label}</small>}
       <small>错误代码：{classified.code}</small>
       <div className="ai-error-notice__actions">
         {classified.actions.includes('RETRY') && onRetry !== undefined ? (
@@ -136,6 +143,86 @@ export function AIErrorNotice({
   );
 }
 
+interface OutputFailureInspection {
+  readonly reason: string;
+  readonly label: string;
+  readonly repaired: boolean;
+}
+
+function inspectOutputFailure(error: unknown): OutputFailureInspection | null {
+  let current: unknown = error;
+  let repaired = false;
+  let validationCode: string | null = null;
+  let failureCode: string | null = null;
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) break;
+    const record = current as Readonly<Record<string, unknown>>;
+    repaired ||= record['attempt'] === 'REPAIR';
+    const validation = record['validation'];
+    if (typeof validation === 'object' && validation !== null && !Array.isArray(validation)) {
+      const code = (validation as Readonly<Record<string, unknown>>)['code'];
+      if (typeof code === 'string') validationCode = code;
+    }
+    const code = record['code'];
+    if (typeof code === 'string') {
+      if (failureCode === null && outputFailureLabel(code, false) !== null) failureCode = code;
+    }
+    current = record['cause'];
+  }
+  return outputFailureLabel(validationCode ?? failureCode ?? '', repaired);
+}
+
+function outputFailureLabel(code: string, repaired: boolean): OutputFailureInspection | null {
+  if (code === 'RESPONSE_TRUNCATED') {
+    return { reason: code, label: '响应截断', repaired };
+  }
+  if (code === 'INVALID_JSON' || code === 'AMBIGUOUS_JSON') {
+    return { reason: code, label: 'JSON 解析', repaired };
+  }
+  if (code === 'SCHEMA_VALIDATION_FAILED' || code.startsWith('SCHEMA_')) {
+    return { reason: code, label: 'Schema 验证', repaired };
+  }
+  if (code.endsWith('_BUSINESS_RULE_INVALID')) {
+    return { reason: code, label: '业务规则', repaired };
+  }
+  return null;
+}
+
+function outputFailurePresentation(
+  failure: OutputFailureInspection | null,
+): ErrorPresentation | null {
+  if (failure === null) return null;
+  const prefix = failure.repaired ? '结构修复后的' : '';
+  if (failure.reason === 'RESPONSE_TRUNCATED') {
+    return {
+      title: `${prefix}模型响应未完整返回`,
+      detail: 'Provider 在 JSON 完成前停止了响应；未完成的世界草稿没有写入存档。',
+    };
+  }
+  if (failure.reason === 'AMBIGUOUS_JSON') {
+    return {
+      title: `${prefix}模型返回了多个 JSON 对象`,
+      detail: '无法安全判定唯一结果；冲突内容没有写入存档。',
+    };
+  }
+  if (failure.reason === 'INVALID_JSON') {
+    return {
+      title: `${prefix}模型返回内容无法解析`,
+      detail: '响应不是可验证的完整 JSON；不合规内容没有写入存档。',
+    };
+  }
+  if (failure.reason.endsWith('_BUSINESS_RULE_INVALID')) {
+    return {
+      title: `${prefix}模型输出违反世界规则`,
+      detail: 'JSON 结构有效，但内容不符合本地业务规则；结果没有写入存档。',
+    };
+  }
+  return {
+    title: `${prefix}模型输出结构不符合要求`,
+    detail: 'JSON 已解析，但必填字段、字段类型或枚举未通过 Schema；结果没有写入存档。',
+  };
+}
+
 function settingsActionLabel(code: string): string {
   if (code === 'AUTHENTICATION_FAILED') return '检查API Key';
   if (code === 'MODEL_NOT_FOUND') return '重新选择模型';
@@ -146,7 +233,14 @@ function settingsActionLabel(code: string): string {
 function retryActionLabel(code: string): string {
   if (code === 'RATE_LIMITED') return '重试这一步';
   if (code === 'TIMEOUT') return '重新请求';
-  if (code === 'INVALID_OUTPUT') return '重新生成';
+  if (
+    code === 'INVALID_OUTPUT' ||
+    code === 'AMBIGUOUS_JSON' ||
+    code === 'RESPONSE_TRUNCATED' ||
+    code.startsWith('SCHEMA_')
+  ) {
+    return '重新生成';
+  }
   if (code === 'NETWORK_FAILED') return '重试连接';
   return '重试相同操作';
 }

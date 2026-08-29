@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import {
+  FAKE_TASK_OUTPUTS,
   FakeAIProvider,
   type AIProvider,
   type ModelCapabilities,
@@ -76,12 +77,94 @@ describe('DesktopAIOrchestrator', () => {
         worldInput('结构损坏的世界'),
         options('failed-repair'),
       ),
-    ).rejects.toMatchObject({ code: 'INVALID_JSON' });
+    ).rejects.toMatchObject({ code: 'RESPONSE_TRUNCATED' });
 
     expect(await sessionAIInspectorGateway.load('ADVANCED')).toMatchObject({
-      generation: { status: 'FAILED', errorCode: 'INVALID_JSON' },
+      generation: { status: 'FAILED', errorCode: 'RESPONSE_TRUNCATED' },
       raw: { characters: 1, content: '［原始输出内容已遮罩］' },
-      validation: { status: 'FAILED', code: 'INVALID_JSON' },
+      validation: { status: 'FAILED', code: 'RESPONSE_TRUNCATED' },
+      repair: { attempted: true, status: 'FAILED' },
+    });
+  });
+
+  it('accepts one markdown-fenced world without spending a repair request', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const provider = new WrappedJsonProvider('FENCE');
+    const result = await new DesktopAIOrchestrator(settings, provider).execute(
+      'GENERATE_WORLD',
+      worldInput('围栏世界'),
+      options('fenced'),
+    );
+
+    expect(provider.calls).toHaveLength(1);
+    expect(result.validatedOutput).toEqual(FAKE_TASK_OUTPUTS.GENERATE_WORLD);
+    expect(result.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'REPAIR', status: 'SKIPPED' }),
+    );
+  });
+
+  it('repairs a schema-invalid world and reruns the complete schema', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const provider = new SchemaInvalidThenCapturingProvider();
+    const result = await new DesktopAIOrchestrator(settings, provider).execute(
+      'GENERATE_WORLD',
+      worldInput('缺字段世界'),
+      options('schema-repair'),
+    );
+
+    expect(provider.calls).toHaveLength(2);
+    expect(result.validatedOutput).toEqual(FAKE_TASK_OUTPUTS.GENERATE_WORLD);
+    expect(result.lifecycle.filter(({ stage }) => stage === 'VALIDATE')).toMatchObject([
+      { status: 'STARTED' },
+      { status: 'FAILED', code: 'SCHEMA_NAME_INVALID' },
+      { status: 'STARTED' },
+      { status: 'SUCCEEDED' },
+    ]);
+  });
+
+  it('fails closed when the repair response still violates the schema', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const provider = new SchemaInvalidThenCapturingProvider(2);
+
+    await expect(
+      new DesktopAIOrchestrator(settings, provider).execute(
+        'GENERATE_WORLD',
+        worldInput('持续缺字段世界'),
+        options('schema-repair-failed'),
+      ),
+    ).rejects.toMatchObject({
+      code: 'SCHEMA_NAME_INVALID',
+      cause: { attempt: 'REPAIR', validation: { code: 'SCHEMA_VALIDATION_FAILED' } },
+    });
+    expect(provider.calls).toHaveLength(2);
+  });
+
+  it('keeps the initial validation path when the independent repair request times out', async () => {
+    resetAIInspectorForTests();
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+
+    await expect(
+      new DesktopAIOrchestrator(settings, new SchemaInvalidThenTimeoutProvider()).execute(
+        'GENERATE_WORLD',
+        worldInput('修复超时世界'),
+        options('schema-repair-timeout'),
+      ),
+    ).rejects.toMatchObject({ code: 'TIMEOUT' });
+    expect(await sessionAIInspectorGateway.load('ADVANCED')).toMatchObject({
+      generation: { status: 'FAILED', errorCode: 'TIMEOUT' },
+      validation: {
+        status: 'FAILED',
+        code: 'SCHEMA_VALIDATION_FAILED',
+        issues: [expect.objectContaining({ path: 'name' })],
+      },
       repair: { attempted: true, status: 'FAILED' },
     });
   });
@@ -483,6 +566,54 @@ class InvalidThenCapturingProvider extends CapturingProvider {
         receivedAt: isoTimestamp('2026-08-01T00:00:00.000Z'),
       };
     }
+    return super.generate(request, config);
+  }
+}
+
+class WrappedJsonProvider extends CapturingProvider {
+  public constructor(private readonly wrapper: 'FENCE' | 'PROSE') {
+    super();
+  }
+
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    const response = await super.generate(request, config);
+    const content =
+      this.wrapper === 'FENCE'
+        ? `\`\`\`json\n${response.content}\n\`\`\``
+        : `生成结果如下：\n${response.content}\n生成结束。`;
+    return { ...response, content };
+  }
+}
+
+class SchemaInvalidThenCapturingProvider extends CapturingProvider {
+  public constructor(private invalidRemaining = 1) {
+    super();
+  }
+
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    if (this.invalidRemaining <= 0) return super.generate(request, config);
+    this.invalidRemaining -= 1;
+    this.calls.push({ request, config });
+    const invalid: Record<string, unknown> = { ...FAKE_TASK_OUTPUTS.GENERATE_WORLD };
+    delete invalid['name'];
+    return {
+      requestId: request.requestId,
+      providerRequestId: 'schema-invalid-request',
+      modelName: request.modelName,
+      content: JSON.stringify(invalid),
+      finishReason: 'STOP' as const,
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      receivedAt: isoTimestamp('2026-08-01T00:00:00.000Z'),
+    };
+  }
+}
+
+class SchemaInvalidThenTimeoutProvider extends SchemaInvalidThenCapturingProvider {
+  private attempts = 0;
+
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    this.attempts += 1;
+    if (this.attempts === 2) throw Object.freeze({ code: 'TIMEOUT' });
     return super.generate(request, config);
   }
 }

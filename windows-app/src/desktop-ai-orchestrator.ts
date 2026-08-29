@@ -360,12 +360,38 @@ class DesktopStructuredGenerator implements Generator<
   }
 
   public validate(parsed: DesktopRawGeneration): DesktopValidatedGeneration {
+    const attempt =
+      parsed.request.requestId === parsed.prepared.request.requestId ? 'INITIAL' : 'REPAIR';
+    if (parsed.response.finishReason === 'LENGTH') {
+      throw new DesktopOutputValidationError(
+        'RESPONSE_TRUNCATED',
+        Object.freeze({
+          code: 'RESPONSE_TRUNCATED',
+          issues: Object.freeze([
+            Object.freeze({
+              path: Object.freeze([]),
+              code: 'response_truncated',
+              message: 'Provider stopped because the output token limit was reached',
+            }),
+          ]),
+        }),
+        parsed.response.content,
+        attempt,
+      );
+    }
+    if (parsed.response.finishReason === 'CONTENT_FILTER') {
+      throw new DesktopAIOrchestrationError('CONTENT_FILTERED');
+    }
+    if (parsed.response.finishReason !== 'STOP') {
+      throw new DesktopAIOrchestrationError('PROVIDER_RESPONSE_INCOMPLETE');
+    }
     const validated = validateAIOutput(parsed.prepared.task, parsed.response.content);
     if (!validated.ok) {
       throw new DesktopOutputValidationError(
         validationFailureCode(validated.error),
         validated.error,
         parsed.response.content,
+        attempt,
       );
     }
     return Object.freeze({ ...parsed, validatedOutput: validated.validatedOutput });
@@ -402,11 +428,16 @@ class DesktopStructuredGenerator implements Generator<
     };
     this.lastRequest = request;
     const signal = prepared.options.stream?.signal ?? prepared.options.signal;
-    const response = await this.provider.generate(
-      request,
-      prepared.providerConfig,
-      signal === undefined ? undefined : { signal },
-    );
+    let response: NormalizedAIResponse;
+    try {
+      response = await this.provider.generate(
+        request,
+        prepared.providerConfig,
+        signal === undefined ? undefined : { signal },
+      );
+    } catch (repairError) {
+      throw new DesktopAIOrchestrationError(errorCodeForInspection(repairError), error);
+    }
     this.lastRaw = response.content;
     return Object.freeze({ prepared, request, response });
   }
@@ -632,16 +663,19 @@ export class DesktopAIOrchestrationError extends Error {
 class DesktopOutputValidationError extends DesktopAIOrchestrationError {
   public readonly validation: Parameters<typeof formatOutputRepairPrompt>[3];
   public readonly raw: string;
+  public readonly attempt: 'INITIAL' | 'REPAIR';
 
   public constructor(
     code: string,
     validation: Parameters<typeof formatOutputRepairPrompt>[3],
     raw: string,
+    attempt: 'INITIAL' | 'REPAIR',
   ) {
     super(code);
     this.name = 'DesktopOutputValidationError';
     this.validation = validation;
     this.raw = raw;
+    this.attempt = attempt;
   }
 }
 

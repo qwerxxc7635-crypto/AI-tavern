@@ -78,6 +78,7 @@ export type {
   OutputValidationErrorCode,
   OutputValidationFailure,
   OutputValidationIssue,
+  OutputNormalization,
   OutputValidationResult,
   OutputValidationSuccess,
 } from './output-validator.js';

@@ -194,6 +194,34 @@ describe('WindowsWorldCreationService', () => {
     expect(gateway.commits).toHaveLength(1);
   });
 
+  it('leaves no partial world after invalid output and commits only the explicit retry', async () => {
+    const gateway = new FakeWorldGateway();
+    let calls = 0;
+    const service = serviceWithQueue(gateway, {
+      async execute(_task, _input, options) {
+        calls += 1;
+        if (calls === 1) throw Object.freeze({ code: 'SCHEMA_NAME_INVALID' });
+        return execution(options.requestId, worldDraft());
+      },
+    });
+
+    await expect(service.generate('campaign-world', defaultOptions())).rejects.toMatchObject({
+      code: 'SCHEMA_NAME_INVALID',
+    });
+    expect(gateway.commits).toHaveLength(0);
+    expect(gateway.snapshot).toEqual({
+      campaignState: 'CREATING_WORLD',
+      world: null,
+      constitution: null,
+    });
+
+    await expect(service.generate('campaign-world', defaultOptions())).resolves.toMatchObject({
+      campaignState: 'REVIEWING_WORLD',
+    });
+    expect(calls).toBe(2);
+    expect(gateway.commits).toHaveLength(1);
+  });
+
   it('deduplicates concurrent world intent and commits one successful result', async () => {
     const gateway = new FakeWorldGateway();
     const delayed = deferred<undefined>();
