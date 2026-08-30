@@ -5,7 +5,7 @@ export const RELEASE_INFO = Object.freeze({
   channel: 'stable',
   status: 'released',
   changelogPath: 'CHANGELOG.md',
-  changelogHeading: '[0.3.0] - 2026-08-30',
+  changelogHeading: '[0.3.0] - 2026-08-31',
   highlights: Object.freeze([
     '建立通用角色、动态职业池、特质点数与透明平衡合同，同时保留 V0.2 兼容投影。',
     '扩展本地规则引擎，统一 D20、状态、特质、装备、金钱、时间、任务与事件的原子硬结果。',

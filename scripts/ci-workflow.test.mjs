@@ -93,6 +93,7 @@ test('requires an ephemeral Windows install lifecycle gate with system integrati
     '@(Get-ProductRegistrations).Count -eq 0',
     'Get-Content -LiteralPath $releaseInfoPath',
     '[regex]::Escape($expectedVersion)',
+    '${expectedVersion}:',
     "Get-Process -Name 'msedgewebview2' -ErrorAction SilentlyContinue |",
     'ForEach-Object { $_.Id }',
   ]) {

@@ -157,7 +157,7 @@ try {
     throw 'Installed Ember Tavern application executable was not found.'
   }
   if ($application.VersionInfo.ProductVersion -notmatch $expectedVersionPattern) {
-    throw "Installed product version is not $expectedVersion: $($application.VersionInfo.ProductVersion)"
+    throw "Installed product version is not ${expectedVersion}: $($application.VersionInfo.ProductVersion)"
   }
   $evidence.install = [ordered]@{
     exitCode = $installProcess.ExitCode
