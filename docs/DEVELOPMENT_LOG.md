@@ -5031,3 +5031,22 @@
 - 严格结构任务统一 DeepSeek non-thinking；职业池改为 4096 token、60s 无进度时限、150s operation，Provider 取消和 commit 纳入同一 intent Queue。传输层对持续分块重置 idle deadline，并保留 300s 安全总上限。TIMEOUT UI 不再误述为“网络恢复”。
 - 三组真实 DeepSeek 职业链路使用 OS Credential Store opaque reference 和隔离 SQLite。两个不同世界直接通过；既有 Campaign 显式重试先将 2048 token 截断响应 fail closed，4096 预算下 33.616s/3071 tokens 完整通过并单次提交。三库均 integrity ok、外键违规 0、unfinished 0、每 Campaign 1 个职业池/4 个职业/1 条 generation record，用户存档未打开或修改。
 - 完整门禁通过：Vitest 189 files/1091 tests，Node 30/30，Rust native 101、platform 5、provider 19、HTTP 12、secrets 3、Tauri 13；Windows E2E 1/1、desktop build 281 modules 和标准 `Ember Tavern.app` 打包通过。临时诊断入口已移除，未 push、merge、签名、notarize 或发布。
+
+## 2026-08-31 — V0.3.0 最终 Git 与 Release 发布
+
+### 发布范围与元数据
+
+- 完整复核 `docs/TASKS.md`：V0.3 的 60 项实现任务全部为 `DONE`，没有 `PARTIAL`、`NOT DONE` 或 `UNVERIFIABLE`，也没有把 V0.4 规划内容带入发布。补齐既有 DONE 项的真实完成日期，不改写任务结论。
+- 将 `CHANGELOG.md`、`release-info.json`、生成的桌面端发布信息和 README 同步为稳定版 `0.3.0`，正式发布日期为 2026-08-31；新增 `docs/RELEASE_NOTES_0.3.md`。发布准备提交为 `221ef0f806bf08bfb9ce6deba49ef31cac7cb745`，PR 为 `#3`。
+- 首轮 PR 生命周期批次 `33319736944` 发现 Windows PowerShell 在解析 `"$expectedVersion:"` 时失败；修复为显式 `${expectedVersion}` 边界并增加静态回归断言。修复提交 `e0d78874c316fe3f50c2c6109a37f8812f56fa31` 的复验批次 `33321429337` 四个 job 全部通过。
+
+### 最终门禁与发布产物
+
+- 本地 `pnpm check` 通过：Vitest 189 files / 1091 tests，另 2 files / 6 tests 按显式环境合同 skip；Node 33/33；Rust 153 tests 通过，另 1 项真实 Credential 测试 ignored；格式、release sync、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy和 archive interop 全绿。
+- Windows E2E 1/1、desktop build 281 modules、三世界加自由输入 104 项可玩性证据、确定性性能门 24 PASS / 2 个真实 Provider 指标 `NOT_EVALUATED` 均通过。Windows CI 完成 NSIS、Credential Manager、WebView2、静默安装、启动与卸载；macOS CI 完成 `.app`、Keychain、WKWebView、启动、PlatformPaths 与哈希门禁。
+- 正式 Release 只发布 Windows x64 NSIS 安装包、与 CI 一致的 macOS 应用包压缩档和 SHA-256 清单；不上传测试 SQLite、用户存档、Credential、日志或审计临时数据库。当前产物未做代码签名和 Apple notarization，该限制在 Release Notes 中明确披露。
+
+### Git 与发布边界
+
+- 发布分支先正常合并当时的 `origin/main`，保留完整历史，再通过 PR #3 以普通 merge 进入 `main`；最终 `v0.3.0` 为指向发布后 `main` HEAD 的 annotated tag。GitHub Release 固定入口为 `https://github.com/qwerxxc7635-crypto/AI-tavern/releases/tag/v0.3.0`。
+- 用户已有 `.gitignore` 修改始终保持未暂存，未进入任何发布提交。发布过程未读取、打印或上传真实 API Key，未修改用户数据库，也未开始 V0.4。
