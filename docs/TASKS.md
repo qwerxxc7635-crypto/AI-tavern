@@ -193,7 +193,7 @@
 
 ## M4-T01 World Constitution
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-14）
 - **Dependency**：M3-T04。
 - **Deliverable**：合同、Generator、SQLite migration/repository、确认 UI 和下游约束入口。
 - **Acceptance**：必需字段齐全、版本化、锁定后不可随意改写；生成内容违反 Constitution 时拒绝/repair。
@@ -202,7 +202,7 @@
 
 ## M4-T02 World Seed
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-14）
 - **Dependency**：M4-T01。
 - **Deliverable**：持久 Seed、可注入程序随机流和确定性抽样工具。
 - **Acceptance**：相同 Seed/状态得到相同程序选择；事实写入后以 SQLite 为准；D20 保持独立受信随机边界。
@@ -211,7 +211,7 @@
 
 ## M4-T03 Rules Engine Expansion
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-14）
 - **Dependency**：M4-T02。
 - **Deliverable**：属性/技能/HP/状态/装备/钱/时间/Trait/Quest/资源的规则合同与 validator。
 - **Acceptance**：所有数值状态由本地规则裁决，AI proposal 无直接写入口；事务和事件可审计。
@@ -220,7 +220,7 @@
 
 ## M4-T04 Knowledge Boundary
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-19）
 - **Dependency**：M4-T03。
 - **Deliverable**：World/NPC/Player Knowledge 持久模型、provenance、上下文投影和授权规则。
 - **Acceptance**：NPC 不获得无权事实；Player Knowledge 独立；Memory/Claim 不升级 Truth；多 NPC 场景按 Actor 投影。
@@ -233,7 +233,7 @@
 
 ## M5-T01 Universal Character Schema
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-19）
 - **Dependency**：M4-T04。
 - **Deliverable**：通用角色合同、世界扩展定义、V0.2 兼容投影与存储迁移。
 - **Acceptance**：规格字段可表达；修仙/调查/Cyberpunk 扩展示例可验证；未知扩展安全保留或明确拒绝。
@@ -242,7 +242,7 @@
 
 ## M5-T02 Quick / Advanced Creation
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M5-T01。
 - **Deliverable**：两种车卡流程和共享草稿/锁定/确认状态机。
 - **Acceptance**：Quick 一句生成完整合法卡；Advanced 全字段可编辑；切换模式不丢已锁内容；只有确认后写正式事实。
@@ -251,7 +251,7 @@
 
 ## M5-T03 Character AI Everywhere
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M5-T02。
 - **Deliverable**：单字段、3 候选、补空、区域、整卡、未锁重生能力。
 - **Acceptance**：每个自然语言字段均接入统一 AIFieldAssist；生成读取锁定上下文并通过角色一致性校验。
@@ -260,7 +260,7 @@
 
 ## M5-T04 Trait Point System
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M5-T03。
 - **Deliverable**：Buff/Debuff/Mixed/Narrative Trait 合同、点数计算、规则 UI。
 - **Acceptance**：空集合和严格净 0 可开始；非零禁止；点值只由本地规则确认。
@@ -269,7 +269,7 @@
 
 ## M5-T05 Trait Balance & Synergy
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-20）
 - **Dependency**：M5-T04。
 - **Deliverable**：`TraitBalanceValidator`、`TraitSynergyValidator`、解释性错误和生成反馈。
 - **Acceptance**：覆盖十项平衡维度并能拒绝明显组合套利；相同世界规则下结果可重复审计。
@@ -477,7 +477,7 @@
 
 ## M10-T01 Lazy World Generation
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-24）
 - **Dependency**：M9-T03。
 - **Deliverable**：核心骨架启动、按需具体化和后台生成计划。
 - **Acceptance**：新世界不等待全量 NPC/职业/Quest/地点；骨架足以安全进入；需要时幂等具体化。
@@ -591,7 +591,7 @@
 
 ## M11-T05 Free-Input Stress Test
 
-- **Status**：DONE
+- **Status**：DONE（2026-08-27）
 - **Dependency**：M11-T04。
 - **Deliverable**：至少八类非推荐行为的跨世界压力证据与修复。
 - **Acceptance**：系统可合理成功/失败/拒绝，但不崩溃、丢档、跳过后果或强迫预设路线。

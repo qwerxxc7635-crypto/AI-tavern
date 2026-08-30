@@ -117,7 +117,9 @@ export const zhCN = Object.freeze({
 export type ZhCNResources = typeof zhCN;
 
 function releaseChannelLabel(channel: string): string {
-  return channel === 'development' ? '开发频道' : '未知频道';
+  if (channel === 'development') return '开发频道';
+  if (channel === 'stable') return '稳定频道';
+  return '未知频道';
 }
 
 function apiBindingPhaseLabel(phase: string): string {
@@ -140,5 +142,7 @@ function apiBindingPhaseLabel(phase: string): string {
 }
 
 function releaseStatusLabel(status: string): string {
-  return status === 'unreleased' ? '未发布' : '未知状态';
+  if (status === 'unreleased') return '未发布';
+  if (status === 'released') return '已发布';
+  return '未知状态';
 }

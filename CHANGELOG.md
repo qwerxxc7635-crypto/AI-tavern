@@ -4,7 +4,7 @@
 
 <!-- current-release:start -->
 
-## [0.3.0] - 未发布
+## [0.3.0] - 2026-08-30
 
 <!-- current-release:end -->
 

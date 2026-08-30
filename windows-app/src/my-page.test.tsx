@@ -69,7 +69,7 @@ describe('My page information architecture', () => {
       '/settings',
     );
     expect(await screen.findByText('当前版本：0.3.0')).toBeTruthy();
-    expect(screen.getByText('发布状态：开发频道 / 未发布')).toBeTruthy();
+    expect(screen.getByText('发布状态：稳定频道 / 已发布')).toBeTruthy();
     expect(
       screen.getByRole('list', { name: '当前版本更新记录' }).querySelectorAll('li'),
     ).toHaveLength(RELEASE_INFO.highlights.length);
