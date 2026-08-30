@@ -115,6 +115,28 @@ describe('Universal Character Creation page', () => {
     expect(await screen.findByText('写下一位会在这个世界里活起来的人。')).toBeDefined();
   });
 
+  it('starts only one new Career Pool request when retry is clicked repeatedly', async () => {
+    const missing = { ...snapshot(null), careerPool: null };
+    const service = actions(missing);
+    service.generateInitialCareerPool.mockRejectedValueOnce({ code: 'TIMEOUT' });
+    renderPage(service);
+
+    expect(await screen.findByText('模型响应超时')).toBeDefined();
+    let finishRetry!: (value: UniversalCharacterCreationSnapshot) => void;
+    service.generateInitialCareerPool.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRetry = resolve;
+        }),
+    );
+    const retry = screen.getByRole('button', { name: /重新构筑职业池/ });
+    fireEvent.click(retry);
+    fireEvent.click(retry);
+
+    expect(service.generateInitialCareerPool).toHaveBeenCalledTimes(2);
+    finishRetry(snapshot(null));
+  });
+
   it('starts Quick from one concept and exposes generation without writing formal facts', async () => {
     const empty = snapshot(null);
     const active = snapshot(session('QUICK', 'ACTIVE'));

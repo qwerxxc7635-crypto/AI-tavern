@@ -162,6 +162,9 @@ interface PreparedCareerGeneration {
 }
 
 const careerGenerationQueue = new GenerationQueue({ concurrency: 2, maxPending: 32 });
+export const CAREER_PROVIDER_IDLE_TIMEOUT_MS = 60_000;
+export const CAREER_OPERATION_TIMEOUT_MS = 150_000;
+export const CAREER_MAX_OUTPUT_TOKENS = 4_096;
 
 export const tauriUniversalCharacterCreationGateway: UniversalCharacterCreationGateway = {
   async load(id) {
@@ -594,18 +597,25 @@ export class UniversalCharacterCreationService {
       poolRevision,
       requestedRarities.join('-'),
     ].join(':');
-    const prepared = await this.generationQueue.submit({
+    const careerPool = await this.generationQueue.submit({
       id: `career-pool-${crypto.randomUUID()}`,
       intentKey,
       task: 'GENERATE_CAREER_POOL',
       priority: 'P2',
-      timeoutMs: 12_000,
+      timeoutMs: CAREER_OPERATION_TIMEOUT_MS,
       maxRetries: 0,
       allowFallback: false,
-      execute: ({ signal }) =>
-        this.prepareCareerGeneration(snapshot, mode, requestedRarities, signal),
+      execute: async ({ signal }) => {
+        const prepared = await this.prepareCareerGeneration(
+          snapshot,
+          mode,
+          requestedRarities,
+          signal,
+        );
+        requireCareerGenerationActive(signal);
+        return this.gateway.commitCareerPool(prepared);
+      },
     }).promise;
-    const careerPool = await this.gateway.commitCareerPool(prepared);
     return Object.freeze({ ...snapshot, careerPool });
   }
 
@@ -635,8 +645,9 @@ export class UniversalCharacterCreationService {
     const generated = await this.ai.execute('GENERATE_CAREER_POOL', input, {
       requestId: identity.requestId,
       temperature,
-      maxOutputTokens: 8_000,
-      timeoutMs: 8_000,
+      maxOutputTokens: CAREER_MAX_OUTPUT_TOKENS,
+      timeoutMs: CAREER_PROVIDER_IDLE_TIMEOUT_MS,
+      signal,
     });
     const output = CareerOutputSchema.parse(generated.validatedOutput);
     requireCareerGenerationActive(signal);

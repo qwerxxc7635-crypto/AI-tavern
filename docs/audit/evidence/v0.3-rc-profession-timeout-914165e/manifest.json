@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "branch": "fix/v0.3-rc-playtest-issues",
+  "startingHead": "914165e",
+  "sourceScreenshot": {
+    "path": "source/profession-pool-timeout-user-playtest.png",
+    "sha256": "ecacee64d24369bf050ccadb4580656785655a5291e19c1ec5bb12a4a8a9a333",
+    "page": "EMBER TAVERN / 01 / 构筑职业池",
+    "errorCode": "TIMEOUT"
+  },
+  "credentialHandling": "OS_CREDENTIAL_STORE_OPAQUE_REFERENCE_ONLY",
+  "userSaveOpenedOrModified": false,
+  "secretMaterialRecorded": false,
+  "previousAuditEvidenceOverwritten": false
+}

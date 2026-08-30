@@ -1,5 +1,6 @@
 import {
   FakeAIProvider,
+  StandardAIError,
   type AIProvider,
   type NormalizedAIRequest,
   type ProviderConfig,
@@ -25,6 +26,9 @@ import {
 import { describe, expect, it, vi } from 'vitest';
 
 import {
+  CAREER_MAX_OUTPUT_TOKENS,
+  CAREER_OPERATION_TIMEOUT_MS,
+  CAREER_PROVIDER_IDLE_TIMEOUT_MS,
   UniversalCharacterCreationService,
   buildQuickDraft,
   type UniversalCharacterCreationGateway,
@@ -38,7 +42,8 @@ const at = isoTimestamp('2026-08-20T02:00:00.000Z');
 describe('UniversalCharacterCreationService', () => {
   it('generates and commits an initial four-tier Career Pool before character creation', async () => {
     const gateway = new FakeGateway({ ...advancedSnapshot(), careerPool: null, session: null });
-    const service = serviceWith(gateway, new CareerPoolProvider());
+    const provider = new CareerPoolProvider();
+    const service = serviceWith(gateway, provider);
 
     const result = await service.generateInitialCareerPool(gateway.snapshot);
 
@@ -59,6 +64,38 @@ describe('UniversalCharacterCreationService', () => {
         },
       },
     });
+    expect(provider.careerRequests).toHaveLength(1);
+    expect(provider.careerRequests[0]).toMatchObject({
+      maxOutputTokens: CAREER_MAX_OUTPUT_TOKENS,
+      timeoutMs: CAREER_PROVIDER_IDLE_TIMEOUT_MS,
+    });
+    expect(CAREER_OPERATION_TIMEOUT_MS).toBeGreaterThan(CAREER_PROVIDER_IDLE_TIMEOUT_MS * 2);
+  });
+
+  it('fails a timed-out Career Pool closed without attempting a commit', async () => {
+    const gateway = new FakeGateway({ ...advancedSnapshot(), careerPool: null, session: null });
+    const service = serviceWith(gateway, new TimedOutCareerPoolProvider());
+
+    await expect(service.generateInitialCareerPool(gateway.snapshot)).rejects.toMatchObject({
+      code: 'TIMEOUT',
+    });
+    expect(gateway.careerCommits).toHaveLength(0);
+    expect(gateway.snapshot.careerPool).toBeNull();
+  });
+
+  it('deduplicates concurrent Career Pool intent through the single transaction commit', async () => {
+    const gateway = new FakeGateway({ ...advancedSnapshot(), careerPool: null, session: null });
+    const provider = new DelayedCareerPoolProvider();
+    const service = serviceWith(gateway, provider);
+
+    const [first, second] = await Promise.all([
+      service.generateInitialCareerPool(gateway.snapshot),
+      service.generateInitialCareerPool(gateway.snapshot),
+    ]);
+
+    expect(first.careerPool).toEqual(second.careerPool);
+    expect(provider.calls).toBe(1);
+    expect(gateway.careerCommits).toHaveLength(1);
   });
 
   it('turns one Quick concept into a complete locally bounded candidate', async () => {
@@ -260,13 +297,35 @@ class ContradictingCharacterProvider extends FakeAIProvider {
 }
 
 class CareerPoolProvider extends FakeAIProvider {
+  public readonly careerRequests: NormalizedAIRequest[] = [];
+
   public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
     const response = await super.generate(request, config);
     if (request.task !== 'GENERATE_CAREER_POOL') return response;
+    this.careerRequests.push(request);
     return {
       ...response,
       content: JSON.stringify({ schemaVersion: 1, careers: generatedCareerCandidates() }),
     };
+  }
+}
+
+class TimedOutCareerPoolProvider extends CareerPoolProvider {
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    if (request.task === 'GENERATE_CAREER_POOL') throw new StandardAIError('TIMEOUT');
+    return super.generate(request, config);
+  }
+}
+
+class DelayedCareerPoolProvider extends CareerPoolProvider {
+  public calls = 0;
+
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    if (request.task === 'GENERATE_CAREER_POOL') {
+      this.calls += 1;
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    return super.generate(request, config);
   }
 }
 

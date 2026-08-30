@@ -3467,3 +3467,20 @@ Prompt 输出 Schema 继续直接来自 `AI_TASK_SCHEMAS`；Rust commit 继续�
 - 不降低任何必填、枚举、引用或 Rust commit 约束；业务错误与 Schema 错误在 UI 和证据中保持可区分。
 - 4096 不是无限保证；`finishReason=LENGTH` 仍明确进入截断/结构修复或 fail-closed 流程。
 - 三次真实世界生成只使用隔离存档与 OS Credential Store opaque reference；该验证不授予公开发布、签名或部署权限。
+## DEC-161：结构生成使用任务级 reasoning、无进度与总时限预算
+
+- 日期：2026-08-30
+- 状态：已采纳
+- 依据：RC 真人实测世界/职业池 TIMEOUT 与 `docs/audit/evidence/v0.3-rc-profession-timeout-914165e/`
+
+### 背景
+
+DeepSeek 的严格 JSON 任务若使用 Provider 默认 thinking，可在没有可用 content 的情况下消耗任务时间。原职业池又把 12 秒 Queue 总时限、Provider 时限和 commit 分开配置，造成 UI 失败、后台请求可继续与重复 commit 窗口。
+
+### 决定
+
+对 DeepSeek 的世界、职业、特质、角色和一致性等严格结构任务显式关闭 thinking，叙事/推理任务保留默认。Provider timeout 表示首包/无进度时限，合法分块重置它；传输仍有 300 秒安全总上限。业务 Queue 独立提供 operation 总时限与取消，repair 使用新的 Provider 无进度预算。同一 intent 的准备与事务提交必须位于同一去重 Queue 内。
+
+### 影响与可逆性
+
+职业池以真实样本校准为 4096 token、60 秒无进度、150 秒 operation。其他任务仍保留自身 Schema/历史预算，不因本决定统一放大 token。具体数值可随脱敏统计调整，fail-closed、信号贯穿和单事务边界不可撤销。

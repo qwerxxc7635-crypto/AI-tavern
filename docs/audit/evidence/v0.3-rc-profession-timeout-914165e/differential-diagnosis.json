@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 1,
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "endpointPath": "/chat/completions",
+  "responseFormat": "json_object",
+  "cases": [
+    {
+      "case": "minimum-json-disabled",
+      "configuredIdleTimeoutMs": 8000,
+      "complete": true,
+      "elapsedMs": 2187,
+      "finishReason": "STOP",
+      "inputTokens": 36,
+      "outputTokens": 5,
+      "jsonParse": true
+    },
+    {
+      "case": "profession-original-provider-default",
+      "configuredIdleTimeoutMs": 8000,
+      "maxOutputTokens": 8000,
+      "complete": false,
+      "elapsedMs": 8004,
+      "error": "TIMEOUT"
+    },
+    {
+      "case": "profession-disabled-same-authority",
+      "configuredIdleTimeoutMs": 120000,
+      "maxOutputTokens": 4096,
+      "complete": true,
+      "elapsedMs": 13691,
+      "finishReason": "STOP",
+      "inputTokens": 1262,
+      "outputTokens": 1421,
+      "jsonParse": true
+    }
+  ],
+  "productionSemantics": {
+    "serviceRequestedProviderTimeoutMsBeforeFix": 8000,
+    "remoteEffectiveProviderTimeoutMsBeforeFix": 60000,
+    "careerQueueOperationTimeoutMsBeforeFix": 12000,
+    "queueSignalPassedToProviderBeforeFix": false,
+    "commitInsideDeduplicatedQueueBeforeFix": false
+  },
+  "rootCause": [
+    "GENERATE_CAREER_POOL had a 12 second queue deadline although an identical non-thinking career response required 13.691 seconds.",
+    "The queue AbortSignal was not passed into the Provider request, so the UI operation could time out while the paid request continued in the background.",
+    "DeepSeek thinking was disabled only for world tasks, leaving strict career generation on provider-default reasoning.",
+    "The transaction commit occurred outside the intent-deduplicated queue, allowing concurrent callers to invoke commit more than once.",
+    "The transport used one absolute deadline for the entire response, so continuous response progress could still be interrupted."
+  ]
+}

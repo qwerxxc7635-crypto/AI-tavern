@@ -216,6 +216,7 @@ export function CharacterCreationPage({
   } | null>(null);
   const [bulkUndo, setBulkUndo] = useState<UniversalCharacterDraft | null>(null);
   const bulkAbort = useRef<AbortController | null>(null);
+  const operationInFlight = useRef(false);
   const draftRef = useRef<UniversalCharacterDraft | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<unknown | null>(null);
@@ -243,6 +244,8 @@ export function CharacterCreationPage({
   }, [campaignId, service]);
 
   async function perform(run: () => Promise<UniversalCharacterCreationSnapshot>) {
+    if (operationInFlight.current) return;
+    operationInFlight.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -258,6 +261,7 @@ export function CharacterCreationPage({
     } catch (cause) {
       setError(cause);
     } finally {
+      operationInFlight.current = false;
       setBusy(false);
     }
   }

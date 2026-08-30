@@ -33,6 +33,12 @@ describe('AIErrorNotice', () => {
     expect(retry).toHaveBeenCalledOnce();
   });
 
+  it('describes TIMEOUT without claiming that the network is down', () => {
+    renderNotice('TIMEOUT', () => undefined);
+    expect(screen.getByText(/模型未在本步的等待时间内完成响应/)).toBeTruthy();
+    expect(screen.queryByText(/网络恢复/)).toBeNull();
+  });
+
   it('does not leak an unknown provider message and still offers a next step', () => {
     render(
       <MemoryRouter>

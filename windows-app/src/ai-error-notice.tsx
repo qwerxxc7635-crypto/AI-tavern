@@ -29,7 +29,7 @@ const PRESENTATIONS: Readonly<Record<StandardAIErrorCode, ErrorPresentation>> = 
   },
   TIMEOUT: {
     title: '模型响应超时',
-    detail: '本地进度没有改变。网络恢复后可重试同一步。',
+    detail: '本地进度没有改变。模型未在本步的等待时间内完成响应，可以重试同一步。',
   },
   MODEL_NOT_FOUND: {
     title: '当前模型不可用',

@@ -5025,3 +5025,9 @@
 
 - `pnpm check` PASS：Vitest 189 files / 1087 tests，另 2 files / 6 tests 合同 skip；Node 30/30；Rust native 101、platform 5、provider 19、HTTP 11、secrets 3、Tauri 13 全绿，1 个环境变量式真实测试 ignored。Windows E2E 1/1、desktop 281 modules 和移除临时诊断入口后的标准 macOS `.app` 构建均 PASS。
 - 新增追加证据目录 `audit/evidence/v0.3-rc-playtest-real-provider-1934053/`，更新 RC 修复报告与 `DEC-160`。三个问题均完全关闭，状态更新为 `FIXED — READY FOR RC REVALIDATION`；只批准 RC 复验，不构成公开发布批准。未 push、merge、签名、notarize 或发布。
+## 2026-08-30 — V0.3 RC 职业池 TIMEOUT 追加闭环
+
+- 在同一 `fix/v0.3-rc-playtest-issues` 分支与 `914165e` 之后固化真人实测职业池 TIMEOUT 截图，不覆盖二轮审计证据。差分确认职业池 12s Queue 总时限、未传递 AbortSignal、DeepSeek provider-default thinking 与 Queue 外 commit 共同导致问题；不将它写成普通网络中断。
+- 严格结构任务统一 DeepSeek non-thinking；职业池改为 4096 token、60s 无进度时限、150s operation，Provider 取消和 commit 纳入同一 intent Queue。传输层对持续分块重置 idle deadline，并保留 300s 安全总上限。TIMEOUT UI 不再误述为“网络恢复”。
+- 三组真实 DeepSeek 职业链路使用 OS Credential Store opaque reference 和隔离 SQLite。两个不同世界直接通过；既有 Campaign 显式重试先将 2048 token 截断响应 fail closed，4096 预算下 33.616s/3071 tokens 完整通过并单次提交。三库均 integrity ok、外键违规 0、unfinished 0、每 Campaign 1 个职业池/4 个职业/1 条 generation record，用户存档未打开或修改。
+- 完整门禁通过：Vitest 189 files/1091 tests，Node 30/30，Rust native 101、platform 5、provider 19、HTTP 12、secrets 3、Tauri 13；Windows E2E 1/1、desktop build 281 modules 和标准 `Ember Tavern.app` 打包通过。临时诊断入口已移除，未 push、merge、签名、notarize 或发布。

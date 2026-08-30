@@ -750,7 +750,18 @@ fn runtime_provider_config(
 }
 
 fn should_disable_thinking(preset_key: &str, task: &str) -> bool {
-    preset_key == "deepseek" && matches!(task, "GENERATE_WORLD" | "REFINE_WORLD")
+    preset_key == "deepseek"
+        && matches!(
+            task,
+            "GENERATE_WORLD"
+                | "REFINE_WORLD"
+                | "GENERATE_CAREER_POOL"
+                | "GENERATE_CHARACTER_TRAITS"
+                | "COMPLETE_CHARACTER_BACKGROUND"
+                | "GENERATE_QUICK_CHARACTER"
+                | "EDIT_CHARACTER_DRAFT"
+                | "CHECK_CONSISTENCY"
+        )
 }
 
 fn is_sha256_hex(value: &str) -> bool {
@@ -1989,10 +2000,24 @@ mod tests {
     use time::format_description::well_known::Rfc3339;
 
     #[test]
-    fn deepseek_world_tasks_disable_thinking_without_affecting_other_tasks_or_providers() {
-        assert!(should_disable_thinking("deepseek", "GENERATE_WORLD"));
-        assert!(should_disable_thinking("deepseek", "REFINE_WORLD"));
+    fn deepseek_strict_structured_tasks_disable_thinking_without_affecting_narrative_tasks() {
+        for task in [
+            "GENERATE_WORLD",
+            "REFINE_WORLD",
+            "GENERATE_CAREER_POOL",
+            "GENERATE_CHARACTER_TRAITS",
+            "COMPLETE_CHARACTER_BACKGROUND",
+            "GENERATE_QUICK_CHARACTER",
+            "EDIT_CHARACTER_DRAFT",
+            "CHECK_CONSISTENCY",
+        ] {
+            assert!(should_disable_thinking("deepseek", task), "{task}");
+        }
         assert!(!should_disable_thinking("deepseek", "NPC_REPLY"));
+        assert!(!should_disable_thinking(
+            "deepseek",
+            "GENERATE_ADVENTURE_TURN"
+        ));
         assert!(!should_disable_thinking("custom", "GENERATE_WORLD"));
     }
 

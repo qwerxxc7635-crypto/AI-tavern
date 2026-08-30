@@ -8,18 +8,21 @@
 - 追加诊断基线：`1934053`
 - 原始修复证据：[`evidence/v0.3-rc-playtest-fix-00fc1ad/`](evidence/v0.3-rc-playtest-fix-00fc1ad/)
 - 追加真实链路证据：[`evidence/v0.3-rc-playtest-real-provider-1934053/`](evidence/v0.3-rc-playtest-real-provider-1934053/)
+- 职业池 TIMEOUT 追加证据：[`evidence/v0.3-rc-profession-timeout-914165e/`](evidence/v0.3-rc-profession-timeout-914165e/)
 
 本轮只处理三个 RC 实测阻塞项。凭据只通过 OS Credential Store opaque reference 使用；没有读取或记录 API Key、Authorization、用户故事或用户存档内容。所有真实生成都使用隔离 SQLite。没有修改用户 `.gitignore`，没有覆盖第二轮审计证据，没有 push、merge、签名、notarize 或发布。
 
-差分诊断实际 API 调用严格为 5 次：含钥匙串人工授权等待的 A warm-up、排除人工等待后的 A、B、C、D。修复后三世界验收独立执行 3 次初始生成；第三次按既有合同额外执行 1 次且仅 1 次 repair。
+世界问题的 A–D 差分与三世界验收保持原证据。职业池追加诊断使用权威职业 Prompt/Schema 和三份隔离 SQLite；失败、截断与取消响应均 fail closed，没有保存模型正文到开发证据。
 
 ## RC-PLAYTEST-001 — 世界生成 `TIMEOUT`
 
 - 严重度：P1 / RC blocker。
 - 复现结果：原截图与旧隔离验证均可复现超时。追加差分中 `/models` 167ms 成功并找到 `deepseek-v4-flash`；最小 JSON 在 thinking disabled/default 下分别 800ms/1155ms 完成，排除认证、模型不存在、DNS/连接和 JSON mode 整体不可用。
-- 根因：原实现同时存在两个因素：世界任务绕过统一 Queue、使用 120 秒完整流 deadline 承担最大 8000 token；DeepSeek V4 Flash 未显式设置 thinking，默认高强度 reasoning，而当前流只投影 `delta.content`。世界构筑因此可能长时间消耗 reasoning token 却没有可见内容，最终撞上完整流 deadline。8000 预算也没有历史输出依据。
+- 根因：世界根因保持不变。追加职业池证据确认同源任务配置漂移：`GENERATE_CAREER_POOL` 只有 12s Queue 整体时限，同一权威 Prompt 在 non-thinking 下就需 13.691s；Queue `AbortSignal` 没有传入 Provider，页面超时后请求可继续后台运行；DeepSeek non-thinking 只适用世界任务；commit 位于去重 Queue 外。传输层另把持续分块响应也绑在同一绝对 deadline。
 - 修改文件：`crates/provider-openai-compatible/src/lib.rs`、`windows-app/src-tauri/src/lib.rs`、`windows-app/src/world-creation-service.ts` 及对应测试；原 Queue/取消修复文件保持不变。
-- 修复机制：仅对 DeepSeek 的 `GENERATE_WORLD/REFINE_WORLD` 序列化 `thinking:{type:"disabled"}`，其他 Provider/任务保留默认行为；世界输出预算以历史成功样本重新校准为 4096；保留 DNS 10s、connect 15s、Provider 120s、operation 270s、单并发去重和端到端取消。
+- 修复机制：DeepSeek non-thinking 策略统一覆盖世界、职业、特质、角色与一致性修复等严格结构任务，叙事/推理任务保留 Provider default。职业池使用 4096 token、60s Provider 无进度时限和 150s operation 总时限，为初始+一次 repair 留出独立 HTTP 预算。Queue 信号贯穿 Provider/HTTP，准备和 commit 均在同一 intent 去重区内。传输 timeout 改为首包/无进度计时，每个合法 chunk 重置，同时保留 300s 安全总上限。
+- 追加真实验证：PASS。两个不同世界配置的职业池分别 20.468s / 14.553s 完成，token 1510→1731 / 1394→1596。既有 Campaign 显式重试先证明旧 12s 操作取消，再以 2048 token 复现 `LENGTH` 并 fail closed，校准到 4096 后 33.616s、2333→3071 token、`STOP`，完整通过 JSON/TS Schema/业务/Rust transaction。
+- SQLite：三份隔离库均 `integrity_check=ok`、外键违规 0、unfinished 0；每个目标 Campaign 只有 1 个职业池、4 个职业和 1 条 generation record，幂等重放不增写。
 - 回归测试：默认请求不携带 thinking 扩展；DeepSeek 世界/重绘精确携带 disabled；最小 JSON 请求锁定 `json_object`、256 token 和显式 JSON 指令；世界服务锁定 4096/120s；既有超时、取消、重试、并发去重和单次提交测试全绿。
 - 真实验证状态：PASS。三组生产世界请求均在 120s 内得到完整 `STOP`；总时延 14.209s、10.047s、45.514s，第三组 repair 20.120s。首内容分别 1.732s、1.892s、1.373s，repair 1.096s。
 - SQLite：三份验收 Campaign 均为 `REVIEWING_WORLD`，world/constitution/generation record 各 3，unfinished 0，重复请求 0。
@@ -52,7 +55,7 @@
 
 ## 完整门禁
 
-- `pnpm check`：PASS；Vitest 189 files / 1087 tests，另 2 files / 6 tests 按合同 skip；Node 30/30；Rust native 101、platform 5、provider 19、HTTP 11、secrets 3、Tauri 13 全部通过，1 个环境变量式真实 DeepSeek 单测按合同 ignored；格式、release metadata、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy、archive interop 全绿。
+- `pnpm check`：PASS；Vitest 189 files / 1091 tests，另 2 files / 6 tests 按合同 skip；Node 30/30；Rust native 101、platform 5、provider 19、HTTP 12、secrets 3、Tauri 13 全部通过，1 个环境变量式真实 DeepSeek 单测按合同 ignored；格式、release metadata、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy、archive interop 全绿。
 - `pnpm test:windows-e2e`：1/1 PASS。
 - `pnpm build:desktop`：PASS，Vite 281 modules。
 - `pnpm --dir windows-app tauri build --bundles app`：PASS；标准 `Ember Tavern.app` 在移除临时诊断入口后重新构建。

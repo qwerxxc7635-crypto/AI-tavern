@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS",
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "thinking": "disabled",
+  "responseMode": "JSON_OBJECT",
+  "maxOutputTokens": 4096,
+  "providerIdleTimeoutMs": 60000,
+  "operationTimeoutMs": 150000,
+  "isolatedData": true,
+  "userSaveModified": false,
+  "runs": [
+    {
+      "run": 1,
+      "scenario": "world-configuration-1-to-profession",
+      "latencyMs": 20468,
+      "finishReason": "STOP",
+      "inputTokens": 1510,
+      "outputTokens": 1731,
+      "jsonParse": "PASS",
+      "typescriptSchema": "PASS",
+      "businessValidation": "PASS",
+      "rustTransaction": "PASS",
+      "careerCount": 4,
+      "duplicateCommit": false
+    },
+    {
+      "run": 2,
+      "scenario": "different-world-configuration-to-profession",
+      "latencyMs": 14553,
+      "finishReason": "STOP",
+      "inputTokens": 1394,
+      "outputTokens": 1596,
+      "jsonParse": "PASS",
+      "typescriptSchema": "PASS",
+      "businessValidation": "PASS",
+      "rustTransaction": "PASS",
+      "careerCount": 4,
+      "duplicateCommit": false
+    },
+    {
+      "run": 3,
+      "scenario": "existing-campaign-explicit-retry",
+      "oldOperationAttempt": {"cancelAfterMs": 12000, "providerResult": "CANCELLED", "transaction": "NOT_RUN"},
+      "firstFixedAttempt": {"maxOutputTokens": 2048, "finishReason": "LENGTH", "jsonParse": "FAIL_CLOSED", "transaction": "NOT_RUN"},
+      "retryLatencyMs": 33616,
+      "retryFinishReason": "STOP",
+      "inputTokens": 2333,
+      "outputTokens": 3071,
+      "jsonParse": "PASS",
+      "typescriptSchema": "PASS",
+      "businessValidation": "PASS",
+      "rustTransaction": "PASS",
+      "careerCount": 4,
+      "duplicateCommit": false
+    }
+  ],
+  "providerRequestIdPresentForSuccessfulCalls": true,
+  "cacheMetrics": "UNAVAILABLE_IN_RECORDED_RESPONSE",
+  "secretMaterialRecorded": false
+}
