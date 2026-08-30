@@ -45,6 +45,32 @@ type SnapshotTable =
   | 'npc_knowledge'
   | 'npc_relationships'
   | 'quests'
+  | 'quest_pool_states'
+  | 'quest_pool_transitions'
+  | 'quest_graphs'
+  | 'quest_graph_edges'
+  | 'quest_graph_revisions'
+  | 'quest_graph_evaluations'
+  | 'dynamic_quest_sources'
+  | 'world_director_runs'
+  | 'world_director_proposals'
+  | 'director_budget_states'
+  | 'director_budget_admissions'
+  | 'director_budget_entries'
+  | 'director_budget_cooldowns'
+  | 'director_budget_decisions'
+  | 'world_truths'
+  | 'knowledge_claims'
+  | 'actor_knowledge'
+  | 'knowledge_memories'
+  | 'historical_summaries'
+  | 'world_lore_entries'
+  | 'world_lore_retrieval_rules'
+  | 'memory_artifact_sources'
+  | 'lazy_world_generation_plans'
+  | 'lazy_world_generation_transitions'
+  | 'prefetch_candidates'
+  | 'prefetch_events'
   | 'adventures'
   | 'adventure_turns'
   | 'conversations'
@@ -66,6 +92,51 @@ const TABLE_QUERIES: Readonly<Record<SnapshotTable, string>> = {
     FROM npc_relationships JOIN npcs ON npcs.id = npc_relationships.npc_id
     WHERE npcs.campaign_id = ? ORDER BY npc_relationships.npc_id`,
   quests: 'SELECT * FROM quests WHERE campaign_id = ? ORDER BY id',
+  quest_pool_states: 'SELECT * FROM quest_pool_states WHERE campaign_id = ? ORDER BY quest_id',
+  quest_pool_transitions:
+    'SELECT * FROM quest_pool_transitions WHERE campaign_id = ? ORDER BY quest_id, after_revision',
+  quest_graphs: 'SELECT * FROM quest_graphs WHERE campaign_id = ? ORDER BY campaign_id',
+  quest_graph_edges:
+    'SELECT * FROM quest_graph_edges WHERE campaign_id = ? ORDER BY priority DESC, id',
+  quest_graph_revisions:
+    'SELECT * FROM quest_graph_revisions WHERE campaign_id = ? ORDER BY revision',
+  quest_graph_evaluations:
+    'SELECT * FROM quest_graph_evaluations WHERE campaign_id = ? ORDER BY occurred_at, operation_id',
+  dynamic_quest_sources:
+    'SELECT * FROM dynamic_quest_sources WHERE campaign_id = ? ORDER BY created_at, quest_id',
+  world_director_runs:
+    'SELECT * FROM world_director_runs WHERE campaign_id = ? ORDER BY created_at, id',
+  world_director_proposals:
+    'SELECT * FROM world_director_proposals WHERE campaign_id = ? ORDER BY run_id, ordinal',
+  director_budget_states:
+    'SELECT * FROM director_budget_states WHERE campaign_id = ? ORDER BY campaign_id',
+  director_budget_admissions:
+    'SELECT * FROM director_budget_admissions WHERE campaign_id = ? ORDER BY admitted_at, run_id',
+  director_budget_entries:
+    'SELECT * FROM director_budget_entries WHERE campaign_id = ? ORDER BY requested_game_time, run_id, ordinal',
+  director_budget_cooldowns:
+    'SELECT * FROM director_budget_cooldowns WHERE campaign_id = ? ORDER BY cooldown_key',
+  director_budget_decisions:
+    'SELECT * FROM director_budget_decisions WHERE campaign_id = ? ORDER BY id',
+  world_truths: 'SELECT * FROM world_truths WHERE campaign_id = ? ORDER BY id',
+  knowledge_claims: 'SELECT * FROM knowledge_claims WHERE campaign_id = ? ORDER BY id',
+  actor_knowledge: 'SELECT * FROM actor_knowledge WHERE campaign_id = ? ORDER BY id',
+  knowledge_memories: 'SELECT * FROM knowledge_memories WHERE campaign_id = ? ORDER BY id',
+  historical_summaries:
+    'SELECT * FROM historical_summaries WHERE campaign_id = ? ORDER BY covered_to, id',
+  world_lore_entries:
+    'SELECT * FROM world_lore_entries WHERE campaign_id = ? ORDER BY updated_at, id',
+  world_lore_retrieval_rules:
+    'SELECT * FROM world_lore_retrieval_rules WHERE campaign_id = ? ORDER BY priority DESC, lore_entry_id',
+  memory_artifact_sources:
+    'SELECT * FROM memory_artifact_sources WHERE campaign_id = ? ORDER BY artifact_kind, artifact_id, ordinal',
+  lazy_world_generation_plans:
+    "SELECT * FROM lazy_world_generation_plans WHERE campaign_id = ? ORDER BY CASE priority WHEN 'P0' THEN 0 WHEN 'P1' THEN 1 ELSE 2 END, created_at, intent_key",
+  lazy_world_generation_transitions:
+    'SELECT * FROM lazy_world_generation_transitions WHERE campaign_id = ? ORDER BY id',
+  prefetch_candidates:
+    "SELECT * FROM prefetch_candidates WHERE campaign_id = ? ORDER BY CASE priority WHEN 'P1' THEN 0 ELSE 1 END, predicted_at, id",
+  prefetch_events: 'SELECT * FROM prefetch_events WHERE campaign_id = ? ORDER BY id',
   adventures: 'SELECT * FROM adventures WHERE campaign_id = ? ORDER BY id',
   adventure_turns: `SELECT adventure_turns.*
     FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id
@@ -88,6 +159,12 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'npc_knowledge',
   'npc_relationships',
   'quests',
+  'quest_pool_states',
+  'quest_pool_transitions',
+  'quest_graphs',
+  'quest_graph_revisions',
+  'quest_graph_edges',
+  'quest_graph_evaluations',
   'adventures',
   'adventure_turns',
   'conversations',
@@ -95,6 +172,26 @@ const INSERT_ORDER: readonly SnapshotTable[] = [
   'items',
   'world_clocks',
   'game_events',
+  'world_truths',
+  'knowledge_claims',
+  'actor_knowledge',
+  'knowledge_memories',
+  'historical_summaries',
+  'world_lore_entries',
+  'world_lore_retrieval_rules',
+  'memory_artifact_sources',
+  'dynamic_quest_sources',
+  'world_director_runs',
+  'world_director_proposals',
+  'director_budget_states',
+  'director_budget_admissions',
+  'director_budget_entries',
+  'director_budget_cooldowns',
+  'director_budget_decisions',
+  'lazy_world_generation_plans',
+  'lazy_world_generation_transitions',
+  'prefetch_candidates',
+  'prefetch_events',
 ];
 
 export class SnapshotRepository {
@@ -266,12 +363,20 @@ export class SnapshotRepository {
       .map(toStoredRow);
 
     this.database.exec('PRAGMA defer_foreign_keys = ON');
+    this.database
+      .prepare('INSERT INTO quest_pool_restore_sessions (campaign_id) VALUES (?)')
+      .run(snapshot.campaignId);
     this.deleteCampaignState(snapshot.campaignId);
     this.restoreCampaign(payload.campaign);
     for (const table of INSERT_ORDER) {
       for (const stored of payload.tables[table]) this.insertRow(table, stored);
     }
+    this.backfillLegacyQuestPool(snapshot.campaignId);
+    this.backfillLegacyQuestGraph(snapshot.campaignId);
     for (const request of turnRequests) this.restoreTurnRequest(request);
+    this.database
+      .prepare('DELETE FROM quest_pool_restore_sessions WHERE campaign_id = ?')
+      .run(snapshot.campaignId);
     return snapshot;
   }
 
@@ -288,6 +393,32 @@ export class SnapshotRepository {
 
   private deleteCampaignState(campaign: CampaignId): void {
     const statements = [
+      'DELETE FROM prefetch_events WHERE campaign_id = ?',
+      'DELETE FROM prefetch_candidates WHERE campaign_id = ?',
+      'DELETE FROM lazy_world_generation_transitions WHERE campaign_id = ?',
+      'DELETE FROM lazy_world_generation_plans WHERE campaign_id = ?',
+      'DELETE FROM memory_artifact_sources WHERE campaign_id = ?',
+      'DELETE FROM world_lore_retrieval_rules WHERE campaign_id = ?',
+      'DELETE FROM historical_summaries WHERE campaign_id = ?',
+      'DELETE FROM world_lore_entries WHERE campaign_id = ?',
+      'DELETE FROM knowledge_memories WHERE campaign_id = ?',
+      'DELETE FROM actor_knowledge WHERE campaign_id = ?',
+      'DELETE FROM knowledge_claims WHERE campaign_id = ?',
+      'DELETE FROM world_truths WHERE campaign_id = ?',
+      'DELETE FROM director_budget_decisions WHERE campaign_id = ?',
+      'DELETE FROM director_budget_cooldowns WHERE campaign_id = ?',
+      'DELETE FROM director_budget_entries WHERE campaign_id = ?',
+      'DELETE FROM director_budget_admissions WHERE campaign_id = ?',
+      'DELETE FROM director_budget_states WHERE campaign_id = ?',
+      'DELETE FROM world_director_proposals WHERE campaign_id = ?',
+      'DELETE FROM world_director_runs WHERE campaign_id = ?',
+      'DELETE FROM dynamic_quest_sources WHERE campaign_id = ?',
+      'DELETE FROM quest_graph_evaluations WHERE campaign_id = ?',
+      'DELETE FROM quest_graph_revisions WHERE campaign_id = ?',
+      'DELETE FROM quest_graph_edges WHERE campaign_id = ?',
+      'DELETE FROM quest_graphs WHERE campaign_id = ?',
+      'DELETE FROM quest_pool_transitions WHERE campaign_id = ?',
+      'DELETE FROM quest_pool_states WHERE campaign_id = ?',
       `DELETE FROM messages WHERE conversation_id IN
          (SELECT id FROM conversations WHERE campaign_id = ?)`,
       `DELETE FROM adventure_turns WHERE adventure_id IN
@@ -309,6 +440,64 @@ export class SnapshotRepository {
       'DELETE FROM world_bibles WHERE campaign_id = ?',
     ];
     for (const sql of statements) this.database.prepare(sql).run(campaign);
+  }
+
+  private backfillLegacyQuestPool(campaign: CampaignId): void {
+    this.database
+      .prepare(
+        `INSERT INTO quest_pool_states (
+           quest_id,campaign_id,status,revision,last_source,last_reason,last_operation_id,
+           created_at,updated_at
+         )
+         SELECT id,campaign_id,status,1,'MIGRATION',
+           'Restored from a legacy internal snapshot.','quest:snapshot-migration:' || id,
+           created_at,updated_at
+         FROM quests
+         WHERE campaign_id=?
+           AND NOT EXISTS (SELECT 1 FROM quest_pool_states WHERE quest_id=quests.id)`,
+      )
+      .run(campaign);
+    this.database
+      .prepare(
+        `INSERT INTO quest_pool_transitions (
+           operation_id,quest_id,campaign_id,from_status,to_status,source,reason,
+           before_revision,after_revision,occurred_at
+         )
+         SELECT last_operation_id,quest_id,campaign_id,NULL,status,last_source,last_reason,
+           0,1,updated_at
+         FROM quest_pool_states
+         WHERE campaign_id=?
+           AND NOT EXISTS (
+             SELECT 1 FROM quest_pool_transitions
+             WHERE quest_pool_transitions.quest_id=quest_pool_states.quest_id
+           )`,
+      )
+      .run(campaign);
+  }
+
+  private backfillLegacyQuestGraph(campaign: CampaignId): void {
+    this.database
+      .prepare(
+        `INSERT INTO quest_graphs (campaign_id,revision,updated_at)
+         SELECT id,1,updated_at FROM campaigns
+         WHERE id=? AND NOT EXISTS (
+           SELECT 1 FROM quest_graphs WHERE campaign_id=campaigns.id
+         )`,
+      )
+      .run(campaign);
+    this.database
+      .prepare(
+        `INSERT INTO quest_graph_revisions (
+           operation_id,campaign_id,revision,edges_json,occurred_at
+         )
+         SELECT 'quest-graph:snapshot-migration:' || campaign_id,campaign_id,1,'[]',updated_at
+         FROM quest_graphs
+         WHERE campaign_id=? AND NOT EXISTS (
+           SELECT 1 FROM quest_graph_revisions
+           WHERE quest_graph_revisions.campaign_id=quest_graphs.campaign_id
+         )`,
+      )
+      .run(campaign);
   }
 
   private restoreCampaign(row: StoredRow): void {
@@ -388,6 +577,37 @@ function parsePayload(text: string): SnapshotPayload {
   const tableRoot = requireRow(root['tables'], 'Snapshot tables must be an object');
   const tables = snapshotTableRecord((table) => {
     const rows = tableRoot[table];
+    if (
+      rows === undefined &&
+      (table === 'quest_pool_states' ||
+        table === 'quest_pool_transitions' ||
+        table === 'quest_graphs' ||
+        table === 'quest_graph_edges' ||
+        table === 'quest_graph_revisions' ||
+        table === 'quest_graph_evaluations' ||
+        table === 'dynamic_quest_sources' ||
+        table === 'world_director_runs' ||
+        table === 'world_director_proposals' ||
+        table === 'director_budget_states' ||
+        table === 'director_budget_admissions' ||
+        table === 'director_budget_entries' ||
+        table === 'director_budget_cooldowns' ||
+        table === 'director_budget_decisions' ||
+        table === 'world_truths' ||
+        table === 'knowledge_claims' ||
+        table === 'actor_knowledge' ||
+        table === 'knowledge_memories' ||
+        table === 'historical_summaries' ||
+        table === 'world_lore_entries' ||
+        table === 'world_lore_retrieval_rules' ||
+        table === 'memory_artifact_sources' ||
+        table === 'lazy_world_generation_plans' ||
+        table === 'lazy_world_generation_transitions' ||
+        table === 'prefetch_candidates' ||
+        table === 'prefetch_events')
+    ) {
+      return [];
+    }
     if (!Array.isArray(rows)) throw new PersistenceDataError(`Snapshot table ${table} is invalid`);
     return rows.map((row) => requireStoredRow(row, `snapshot table ${table}`));
   });
@@ -511,6 +731,32 @@ function snapshotTableRecord(
     npc_knowledge: values('npc_knowledge'),
     npc_relationships: values('npc_relationships'),
     quests: values('quests'),
+    quest_pool_states: values('quest_pool_states'),
+    quest_pool_transitions: values('quest_pool_transitions'),
+    quest_graphs: values('quest_graphs'),
+    quest_graph_edges: values('quest_graph_edges'),
+    quest_graph_revisions: values('quest_graph_revisions'),
+    quest_graph_evaluations: values('quest_graph_evaluations'),
+    dynamic_quest_sources: values('dynamic_quest_sources'),
+    world_director_runs: values('world_director_runs'),
+    world_director_proposals: values('world_director_proposals'),
+    director_budget_states: values('director_budget_states'),
+    director_budget_admissions: values('director_budget_admissions'),
+    director_budget_entries: values('director_budget_entries'),
+    director_budget_cooldowns: values('director_budget_cooldowns'),
+    director_budget_decisions: values('director_budget_decisions'),
+    world_truths: values('world_truths'),
+    knowledge_claims: values('knowledge_claims'),
+    actor_knowledge: values('actor_knowledge'),
+    knowledge_memories: values('knowledge_memories'),
+    historical_summaries: values('historical_summaries'),
+    world_lore_entries: values('world_lore_entries'),
+    world_lore_retrieval_rules: values('world_lore_retrieval_rules'),
+    memory_artifact_sources: values('memory_artifact_sources'),
+    lazy_world_generation_plans: values('lazy_world_generation_plans'),
+    lazy_world_generation_transitions: values('lazy_world_generation_transitions'),
+    prefetch_candidates: values('prefetch_candidates'),
+    prefetch_events: values('prefetch_events'),
     adventures: values('adventures'),
     adventure_turns: values('adventure_turns'),
     conversations: values('conversations'),

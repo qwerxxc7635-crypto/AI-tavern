@@ -129,10 +129,11 @@ export function createWorldTruth(input: Omit<WorldTruth, 'kind'>): WorldTruth {
   return Object.freeze({
     ...input,
     kind: 'WORLD_TRUTH',
-    subject: requireText(input.subject, 'WorldTruth subject'),
-    predicate: requireText(input.predicate, 'WorldTruth predicate'),
+    subject: requireText(input.subject, 'WorldTruth subject', 256),
+    predicate: requireText(input.predicate, 'WorldTruth predicate', 128),
     object: freezeJson(input.object, 'WorldTruth object'),
     revision: requireRevision(input.revision),
+    createdAt: requireTimestamp(input.createdAt, 'WorldTruth createdAt'),
   });
 }
 
@@ -141,12 +142,13 @@ export function createClaim(input: Omit<Claim, 'kind'>): Claim {
   return Object.freeze({
     ...input,
     kind: 'CLAIM',
-    subject: requireText(input.subject, 'Claim subject'),
-    predicate: requireText(input.predicate, 'Claim predicate'),
+    subject: requireText(input.subject, 'Claim subject', 256),
+    predicate: requireText(input.predicate, 'Claim predicate', 128),
     object: freezeJson(input.object, 'Claim object'),
     source: Object.freeze({ ...input.source }),
     confidence: requireConfidence(input.confidence),
     revision: requireRevision(input.revision),
+    createdAt: requireTimestamp(input.createdAt, 'Claim createdAt'),
   });
 }
 
@@ -184,7 +186,7 @@ export function createKnowledge(input: Omit<Knowledge, 'kind'>): Knowledge {
     target: Object.freeze({ ...input.target }),
     provenance: Object.freeze({
       ...input.provenance,
-      sourceId: requireText(input.provenance.sourceId, 'Knowledge provenance sourceId'),
+      sourceId: requireText(input.provenance.sourceId, 'Knowledge provenance sourceId', 256),
       learnedAt: requireTimestamp(input.provenance.learnedAt, 'Knowledge provenance learnedAt'),
       confidence: requireConfidence(input.provenance.confidence),
     }),
@@ -206,24 +208,35 @@ export function createMemory(input: Omit<Memory, 'kind'>): Memory {
   }
   requireUnique(input.sourceKnowledgeIds, 'Memory sourceKnowledgeIds');
   requireUnique(input.sourceEventIds, 'Memory sourceEventIds');
+  if (input.sourceKnowledgeIds.length > 128 || input.sourceEventIds.length > 128) {
+    throw new KnowledgeModelError('Memory source arrays exceed the resource limit');
+  }
   return Object.freeze({
     ...input,
     kind: 'MEMORY',
     actor: Object.freeze({ ...input.actor }),
-    summary: requireText(input.summary, 'Memory summary'),
+    summary: requireText(input.summary, 'Memory summary', 4_000),
     sourceKnowledgeIds: Object.freeze([...input.sourceKnowledgeIds]),
     sourceEventIds: Object.freeze([...input.sourceEventIds]),
     revision: requireRevision(input.revision),
+    createdAt: requireTimestamp(input.createdAt, 'Memory createdAt'),
   });
 }
 
 function validateActor(actor: KnowledgeActor): void {
   requireEnum(KNOWLEDGE_ACTOR_TYPES, actor.type, 'Knowledge actor type');
-  requireText(actor.id, 'Knowledge actor id');
+  requireText(actor.id, 'Knowledge actor id', 256);
 }
 
 function validateClaimSource(source: ClaimSource): void {
-  if (source.kind === 'TRUTH' || source.kind === 'EVENT') return;
+  if (source.kind === 'TRUTH') {
+    requireText(source.truthId, 'Claim source truth id', 256);
+    return;
+  }
+  if (source.kind === 'EVENT') {
+    requireText(source.eventId, 'Claim source event id', 256);
+    return;
+  }
   if (source.kind === 'ACTOR') {
     validateActor({ type: source.actorType, id: source.actorId });
     return;
@@ -232,13 +245,19 @@ function validateClaimSource(source: ClaimSource): void {
 }
 
 function validateKnowledgeTarget(target: KnowledgeTarget): void {
-  if (target.kind !== 'TRUTH' && target.kind !== 'CLAIM') {
-    throw new KnowledgeModelError('Knowledge target must be a Truth or Claim');
+  if (target.kind === 'TRUTH') {
+    requireText(target.truthId, 'Knowledge target truth id', 256);
+    return;
   }
+  if (target.kind === 'CLAIM') {
+    requireText(target.claimId, 'Knowledge target claim id', 256);
+    return;
+  }
+  throw new KnowledgeModelError('Knowledge target must be a Truth or Claim');
 }
 
-function requireText(value: string, label: string): string {
-  if (value.length === 0 || value.trim() !== value) {
+function requireText(value: string, label: string, maxLength = 256): string {
+  if (value.length === 0 || value.trim() !== value || value.length > maxLength) {
     throw new KnowledgeModelError(`${label} must be non-empty without surrounding whitespace`);
   }
   return value;

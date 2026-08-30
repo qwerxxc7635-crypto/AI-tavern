@@ -267,7 +267,7 @@ async fn cancellation_interrupts_an_in_flight_request() {
 }
 
 #[tokio::test]
-async fn timeout_covers_the_entire_stream() {
+async fn timeout_rejects_a_response_without_progress() {
     let (endpoint, _) = serve_once(vec![(
         b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\n\r\nlate",
         Duration::from_millis(250),
@@ -280,6 +280,28 @@ async fn timeout_covers_the_entire_stream() {
         .send(&endpoint, request, CancellationToken::new())
         .await;
     assert_eq!(result, Err(TransportError::Timeout));
+}
+
+#[tokio::test]
+async fn continuous_response_progress_resets_the_idle_timeout() {
+    let (endpoint, _) = serve_once(vec![
+        (
+            b"HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\n\r\n1\r\na\r\n",
+            Duration::ZERO,
+        ),
+        (b"1\r\nb\r\n", Duration::from_millis(70)),
+        (b"1\r\nc\r\n", Duration::from_millis(70)),
+        (b"0\r\n\r\n", Duration::from_millis(70)),
+    ])
+    .await;
+    let mut request = TransportRequest::post("responses", Vec::new());
+    request.timeout = Duration::from_millis(100);
+    let response = SecureHttpTransport::new()
+        .unwrap()
+        .send(&endpoint, request, CancellationToken::new())
+        .await
+        .unwrap();
+    assert_eq!(response.body, b"abc");
 }
 
 #[tokio::test]

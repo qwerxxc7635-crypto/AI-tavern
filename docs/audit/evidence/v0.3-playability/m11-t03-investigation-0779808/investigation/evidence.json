@@ -1,0 +1,956 @@
+{
+  "format": "EMBER_PLAYTEST_EVIDENCE",
+  "formatVersion": 1,
+  "runId": "m11-t03-investigation-0779808",
+  "worldKey": "investigation",
+  "scenarioHash": "828b249efe7a49e7860037d667ae8d77088345ca30572214a1b62ff2d9a7ac9d",
+  "sourceCommit": "0779808",
+  "provider": {
+    "mode": "FAKE",
+    "providerName": "Ember deterministic fixture provider",
+    "modelName": "ember-fake-v1"
+  },
+  "status": "COMPLETE",
+  "resetCount": 0,
+  "startedAt": "2026-08-27T02:26:18.179Z",
+  "completedAt": "2026-08-27T02:26:18.211Z",
+  "actions": [
+    {
+      "sequence": 1,
+      "actionId": "investigation-01",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.179Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "START_CAMPAIGN executed through the production native investigation slice; input: 以“雾港失踪电台”为世界种子创建调查战役并锁定宪章。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        }
+      ]
+    },
+    {
+      "sequence": 2,
+      "actionId": "investigation-02",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.180Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "CREATE_CHARACTER executed through the production native investigation slice; input: 创建一名夜渡档案员，填写镇定、机运、信用与线索负荷。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        }
+      ]
+    },
+    {
+      "sequence": 3,
+      "actionId": "investigation-03",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.181Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ENTER_TAVERN executed through the production native investigation slice; input: 进入潮痕咖啡馆，记录雨夜来客、公告和闭店时间。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        }
+      ]
+    },
+    {
+      "sequence": 4,
+      "actionId": "investigation-04",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.182Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native investigation slice; input: 询问伊芙琳最后一次听见失踪电台呼号的时间。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 5,
+      "actionId": "investigation-05",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.183Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "INSPECT_RUMOR executed through the production native investigation slice; input: 区分“地下室有第二台发报机”是目击、推测还是误导。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 6,
+      "actionId": "investigation-06",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.184Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ACCEPT_QUEST executed through the production native investigation slice; input: 接受《凌晨两点的空白频段》，保留其他调查线索。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "QUEST_STATE",
+          "status": "PASS",
+          "detail": "2 independent Quest states persisted: 1 completed and 1 still open after settlement."
+        }
+      ]
+    },
+    {
+      "sequence": 7,
+      "actionId": "investigation-07",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.185Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native investigation slice; input: 要求查看咖啡馆电话账单，而不是立刻前往电台。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and misinformation stayed explicitly traceable rather than becoming authoritative truth."
+        }
+      ]
+    },
+    {
+      "sequence": 8,
+      "actionId": "investigation-08",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.186Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native investigation slice; input: 用知识检定比对账单号码与旧港务名录。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 9,
+      "actionId": "investigation-09",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.187Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "EQUIP_ITEM executed through the production native investigation slice; input: 携带折叠式板盒相机，确认它是证据工具而非武器加成。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left cash=9, credit=35, and exactly 1 equipped item after explicit replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 10,
+      "actionId": "investigation-10",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.188Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRAVEL executed through the production native investigation slice; input: 前往停用的海雾观测站，记录交通时间和天气变化。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=660, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 11,
+      "actionId": "investigation-11",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.189Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native investigation slice; input: 向值夜员询问噪声记录，但不透露伊芙琳的姓名。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 12,
+      "actionId": "investigation-12",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.190Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native investigation slice; input: 故意给值夜员一个错误日期，观察其是否纠正或附和。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and misinformation stayed explicitly traceable rather than becoming authoritative truth."
+        }
+      ]
+    },
+    {
+      "sequence": 13,
+      "actionId": "investigation-13",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.191Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native investigation slice; input: 用敏捷检定在不破坏封条的情况下进入记录室。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 14,
+      "actionId": "investigation-14",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.192Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "INSPECT_RUMOR executed through the production native investigation slice; input: 交叉检查电话账单、噪声日志与值夜员陈述的矛盾。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 15,
+      "actionId": "investigation-15",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.193Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ADVANCE_TIME executed through the production native investigation slice; input: 等待下一次整点广播，允许失败继续产生新线索。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=660, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 16,
+      "actionId": "investigation-16",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.194Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ACCEPT_QUEST executed through the production native investigation slice; input: 发现并激活《被涂黑的潮位表》关联调查。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "QUEST_STATE",
+          "status": "PASS",
+          "detail": "2 independent Quest states persisted: 1 completed and 1 still open after settlement."
+        }
+      ]
+    },
+    {
+      "sequence": 17,
+      "actionId": "investigation-17",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.195Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRADE executed through the production native investigation slice; input: 支付合理费用复制档案，确认信用与现金记录分离。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left cash=9, credit=35, and exactly 1 equipped item after explicit replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 18,
+      "actionId": "investigation-18",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.196Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "EQUIP_ITEM executed through the production native investigation slice; input: 使用封口证物袋保存磁带碎片，记录证据链。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left cash=9, credit=35, and exactly 1 equipped item after explicit replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 19,
+      "actionId": "investigation-19",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.197Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native investigation slice; input: 把一条未经证实的推论告诉报社，观察社会后果。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and misinformation stayed explicitly traceable rather than becoming authoritative truth."
+        }
+      ]
+    },
+    {
+      "sequence": 20,
+      "actionId": "investigation-20",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.198Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native investigation slice; input: 再次询问伊芙琳，检查她只回应已知或相信的内容。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 21,
+      "actionId": "investigation-21",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.199Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native investigation slice; input: 用魅力检定让报社暂缓刊登，失败也不锁死调查。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 22,
+      "actionId": "investigation-22",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.200Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRAVEL executed through the production native investigation slice; input: 返回潮痕咖啡馆，验证 NPC 时序和地点记忆。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=660, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 23,
+      "actionId": "investigation-23",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.201Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "SAVE_REOPEN executed through the production native investigation slice; input: 保存并重启，复核线索、误导信息、Quest 与扩展数值。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "REOPEN_STATE",
+          "status": "PASS",
+          "detail": "Normal reopen, interrupted-request recovery and archive overwrite import retained extensions/dialogue/adventure state with integrity=ok and 0 foreign-key violations."
+        }
+      ]
+    },
+    {
+      "sequence": 24,
+      "actionId": "investigation-24",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.202Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "REVIEW_STATE executed through the production native investigation slice; input: 审阅镇定、机运、信用、知识边界和调查图谱。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        }
+      ]
+    },
+    {
+      "sequence": 25,
+      "actionId": "investigation-25",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.203Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native investigation slice; input: 拒绝把磁带交给警署，提议由三方共同封存。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and misinformation stayed explicitly traceable rather than becoming authoritative truth."
+        }
+      ]
+    },
+    {
+      "sequence": 26,
+      "actionId": "investigation-26",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.204Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native investigation slice; input: 用体魄检定搬开记录室倒柜，记录压力与失败代价。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 events include 2 failures; the guaranteed first failure retained the same hard result and the next seven turns still committed."
+        }
+      ]
+    },
+    {
+      "sequence": 27,
+      "actionId": "investigation-27",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.205Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ADVANCE_TIME executed through the production native investigation slice; input: 让调查跨过清晨，观察有限认知与任务时效变化。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=660, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 28,
+      "actionId": "investigation-28",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.206Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native investigation slice; input: 询问早班邮差是否见过携带发报箱的陌生人。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows and FALSE/PARTIAL/TRUE rumor counts 1/1/1 survived bounded dialogue and a multi-NPC scene."
+        }
+      ]
+    },
+    {
+      "sequence": 29,
+      "actionId": "investigation-29",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.207Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRADE executed through the production native investigation slice; input: 购买普通显影药剂，核对价格、用途和库存。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "8 append-only rule events left cash=9, credit=35, and exactly 1 equipped item after explicit replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 30,
+      "actionId": "investigation-30",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.208Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native investigation slice; input: 尝试把无关旧照片当作筹码交换观测站钥匙。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 turns continued after failure, one Quest settled, one remained open, and misinformation stayed explicitly traceable rather than becoming authoritative truth."
+        }
+      ]
+    },
+    {
+      "sequence": 31,
+      "actionId": "investigation-31",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.209Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "SAVE_REOPEN executed through the production native investigation slice; input: 再次保存重启，确认失败线索和已公开误导仍可追溯。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        },
+        {
+          "kind": "REOPEN_STATE",
+          "status": "PASS",
+          "detail": "Normal reopen, interrupted-request recovery and archive overwrite import retained extensions/dialogue/adventure state with integrity=ok and 0 foreign-key violations."
+        }
+      ]
+    },
+    {
+      "sequence": 32,
+      "actionId": "investigation-32",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 80.566,
+      "persisted": true,
+      "recordedAt": "2026-08-27T02:26:18.210Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "REVIEW_STATE executed through the production native investigation slice; input: 记录人格、线索、Quest、World、Trait、Equipment 与 Context 观察。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2578.118 ms; the action value is amortized flow latency, not provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; extensions=62/48/35/0; quests=2; turns=8; generations=32."
+        }
+      ]
+    }
+  ],
+  "findings": [],
+  "blockedReason": null
+}

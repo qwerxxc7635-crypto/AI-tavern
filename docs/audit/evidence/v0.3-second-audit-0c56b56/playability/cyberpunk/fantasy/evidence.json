@@ -1,0 +1,20 @@
+{
+  "format": "EMBER_PLAYTEST_EVIDENCE",
+  "formatVersion": 1,
+  "runId": "cyberpunk",
+  "worldKey": "fantasy",
+  "scenarioHash": "7d0439821cbd4d8eeb01d444f6709c29481d6320fd7ebecce229276ee3ca156e",
+  "sourceCommit": "0c56b56f174e07ffcfe01a7d4b52ff741273c88c",
+  "provider": {
+    "mode": "NOT_SET",
+    "providerName": null,
+    "modelName": null
+  },
+  "status": "NOT_RUN",
+  "resetCount": 0,
+  "startedAt": null,
+  "completedAt": null,
+  "actions": [],
+  "findings": [],
+  "blockedReason": null
+}

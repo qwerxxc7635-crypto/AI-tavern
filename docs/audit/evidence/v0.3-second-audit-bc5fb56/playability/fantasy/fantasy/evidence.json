@@ -1,0 +1,964 @@
+{
+  "format": "EMBER_PLAYTEST_EVIDENCE",
+  "formatVersion": 1,
+  "runId": "fantasy",
+  "worldKey": "fantasy",
+  "scenarioHash": "7d0439821cbd4d8eeb01d444f6709c29481d6320fd7ebecce229276ee3ca156e",
+  "sourceCommit": "bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+  "provider": {
+    "mode": "FAKE",
+    "providerName": "Ember deterministic fixture provider",
+    "modelName": "ember-fake-v1"
+  },
+  "status": "COMPLETE",
+  "resetCount": 0,
+  "startedAt": "2026-08-28T02:55:20.715Z",
+  "completedAt": "2026-08-28T02:55:20.747Z",
+  "actions": [
+    {
+      "sequence": 1,
+      "actionId": "fantasy-01",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.715Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "START_CAMPAIGN executed through the production native vertical slice; input: 以“灰烬潮下的烛湾”为世界种子创建新战役并确认世界宪章。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        }
+      ]
+    },
+    {
+      "sequence": 2,
+      "actionId": "fantasy-02",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.716Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "CREATE_CHARACTER executed through the production native vertical slice; input: 创建一名雾钟抄契人，保留契约职业、余烬听觉与誓债特质。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        }
+      ]
+    },
+    {
+      "sequence": 3,
+      "actionId": "fantasy-03",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.717Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ENTER_TAVERN executed through the production native vertical slice; input: 进入断梁酒馆，观察当前住客、传闻与酒馆时钟。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        }
+      ]
+    },
+    {
+      "sequence": 4,
+      "actionId": "fantasy-04",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.718Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native vertical slice; input: 询问玛菈为何把东门巡夜表藏在酒桶夹层。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows, 3 provenance-bearing rumors, and 1 multi-NPC turn survived; dialogue commits remained limited to persisted NPC context."
+        }
+      ]
+    },
+    {
+      "sequence": 5,
+      "actionId": "fantasy-05",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.719Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "INSPECT_RUMOR executed through the production native vertical slice; input: 核对“灰潮会在第三声钟响后倒流”的来源与可信度。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows, 3 provenance-bearing rumors, and 1 multi-NPC turn survived; dialogue commits remained limited to persisted NPC context."
+        }
+      ]
+    },
+    {
+      "sequence": 6,
+      "actionId": "fantasy-06",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.720Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ACCEPT_QUEST executed through the production native vertical slice; input: 接受《找回失火的潮汐账册》，但先不离开酒馆。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "QUEST_STATE",
+          "status": "PASS",
+          "detail": "2 independent Quest states persisted: 1 completed and 1 still open after the first adventure."
+        }
+      ]
+    },
+    {
+      "sequence": 7,
+      "actionId": "fantasy-07",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.721Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native vertical slice; input: 公开质疑巡钟人奥尔德伪造了昨夜的点灯记录。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 committed turns, 7 local consequences, and one archived settlement remained authoritative after continuation."
+        }
+      ]
+    },
+    {
+      "sequence": 8,
+      "actionId": "fantasy-08",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.722Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native vertical slice; input: 用知识检定辨认账册封蜡是否来自河港行会。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 hard-result events persisted for seven checks and were not rerolled during reopen/import."
+        }
+      ]
+    },
+    {
+      "sequence": 9,
+      "actionId": "fantasy-09",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.723Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "EQUIP_ITEM executed through the production native vertical slice; input: 装备缺口银灯，并检查它只影响既定可见规则。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "7 append-only rules events left money=12 and exactly 1 equipped item after slot replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 10,
+      "actionId": "fantasy-10",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.724Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRAVEL executed through the production native vertical slice; input: 前往被潮水淹没的旧盐门，记录地点连接和耗时。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=765, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 11,
+      "actionId": "fantasy-11",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.725Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native vertical slice; input: 向守门人索要昨夜放行名单，不透露玛菈的怀疑。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows, 3 provenance-bearing rumors, and 1 multi-NPC turn survived; dialogue commits remained limited to persisted NPC context."
+        }
+      ]
+    },
+    {
+      "sequence": 12,
+      "actionId": "fantasy-12",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.726Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native vertical slice; input: 尝试用一份未来收益承诺换取盐门钥匙。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 committed turns, 7 local consequences, and one archived settlement remained authoritative after continuation."
+        }
+      ]
+    },
+    {
+      "sequence": 13,
+      "actionId": "fantasy-13",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.727Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native vertical slice; input: 在涨潮前攀上断裂钟塔，接受失败造成的时间后果。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 hard-result events persisted for seven checks and were not rerolled during reopen/import."
+        }
+      ]
+    },
+    {
+      "sequence": 14,
+      "actionId": "fantasy-14",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.728Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "INSPECT_RUMOR executed through the production native vertical slice; input: 比较奥尔德、玛菈和守门人对第三声钟的不同认知。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows, 3 provenance-bearing rumors, and 1 multi-NPC turn survived; dialogue commits remained limited to persisted NPC context."
+        }
+      ]
+    },
+    {
+      "sequence": 15,
+      "actionId": "fantasy-15",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.729Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ADVANCE_TIME executed through the production native vertical slice; input: 在旧盐门等待一刻钟，观察酒馆与任务是否同步推进。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=765, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 16,
+      "actionId": "fantasy-16",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.730Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ACCEPT_QUEST executed through the production native vertical slice; input: 发现并激活《钟塔下的无名誓约》支线。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "QUEST_STATE",
+          "status": "PASS",
+          "detail": "2 independent Quest states persisted: 1 completed and 1 still open after the first adventure."
+        }
+      ]
+    },
+    {
+      "sequence": 17,
+      "actionId": "fantasy-17",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.731Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRADE executed through the production native vertical slice; input: 向旧物商出售一枚普通铜扣，确认价格不受传说文案膨胀。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "7 append-only rules events left money=12 and exactly 1 equipped item after slot replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 18,
+      "actionId": "fantasy-18",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.732Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "EQUIP_ITEM executed through the production native vertical slice; input: 改穿荆纹短披风，确认同槽位装备替换而非叠加。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "7 append-only rules events left money=12 and exactly 1 equipped item after slot replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 19,
+      "actionId": "fantasy-19",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.733Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native vertical slice; input: 把找到账册的消息只告诉玛菈，不通知巡钟人。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 committed turns, 7 local consequences, and one archived settlement remained authoritative after continuation."
+        }
+      ]
+    },
+    {
+      "sequence": 20,
+      "actionId": "fantasy-20",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.734Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native vertical slice; input: 追问奥尔德对旧盐门火灾的个人记忆与未知部分。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows, 3 provenance-bearing rumors, and 1 multi-NPC turn survived; dialogue commits remained limited to persisted NPC context."
+        }
+      ]
+    },
+    {
+      "sequence": 21,
+      "actionId": "fantasy-21",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.735Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native vertical slice; input: 用魅力检定说服奥尔德交出半张烧焦的巡夜图。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 hard-result events persisted for seven checks and were not rerolled during reopen/import."
+        }
+      ]
+    },
+    {
+      "sequence": 22,
+      "actionId": "fantasy-22",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.736Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRAVEL executed through the production native vertical slice; input: 返回断梁酒馆，验证路程时间与 NPC 当前状态。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=765, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 23,
+      "actionId": "fantasy-23",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.737Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "SAVE_REOPEN executed through the production native vertical slice; input: 保存并重启，复核任务、装备、金钱、时钟和 NPC 认知。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "REOPEN_STATE",
+          "status": "PASS",
+          "detail": "The native test reopened after normal save, recovered an interrupted request, exported/imported the archive, and ended with integrity=ok and 0 foreign-key violations."
+        }
+      ]
+    },
+    {
+      "sequence": 24,
+      "actionId": "fantasy-24",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.738Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "REVIEW_STATE executed through the production native vertical slice; input: 审阅角色、Trait、D20 历史与两条任务的当前状态。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        }
+      ]
+    },
+    {
+      "sequence": 25,
+      "actionId": "fantasy-25",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.739Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native vertical slice; input: 拒绝把账册交给任一行会，提出在酒馆当众宣读。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 committed turns, 7 local consequences, and one archived settlement remained authoritative after continuation."
+        }
+      ]
+    },
+    {
+      "sequence": 26,
+      "actionId": "fantasy-26",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.740Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "D20_ACTION executed through the production native vertical slice; input: 用体魄检定保护账册免受抢夺，保留同一次硬结果。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "D20_HARD_RESULT",
+          "status": "PASS",
+          "detail": "7 local D20 hard-result events persisted for seven checks and were not rerolled during reopen/import."
+        }
+      ]
+    },
+    {
+      "sequence": 27,
+      "actionId": "fantasy-27",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.741Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "ADVANCE_TIME executed through the production native vertical slice; input: 让酒馆时钟跨过午夜，观察每日预算与传闻变化。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "WORLD_STATE",
+          "status": "PASS",
+          "detail": "2 locations, 2 travel events, gameTime=765, and 1 Director run persisted."
+        }
+      ]
+    },
+    {
+      "sequence": 28,
+      "actionId": "fantasy-28",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.742Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TALK_NPC executed through the production native vertical slice; input: 询问新到访旅人是否亲眼见过灰潮倒流。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "KNOWLEDGE_BOUNDARY",
+          "status": "PASS",
+          "detail": "4 NPC knowledge rows, 3 provenance-bearing rumors, and 1 multi-NPC turn survived; dialogue commits remained limited to persisted NPC context."
+        }
+      ]
+    },
+    {
+      "sequence": 29,
+      "actionId": "fantasy-29",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.743Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "TRADE executed through the production native vertical slice; input: 购买一份普通灯油，核对库存、金钱与消耗品用途。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "ECONOMY_EQUIPMENT",
+          "status": "PASS",
+          "detail": "7 append-only rules events left money=12 and exactly 1 equipped item after slot replacement."
+        }
+      ]
+    },
+    {
+      "sequence": 30,
+      "actionId": "fantasy-30",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.744Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "FREE_INPUT executed through the production native vertical slice; input: 把缺口银灯借给玛菈并要求她独自验证封蜡。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "CONSEQUENCE",
+          "status": "PASS",
+          "detail": "8 committed turns, 7 local consequences, and one archived settlement remained authoritative after continuation."
+        }
+      ]
+    },
+    {
+      "sequence": 31,
+      "actionId": "fantasy-31",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.745Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "SAVE_REOPEN executed through the production native vertical slice; input: 再次保存重启，检查借出物品和隐秘信息没有回滚。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        },
+        {
+          "kind": "REOPEN_STATE",
+          "status": "PASS",
+          "detail": "The native test reopened after normal save, recovered an interrupted request, exported/imported the archive, and ended with integrity=ok and 0 foreign-key violations."
+        }
+      ]
+    },
+    {
+      "sequence": 32,
+      "actionId": "fantasy-32",
+      "outcome": "SUCCEEDED",
+      "latencyMs": 90.984,
+      "persisted": true,
+      "recordedAt": "2026-08-28T02:55:20.746Z",
+      "observations": [
+        {
+          "kind": "OUTPUT",
+          "status": "PASS",
+          "detail": "REVIEW_STATE executed through the production native vertical slice; input: 记录世界、人格、知识、Quest、装备、Director 与 Context 观察。"
+        },
+        {
+          "kind": "LATENCY",
+          "status": "PASS",
+          "detail": "The complete 32-action native flow took 2911.493 ms; this record uses the amortized flow latency and does not claim provider billing latency."
+        },
+        {
+          "kind": "STATE_DIGEST",
+          "status": "PASS",
+          "detail": "campaign=TAVERN; quests=2; turns=8; rulesRevision=8; generations=33; saveSchema=3."
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "M11-FAN-001",
+      "severity": "P1",
+      "title": "Multi-NPC scene queried a non-existent NPC LOD column",
+      "evidence": "The long playtest failed at scene start with SQLite 'no such column: population_role'; the production query now reads profile_json.$.populationRole and the same-save regression commits a two-NPC turn.",
+      "status": "FIXED"
+    }
+  ],
+  "blockedReason": null
+}

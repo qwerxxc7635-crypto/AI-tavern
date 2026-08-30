@@ -3,8 +3,11 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   GenerateWorldInputSchema,
   GenerateWorldOutputSchema,
+  GenerationQueue,
   RefineWorldInputSchema,
   RefineWorldOutputSchema,
+  StructuredJsonStreamProjector,
+  WorldConstitutionOutputSchema,
   type AIProvider,
   type AITask,
 } from '@ember-tavern/ai-core';
@@ -40,6 +43,18 @@ export interface WorldBibleView extends WorldDraft {
 export interface WorldCreationSnapshot {
   readonly campaignState: string;
   readonly world: WorldBibleView | null;
+  readonly constitution: WorldConstitutionView | null;
+}
+
+export interface WorldConstitutionView extends ReturnType<
+  typeof WorldConstitutionOutputSchema.parse
+> {
+  readonly campaignId: string;
+  readonly revision: number;
+  readonly status: 'DRAFT' | 'LOCKED';
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lockedAt: string | null;
 }
 
 export interface GenerateWorldOptions {
@@ -53,6 +68,19 @@ export interface GenerateWorldOptions {
     excludedContent: readonly string[];
   }>;
 }
+
+export interface WorldGenerationStreamOptions {
+  readonly signal: AbortSignal;
+  readonly onChunk: (content: string) => void;
+  readonly onReset?: () => void;
+}
+
+// The transport retains a strict 120s ceiling. The outer operation budget allows either one
+// schema-repair request or one authorized Provider fallback plus bounded local validation/commit.
+export const WORLD_PROVIDER_TIMEOUT_MS = 120_000;
+export const WORLD_OPERATION_TIMEOUT_MS = 270_000;
+
+const worldGenerationQueue = new GenerationQueue({ concurrency: 1, maxPending: 32 });
 
 export interface WorldCreationGateway {
   load(campaignId: string): Promise<WorldCreationSnapshot>;
@@ -116,6 +144,7 @@ export class WindowsWorldCreationService {
       task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     ) => WorldRequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
+    private readonly generationQueue: GenerationQueue = worldGenerationQueue,
   ) {
     this.ai = desktopAIEngine(provider);
   }
@@ -130,10 +159,11 @@ export class WindowsWorldCreationService {
   public async generate(
     campaignIdValue: string,
     options: GenerateWorldOptions,
+    stream?: WorldGenerationStreamOptions,
   ): Promise<WorldCreationSnapshot> {
     campaignId(campaignIdValue);
     const input = GenerateWorldInputSchema.parse(options);
-    return this.execute('GENERATE_WORLD', campaignIdValue, input);
+    return this.execute('GENERATE_WORLD', campaignIdValue, input, stream);
   }
 
   public async refine(
@@ -174,32 +204,78 @@ export class WindowsWorldCreationService {
     task: Extract<AITask, 'GENERATE_WORLD' | 'REFINE_WORLD'>,
     campaignIdValue: string,
     input: unknown,
+    stream?: WorldGenerationStreamOptions,
   ): Promise<WorldCreationSnapshot> {
     const identity = this.createIdentity(task);
-    const temperature = await this.randomness.resolveTemperature();
-    const generated = await this.ai.execute(task, input, {
-      requestId: identity.requestId,
-      temperature,
-      maxOutputTokens: 8_000,
-      timeoutMs: 5_000,
-    });
-    const world =
-      task === 'GENERATE_WORLD'
-        ? GenerateWorldOutputSchema.parse(generated.validatedOutput)
-        : RefineWorldOutputSchema.parse(generated.validatedOutput).world;
-    return this.gateway.commit({
-      campaignId: campaignIdValue,
+    const handle = this.generationQueue.submit({
+      id: identity.requestId,
+      intentKey: `world:${campaignIdValue}:${task}`,
       task,
-      requestId: identity.requestId,
-      generationRecordId: identity.generationRecordId,
-      idempotencyKey: identity.idempotencyKey,
-      promptVersion: generated.request.promptVersion,
-      input,
-      request: generated.request,
-      rawResponseText: generated.response.content,
-      validatedOutput: generated.validatedOutput,
-      world,
+      priority: 'P0',
+      timeoutMs: WORLD_OPERATION_TIMEOUT_MS,
+      maxRetries: 0,
+      allowFallback: false,
+      execute: async ({ signal }) => {
+        const temperature = await this.randomness.resolveTemperature();
+        let projector = stream === undefined ? null : new StructuredJsonStreamProjector('summary');
+        let rawChunks = 0;
+        const generated = await this.ai.execute(task, input, {
+          requestId: identity.requestId,
+          temperature,
+          maxOutputTokens: 4_096,
+          timeoutMs: WORLD_PROVIDER_TIMEOUT_MS,
+          signal,
+          ...(stream === undefined
+            ? {}
+            : {
+                stream: {
+                  signal,
+                  onChunk(chunk: { readonly content: string }) {
+                    rawChunks += 1;
+                    const visible = projector?.push(chunk.content) ?? '';
+                    if (visible.length > 0) stream.onChunk(visible);
+                  },
+                  onReset() {
+                    projector = new StructuredJsonStreamProjector('summary');
+                    rawChunks = 0;
+                    stream.onReset?.();
+                  },
+                },
+              }),
+        });
+        if (signal.aborted) throw new WorldCreationServiceError('CANCELLED');
+        if (projector !== null && rawChunks > 0) {
+          const visible = projector.finish(generated.response.content);
+          if (visible.length > 0) stream?.onChunk(visible);
+        }
+        const world =
+          task === 'GENERATE_WORLD'
+            ? GenerateWorldOutputSchema.parse(generated.validatedOutput)
+            : RefineWorldOutputSchema.parse(generated.validatedOutput).world;
+        if (signal.aborted) throw new WorldCreationServiceError('CANCELLED');
+        return this.gateway.commit({
+          campaignId: campaignIdValue,
+          task,
+          requestId: identity.requestId,
+          generationRecordId: identity.generationRecordId,
+          idempotencyKey: identity.idempotencyKey,
+          promptVersion: generated.request.promptVersion,
+          input,
+          request: generated.request,
+          rawResponseText: generated.response.content,
+          validatedOutput: generated.validatedOutput,
+          world,
+        });
+      },
     });
+    const cancel = () => handle.cancel();
+    stream?.signal.addEventListener('abort', cancel, { once: true });
+    if (stream?.signal.aborted === true) handle.cancel();
+    try {
+      return await handle.promise;
+    } finally {
+      stream?.signal.removeEventListener('abort', cancel);
+    }
   }
 }
 
@@ -230,6 +306,7 @@ function defaultIdentity(
 
 function draftOf(world: WorldBibleView): WorldDraft {
   return GenerateWorldOutputSchema.parse({
+    constitution: world.constitution,
     name: world.name,
     currentRegion: world.currentRegion,
     summary: world.summary,
@@ -267,18 +344,28 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): WorldCreatio
   }
   const rawWorld = record['world'];
   const world = rawWorld === null ? null : parseWorld(rawWorld);
+  const rawConstitution = record['constitution'];
+  const constitution = rawConstitution === null ? null : parseConstitution(rawConstitution);
   if (world !== null && world.campaignId !== expectedCampaignId) {
     throw new TypeError('World belongs to another campaign');
+  }
+  if (constitution !== null && constitution.campaignId !== expectedCampaignId) {
+    throw new TypeError('World Constitution belongs to another campaign');
+  }
+  if ((world === null) !== (constitution === null)) {
+    throw new TypeError('World and Constitution must exist together');
   }
   return Object.freeze({
     campaignState,
     world,
+    constitution,
   });
 }
 
 function parseWorld(value: unknown): WorldBibleView {
   const record = requireRecord(value);
   const draft = GenerateWorldOutputSchema.parse({
+    constitution: record['constitution'],
     name: record['name'],
     currentRegion: record['currentRegion'],
     summary: record['summary'],
@@ -313,6 +400,60 @@ function parseWorld(value: unknown): WorldBibleView {
     createdAt,
     updatedAt,
   });
+}
+
+function parseConstitution(value: unknown): WorldConstitutionView {
+  const record = requireRecord(value);
+  const content = WorldConstitutionOutputSchema.parse(constitutionContentRecord(record));
+  const revision = record['revision'];
+  if (!Number.isSafeInteger(revision) || (revision as number) < 1) {
+    throw new TypeError('World Constitution revision is invalid');
+  }
+  const status = requireString(record['status']);
+  if (status !== 'DRAFT' && status !== 'LOCKED') {
+    throw new TypeError('World Constitution status is invalid');
+  }
+  const createdAt = isoTimestamp(requireString(record['createdAt']));
+  const updatedAt = isoTimestamp(requireString(record['updatedAt']));
+  const rawLockedAt = record['lockedAt'];
+  const lockedAt = rawLockedAt === null ? null : isoTimestamp(requireString(rawLockedAt));
+  if (
+    updatedAt < createdAt ||
+    (status === 'DRAFT' && lockedAt !== null) ||
+    (status === 'LOCKED' && lockedAt === null)
+  ) {
+    throw new TypeError('World Constitution metadata is invalid');
+  }
+  return Object.freeze({
+    ...content,
+    campaignId: campaignId(requireString(record['campaignId'])),
+    revision: revision as number,
+    status,
+    createdAt,
+    updatedAt,
+    lockedAt,
+  });
+}
+
+function constitutionContentRecord(record: Record<string, unknown>): Record<string, unknown> {
+  return {
+    schemaVersion: record['schemaVersion'],
+    worldType: record['worldType'],
+    era: record['era'],
+    technology: record['technology'],
+    magic: record['magic'],
+    peoples: record['peoples'],
+    society: record['society'],
+    politics: record['politics'],
+    economy: record['economy'],
+    combatScale: record['combatScale'],
+    deathRules: record['deathRules'],
+    careerRules: record['careerRules'],
+    equipmentRules: record['equipmentRules'],
+    npcRules: record['npcRules'],
+    traitRules: record['traitRules'],
+    taboos: record['taboos'],
+  };
 }
 
 function requireRecord(value: unknown): Record<string, unknown> {

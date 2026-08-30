@@ -1,0 +1,291 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T09:21:49.149Z",
+  "sourceCommit": "0c56b56f174e07ffcfe01a7d4b52ff741273c88c",
+  "baselineCommit": "589ef756c4df3b552a1b8c7cbf5b8da34c8793f5",
+  "evidenceKind": "FAKE",
+  "aggregation": "MEDIAN_OF_RUN_P95",
+  "coldRuns": 3,
+  "warmRuns": 3,
+  "iterationsPerTask": 10,
+  "baseline": [
+    {
+      "task": "GENERATE_WORLD",
+      "latencyP95Ms": 1.857,
+      "queueWaitP95Ms": 0.056
+    },
+    {
+      "task": "GENERATE_NPCS",
+      "latencyP95Ms": 2.003,
+      "queueWaitP95Ms": 1.077
+    },
+    {
+      "task": "GENERATE_QUEST",
+      "latencyP95Ms": 0.645,
+      "queueWaitP95Ms": 0.026
+    },
+    {
+      "task": "GENERATE_ADVENTURE_TURN",
+      "latencyP95Ms": 1.128,
+      "queueWaitP95Ms": 0.068
+    },
+    {
+      "task": "RESOLVE_DICE_RESULT",
+      "latencyP95Ms": 0.234,
+      "queueWaitP95Ms": 0.083
+    }
+  ],
+  "current": [
+    {
+      "task": "GENERATE_WORLD",
+      "coldLatencyP95MedianMs": 1.737,
+      "warmLatencyP95MedianMs": 0.076,
+      "coldQueueP95MedianMs": 1.524,
+      "warmQueueP95MedianMs": 0.044
+    },
+    {
+      "task": "GENERATE_NPCS",
+      "coldLatencyP95MedianMs": 0.551,
+      "warmLatencyP95MedianMs": 0.149,
+      "coldQueueP95MedianMs": 0.039,
+      "warmQueueP95MedianMs": 0.059
+    },
+    {
+      "task": "GENERATE_QUEST",
+      "coldLatencyP95MedianMs": 0.126,
+      "warmLatencyP95MedianMs": 0.077,
+      "coldQueueP95MedianMs": 0.04,
+      "warmQueueP95MedianMs": 0.031
+    },
+    {
+      "task": "GENERATE_ADVENTURE_TURN",
+      "coldLatencyP95MedianMs": 0.098,
+      "warmLatencyP95MedianMs": 0.138,
+      "coldQueueP95MedianMs": 0.061,
+      "warmQueueP95MedianMs": 0.057
+    },
+    {
+      "task": "RESOLVE_DICE_RESULT",
+      "coldLatencyP95MedianMs": 0.065,
+      "warmLatencyP95MedianMs": 0.043,
+      "coldQueueP95MedianMs": 0.033,
+      "warmQueueP95MedianMs": 0.031
+    }
+  ],
+  "longSave": {
+    "smallTurns": 100,
+    "largeTurns": 1000,
+    "databaseBytesAtSmall": 1556480,
+    "databaseBytesAtLarge": 2043904,
+    "contextTokensAtSmall": 377,
+    "contextTokensAtLarge": 383,
+    "generationQueueP95Ms": 2,
+    "databaseBytesPerAdditionalTurn": 541.582,
+    "contextGrowthRatio": 1.016
+  },
+  "usage": {
+    "inputTokens": null,
+    "sampleCount": 300,
+    "promptCacheHitTokens": null,
+    "promptCacheMissTokens": null
+  },
+  "thresholds": {
+    "minimumRuns": 3,
+    "minimumIterationsPerTask": 10,
+    "latencyP95RatioMax": 3,
+    "latencyP95AbsoluteSlackMs": 5,
+    "queueP95RatioMax": 3,
+    "queueP95AbsoluteSlackMs": 5,
+    "generationQueueP95MaxMs": 50,
+    "databaseBytesPerTurnMax": 4096,
+    "contextTokensMax": 2048,
+    "contextGrowthRatioMax": 1.05,
+    "inputTokensPerSampleMax": 16384,
+    "cacheHitRatioMin": 0.5
+  },
+  "checks": [
+    {
+      "id": "GENERATE_WORLD.cold.latency_p95",
+      "status": "PASS",
+      "observed": 1.737,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 6.857 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_WORLD.warm.latency_p95",
+      "status": "PASS",
+      "observed": 0.076,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 6.857 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_WORLD.cold.queue_p95",
+      "status": "PASS",
+      "observed": 1.524,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.056 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_WORLD.warm.queue_p95",
+      "status": "PASS",
+      "observed": 0.044,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.056 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_NPCS.cold.latency_p95",
+      "status": "PASS",
+      "observed": 0.551,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 7.003 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_NPCS.warm.latency_p95",
+      "status": "PASS",
+      "observed": 0.149,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 7.003 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_NPCS.cold.queue_p95",
+      "status": "PASS",
+      "observed": 0.039,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 6.077 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_NPCS.warm.queue_p95",
+      "status": "PASS",
+      "observed": 0.059,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 6.077 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_QUEST.cold.latency_p95",
+      "status": "PASS",
+      "observed": 0.126,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.645 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_QUEST.warm.latency_p95",
+      "status": "PASS",
+      "observed": 0.077,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.645 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_QUEST.cold.queue_p95",
+      "status": "PASS",
+      "observed": 0.04,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.026 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_QUEST.warm.queue_p95",
+      "status": "PASS",
+      "observed": 0.031,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.026 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_ADVENTURE_TURN.cold.latency_p95",
+      "status": "PASS",
+      "observed": 0.098,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 6.128 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_ADVENTURE_TURN.warm.latency_p95",
+      "status": "PASS",
+      "observed": 0.138,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 6.128 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_ADVENTURE_TURN.cold.queue_p95",
+      "status": "PASS",
+      "observed": 0.061,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.068 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "GENERATE_ADVENTURE_TURN.warm.queue_p95",
+      "status": "PASS",
+      "observed": 0.057,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.068 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "RESOLVE_DICE_RESULT.cold.latency_p95",
+      "status": "PASS",
+      "observed": 0.065,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.234 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "RESOLVE_DICE_RESULT.warm.latency_p95",
+      "status": "PASS",
+      "observed": 0.043,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.234 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "RESOLVE_DICE_RESULT.cold.queue_p95",
+      "status": "PASS",
+      "observed": 0.033,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.083 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "RESOLVE_DICE_RESULT.warm.queue_p95",
+      "status": "PASS",
+      "observed": 0.031,
+      "threshold": "≤ max(M1 × 3, M1 + 5 ms) = 5.083 ms",
+      "explanation": "使用多批次 run-level P95 的中位数，不选择单次最快值。"
+    },
+    {
+      "id": "generation_queue.p95",
+      "status": "PASS",
+      "observed": 2,
+      "threshold": "≤ 50",
+      "explanation": "真实 GenerationQueue 的同进程压力队列等待 P95。"
+    },
+    {
+      "id": "long_save.database_bytes_per_turn",
+      "status": "PASS",
+      "observed": 541.582,
+      "threshold": "≤ 4096",
+      "explanation": "以 SQLite page_count × page_size 计算 100→1000 回合的增量，不使用文件系统稀疏大小。"
+    },
+    {
+      "id": "long_save.context_tokens",
+      "status": "PASS",
+      "observed": 383,
+      "threshold": "≤ 2048",
+      "explanation": "长期存档只投影有界 recent/memory，不把完整数据库或全量历史送入 Context。"
+    },
+    {
+      "id": "long_save.context_growth_ratio",
+      "status": "PASS",
+      "observed": 1.016,
+      "threshold": "≤ 1.05",
+      "explanation": "比较 100 与 1000 回合的 Unified Context token 估算。"
+    },
+    {
+      "id": "provider.input_tokens_per_sample",
+      "status": "NOT_EVALUATED",
+      "observed": null,
+      "threshold": "≤ 16384",
+      "explanation": "M1 与当前 Fake Provider 均未报告 usage；unknown 不按 0 处理。"
+    },
+    {
+      "id": "provider.cache_hit_ratio",
+      "status": "NOT_EVALUATED",
+      "observed": null,
+      "threshold": "≥ 0.5",
+      "explanation": "Fake Provider 没有计费缓存 usage；不以进程内 prefix reuse 冒充 Provider hit。"
+    }
+  ],
+  "passed": true
+}

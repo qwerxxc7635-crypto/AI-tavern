@@ -11,16 +11,33 @@ use std::{
 };
 
 use ember_native_bridge::{
-    AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit, AdventurePlanCommit,
-    AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit, CampaignArchiveExportResult,
-    CampaignArchiveImportMode, CampaignArchiveInspection, CampaignRecoverySnapshot, CampaignStore,
-    CampaignStoreError, CampaignSummary, CapabilitySource, CharacterCandidateConfirm,
-    CharacterCompletionCommit, CharacterCreationSnapshot, CharacterTraitGenerationCommit,
-    CredentialAction, CredentialCleanupReason, ModelCapabilitiesRegistration,
+    ActiveFactionGenerationCommit, ActiveFactionGenerationRequest, ActiveFactionGenerationSnapshot,
+    ActiveFactionSnapshot, AdventureActionSubmit, AdventureArchiveView, AdventureDiceCommit,
+    AdventurePlanCommit, AdventureSettlementCommit, AdventureSnapshot, AdventureTurnCommit,
+    CampaignArchiveExportResult, CampaignArchiveImportMode, CampaignArchiveInspection,
+    CampaignRecoverySnapshot, CampaignStore, CampaignStoreError, CampaignSummary, CapabilitySource,
+    CareerPool, CareerPoolGenerationCommit, CharacterCandidateConfirm, CharacterCompletionCommit,
+    CharacterCreationSnapshot, CharacterRulesState, CharacterTraitGenerationCommit,
+    CredentialAction, CredentialCleanupReason, DialogueSuggestionCommit,
+    DialogueSuggestionPreparation, DialogueSuggestionPrepareCommand, DialogueSuggestionSet,
+    DirectorBudgetAdmitCommand, DirectorBudgetSnapshot, DynamicLocationGenerationCommit,
+    DynamicLocationGenerationRequest, DynamicLocationGenerationSnapshot, DynamicLocationSnapshot,
+    DynamicLocationTravelCommand, DynamicQuestCommitCommand, DynamicQuestPreparation,
+    DynamicQuestPrepareCommand, FactionActionCommand, ModelCapabilitiesRegistration,
     ModelSettingsSnapshot, ModelSettingsUpdate, NpcDialogueCommit, NpcDialogueSnapshot,
-    NpcRosterGenerationCommit, QuestBoardSnapshot, QuestGenerationCommit,
-    RandomnessSettingsSnapshot, RandomnessSettingsUpdate, TavernGenerationCommit, TavernSnapshot,
-    WorldCreationSnapshot, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
+    NpcLodGenerationSnapshot, NpcLodSeedCommand, NpcLodUpgradeCommit, NpcRosterGenerationCommit,
+    NpcTimelineBegin, NpcTimelineFail, NpcTimelineOperation, PromptManagerSnapshot,
+    PromptPresetActivateCommand, PromptPresetImportCommand, PromptPresetSaveCommand,
+    QuestBoardSnapshot, QuestGenerationCommit, QuestGraphEvaluateCommand, QuestGraphReplaceCommand,
+    QuestGraphSnapshot, QuestPoolTransitionCommand, RandomnessSettingsSnapshot,
+    RandomnessSettingsUpdate, RulesApplyCommand, RulesCommitReceipt, TavernGenerationCommit,
+    TavernPopulationFocusCommand, TavernPopulationProjectCommand, TavernPopulationSnapshot,
+    TavernSceneCommit, TavernSceneGenerationRequest, TavernScenePrepare, TavernSceneSnapshot,
+    TavernSceneStart, TavernSnapshot, UniversalCharacterCreationConfirm,
+    UniversalCharacterCreationSave, UniversalCharacterCreationSnapshot,
+    UniversalCharacterCreationStart, UniversalCharacterQuickCommit, WorldCreationSnapshot,
+    WorldDirectorCommitCommand, WorldDirectorPreparation, WorldDirectorPrepareCommand,
+    WorldDirectorRun, WorldGenerationCommit, WorldManualUpdate, model_endpoint_fingerprint,
     model_probe_fingerprint,
 };
 use ember_platform_services::{AppInstanceLock, FileAppInstanceLock};
@@ -31,20 +48,137 @@ use ember_provider_openai_compatible::{
     QWEN_BASE_URL, QwenPreset, ResponseFormat, TokenUsage,
 };
 use ember_secure_secrets::{CredentialRef, SecretStore, SecureVault};
-use serde::{Deserialize, Serialize};
-use tauri::{Manager, State};
+use serde::{Deserialize, Serialize, ser::SerializeStruct};
+use tauri::{Manager, State, ipc::Channel};
 use time::OffsetDateTime;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
 const PROBE_RECEIPT_TTL: Duration = Duration::from_secs(15 * 60);
 const MAX_PROBE_RECEIPTS: usize = 64;
+const MAX_ACTIVE_AI_STREAMS: usize = 32;
+const AI_STREAM_CANCEL_TOMBSTONE_TTL: Duration = Duration::from_secs(30);
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
+#[derive(Debug)]
 struct CommandError {
     code: &'static str,
     message: &'static str,
+}
+
+#[derive(Clone, Copy)]
+struct CommandErrorPolicy {
+    kind: &'static str,
+    retryable: bool,
+    fallback_eligible: bool,
+    surface: &'static str,
+    actions: &'static [&'static str],
+}
+
+impl Serialize for CommandError {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        let policy = command_error_policy(self.code);
+        let mut state = serializer.serialize_struct("CommandError", 7)?;
+        state.serialize_field("code", self.code)?;
+        state.serialize_field("message", self.message)?;
+        state.serialize_field("kind", policy.kind)?;
+        state.serialize_field("retryable", &policy.retryable)?;
+        state.serialize_field("fallbackEligible", &policy.fallback_eligible)?;
+        state.serialize_field("surface", policy.surface)?;
+        state.serialize_field("actions", policy.actions)?;
+        state.end()
+    }
+}
+
+fn command_error_policy(code: &str) -> CommandErrorPolicy {
+    match code {
+        "AUTHENTICATION_FAILED"
+        | "QUOTA_EXCEEDED"
+        | "MODEL_NOT_FOUND"
+        | "MODEL_NOT_CONFIGURED"
+        | "MODEL_PROFILE_MISSING"
+        | "NO_MODEL_CANDIDATE"
+        | "MODEL_SELECTION_DRIFT"
+        | "CREDENTIAL_INVALID"
+        | "CREDENTIAL_UNAVAILABLE"
+        | "CREDENTIAL_NOT_FOUND" => {
+            error_policy("PROVIDER", false, false, "ERROR_STATE", &["OPEN_SETTINGS"])
+        }
+        "RATE_LIMITED" | "PROVIDER_UNAVAILABLE" => error_policy(
+            "PROVIDER",
+            true,
+            true,
+            "TOAST",
+            &["RETRY", "CANCEL", "USE_FALLBACK"],
+        ),
+        "TIMEOUT" | "NETWORK_FAILED" => error_policy(
+            "NETWORK",
+            true,
+            true,
+            "TOAST",
+            &["RETRY", "CANCEL", "USE_FALLBACK"],
+        ),
+        "CANCELLED" => error_policy("GENERATION", true, false, "TOAST", &["RETRY", "CANCEL"]),
+        "INVALID_OUTPUT"
+        | "FACT_CONFLICT"
+        | "PROBE_STALE"
+        | "REPETITION_DETECTED"
+        | "WORLD_COMMIT_OUTPUT_MISMATCH"
+        | "WORLD_COMMIT_ENVELOPE_INVALID" => error_policy(
+            "VALIDATION",
+            true,
+            false,
+            "ERROR_STATE",
+            &["RETRY", "CANCEL"],
+        ),
+        "CAMPAIGN_STATE_INVALID" | "UNCONFIRMED_CANDIDATE" | "WORLD_BUSINESS_RULE_INVALID" => {
+            error_policy("RULE", false, false, "ERROR_STATE", &["DISMISS"])
+        }
+        "CONCURRENT_MODIFICATION" | "APP_LOCK_UNAVAILABLE" | "LOCAL_STORAGE_UNAVAILABLE" => {
+            error_policy(
+                "PERSISTENCE",
+                true,
+                false,
+                "ERROR_STATE",
+                &["RETRY", "CANCEL"],
+            )
+        }
+        "CAMPAIGN_NOT_FOUND"
+        | "CAMPAIGN_ARCHIVED"
+        | "CAMPAIGN_DATA_INVALID"
+        | "SAVE_ARCHIVE_INVALID"
+        | "SAVE_ARCHIVE_FUTURE"
+        | "SAVE_ARCHIVE_CONFLICT"
+        | "SAVE_PATH_INVALID" => {
+            error_policy("PERSISTENCE", false, false, "ERROR_STATE", &["DISMISS"])
+        }
+        "UNKNOWN" => error_policy(
+            "GENERATION",
+            false,
+            false,
+            "ERROR_STATE",
+            &["OPEN_SETTINGS"],
+        ),
+        _ => error_policy("GENERATION", false, false, "ERROR_STATE", &["DISMISS"]),
+    }
+}
+
+const fn error_policy(
+    kind: &'static str,
+    retryable: bool,
+    fallback_eligible: bool,
+    surface: &'static str,
+    actions: &'static [&'static str],
+) -> CommandErrorPolicy {
+    CommandErrorPolicy {
+        kind,
+        retryable,
+        fallback_eligible,
+        surface,
+        actions,
+    }
 }
 
 impl From<CampaignStoreError> for CommandError {
@@ -66,9 +200,17 @@ impl From<CampaignStoreError> for CommandError {
                 code: "CAMPAIGN_DATA_INVALID",
                 message: "本地存档数据无法读取。",
             },
+            CampaignStoreError::FactConflict => Self {
+                code: "FACT_CONFLICT",
+                message: "生成内容与当前世界事实冲突，可用相同意图进行技术重试。",
+            },
             CampaignStoreError::ArchiveInvalid => Self {
                 code: "SAVE_ARCHIVE_INVALID",
                 message: "存档文件损坏、格式不兼容或未通过安全校验。",
+            },
+            CampaignStoreError::ArchiveTooNew => Self {
+                code: "SAVE_ARCHIVE_FUTURE",
+                message: "该存档来自更新版本；请升级 Ember Tavern 后再导入。",
             },
             CampaignStoreError::ArchiveConflict => Self {
                 code: "SAVE_ARCHIVE_CONFLICT",
@@ -118,6 +260,10 @@ impl From<ProviderError> for CommandError {
             ProviderError::Timeout => Self {
                 code: "TIMEOUT",
                 message: "模型服务响应超时，请重试。",
+            },
+            ProviderError::Cancelled => Self {
+                code: "CANCELLED",
+                message: "生成已取消，本地存档未修改。",
             },
             ProviderError::ModelNotFound => Self {
                 code: "MODEL_NOT_FOUND",
@@ -299,18 +445,179 @@ struct RuntimeGenerateResponse {
     cache_metric_recorded: Option<bool>,
 }
 
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RuntimeStreamEvent {
+    request_id: String,
+    sequence: u64,
+    content: String,
+}
+
+struct RegisteredAiStream {
+    cancellation: CancellationToken,
+    registered: bool,
+    created_at: Instant,
+}
+
+#[derive(Default)]
+struct AiStreamRegistry(Mutex<HashMap<String, RegisteredAiStream>>);
+
+impl AiStreamRegistry {
+    fn register(&self, request_id: &str) -> Result<CancellationToken, CommandError> {
+        if !valid_stream_request_id(request_id) {
+            return Err(ProviderError::InvalidRequest.into());
+        }
+        let mut streams = self.0.lock().map_err(|_| CommandError {
+            code: "PROVIDER_UNAVAILABLE",
+            message: "模型流式通道暂时不可用，请重试。",
+        })?;
+        streams.retain(|_, value| {
+            value.registered || value.created_at.elapsed() <= AI_STREAM_CANCEL_TOMBSTONE_TTL
+        });
+        if let Some(existing) = streams.get(request_id) {
+            if !existing.registered {
+                streams.remove(request_id);
+                return Err(ProviderError::Cancelled.into());
+            }
+            return Err(CommandError {
+                code: "PROVIDER_UNAVAILABLE",
+                message: "相同的流式生成任务正在执行，请稍后重试。",
+            });
+        }
+        if streams.len() >= MAX_ACTIVE_AI_STREAMS {
+            return Err(CommandError {
+                code: "PROVIDER_UNAVAILABLE",
+                message: "当前流式生成任务过多，请稍后重试。",
+            });
+        }
+        let cancellation = CancellationToken::new();
+        streams.insert(
+            request_id.to_owned(),
+            RegisteredAiStream {
+                cancellation: cancellation.clone(),
+                registered: true,
+                created_at: Instant::now(),
+            },
+        );
+        Ok(cancellation)
+    }
+
+    fn cancel(&self, request_id: &str) -> Result<bool, CommandError> {
+        if !valid_stream_request_id(request_id) {
+            return Err(ProviderError::InvalidRequest.into());
+        }
+        let mut streams = self.0.lock().map_err(|_| CommandError {
+            code: "PROVIDER_UNAVAILABLE",
+            message: "模型流式通道暂时不可用，请重试。",
+        })?;
+        streams.retain(|_, value| {
+            value.registered || value.created_at.elapsed() <= AI_STREAM_CANCEL_TOMBSTONE_TTL
+        });
+        if let Some(stream) = streams.get(request_id) {
+            stream.cancellation.cancel();
+        } else {
+            if streams.len() >= MAX_ACTIVE_AI_STREAMS {
+                return Err(CommandError {
+                    code: "PROVIDER_UNAVAILABLE",
+                    message: "当前流式生成任务过多，请稍后重试。",
+                });
+            }
+            let cancellation = CancellationToken::new();
+            cancellation.cancel();
+            streams.insert(
+                request_id.to_owned(),
+                RegisteredAiStream {
+                    cancellation,
+                    registered: false,
+                    created_at: Instant::now(),
+                },
+            );
+        }
+        Ok(true)
+    }
+
+    fn remove(&self, request_id: &str) {
+        if let Ok(mut streams) = self.0.lock() {
+            streams.remove(request_id);
+        }
+    }
+}
+
+fn valid_stream_request_id(request_id: &str) -> bool {
+    !request_id.is_empty()
+        && request_id.len() <= 256
+        && request_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b":._-".contains(&byte))
+}
+
 #[tauri::command]
 async fn ai_generate(
     request: RuntimeGenerateRequest,
     store: State<'_, CampaignStore>,
+    streams: State<'_, AiStreamRegistry>,
 ) -> Result<RuntimeGenerateResponse, CommandError> {
-    execute_ai_generate(request, store.inner()).await
+    let request_id = request.request_id.clone();
+    let cancellation = streams.register(&request_id)?;
+    let result =
+        execute_ai_generate_inner(request, store.inner(), cancellation, false, |_| Ok(())).await;
+    streams.remove(&request_id);
+    result
 }
 
+#[cfg(test)]
 async fn execute_ai_generate(
     request: RuntimeGenerateRequest,
     store: &CampaignStore,
 ) -> Result<RuntimeGenerateResponse, CommandError> {
+    execute_ai_generate_inner(request, store, CancellationToken::new(), false, |_| Ok(())).await
+}
+
+#[tauri::command]
+async fn ai_generate_stream(
+    request: RuntimeGenerateRequest,
+    on_event: Channel<RuntimeStreamEvent>,
+    store: State<'_, CampaignStore>,
+    streams: State<'_, AiStreamRegistry>,
+) -> Result<RuntimeGenerateResponse, CommandError> {
+    let request_id = request.request_id.clone();
+    let cancellation = streams.register(&request_id)?;
+    let mut sequence = 0_u64;
+    let result = execute_ai_generate_inner(request, store.inner(), cancellation, true, |content| {
+        sequence = sequence
+            .checked_add(1)
+            .ok_or(ProviderError::InvalidResponse)?;
+        on_event
+            .send(RuntimeStreamEvent {
+                request_id: request_id.clone(),
+                sequence,
+                content: content.to_owned(),
+            })
+            .map_err(|_| ProviderError::Cancelled)
+    })
+    .await;
+    streams.remove(&request_id);
+    result
+}
+
+#[tauri::command]
+fn ai_stream_cancel(
+    request_id: String,
+    streams: State<'_, AiStreamRegistry>,
+) -> Result<bool, CommandError> {
+    streams.cancel(&request_id)
+}
+
+async fn execute_ai_generate_inner<F>(
+    request: RuntimeGenerateRequest,
+    store: &CampaignStore,
+    cancellation: CancellationToken,
+    streaming: bool,
+    mut on_delta: F,
+) -> Result<RuntimeGenerateResponse, CommandError>
+where
+    F: FnMut(&str) -> Result<(), ProviderError>,
+{
     let runtime = store
         .model_runtime_config(&request.selected_profile_id)
         .map_err(|error| match error {
@@ -339,6 +646,11 @@ async fn execute_ai_generate(
         .transpose()
         .map_err(|_| ProviderError::InvalidConfig)?;
     let config = runtime_provider_config(&runtime.preset_key, &runtime.base_url, credential)?;
+    let config = if should_disable_thinking(&runtime.preset_key, &request.task) {
+        config.with_thinking_disabled()
+    } else {
+        config
+    };
     let metric_task = request.task.clone();
     let cache_prefix_hash = request.cache_prefix_hash.clone();
     let normalized = NormalizedRequest {
@@ -365,9 +677,16 @@ async fn execute_ai_generate(
         max_output_tokens: request.max_output_tokens,
         timeout: Duration::from_millis(request.timeout_ms),
     };
-    let response = OpenAiCompatibleProvider::new()?
-        .generate(&config, &normalized, CancellationToken::new())
-        .await?;
+    let provider = OpenAiCompatibleProvider::new()?;
+    let response = if streaming {
+        provider
+            .generate_stream(&config, &normalized, cancellation, &mut on_delta)
+            .await?
+    } else {
+        provider
+            .generate(&config, &normalized, cancellation)
+            .await?
+    };
     let cache_metric_recorded = record_cache_metric_best_effort(
         store,
         &runtime.preset_key,
@@ -428,6 +747,21 @@ fn runtime_provider_config(
         "custom" => OpenAiCompatibleConfig::new(base_url, credential),
         _ => Err(ProviderError::InvalidConfig),
     }
+}
+
+fn should_disable_thinking(preset_key: &str, task: &str) -> bool {
+    preset_key == "deepseek"
+        && matches!(
+            task,
+            "GENERATE_WORLD"
+                | "REFINE_WORLD"
+                | "GENERATE_CAREER_POOL"
+                | "GENERATE_CHARACTER_TRAITS"
+                | "COMPLETE_CHARACTER_BACKGROUND"
+                | "GENERATE_QUICK_CHARACTER"
+                | "EDIT_CHARACTER_DRAFT"
+                | "CHECK_CONSISTENCY"
+        )
 }
 
 fn is_sha256_hex(value: &str) -> bool {
@@ -517,11 +851,67 @@ fn randomness_settings_save(
     store.save_randomness_settings(command).map_err(Into::into)
 }
 
+#[tauri::command]
+fn prompt_manager_get(
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.prompt_manager().map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_save(
+    command: PromptPresetSaveCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.save_prompt_preset(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_activate(
+    command: PromptPresetActivateCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.activate_prompt_preset(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_import(
+    command: PromptPresetImportCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store.import_prompt_preset(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_preset_export(
+    preset_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<String, CommandError> {
+    store.export_prompt_preset(&preset_id).map_err(Into::into)
+}
+
+#[tauri::command]
+fn prompt_manager_reset(
+    expected_revision: Option<u64>,
+    store: State<'_, CampaignStore>,
+) -> Result<PromptManagerSnapshot, CommandError> {
+    store
+        .reset_prompt_manager(expected_revision)
+        .map_err(Into::into)
+}
+
 fn retry_pending_credential_cleanup(
     store: &CampaignStore,
     vault: &impl SecureVault,
 ) -> Result<(), CampaignStoreError> {
     for pending in store.pending_credential_cleanups()? {
+        // Old databases, restored backups or a previously interrupted settings
+        // flow may contain a stale cleanup row for a credential that is active
+        // again. The SQLite reference is authoritative: never delete a secret
+        // that a provider configuration still owns.
+        if store.discard_cleanup_if_credential_active(&pending.credential_ref)? {
+            continue;
+        }
         let reference = pending
             .credential_ref
             .parse::<CredentialRef>()
@@ -580,7 +970,10 @@ async fn provider_probe(
             };
             let capabilities = ModelCapabilitiesRegistration {
                 text: true,
-                streaming: false,
+                streaming: matches!(
+                    preset_key.as_str(),
+                    "deepseek" | "qwen" | "openrouter" | "ollama"
+                ),
                 system_messages: true,
                 json_mode: preset
                     .map(|value| value.json_mode)
@@ -726,6 +1119,24 @@ fn campaign_recovery_restore(
     store
         .restore_campaign_after_failure(&id)
         .map_err(Into::into)
+}
+
+#[tauri::command]
+fn rules_state_get(
+    player_character_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<CharacterRulesState, CommandError> {
+    store
+        .character_rules_state(&player_character_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn rules_apply(
+    command: RulesApplyCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<RulesCommitReceipt, CommandError> {
+    store.apply_rules_command(command).map_err(Into::into)
 }
 
 #[tauri::command]
@@ -887,6 +1298,260 @@ fn character_candidate_confirm(
 }
 
 #[tauri::command]
+fn universal_character_creation_get(
+    id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .universal_character_creation_snapshot(&id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn career_pool_generation_commit(
+    command: CareerPoolGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<CareerPool, CommandError> {
+    store
+        .commit_career_pool_generation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_lod_seed(
+    command: NpcLodSeedCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcLodGenerationSnapshot, CommandError> {
+    store.create_npc_lod_seed(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_lod_get(
+    campaign_id: String,
+    npc_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcLodGenerationSnapshot, CommandError> {
+    store
+        .npc_lod_generation_snapshot(&campaign_id, &npc_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_lod_upgrade_commit(
+    command: NpcLodUpgradeCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcLodGenerationSnapshot, CommandError> {
+    store.commit_npc_lod_upgrade(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationSnapshot, CommandError> {
+    store
+        .dynamic_location_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_generation_get(
+    command: DynamicLocationGenerationRequest,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationGenerationSnapshot, CommandError> {
+    store
+        .dynamic_location_generation_snapshot(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_generation_commit(
+    command: DynamicLocationGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationSnapshot, CommandError> {
+    store
+        .commit_dynamic_location_generation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_locations_travel(
+    command: DynamicLocationTravelCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicLocationSnapshot, CommandError> {
+    store.travel_dynamic_location(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionSnapshot, CommandError> {
+    store
+        .active_faction_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_generation_get(
+    command: ActiveFactionGenerationRequest,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionGenerationSnapshot, CommandError> {
+    store
+        .active_faction_generation_snapshot(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_generation_commit(
+    command: ActiveFactionGenerationCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionSnapshot, CommandError> {
+    store
+        .commit_active_faction_generation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn active_factions_action_apply(
+    command: FactionActionCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<ActiveFactionSnapshot, CommandError> {
+    store.apply_faction_action(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_population_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernPopulationSnapshot, CommandError> {
+    store
+        .tavern_population_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_population_project(
+    command: TavernPopulationProjectCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernPopulationSnapshot, CommandError> {
+    store.project_tavern_population(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_population_focus(
+    command: TavernPopulationFocusCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernPopulationSnapshot, CommandError> {
+    store.focus_tavern_population(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_get(
+    campaign_id: String,
+    scene_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneSnapshot, CommandError> {
+    store
+        .tavern_scene_snapshot(&campaign_id, &scene_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_start(
+    command: TavernSceneStart,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneSnapshot, CommandError> {
+    store.start_tavern_scene(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_turn_prepare(
+    command: TavernScenePrepare,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneGenerationRequest, CommandError> {
+    store.prepare_tavern_scene_turn(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn tavern_scene_turn_commit(
+    command: TavernSceneCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<TavernSceneSnapshot, CommandError> {
+    store.commit_tavern_scene_turn(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_timeline_get(
+    campaign_id: String,
+    scope_kind: String,
+    scope_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<Option<NpcTimelineOperation>, CommandError> {
+    store
+        .latest_npc_timeline(&campaign_id, &scope_kind, &scope_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_timeline_begin(
+    command: NpcTimelineBegin,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcTimelineOperation, CommandError> {
+    store
+        .begin_npc_timeline_attempt(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn npc_timeline_fail(
+    command: NpcTimelineFail,
+    store: State<'_, CampaignStore>,
+) -> Result<NpcTimelineOperation, CommandError> {
+    store.fail_npc_timeline_attempt(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_creation_start(
+    command: UniversalCharacterCreationStart,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .start_universal_character_creation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_creation_save(
+    command: UniversalCharacterCreationSave,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .save_universal_character_creation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_quick_commit(
+    command: UniversalCharacterQuickCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .commit_universal_quick_character(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn universal_character_creation_confirm(
+    command: UniversalCharacterCreationConfirm,
+    store: State<'_, CampaignStore>,
+) -> Result<UniversalCharacterCreationSnapshot, CommandError> {
+    store
+        .confirm_universal_character_creation(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn tavern_get(id: String, store: State<'_, CampaignStore>) -> Result<TavernSnapshot, CommandError> {
     store.tavern_snapshot(&id).map_err(Into::into)
 }
@@ -929,6 +1594,26 @@ fn npc_dialogue_commit(
 }
 
 #[tauri::command]
+fn dialogue_suggestions_prepare(
+    command: DialogueSuggestionPrepareCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DialogueSuggestionPreparation, CommandError> {
+    store
+        .prepare_dialogue_suggestions(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn dialogue_suggestions_commit(
+    command: DialogueSuggestionCommit,
+    store: State<'_, CampaignStore>,
+) -> Result<DialogueSuggestionSet, CommandError> {
+    store
+        .commit_dialogue_suggestions(command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn quest_board_get(
     campaign_id: String,
     store: State<'_, CampaignStore>,
@@ -945,6 +1630,67 @@ fn quest_generation_commit(
 }
 
 #[tauri::command]
+fn dynamic_quest_prepare(
+    command: DynamicQuestPrepareCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DynamicQuestPreparation, CommandError> {
+    store.prepare_dynamic_quest(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn dynamic_quest_commit(
+    command: DynamicQuestCommitCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store.commit_dynamic_quest(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_director_prepare(
+    command: WorldDirectorPrepareCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldDirectorPreparation, CommandError> {
+    store.prepare_world_director(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_director_commit(
+    command: WorldDirectorCommitCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<WorldDirectorRun, CommandError> {
+    store.commit_world_director(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn world_director_history(
+    campaign_id: String,
+    limit: usize,
+    store: State<'_, CampaignStore>,
+) -> Result<Vec<WorldDirectorRun>, CommandError> {
+    store
+        .world_director_history(&campaign_id, limit)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn director_budget_admit(
+    command: DirectorBudgetAdmitCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<DirectorBudgetSnapshot, CommandError> {
+    store.admit_director_budget(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn director_budget_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<Option<DirectorBudgetSnapshot>, CommandError> {
+    store
+        .director_budget_snapshot(&campaign_id)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn quest_accept(
     campaign_id: String,
     quest_id: String,
@@ -953,6 +1699,41 @@ fn quest_accept(
     store
         .accept_quest(&campaign_id, &quest_id)
         .map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_pool_transition(
+    command: QuestPoolTransitionCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestBoardSnapshot, CommandError> {
+    store.transition_quest_pool(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_graph_get(
+    campaign_id: String,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestGraphSnapshot, CommandError> {
+    store
+        .quest_board_snapshot(&campaign_id)
+        .map(|snapshot| snapshot.graph)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_graph_replace(
+    command: QuestGraphReplaceCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestGraphSnapshot, CommandError> {
+    store.replace_quest_graph(command).map_err(Into::into)
+}
+
+#[tauri::command]
+fn quest_graph_evaluate(
+    command: QuestGraphEvaluateCommand,
+    store: State<'_, CampaignStore>,
+) -> Result<QuestGraphSnapshot, CommandError> {
+    store.evaluate_quest_graph(command).map_err(Into::into)
 }
 
 #[tauri::command]
@@ -1105,6 +1886,7 @@ pub fn run() {
             app.manage(instance_guard);
             app.manage(store);
             app.manage(ProviderProbeRegistry::default());
+            app.manage(AiStreamRegistry::default());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -1115,6 +1897,8 @@ pub fn run() {
             campaign_delete,
             campaign_recovery_get,
             campaign_recovery_restore,
+            rules_state_get,
+            rules_apply,
             save_archive_inspect,
             save_archive_export,
             save_archive_import,
@@ -1126,14 +1910,54 @@ pub fn run() {
             character_traits_commit,
             character_completion_commit,
             character_candidate_confirm,
+            universal_character_creation_get,
+            career_pool_generation_commit,
+            npc_lod_seed,
+            npc_lod_get,
+            npc_lod_upgrade_commit,
+            dynamic_locations_get,
+            dynamic_locations_generation_get,
+            dynamic_locations_generation_commit,
+            dynamic_locations_travel,
+            active_factions_get,
+            active_factions_generation_get,
+            active_factions_generation_commit,
+            active_factions_action_apply,
+            tavern_population_get,
+            tavern_population_project,
+            tavern_population_focus,
+            tavern_scene_get,
+            tavern_scene_start,
+            tavern_scene_turn_prepare,
+            tavern_scene_turn_commit,
+            npc_timeline_get,
+            npc_timeline_begin,
+            npc_timeline_fail,
+            universal_character_creation_start,
+            universal_character_creation_save,
+            universal_character_quick_commit,
+            universal_character_creation_confirm,
             tavern_get,
             tavern_generation_commit,
             tavern_npcs_commit,
             npc_dialogue_get,
             npc_dialogue_commit,
+            dialogue_suggestions_prepare,
+            dialogue_suggestions_commit,
             quest_board_get,
             quest_generation_commit,
+            dynamic_quest_prepare,
+            dynamic_quest_commit,
+            world_director_prepare,
+            world_director_commit,
+            world_director_history,
+            director_budget_admit,
+            director_budget_get,
             quest_accept,
+            quest_pool_transition,
+            quest_graph_get,
+            quest_graph_replace,
+            quest_graph_evaluate,
             adventure_get,
             adventure_plan_commit,
             adventure_start,
@@ -1151,8 +1975,16 @@ pub fn run() {
             model_settings_save,
             model_settings_forget_credential,
             ai_generate,
+            ai_generate_stream,
+            ai_stream_cancel,
             randomness_settings_get,
             randomness_settings_save,
+            prompt_manager_get,
+            prompt_preset_save,
+            prompt_preset_activate,
+            prompt_preset_import,
+            prompt_preset_export,
+            prompt_manager_reset,
             provider_probe
         ])
         .run(tauri::generate_context!())
@@ -1166,6 +1998,28 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use time::format_description::well_known::Rfc3339;
+
+    #[test]
+    fn deepseek_strict_structured_tasks_disable_thinking_without_affecting_narrative_tasks() {
+        for task in [
+            "GENERATE_WORLD",
+            "REFINE_WORLD",
+            "GENERATE_CAREER_POOL",
+            "GENERATE_CHARACTER_TRAITS",
+            "COMPLETE_CHARACTER_BACKGROUND",
+            "GENERATE_QUICK_CHARACTER",
+            "EDIT_CHARACTER_DRAFT",
+            "CHECK_CONSISTENCY",
+        ] {
+            assert!(should_disable_thinking("deepseek", task), "{task}");
+        }
+        assert!(!should_disable_thinking("deepseek", "NPC_REPLY"));
+        assert!(!should_disable_thinking(
+            "deepseek",
+            "GENERATE_ADVENTURE_TURN"
+        ));
+        assert!(!should_disable_thinking("custom", "GENERATE_WORLD"));
+    }
 
     #[test]
     fn cache_telemetry_failure_is_observable_but_does_not_replace_generation() {
@@ -1226,6 +2080,7 @@ mod tests {
             (ProviderError::Authentication, "AUTHENTICATION_FAILED"),
             (ProviderError::RateLimited, "RATE_LIMITED"),
             (ProviderError::Timeout, "TIMEOUT"),
+            (ProviderError::Cancelled, "CANCELLED"),
             (ProviderError::ModelNotFound, "MODEL_NOT_FOUND"),
             (ProviderError::InvalidResponse, "INVALID_OUTPUT"),
             (ProviderError::Network, "NETWORK_FAILED"),
@@ -1233,6 +2088,66 @@ mod tests {
             let command_error = CommandError::from(source);
             assert_eq!(command_error.code, expected);
             assert!(!command_error.message.is_empty());
+        }
+    }
+
+    #[test]
+    fn stream_registry_handles_active_and_pre_dispatch_cancellation() {
+        let registry = AiStreamRegistry::default();
+        let active = registry.register("stream-active").unwrap();
+        assert!(!active.is_cancelled());
+        assert!(registry.cancel("stream-active").unwrap());
+        assert!(active.is_cancelled());
+        registry.remove("stream-active");
+
+        assert!(registry.cancel("stream-race").unwrap());
+        let error = registry.register("stream-race").unwrap_err();
+        assert_eq!(error.code, "CANCELLED");
+        assert!(registry.register("stream-race").is_ok());
+    }
+
+    #[test]
+    fn command_errors_serialize_the_six_kind_policy_without_unsafe_fallbacks() {
+        #[derive(Deserialize)]
+        #[serde(rename_all = "camelCase")]
+        struct ErrorFixture {
+            code: String,
+            kind: String,
+            retryable: bool,
+            fallback_eligible: bool,
+            surface: String,
+            actions: Vec<String>,
+        }
+        let fixtures: Vec<ErrorFixture> = serde_json::from_str(include_str!(
+            "../../../packages/ai-core/src/application-error-contract.fixture.json"
+        ))
+        .unwrap();
+        assert_eq!(fixtures.len(), 6);
+        for fixture in fixtures {
+            let policy = command_error_policy(&fixture.code);
+            assert_eq!(policy.kind, fixture.kind);
+            assert_eq!(policy.retryable, fixture.retryable);
+            assert_eq!(policy.fallback_eligible, fixture.fallback_eligible);
+            assert_eq!(policy.surface, fixture.surface);
+            assert_eq!(policy.actions, fixture.actions);
+        }
+
+        let serialized = serde_json::to_value(CommandError {
+            code: "NETWORK_FAILED",
+            message: "安全错误说明",
+        })
+        .unwrap();
+        assert_eq!(serialized["kind"], "NETWORK");
+        assert_eq!(serialized["actions"][2], "USE_FALLBACK");
+
+        for code in [
+            "AUTHENTICATION_FAILED",
+            "QUOTA_EXCEEDED",
+            "INVALID_OUTPUT",
+            "WORLD_BUSINESS_RULE_INVALID",
+            "LOCAL_STORAGE_UNAVAILABLE",
+        ] {
+            assert!(!command_error_policy(code).fallback_eligible);
         }
     }
 
@@ -1374,6 +2289,172 @@ mod tests {
             .await
             .unwrap_err();
         assert_eq!(error.code, "MODEL_SELECTION_DRIFT");
+    }
+
+    #[tokio::test]
+    async fn credential_survives_the_full_game_generation_chain_cleanup_and_reopen() {
+        const TASKS: &[&str] = &[
+            "GENERATE_WORLD",
+            "COMPLETE_CHARACTER_BACKGROUND",
+            "GENERATE_NPCS",
+            "NPC_REPLY",
+            "GENERATE_QUEST",
+            "GENERATE_ADVENTURE_PLAN",
+            "GENERATE_ADVENTURE_TURN",
+            "RESOLVE_DICE_RESULT",
+            "SUMMARIZE_ADVENTURE",
+        ];
+
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let base_url = format!("http://{}/v1/", listener.local_addr().unwrap());
+        let runtime_secret = format!("runtime-{}", Uuid::new_v4());
+        let expected_secret = runtime_secret.clone();
+        let server = std::thread::spawn(move || {
+            for index in 0..TASKS.len() {
+                let (mut socket, _) = listener.accept().unwrap();
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 4096];
+                let header_end = loop {
+                    let read = socket.read(&mut buffer).unwrap();
+                    assert_ne!(read, 0);
+                    request.extend_from_slice(&buffer[..read]);
+                    if let Some(position) = request.windows(4).position(|part| part == b"\r\n\r\n")
+                    {
+                        break position + 4;
+                    }
+                };
+                let headers = String::from_utf8_lossy(&request[..header_end]);
+                let normalized_headers = headers.to_ascii_lowercase();
+                assert!(normalized_headers.contains(&format!(
+                    "authorization: bearer {}",
+                    expected_secret.to_ascii_lowercase()
+                )));
+                let content_length = headers
+                    .lines()
+                    .find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    })
+                    .unwrap();
+                while request.len() - header_end < content_length {
+                    let read = socket.read(&mut buffer).unwrap();
+                    assert_ne!(read, 0);
+                    request.extend_from_slice(&buffer[..read]);
+                }
+                let body = serde_json::json!({
+                    "id": format!("credential-lifecycle-{index}"),
+                    "model": "lifecycle-model",
+                    "choices": [{
+                        "message": { "content": "{\"status\":\"ok\"}" },
+                        "finish_reason": "stop"
+                    }],
+                    "usage": { "prompt_tokens": 10, "completion_tokens": 4, "total_tokens": 14 }
+                })
+                .to_string();
+                let response = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                socket.write_all(response.as_bytes()).unwrap();
+            }
+        });
+
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("credential-game-lifecycle.sqlite");
+        let reference = SecretStore.save(runtime_secret).unwrap();
+        let cleanup = RealCredentialCleanup(reference.clone());
+        let mut store = CampaignStore::open(&database_path).unwrap();
+        store
+            .enqueue_credential_cleanup(
+                reference.expose_reference(),
+                CredentialCleanupReason::Rollback,
+            )
+            .unwrap();
+        let capabilities = ModelCapabilitiesRegistration {
+            text: true,
+            streaming: false,
+            system_messages: true,
+            json_mode: true,
+            json_schema: false,
+            tool_calling: false,
+            reasoning: false,
+            context_window_tokens: Some(8192),
+            cost_status: "UNKNOWN".to_owned(),
+            checked_at: "2026-08-13T00:00:00Z".to_owned(),
+        };
+        let endpoint = model_endpoint_fingerprint("custom", &base_url);
+        let probe = model_probe_fingerprint(
+            &endpoint,
+            "lifecycle-model",
+            CapabilitySource::Unknown,
+            &capabilities,
+        )
+        .unwrap();
+        let saved = store
+            .save_model_settings(ModelSettingsUpdate {
+                preset_key: "custom".to_owned(),
+                provider_display_name: "Credential lifecycle provider".to_owned(),
+                base_url: Some(base_url),
+                endpoint_fingerprint: endpoint,
+                credential_ref: Some(reference.to_string()),
+                credential_action: CredentialAction::Replace,
+                model_name: "lifecycle-model".to_owned(),
+                model_display_name: "Lifecycle Model".to_owned(),
+                capabilities,
+                capability_source: CapabilitySource::Unknown,
+                probe_fingerprint: probe,
+                probe_receipt_id: Uuid::new_v4().to_string(),
+                use_as_default: true,
+                use_as_fallback: false,
+            })
+            .unwrap();
+        let profile_id = saved.default_model_profile_id.unwrap();
+        assert!(store.pending_credential_cleanups().unwrap().is_empty());
+
+        for (index, task) in TASKS.iter().enumerate() {
+            if index == 3 {
+                // Simulate a stale cleanup row left by an older build or restore.
+                store
+                    .enqueue_credential_cleanup(
+                        reference.expose_reference(),
+                        CredentialCleanupReason::Transient,
+                    )
+                    .unwrap();
+                retry_pending_credential_cleanup(&store, &SecretStore).unwrap();
+                assert!(store.pending_credential_cleanups().unwrap().is_empty());
+                assert!(SecretStore.exists(&reference).unwrap());
+            }
+            if index == 5 {
+                drop(store);
+                store = CampaignStore::open(&database_path).unwrap();
+                retry_pending_credential_cleanup(&store, &SecretStore).unwrap();
+            }
+            let mut request = runtime_test_request(&profile_id, "lifecycle-model");
+            request.request_id = format!("credential-lifecycle-{index}");
+            request.task = (*task).to_owned();
+            let response = execute_ai_generate(request, &store).await.unwrap();
+            assert_eq!(response.selected_profile_id, profile_id);
+            assert!(SecretStore.exists(&reference).unwrap());
+            assert_eq!(
+                store
+                    .default_model_runtime_config()
+                    .unwrap()
+                    .credential_ref
+                    .as_deref(),
+                Some(reference.expose_reference())
+            );
+        }
+        server.join().unwrap();
+        drop(store);
+
+        let reopened = CampaignStore::open(database_path).unwrap();
+        retry_pending_credential_cleanup(&reopened, &SecretStore).unwrap();
+        assert!(reopened.model_settings().unwrap().profiles[0].has_credential);
+        assert!(SecretStore.exists(&reference).unwrap());
+        drop(reopened);
+        drop(cleanup);
+        assert!(!SecretStore.exists(&reference).unwrap());
     }
 
     #[tokio::test]

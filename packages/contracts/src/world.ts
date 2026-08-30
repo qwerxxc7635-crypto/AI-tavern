@@ -67,6 +67,37 @@ export interface WorldBible {
   readonly updatedAt: IsoTimestamp;
 }
 
+export const WORLD_CONSTITUTION_STATUSES = ['DRAFT', 'LOCKED'] as const;
+export type WorldConstitutionStatus = (typeof WORLD_CONSTITUTION_STATUSES)[number];
+
+export interface WorldConstitutionContent {
+  readonly worldType: string;
+  readonly era: string;
+  readonly technology: string;
+  readonly magic: string;
+  readonly peoples: readonly string[];
+  readonly society: string;
+  readonly politics: string;
+  readonly economy: string;
+  readonly combatScale: string;
+  readonly deathRules: string;
+  readonly careerRules: string;
+  readonly equipmentRules: string;
+  readonly npcRules: string;
+  readonly traitRules: string;
+  readonly taboos: readonly string[];
+}
+
+export interface WorldConstitution extends WorldConstitutionContent {
+  readonly campaignId: CampaignId;
+  readonly schemaVersion: SchemaVersion;
+  readonly revision: number;
+  readonly status: WorldConstitutionStatus;
+  readonly createdAt: IsoTimestamp;
+  readonly updatedAt: IsoTimestamp;
+  readonly lockedAt: IsoTimestamp | null;
+}
+
 interface WorldFactBase {
   readonly id: WorldFactId;
   readonly campaignId: CampaignId;

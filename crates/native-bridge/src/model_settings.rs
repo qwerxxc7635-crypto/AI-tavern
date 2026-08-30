@@ -487,6 +487,32 @@ impl CampaignStore {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
+    pub fn discard_cleanup_if_credential_active(
+        &self,
+        credential_ref: &str,
+    ) -> Result<bool, CampaignStoreError> {
+        if !is_credential_ref(credential_ref) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        let mut connection = self.connect()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let active = transaction.query_row(
+            "SELECT EXISTS(
+               SELECT 1 FROM provider_configs WHERE credential_ref = ?1
+             )",
+            [credential_ref],
+            |row| row.get::<_, bool>(0),
+        )?;
+        if active {
+            transaction.execute(
+                "DELETE FROM credential_cleanup_queue WHERE credential_ref = ?1",
+                [credential_ref],
+            )?;
+        }
+        transaction.commit()?;
+        Ok(active)
+    }
+
     pub fn complete_credential_cleanup(
         &self,
         credential_ref: &str,

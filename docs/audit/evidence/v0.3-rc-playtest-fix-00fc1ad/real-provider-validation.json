@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "status": "BLOCKED_EXTERNAL",
+  "credentialHandling": "OS_CREDENTIAL_STORE_OPAQUE_REFERENCE_ONLY",
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "declaredResponseMode": "JSON_OBJECT",
+  "isolatedData": true,
+  "userSaveModified": false,
+  "runs": [
+    {
+      "run": 1,
+      "options": { "worldType": "FANTASY", "tone": "ADVENTURE", "magic": "MEDIUM", "scale": "REGION" },
+      "providerResponse": "TIMEOUT_BEFORE_COMPLETE_RESPONSE",
+      "finishReason": "NOT_REACHED",
+      "jsonParse": "NOT_REACHED",
+      "schemaValidation": "NOT_REACHED",
+      "businessValidation": "NOT_REACHED",
+      "transactionCommit": false,
+      "duplicateSave": false,
+      "metrics": "UNAVAILABLE_BEFORE_RESPONSE"
+    },
+    {
+      "run": 2,
+      "options": { "worldType": "WUXIA", "tone": "SERIOUS", "magic": "LOW", "scale": "CITY" },
+      "providerResponse": "TIMEOUT_BEFORE_COMPLETE_RESPONSE",
+      "finishReason": "NOT_REACHED",
+      "jsonParse": "NOT_REACHED",
+      "schemaValidation": "NOT_REACHED",
+      "businessValidation": "NOT_REACHED",
+      "transactionCommit": false,
+      "duplicateSave": false,
+      "metrics": "UNAVAILABLE_BEFORE_RESPONSE"
+    },
+    {
+      "run": 3,
+      "options": { "worldType": "SCI_FI", "tone": "BALANCED", "magic": "NONE", "scale": "KINGDOM", "horror": true },
+      "providerResponse": "TIMEOUT_BEFORE_COMPLETE_RESPONSE",
+      "finishReason": "NOT_REACHED",
+      "jsonParse": "NOT_REACHED",
+      "schemaValidation": "NOT_REACHED",
+      "businessValidation": "NOT_REACHED",
+      "transactionCommit": false,
+      "duplicateSave": false,
+      "metrics": "UNAVAILABLE_BEFORE_RESPONSE"
+    }
+  ],
+  "explicitRetry": {
+    "sameCampaign": true,
+    "result": "TIMEOUT",
+    "additionalCampaigns": 0,
+    "additionalWorlds": 0,
+    "unfinishedRequests": 0
+  },
+  "isolatedDatabase": {
+    "integrityCheck": "ok",
+    "foreignKeyViolations": 0,
+    "campaigns": 3,
+    "campaignStates": { "CREATING_WORLD": 3 },
+    "worldBibles": 0,
+    "generationRecords": 0,
+    "unfinishedRequests": 0,
+    "duplicateCampaignIds": 0,
+    "duplicateRequestIds": 0,
+    "duplicateWorldsPerCampaign": 0
+  },
+  "userDatabaseBeforeAndAfter": {
+    "integrityCheck": "ok",
+    "foreignKeyViolations": 0,
+    "campaignStates": { "ADVENTURE": 1, "ARCHIVED": 2, "CREATING_WORLD": 7, "TAVERN": 1 },
+    "worldBibles": 2,
+    "generationRecords": 49,
+    "unfinishedRequests": 0,
+    "duplicateCampaignIds": 0,
+    "duplicateRequestIds": 0,
+    "duplicateWorldsPerCampaign": 0,
+    "unchanged": true
+  },
+  "secretMaterialRecorded": false
+}

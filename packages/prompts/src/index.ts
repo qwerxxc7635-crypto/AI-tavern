@@ -15,6 +15,7 @@ export {
   STABLE_PROMPT_SECTION_KINDS,
   createStablePromptProfile,
   renderStablePromptProfile,
+  stableWorldTruthsFromContext,
 } from './stable-prompt-profile.js';
 export type {
   StablePromptProfile,
@@ -23,3 +24,23 @@ export type {
 } from './stable-prompt-profile.js';
 export { TASK_PROMPTS, taskPrompt } from './task-prompts.js';
 export type { AILogicalRole, TaskPromptDefinition } from './task-prompts.js';
+export {
+  MAX_PROMPT_BLOCKS,
+  MAX_PROMPT_PRESETS,
+  PROMPT_PRESET_FORMAT,
+  PROMPT_PRESET_FORMAT_VERSION,
+  PromptManagerSnapshotSchema,
+  PromptPresetBundleSchema,
+  PromptPresetSchema,
+  PromptUserBlockSchema,
+  parsePromptManagerSnapshot,
+  parsePromptPresetBundle,
+  resolvePromptPreset,
+} from './prompt-manager.js';
+export type {
+  PromptManagerSnapshot,
+  PromptPreset,
+  PromptPresetBundle,
+  PromptUserBlock,
+  ResolvedPromptPreset,
+} from './prompt-manager.js';

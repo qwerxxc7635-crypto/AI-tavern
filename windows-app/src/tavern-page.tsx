@@ -9,12 +9,29 @@ import {
   type WindowsTavernService,
 } from './tavern-service.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, buildRoute, campaignRoute } from './navigation.js';
 import { AIErrorNotice } from './ai-error-notice.js';
+import { NpcCard } from './ui/game-components.js';
+import { ActionComposer, DialogueView } from './ui/game-components.js';
+import {
+  tavernPopulationService,
+  type TavernPopulationService,
+} from './tavern-population-service.js';
+import { tavernSceneService, type TavernSceneService } from './tavern-scene-service.js';
+import type { TavernPopulationSnapshot, TavernSceneSnapshot } from '@ember-tavern/contracts';
+import {
+  dialogueSuggestionService,
+  type DialogueSuggestionSet,
+  type WindowsDialogueSuggestionService,
+} from './dialogue-suggestion-service.js';
 
 type TavernActions = Pick<WindowsTavernService, 'load' | 'initialize'>;
 
 interface TavernPageProps {
   readonly service?: TavernActions;
+  readonly populationService?: Pick<TavernPopulationService, 'refresh' | 'focus'>;
+  readonly sceneService?: Pick<TavernSceneService, 'start' | 'send' | 'retry'>;
+  readonly suggestionService?: Pick<WindowsDialogueSuggestionService, 'load'>;
 }
 
 const RESIDENCY_LABELS: Readonly<Record<TavernNpcView['residency'], string>> = {
@@ -23,12 +40,26 @@ const RESIDENCY_LABELS: Readonly<Record<TavernNpcView['residency'], string>> = {
   TEMPORARY_VISITOR: '临时访客',
 };
 
-export function TavernPage({ service = windowsTavernService }: TavernPageProps) {
+export function TavernPage({
+  service = windowsTavernService,
+  populationService = tavernPopulationService,
+  sceneService = tavernSceneService,
+  suggestionService = dialogueSuggestionService,
+}: TavernPageProps) {
   const [search] = useSearchParams();
   const campaignId = search.get('campaignId');
   const [snapshot, setSnapshot] = useState<TavernSnapshot | null>(null);
   const [selectedNpcId, setSelectedNpcId] = useState<string | null>(null);
   const [error, setError] = useState<unknown | null>(null);
+  const [population, setPopulation] = useState<TavernPopulationSnapshot | null>(null);
+  const [scene, setScene] = useState<TavernSceneSnapshot | null>(null);
+  const [sceneSelection, setSceneSelection] = useState<ReadonlySet<string>>(new Set());
+  const [sceneIntent, setSceneIntent] = useState('');
+  const [sceneBusy, setSceneBusy] = useState(false);
+  const [sceneError, setSceneError] = useState<string | undefined>();
+  const [sceneSuggestions, setSceneSuggestions] = useState<DialogueSuggestionSet | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | undefined>();
+  const [suggestionRevision, setSuggestionRevision] = useState(0);
 
   const initialize = () => {
     if (campaignId === null) return;
@@ -41,7 +72,9 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
       .then((loaded) => {
         setSnapshot(loaded);
         setSelectedNpcId(loaded.npcs[0]?.id ?? null);
+        return populationService.refresh(campaignId, 'ENTERED');
       })
+      .then(setPopulation)
       .catch(setError);
   };
 
@@ -57,6 +90,10 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
         if (!active) return;
         setSnapshot(loaded);
         setSelectedNpcId(loaded.npcs[0]?.id ?? null);
+        return populationService.refresh(campaignId, 'ENTERED');
+      })
+      .then((loaded) => {
+        if (active && loaded !== undefined) setPopulation(loaded);
       })
       .catch((caught: unknown) => {
         if (active) setError(caught);
@@ -64,7 +101,23 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
     return () => {
       active = false;
     };
-  }, [campaignId, service]);
+  }, [campaignId, populationService, service]);
+
+  useEffect(() => {
+    if (campaignId === null || scene === null) return;
+    const controller = new AbortController();
+    setSceneSuggestions(null);
+    setSuggestionError(undefined);
+    void suggestionService
+      .load(campaignId, 'TAVERN_SCENE', scene.id, controller.signal)
+      .then(setSceneSuggestions)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setSuggestionError(error instanceof Error ? error.message : '场景建议暂时无法生成。');
+        }
+      });
+    return () => controller.abort();
+  }, [campaignId, scene, suggestionRevision, suggestionService]);
 
   const selectedNpc = useMemo(
     () => snapshot?.npcs.find(({ id }) => id === selectedNpcId) ?? null,
@@ -97,6 +150,51 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
   }
 
   const tavern = snapshot.tavern;
+  const presentPopulation =
+    population?.members.filter(({ presence }) => presence === 'PRESENT') ?? [];
+  const toggleSceneNpc = (npcId: string) => {
+    setSceneSelection((current) => {
+      const next = new Set(current);
+      if (next.has(npcId)) next.delete(npcId);
+      else if (next.size < 6) next.add(npcId);
+      return next;
+    });
+  };
+  const startScene = async () => {
+    if (campaignId === null || population?.state === null || population === null) return;
+    setSceneBusy(true);
+    setSceneError(undefined);
+    try {
+      let focused = population;
+      for (const npcId of sceneSelection) {
+        const member = focused.members.find((candidate) => candidate.npcId === npcId);
+        if (member?.profile.lod === 0 && focused.state !== null) {
+          focused = await populationService.focus(campaignId, npcId, focused.state.revision);
+        }
+      }
+      setPopulation(focused);
+      setScene(await sceneService.start(campaignId, [...sceneSelection]));
+    } catch (caught) {
+      setSceneError(caught instanceof Error ? caught.message : '场景无法开始');
+    } finally {
+      setSceneBusy(false);
+    }
+  };
+  const sendSceneIntent = async () => {
+    if (campaignId === null || scene === null || sceneIntent.trim().length === 0) return;
+    const intent = sceneIntent.trim();
+    setSceneBusy(true);
+    setSceneError(undefined);
+    try {
+      setScene(await sceneService.send(campaignId, scene, intent, selectedNpcId));
+      setSceneIntent('');
+    } catch (caught) {
+      setSceneError(caught instanceof Error ? caught.message : '场景行动未完成');
+    } finally {
+      setSceneBusy(false);
+    }
+  };
+  const composerError = sceneError ?? suggestionError;
   return (
     <main className="tavern-room">
       <section className="tavern-header">
@@ -140,6 +238,121 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
         </section>
       )}
 
+      <section className="tavern-scene" aria-label="多人酒馆场景">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">炉边群像</p>
+            <h2>多人场景</h2>
+          </div>
+          <span>{presentPopulation.length} 人在场</span>
+        </div>
+        {scene === null ? (
+          <>
+            <p>选择 2–6 位在场角色。尚未聚焦的背景人物会先按既有角色细化规则补全身份。</p>
+            <div className="tavern-scene__participants">
+              {presentPopulation.map((member) => (
+                <NpcCard
+                  key={member.npcId}
+                  selected={sceneSelection.has(member.npcId)}
+                  onSelect={() => toggleSceneNpc(member.npcId)}
+                  npc={{
+                    id: member.npcId,
+                    name: member.profile.name ?? '尚未辨认的旅人',
+                    identity: member.populationRole,
+                    mood: member.profile.currentBehavior ?? '安静地留意炉边动静',
+                    residency: member.sourceKind === 'OWNER' ? '酒馆老板' : member.populationRole,
+                  }}
+                />
+              ))}
+            </div>
+            <button
+              className="primary-action"
+              disabled={sceneSelection.size < 2 || sceneBusy}
+              onClick={() => void startScene()}
+            >
+              {sceneBusy ? '正在聚拢众人…' : '开始多人场景'}
+            </button>
+          </>
+        ) : (
+          <div className="tavern-scene__play">
+            <div className="tavern-scene__status">
+              {scene.participants.map((participant) => (
+                <span key={participant.npcId}>
+                  {participant.name} · {sceneParticipantLabel(participant.status)}
+                </span>
+              ))}
+            </div>
+            <DialogueView
+              label="多人场景记录"
+              emptyText="先向炉边众人开口。"
+              loading={sceneBusy}
+              {...(sceneError === undefined ? {} : { error: sceneError })}
+              messages={scene.turns.flatMap((turn) => [
+                {
+                  id: `${turn.id}:player`,
+                  speaker: '你',
+                  content: turn.playerIntent,
+                  side: 'PLAYER' as const,
+                },
+                ...turn.actions
+                  .filter(({ selected }) => selected)
+                  .map((action) => ({
+                    id: `${turn.id}:${action.actorId}`,
+                    speaker:
+                      scene.participants.find(({ npcId }) => npcId === action.actorId)?.name ??
+                      '某位客人',
+                    content: action.utterance ?? sceneActionLabel(action.action),
+                    side: action.utterance === null ? ('SYSTEM' as const) : ('NPC' as const),
+                  })),
+              ])}
+            />
+            <ActionComposer
+              label="向场景行动"
+              description="可直接说话、观察或点名回应；每位 NPC 只会收到自己的知识上下文。"
+              value={sceneIntent}
+              suggestions={(sceneSuggestions?.suggestions ?? []).map((suggestion) => ({
+                id: suggestion.id,
+                label: suggestion.text,
+              }))}
+              submitLabel="推进场景"
+              submitting={sceneBusy}
+              {...(composerError === undefined ? {} : { error: composerError })}
+              {...(sceneSuggestions === null && suggestionError === undefined
+                ? { status: '正在整理场景建议…' }
+                : {})}
+              onRetry={() => {
+                if (sceneError === undefined) {
+                  setSuggestionRevision((current) => current + 1);
+                  return;
+                }
+                if (campaignId === null || scene === null) return;
+                setSceneBusy(true);
+                setSceneError(undefined);
+                void sceneService
+                  .retry(campaignId, scene)
+                  .then(setScene)
+                  .catch((caught: unknown) =>
+                    setSceneError(caught instanceof Error ? caught.message : '技术重试未完成'),
+                  )
+                  .finally(() => setSceneBusy(false));
+              }}
+              onChange={(value) => {
+                setSceneIntent(value);
+                setSelectedNpcId(null);
+              }}
+              onSuggestion={(suggestion) => {
+                const selected = sceneSuggestions?.suggestions.find(
+                  ({ id }) => id === suggestion.id,
+                );
+                setSelectedNpcId(selected?.addressedNpcId ?? null);
+                setSceneIntent(suggestion.label);
+              }}
+              onSubmit={() => void sendSceneIntent()}
+            />
+          </div>
+        )}
+      </section>
+
       <div className="tavern-grid">
         <section className="tavern-patrons">
           <div className="section-heading">
@@ -151,26 +364,19 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
           </div>
           <div className="patron-list">
             {snapshot.npcs.map((npc) => (
-              <button
-                className={
-                  npc.id === selectedNpcId ? 'patron-card patron-card--selected' : 'patron-card'
-                }
-                type="button"
+              <NpcCard
                 key={npc.id}
-                aria-pressed={npc.id === selectedNpcId}
-                onClick={() => setSelectedNpcId(npc.id)}
-              >
-                <span className="patron-card__sigil" aria-hidden="true">
-                  {npc.name.slice(0, 1)}
-                </span>
-                <span className="patron-card__copy">
-                  <small>
-                    {RESIDENCY_LABELS[npc.residency]} · {npc.currentMood}
-                  </small>
-                  <strong>{npc.name}</strong>
-                  <span>{npc.identity}</span>
-                </span>
-              </button>
+                className="patron-card"
+                selected={npc.id === selectedNpcId}
+                onSelect={() => setSelectedNpcId(npc.id)}
+                npc={{
+                  id: npc.id,
+                  name: npc.name,
+                  identity: npc.identity,
+                  mood: npc.currentMood,
+                  residency: RESIDENCY_LABELS[npc.residency],
+                }}
+              />
             ))}
           </div>
           {selectedNpc === null ? null : (
@@ -189,7 +395,10 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
               )}
               <Link
                 className="primary-action"
-                to={`/npc?campaignId=${encodeURIComponent(campaignId)}&npcId=${encodeURIComponent(selectedNpc.id)}`}
+                to={buildRoute(APP_PATHS.npc, {
+                  campaignId,
+                  npcId: selectedNpc.id,
+                })}
               >
                 开始交谈
               </Link>
@@ -219,10 +428,7 @@ export function TavernPage({ service = windowsTavernService }: TavernPageProps) 
             <p className="eyebrow">{playerText.coreUi.questBoard}</p>
             <h2>告示板</h2>
             <p>常驻者会把需要帮手的事情钉在这里。任务详情与接受操作由任务页面处理。</p>
-            <Link
-              className="primary-action"
-              to={`/quests?campaignId=${encodeURIComponent(campaignId)}`}
-            >
+            <Link className="primary-action" to={campaignRoute(APP_PATHS.quests, campaignId)}>
               选择任务入口
             </Link>
           </section>
@@ -284,7 +490,7 @@ function TavernMessage({ title }: { readonly title: string }) {
     <main className="tavern-room tavern-room--loading" role="alert">
       <p className="eyebrow">{playerText.coreUi.tavernUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>
@@ -293,4 +499,23 @@ function TavernMessage({ title }: { readonly title: string }) {
 
 function npcName(npcs: readonly TavernNpcView[], id: string): string {
   return npcs.find((npc) => npc.id === id)?.name ?? '一位不愿留名的客人';
+}
+
+function sceneParticipantLabel(
+  status: TavernSceneSnapshot['participants'][number]['status'],
+): string {
+  return status === 'ACTIVE' ? '交谈中' : status === 'LISTENING' ? '旁听' : '已离开';
+}
+
+function sceneActionLabel(
+  action: TavernSceneSnapshot['turns'][number]['actions'][number]['action'],
+): string {
+  return {
+    SILENCE: '保持沉默。',
+    EAVESDROP: '在一旁留意谈话。',
+    LEAVE: '离开了炉边。',
+    SPEAK: '开口说话。',
+    INTERRUPT: '打断了谈话。',
+    INTERVENE: '介入了谈话。',
+  }[action];
 }

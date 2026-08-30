@@ -300,7 +300,7 @@ describe('PlayerCharacterRepository', () => {
     repository.create(character);
     database
       .prepare('UPDATE player_characters SET traits_json = ? WHERE id = ?')
-      .run('[]', character.id);
+      .run('[{}]', character.id);
     expect(() => repository.get(character.id)).toThrow(PersistenceDataError);
     expect(repository.get(playerCharacterId('missing'))).toBeNull();
   });

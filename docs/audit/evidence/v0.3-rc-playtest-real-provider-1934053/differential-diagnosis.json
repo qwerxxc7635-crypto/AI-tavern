@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "credentialHandling": "OS_CREDENTIAL_STORE_OPAQUE_REFERENCE_ONLY",
+  "endpointHost": "api.deepseek.com",
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "configuredTimeoutMs": { "dns": 10000, "connect": 15000, "completeStream": 120000 },
+  "transportGranularityNote": "DNS/connect/header timing is not separately exposed by the current safe provider boundary; completed HTTP/body and first content timing are recorded.",
+  "credentialAuthorizationWarmup": {
+    "path": "/models",
+    "actualApiCompleted": true,
+    "wallMsIncludingHumanKeychainApproval": 132433,
+    "excludedFromProviderLatencyConclusion": true
+  },
+  "cases": {
+    "A": { "path": "/models", "completed": true, "latencyMs": 167, "models": 3, "targetFound": true },
+    "B": { "path": "/chat/completions", "responseFormat": "json_object", "thinking": "disabled", "maxTokens": 256, "headersAndBodyCompleted": true, "firstContentMs": 675, "latencyMs": 800, "finishReason": "STOP", "jsonParse": true, "expectedValue": true, "inputTokens": 38, "outputTokens": 5 },
+    "C": { "path": "/chat/completions", "responseFormat": "json_object", "thinking": "provider_default", "maxTokens": 256, "headersAndBodyCompleted": true, "firstContentMs": 1130, "latencyMs": 1155, "finishReason": "STOP", "jsonParse": true, "expectedValue": true, "inputTokens": 117, "outputTokens": 25 },
+    "D": { "path": "/chat/completions", "productionPrompt": true, "productionSchema": true, "thinking": "disabled", "maxTokens": 4096, "completeResponse": true, "firstContentMs": 1025, "latencyMs": 12691, "finishReason": "STOP", "inputTokens": 1550, "outputTokens": 1047, "jsonParse": true, "typescriptSchema": true, "typescriptBusiness": "MISSING_CONSTITUTION_PARITY_CHECK", "rustBusiness": false, "rustFailurePaths": ["technologyLevel", "powerRules", "forbiddenElements"] }
+  },
+  "rootCause": [
+    "DeepSeek world requests omitted an explicit thinking policy while the model defaults to high reasoning.",
+    "The world stream projects content but not reasoning_content, so reasoning consumes the complete-stream deadline without visible progress.",
+    "The 8000 output-token budget was not grounded in observed successful world sizes.",
+    "Desktop TypeScript business validation omitted three Constitution parity rules enforced by application and Rust commit boundaries."
+  ],
+  "secretMaterialRecorded": false
+}

@@ -1,0 +1,43 @@
+{
+  "format": "EMBER_PLAYTEST_RUN",
+  "formatVersion": 1,
+  "runId": "cyberpunk",
+  "sourceCommit": "bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+  "createdAt": "2026-08-28T02:55:30.877Z",
+  "dataOrigin": "SYNTHETIC_M11",
+  "worlds": [
+    {
+      "key": "fantasy",
+      "scenarioHash": "7d0439821cbd4d8eeb01d444f6709c29481d6320fd7ebecce229276ee3ca156e",
+      "fixtureHash": "98e9b82f3113381d5cd16632dad1852d0ec88c790e5e2ecaefd3ffabf28fd268",
+      "scriptHash": "7b856c31f4b044b9f92361a7be1035948994909768a32e0094ec8ce24005c710",
+      "directory": "fantasy",
+      "fixtureFile": "fixture.json",
+      "scriptFile": "script.json",
+      "evidenceFile": "evidence.json",
+      "databaseFile": "campaign.sqlite3"
+    },
+    {
+      "key": "investigation",
+      "scenarioHash": "828b249efe7a49e7860037d667ae8d77088345ca30572214a1b62ff2d9a7ac9d",
+      "fixtureHash": "8b1d39da5ec567129b6e24de2c188e798086908199681b279e3963bdf98c83c4",
+      "scriptHash": "a37c0f595dcca1ffdd72d64e2ecbcb5e2bd80ee4597a3aa8602e634533bb0580",
+      "directory": "investigation",
+      "fixtureFile": "fixture.json",
+      "scriptFile": "script.json",
+      "evidenceFile": "evidence.json",
+      "databaseFile": "campaign.sqlite3"
+    },
+    {
+      "key": "cyberpunk",
+      "scenarioHash": "6bf3a3663f67f8723f009c30f83371e19748f4c2f3294d9438be5dac4f7dfa50",
+      "fixtureHash": "108733c840f04e27f184f3dc9a0a5d8e3398d8cb24ba4c0aa37c917fc02bdb81",
+      "scriptHash": "dc28d532db50bc17593dcd6cb755e2a27352cb119a9585d99e0e0e8614f8a8b2",
+      "directory": "cyberpunk",
+      "fixtureFile": "fixture.json",
+      "scriptFile": "script.json",
+      "evidenceFile": "evidence.json",
+      "databaseFile": "campaign.sqlite3"
+    }
+  ]
+}

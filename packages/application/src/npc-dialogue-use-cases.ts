@@ -14,6 +14,7 @@ import {
   type ProviderConfig,
 } from '@ember-tavern/ai-core';
 import {
+  memoryId,
   turnId,
   type AiRequestId,
   type Campaign,
@@ -21,9 +22,11 @@ import {
   type Conversation,
   type ConversationId,
   type GenerationRecordId,
+  type GameEventId,
   type IdempotencyKey,
   type IsoTimestamp,
   type JsonValue,
+  type KnowledgeId,
   type Message,
   type MessageId,
   type ModelProfileId,
@@ -39,8 +42,13 @@ import {
   CampaignRepository,
   ConversationRepository,
   GenerationRecordRepository,
+  KnowledgeBoundaryRepository,
+  MemoryLayerRepository,
   NpcRepository,
   PendingAiRequestRepository,
+  QuestRepository,
+  TavernRepository,
+  WorldInfoRetrievalRepository,
   WorldRepository,
   type TransactionalSqliteDatabase,
 } from '@ember-tavern/persistence';
@@ -48,6 +56,7 @@ import { formatTaskPrompt } from '@ember-tavern/prompts';
 
 import { AIOrchestrationError, type AITurnGenerationOptions } from './ai-turn-orchestrator.js';
 import { executePrimaryAITask } from './ai-task-orchestrator.js';
+import { WorldInfoRetrievalService } from './world-info-retrieval-service.js';
 
 export interface DialogueIdentityFactory {
   memory(summary: string, index: number): NpcMemoryId;
@@ -75,6 +84,8 @@ export interface ExtractMemoriesCommand extends DialogueGenerationRequest {
   readonly conversationId: ConversationId;
   readonly npcId: NpcId;
   readonly sourceTurnIds: readonly TurnId[];
+  readonly sourceKnowledgeIds: readonly KnowledgeId[];
+  readonly sourceEventIds: readonly GameEventId[];
 }
 
 export interface NpcDialogueResult {
@@ -88,9 +99,14 @@ export class NpcDialogueUseCases {
   private readonly campaigns: CampaignRepository;
   private readonly conversations: ConversationRepository;
   private readonly npcs: NpcRepository;
+  private readonly taverns: TavernRepository;
+  private readonly quests: QuestRepository;
   private readonly worlds: WorldRepository;
   private readonly requests: PendingAiRequestRepository;
   private readonly generations: GenerationRecordRepository;
+  private readonly knowledgeBoundary: KnowledgeBoundaryRepository;
+  private readonly memoryLayers: MemoryLayerRepository;
+  private readonly worldInfo: WorldInfoRetrievalService;
 
   public constructor(
     database: TransactionalSqliteDatabase,
@@ -102,9 +118,14 @@ export class NpcDialogueUseCases {
     this.campaigns = new CampaignRepository(database);
     this.conversations = new ConversationRepository(database);
     this.npcs = new NpcRepository(database);
+    this.taverns = new TavernRepository(database);
+    this.quests = new QuestRepository(database);
     this.worlds = new WorldRepository(database);
     this.requests = new PendingAiRequestRepository(database);
     this.generations = new GenerationRecordRepository(database);
+    this.knowledgeBoundary = new KnowledgeBoundaryRepository(database);
+    this.memoryLayers = new MemoryLayerRepository(database);
+    this.worldInfo = new WorldInfoRetrievalService(new WorldInfoRetrievalRepository(database));
   }
 
   public async talkToNpc(command: TalkToNpcCommand): Promise<NpcDialogueResult> {
@@ -137,6 +158,40 @@ export class NpcDialogueUseCases {
     }
     const messages =
       existing === null ? Object.freeze([]) : this.conversations.listMessages(existing.id);
+    const actor = { type: 'NPC' as const, id: npc.id };
+    const actorProjection = this.knowledgeBoundary.projectActor(campaign.id, actor);
+    const authorizedKnowledge =
+      actorProjection.entries.length === 0
+        ? undefined
+        : actorProjection.entries.map((entry) => ({
+            targetKind: entry.targetKind,
+            state: entry.state,
+            statement: `${entry.subject} ${entry.predicate} ${JSON.stringify(entry.object)}`,
+          }));
+    const currentActorMemories = actorProjection.memories.filter(
+      ({ id }) => this.memoryLayers.inspectLongTermMemory(id).status === 'CURRENT',
+    );
+    const tavern = this.taverns.get(npc.tavernId);
+    if (tavern === null || tavern.campaignId !== campaign.id) {
+      throw new AIOrchestrationError('NPC_CONTEXT_INCOMPLETE', 'NPC tavern is missing');
+    }
+    const relatedQuestIds = this.quests
+      .listByCampaign(campaign.id)
+      .filter(
+        (quest) =>
+          !['COMPLETED', 'FAILED', 'ABANDONED'].includes(quest.status) &&
+          (quest.publisherNpcId === npc.id || quest.relatedNpcIds.includes(npc.id)),
+      )
+      .map(({ id }) => id);
+    const relevantLore = await this.worldInfo.retrieve({
+      campaignId: campaign.id,
+      text: command.playerMessage,
+      entityRefs: [{ kind: 'NPC', id: npc.id }],
+      locationIds: [tavern.locationId],
+      questIds: relatedQuestIds,
+      minimumScore: 0.2,
+      maxTokens: 1_200,
+    });
     const input = buildNpcDialogueContext(
       {
         world,
@@ -145,8 +200,13 @@ export class NpcDialogueUseCases {
         relationship,
         facts: this.worlds.listFacts(campaign.id),
         messages,
-        memories: this.npcs.listMemories(npc.id),
+        memories:
+          currentActorMemories.length === 0
+            ? this.npcs.listMemories(npc.id)
+            : currentActorMemories.map((memory) => ({ npcId: npc.id, summary: memory.summary })),
         playerMessage: command.playerMessage,
+        relevantLore: relevantLore.result.selections,
+        ...(authorizedKnowledge === undefined ? {} : { authorizedKnowledge }),
       },
       contextBudgetForTask('NPC_REPLY'),
     );
@@ -237,12 +297,25 @@ export class NpcDialogueUseCases {
     const transcriptHistory = this.conversations
       .listMessages(conversation.id)
       .map(({ role, content }) => `${role}: ${content}`);
-    if (transcriptHistory.length === 0 || command.sourceTurnIds.length === 0) {
+    if (
+      transcriptHistory.length === 0 ||
+      command.sourceTurnIds.length === 0 ||
+      (command.sourceKnowledgeIds.length === 0 && command.sourceEventIds.length === 0)
+    ) {
       throw new AIOrchestrationError(
         'MEMORY_SOURCE_EMPTY',
-        'Memory extraction requires transcript and source turn IDs',
+        'Memory extraction requires transcript, turn citations, and durable Actor sources',
       );
     }
+    const actor = { type: 'NPC' as const, id: npc.id };
+    this.memoryLayers.captureSources(
+      command.campaignId,
+      [
+        ...command.sourceKnowledgeIds.map((id) => ({ kind: 'KNOWLEDGE' as const, id })),
+        ...command.sourceEventIds.map((id) => ({ kind: 'GAME_EVENT' as const, id })),
+      ],
+      actor,
+    );
     const budget = contextBudgetForTask('EXTRACT_MEMORIES');
     const transcript = compressContextHistory(
       transcriptHistory,
@@ -285,11 +358,23 @@ export class NpcDialogueUseCases {
         });
       }),
     );
+    const longTermMemories = memories.map((memory) => ({
+      kind: 'MEMORY' as const,
+      id: memoryId(memory.id),
+      campaignId: command.campaignId,
+      actor,
+      summary: memory.summary,
+      sourceKnowledgeIds: command.sourceKnowledgeIds,
+      sourceEventIds: command.sourceEventIds,
+      revision: 1,
+      createdAt: timestamp,
+    }));
     try {
       this.requests.commitMemoriesOnce(
         command.idempotencyKey,
         command.campaignId,
         memories,
+        longTermMemories,
         timestamp,
       );
     } catch (error) {

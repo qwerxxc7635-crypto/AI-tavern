@@ -6,16 +6,22 @@ import { DatabaseSync, type StatementSync } from 'node:sqlite';
 import { FakeAIProvider, type ProviderConfig } from '@ember-tavern/ai-core';
 import {
   aiRequestId,
+  aiOperationId,
   campaignId,
   characterTraitId,
   conversationId,
   createCampaign,
+  createKnowledge,
+  createWorldLoreEntry,
+  createWorldLoreRetrievalRule,
   createNpcKnowledge,
   createNpcRelationship,
   generationRecordId,
+  eventLedgerId,
   idempotencyKey,
   isoTimestamp,
   locationId,
+  memoryId,
   messageId,
   npcId,
   npcMemoryId,
@@ -24,7 +30,10 @@ import {
   tavernId,
   transitionCampaign,
   turnId,
+  worldTruthId,
+  knowledgeId,
   worldFactId,
+  worldLoreEntryId,
   type NpcProfile,
   type PlayerCharacter,
   type Tavern,
@@ -34,10 +43,15 @@ import {
   CampaignRepository,
   ConversationRepository,
   GenerationRecordRepository,
+  KnowledgeBoundaryRepository,
+  MemoryLayerRepository,
   NpcRepository,
+  PendingAiRequestRepository,
   PlayerCharacterRepository,
   TavernRepository,
   WorldRepository,
+  WorldInfoRetrievalRepository,
+  memorySourceDigest,
   type SqliteStatement,
   type SqliteValue,
   type TransactionalSqliteDatabase,
@@ -97,6 +111,81 @@ describe('NpcDialogueUseCases', () => {
     const sqlite = adaptDatabase(database);
     try {
       const conversations = new ConversationRepository(sqlite);
+      const boundary = new KnowledgeBoundaryRepository(sqlite);
+      const truth = {
+        kind: 'WORLD_TRUTH' as const,
+        id: worldTruthId('truth-dialogue-cellar'),
+        campaignId: campaignKey,
+        subject: 'cellar',
+        predicate: 'has_door',
+        object: 'The cellar has an old door.',
+        authority: 'IMPORT' as const,
+        visibility: 'GAME_PRIVATE' as const,
+        sourceEventId: null,
+        revision: 1,
+        createdAt: at,
+      };
+      boundary.saveWorldTruth(truth, 0);
+      boundary.saveKnowledgeOnce({
+        knowledge: createKnowledge({
+          id: knowledgeId('knowledge-dialogue-cellar'),
+          campaignId: campaignKey,
+          actor: { type: 'NPC', id: npcKey },
+          target: { kind: 'TRUTH', truthId: truth.id },
+          state: 'KNOWN',
+          visibility: 'ACTOR_PRIVATE',
+          provenance: {
+            kind: 'IMPORT',
+            sourceId: 'dialogue-test-import',
+            eventId: null,
+            learnedAt: at,
+            confidence: 1,
+          },
+          revision: 1,
+        }),
+        expectedRevision: 0,
+        updatedAt: at,
+        operationId: aiOperationId('knowledge-dialogue-import'),
+        ledgerId: eventLedgerId('ledger-dialogue-import'),
+        source: 'IMPORT',
+      });
+      const memoryLayers = new MemoryLayerRepository(sqlite);
+      const loreSources = memoryLayers.captureSources(campaignKey, [
+        { kind: 'WORLD_FACT', id: worldFactId('fact-known') },
+      ]);
+      const lore = memoryLayers.saveWorldLore(
+        createWorldLoreEntry({
+          id: worldLoreEntryId('lore-dialogue-cellar'),
+          campaignId: campaignKey,
+          title: 'Cellar Threshold Rite',
+          text: 'Harbor keepers cool the lower stones before opening the sealed passage.',
+          sources: loreSources,
+          sourceDigest: memorySourceDigest(loreSources),
+          generationRecordId: null,
+          revision: 1,
+          createdAt: at,
+          updatedAt: at,
+        }),
+        0,
+      );
+      new WorldInfoRetrievalRepository(sqlite).saveRule(
+        createWorldLoreRetrievalRule({
+          loreEntryId: lore.id,
+          campaignId: campaignKey,
+          keywords: [],
+          entityRefs: [{ kind: 'NPC', id: npcKey }],
+          locationIds: [locationKey],
+          questIds: [],
+          alwaysActive: false,
+          matchMode: 'ANY',
+          priority: 700,
+          tokenBudget: 600,
+          enabled: true,
+          revision: 1,
+          updatedAt: at,
+        }),
+        0,
+      );
       for (let sequenceNumber = 3; sequenceNumber <= 62; sequenceNumber += 1) {
         const isPlayer = sequenceNumber % 2 === 1;
         conversations.addMessage({
@@ -139,6 +228,10 @@ describe('NpcDialogueUseCases', () => {
         generationRecordId('generation-reply-2'),
       );
       expect(JSON.stringify(generation?.request)).toContain('The cellar has an old door.');
+      expect(JSON.stringify(generation?.request)).toContain(
+        'Harbor keepers cool the lower stones before opening the sealed passage.',
+      );
+      expect(JSON.stringify(generation?.request)).toContain('LOCATION');
       expect(JSON.stringify(generation?.request)).not.toContain('Show me the cellar door.');
       expect(JSON.stringify(generation?.request)).not.toContain(
         'The owner hid a royal seal beneath the floor.',
@@ -159,6 +252,8 @@ describe('NpcDialogueUseCases', () => {
         conversationId: conversationKey,
         npcId: npcKey,
         sourceTurnIds: [turnId('turn-1')],
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+        sourceEventIds: [],
       });
       expect(memories).toEqual([
         {
@@ -178,6 +273,84 @@ describe('NpcDialogueUseCases', () => {
       expect(JSON.stringify(memoryGeneration?.request)).toContain('dialogue-history-62');
       expect(JSON.stringify(memoryGeneration?.request)).not.toContain('dialogue-history-30');
       expect(new NpcRepository(sqlite).listMemories(npcKey).at(-1)).toEqual(memories[0]);
+      expect(
+        new KnowledgeBoundaryRepository(sqlite).requireMemory(memoryId('memory-0')),
+      ).toMatchObject({
+        actor: { type: 'NPC', id: npcKey },
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+      });
+      const replay = await useCases.extractMemories({
+        ...request('memories'),
+        campaignId: campaignKey,
+        conversationId: conversationKey,
+        npcId: npcKey,
+        sourceTurnIds: [turnId('turn-1')],
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+        sourceEventIds: [],
+      });
+      expect(replay).toEqual(memories);
+      expect(
+        new KnowledgeBoundaryRepository(sqlite).listActorMemories(campaignKey, {
+          type: 'NPC',
+          id: npcKey,
+        }),
+      ).toHaveLength(1);
+
+      await useCases.talkToNpc({
+        ...request('reply-3'),
+        campaignId: campaignKey,
+        conversationId: conversationKey,
+        playerMessageId: messageId('message-player-3'),
+        npcMessageId: messageId('message-npc-3'),
+        npcId: npcKey,
+        playerMessage: 'What promise did I make about the passage?',
+      });
+      const currentMemoryGeneration = new GenerationRecordRepository(sqlite).get(
+        generationRecordId('generation-reply-3'),
+      );
+      expect(JSON.stringify(currentMemoryGeneration?.request)).toContain(
+        'The player promised Ilyra to investigate the lighthouse passage.',
+      );
+      expect(JSON.stringify(currentMemoryGeneration?.request)).not.toContain('memory-history-19');
+
+      boundary.appendMemory({
+        kind: 'MEMORY',
+        id: memoryId('memory-universal-conflict'),
+        campaignId: campaignKey,
+        actor: { type: 'NPC', id: npcKey },
+        summary: 'An existing memory with a different immutable identity payload.',
+        sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+        sourceEventIds: [],
+        revision: 1,
+        createdAt: at,
+      });
+      const conflictingUseCases = new NpcDialogueUseCases(
+        sqlite,
+        new FakeAIProvider(() => at),
+        config,
+        { memory: () => npcMemoryId('memory-universal-conflict') },
+        () => at,
+      );
+      await expect(
+        conflictingUseCases.extractMemories({
+          ...request('memories-conflict'),
+          campaignId: campaignKey,
+          conversationId: conversationKey,
+          npcId: npcKey,
+          sourceTurnIds: [turnId('turn-1')],
+          sourceKnowledgeIds: [knowledgeId('knowledge-dialogue-cellar')],
+          sourceEventIds: [],
+        }),
+      ).rejects.toMatchObject({ code: 'COMMIT_FAILED' });
+      expect(
+        npcRepository
+          .listMemories(npcKey)
+          .some(({ id }) => id === npcMemoryId('memory-universal-conflict')),
+      ).toBe(false);
+      expect(
+        new PendingAiRequestRepository(sqlite).get(aiRequestId('request-memories-conflict'))
+          ?.status,
+      ).toBe('FAILED');
     } finally {
       database.close();
     }

@@ -23,6 +23,9 @@ use tokio_util::sync::CancellationToken;
 
 const MIN_TIMEOUT: Duration = Duration::from_millis(100);
 const MAX_TIMEOUT: Duration = Duration::from_secs(120);
+const MAX_OVERALL_RESPONSE_TIME: Duration = Duration::from_secs(300);
+const DNS_TIMEOUT: Duration = Duration::from_secs(10);
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
 const MAX_RESPONSE_BYTES: usize = 16 * 1024 * 1024;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,7 +70,10 @@ impl ApprovedEndpoint {
             .map_err(|_| TransportError::InvalidRequest)
     }
 
-    async fn pinned_client(&self) -> Result<reqwest::Client, TransportError> {
+    async fn pinned_client(
+        &self,
+        connect_timeout: Duration,
+    ) -> Result<reqwest::Client, TransportError> {
         let host = self
             .base_url
             .host_str()
@@ -85,6 +91,7 @@ impl ApprovedEndpoint {
         validate_resolved_addresses(self.base_url.scheme(), &addresses)?;
         reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
+            .connect_timeout(connect_timeout)
             .resolve_to_addrs(host, &addresses)
             .build()
             .map_err(|_| TransportError::Configuration)
@@ -267,10 +274,14 @@ impl SecureHttpTransport {
     ) -> Result<StreamingResponse, TransportError> {
         validate_request(&request)?;
         let url = endpoint.resolve(&request.relative_path)?;
-        let deadline = Instant::now() + request.timeout;
+        let started_at = Instant::now();
+        let response_head_deadline = started_at + request.timeout;
+        let overall_deadline = started_at + MAX_OVERALL_RESPONSE_TIME;
+        let dns_deadline = Instant::now() + request.timeout.min(DNS_TIMEOUT);
+        let connect_timeout = request.timeout.min(CONNECT_TIMEOUT);
         let client = tokio::select! {
             () = cancellation.cancelled() => return Err(TransportError::Cancelled),
-            result = timeout_at(deadline, endpoint.pinned_client()) => {
+            result = timeout_at(dns_deadline, endpoint.pinned_client(connect_timeout)) => {
                 result.map_err(|_| TransportError::Timeout)??
             }
         };
@@ -285,7 +296,7 @@ impl SecureHttpTransport {
 
         let response = tokio::select! {
             () = cancellation.cancelled() => return Err(TransportError::Cancelled),
-            result = timeout_at(deadline, builder.send()) => {
+            result = timeout_at(response_head_deadline, builder.send()) => {
                 result.map_err(|_| TransportError::Timeout)?
                     .map_err(normalize_reqwest_error)?
             }
@@ -299,7 +310,8 @@ impl SecureHttpTransport {
             status: status.as_u16(),
             stream: Box::pin(response.bytes_stream()),
             cancellation,
-            deadline,
+            idle_timeout: request.timeout,
+            overall_deadline,
             bytes_read: 0,
             max_response_bytes: request.max_response_bytes,
         })
@@ -324,16 +336,18 @@ pub struct StreamingResponse {
     pub status: u16,
     stream: ByteStream,
     cancellation: CancellationToken,
-    deadline: Instant,
+    idle_timeout: Duration,
+    overall_deadline: Instant,
     bytes_read: usize,
     max_response_bytes: usize,
 }
 
 impl StreamingResponse {
     pub async fn next_chunk(&mut self) -> Result<Option<Bytes>, TransportError> {
+        let idle_deadline = (Instant::now() + self.idle_timeout).min(self.overall_deadline);
         let next = tokio::select! {
             () = self.cancellation.cancelled() => return Err(TransportError::Cancelled),
-            result = timeout_at(self.deadline, self.stream.next()) => {
+            result = timeout_at(idle_deadline, self.stream.next()) => {
                 result.map_err(|_| TransportError::Timeout)?
             }
         };

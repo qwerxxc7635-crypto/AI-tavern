@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "env",
+    "EMBER_FANTASY_PLAYTEST_RUN_DIRECTORY=/Users/mac/Desktop/item/4D/docs/audit/evidence/v0.3-second-audit-bc5fb56/playability/fantasy",
+    "EMBER_FANTASY_PLAYTEST_SOURCE_COMMIT=bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+    "pnpm",
+    "playtest:fantasy"
+  ],
+  "startedAt": "2026-08-28T02:55:18.916Z",
+  "endedAt": "2026-08-28T02:55:23.723Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\n RUN  v4.1.11 /Users/mac/Desktop/item/4D\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  10:55:19\n   Duration  3.79s (transform 564ms, setup 0ms, import 687ms, tests 3.00s, environment 0ms)\n\n",
+  "stderr": "$ vitest run packages/test-fixtures/src/fantasy-long-playtest-runner.test.ts\n"
+}

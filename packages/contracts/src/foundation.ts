@@ -16,8 +16,11 @@ export type WorldTruthId = Branded<string, 'WorldTruthId'>;
 export type ClaimId = Branded<string, 'ClaimId'>;
 export type KnowledgeId = Branded<string, 'KnowledgeId'>;
 export type MemoryId = Branded<string, 'MemoryId'>;
+export type HistoricalSummaryId = Branded<string, 'HistoricalSummaryId'>;
+export type WorldLoreEntryId = Branded<string, 'WorldLoreEntryId'>;
 export type PlayerCharacterId = Branded<string, 'PlayerCharacterId'>;
 export type CharacterTraitId = Branded<string, 'CharacterTraitId'>;
+export type CareerId = Branded<string, 'CareerId'>;
 export type ItemId = Branded<string, 'ItemId'>;
 export type TavernId = Branded<string, 'TavernId'>;
 export type TavernChangeId = Branded<string, 'TavernChangeId'>;
@@ -29,6 +32,7 @@ export type ActionOptionId = Branded<string, 'ActionOptionId'>;
 export type WorldClockId = Branded<string, 'WorldClockId'>;
 export type GameEventId = Branded<string, 'GameEventId'>;
 export type EventLedgerId = Branded<string, 'EventLedgerId'>;
+export type RulesEventId = Branded<string, 'RulesEventId'>;
 export type ConversationId = Branded<string, 'ConversationId'>;
 export type MessageId = Branded<string, 'MessageId'>;
 export type GenerationRecordId = Branded<string, 'GenerationRecordId'>;
@@ -65,10 +69,15 @@ export const worldTruthId = (value: string): WorldTruthId => createId(value, 'Wo
 export const claimId = (value: string): ClaimId => createId(value, 'ClaimId');
 export const knowledgeId = (value: string): KnowledgeId => createId(value, 'KnowledgeId');
 export const memoryId = (value: string): MemoryId => createId(value, 'MemoryId');
+export const historicalSummaryId = (value: string): HistoricalSummaryId =>
+  createId(value, 'HistoricalSummaryId');
+export const worldLoreEntryId = (value: string): WorldLoreEntryId =>
+  createId(value, 'WorldLoreEntryId');
 export const playerCharacterId = (value: string): PlayerCharacterId =>
   createId(value, 'PlayerCharacterId');
 export const characterTraitId = (value: string): CharacterTraitId =>
   createId(value, 'CharacterTraitId');
+export const careerId = (value: string): CareerId => createId(value, 'CareerId');
 export const itemId = (value: string): ItemId => createId(value, 'ItemId');
 export const tavernId = (value: string): TavernId => createId(value, 'TavernId');
 export const tavernChangeId = (value: string): TavernChangeId => createId(value, 'TavernChangeId');
@@ -80,6 +89,7 @@ export const actionOptionId = (value: string): ActionOptionId => createId(value,
 export const worldClockId = (value: string): WorldClockId => createId(value, 'WorldClockId');
 export const gameEventId = (value: string): GameEventId => createId(value, 'GameEventId');
 export const eventLedgerId = (value: string): EventLedgerId => createId(value, 'EventLedgerId');
+export const rulesEventId = (value: string): RulesEventId => createId(value, 'RulesEventId');
 export const conversationId = (value: string): ConversationId => createId(value, 'ConversationId');
 export const messageId = (value: string): MessageId => createId(value, 'MessageId');
 export const generationRecordId = (value: string): GenerationRecordId =>

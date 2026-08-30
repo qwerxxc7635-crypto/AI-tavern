@@ -21,6 +21,16 @@ export type {
   WorldEventContextSource,
 } from './context-builder.js';
 export {
+  buildUnifiedTaskContext,
+  layerForContextField,
+  UNIFIED_CONTEXT_LAYERS,
+} from './unified-context-builder.js';
+export type {
+  UnifiedContextBuild,
+  UnifiedContextBuildOptions,
+  UnifiedContextLayer,
+} from './unified-context-builder.js';
+export {
   assembleContextBlocks,
   assembleTaskContext,
   CONTEXT_BLOCK_TYPES,
@@ -68,6 +78,7 @@ export type {
   OutputValidationErrorCode,
   OutputValidationFailure,
   OutputValidationIssue,
+  OutputNormalization,
   OutputValidationResult,
   OutputValidationSuccess,
 } from './output-validator.js';
@@ -76,6 +87,9 @@ export type { AITaskSchemaDefinition } from './task-schema-registry.js';
 export * from './task-schemas.js';
 export type {
   AIProvider,
+  AIRequestOptions,
+  AIStreamChunk,
+  AIStreamOptions,
   AITask,
   ConnectionErrorCode,
   ModelCapabilities,
@@ -99,7 +113,133 @@ export {
   standardizeAIError,
 } from './standard-ai-error.js';
 export type { StandardAIErrorCode } from './standard-ai-error.js';
+export {
+  GENERATOR_STAGES,
+  GeneratorLifecycleError,
+  GeneratorRunner,
+  NOOP_GENERATOR_TRANSACTION,
+} from './generator.js';
+export {
+  GENERATION_PRIORITIES,
+  GenerationQueue,
+  GenerationQueueError,
+} from './generation-queue.js';
+export type {
+  GenerationPriority,
+  GenerationQueueExecution,
+  GenerationQueueHandle,
+  GenerationQueueJob,
+  GenerationQueueMetric,
+  GenerationQueueOptions,
+  GenerationQueueStatus,
+  GenerationRoute,
+} from './generation-queue.js';
+export type {
+  Generator,
+  GeneratorAuditEntry,
+  GeneratorExecution,
+  GeneratorPersistence,
+  GeneratorRepairRequest,
+  GeneratorResult,
+  GeneratorRunnerOptions,
+  GeneratorStage,
+  GeneratorStageStatus,
+  GeneratorTransactionPort,
+} from './generator.js';
+export {
+  CareerInputSchema,
+  CareerOutputSchema,
+  DirectorActionInputSchema,
+  DirectorActionOutputSchema,
+  FactionInputSchema,
+  FactionOutputSchema,
+  ItemInputSchema,
+  ItemOutputSchema,
+  LocationInputSchema,
+  LocationOutputSchema,
+  NpcLodInputSchema,
+  NpcLodOutputSchema,
+  QuestGraphInputSchema,
+  QuestGraphOutputSchema,
+  STRUCTURED_ENTITY_KINDS,
+  STRUCTURED_ENTITY_SCHEMAS,
+  structuredEntitySchemas,
+  TraitInputSchema,
+  TraitOutputSchema,
+  WorldConstitutionInputSchema,
+  WorldConstitutionOutputSchema,
+} from './entity-schemas.js';
+export type {
+  CareerInput,
+  CareerOutput,
+  DirectorActionInput,
+  DirectorActionOutput,
+  FactionInput,
+  FactionOutput,
+  ItemInput,
+  ItemOutput,
+  LocationInput,
+  LocationOutput,
+  NpcLodInput,
+  NpcLodOutput,
+  QuestGraphInput,
+  QuestGraphOutput,
+  StructuredEntityKind,
+  StructuredEntitySchemaDefinition,
+  TraitInput,
+  TraitOutput,
+  WorldConstitutionInput,
+  WorldConstitutionOutput,
+} from './entity-schemas.js';
+export {
+  APPLICATION_ERROR_KINDS,
+  ERROR_ACTIONS,
+  ApplicationError,
+  applicationErrorFromStandardCode,
+  classifyApplicationError,
+} from './application-error.js';
+export {
+  BASELINE_TASKS,
+  summarizePerformanceMetrics,
+  validatePerformanceBaselineReport,
+  validatePerformanceMetric,
+} from './performance-metric.js';
+export {
+  DEFAULT_PERFORMANCE_REGRESSION_THRESHOLDS,
+  evaluatePerformanceRegression,
+  M1_T04_PERFORMANCE_REFERENCE,
+  renderPerformanceRegressionMarkdown,
+} from './performance-regression.js';
+export type {
+  LongSavePerformanceObservation,
+  PerformanceGateCheck,
+  PerformanceGateStatus,
+  PerformanceReferenceSummary,
+  PerformanceRegressionGateInput,
+  PerformanceRegressionReport,
+  PerformanceRegressionThresholds,
+  ProviderUsageObservation,
+} from './performance-regression.js';
+export type {
+  BaselineProviderKind,
+  BaselineScenario,
+  BaselineStatus,
+  BaselineTask,
+  PerformanceMetric,
+  PerformanceBaselineReport,
+  PerformanceSummary,
+} from './performance-metric.js';
+export type {
+  ApplicationErrorContract,
+  ApplicationErrorKind,
+  ErrorAction,
+  ErrorSurface,
+} from './application-error.js';
 export * from './repetition-detector.js';
+export {
+  StructuredJsonStreamError,
+  StructuredJsonStreamProjector,
+} from './structured-json-stream.js';
 export {
   providerConfigFromResolved,
   resolveModelConfig,

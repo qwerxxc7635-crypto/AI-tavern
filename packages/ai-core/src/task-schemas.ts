@@ -1,7 +1,8 @@
-import type { JsonValue } from '@ember-tavern/contracts';
+import { QUEST_STATUSES, type JsonValue } from '@ember-tavern/contracts';
 import { z } from 'zod';
 
 import { findRepeatedNpcArchetype, findRepeatedPhrase } from './repetition-detector.js';
+import { WorldConstitutionOutputSchema } from './entity-schemas.js';
 
 const text = z.string().trim().min(1).max(4_000);
 const sceneText = z.string().trim().min(1).max(12_000);
@@ -51,6 +52,7 @@ const locationDraft = z
   })
   .strict();
 const worldDraftShape = {
+  constitution: WorldConstitutionOutputSchema,
   name: shortText,
   currentRegion: shortText,
   summary: text,
@@ -189,7 +191,7 @@ const questContext = z
   .object({
     id: identifier,
     content: questContent,
-    status: z.enum(['AVAILABLE', 'ACCEPTED', 'ACTIVE', 'COMPLETED', 'FAILED', 'ABANDONED']),
+    status: z.enum(QUEST_STATUSES),
     risk: questRisk,
     rewardTier,
   })
@@ -278,6 +280,230 @@ export const CompleteCharacterBackgroundOutputSchema = z
       .max(4),
   })
   .strict();
+
+const quickExtensionField = z.discriminatedUnion('type', [
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('TEXT'),
+      maxLength: z.number().int().min(1).max(4_000),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.enum(['INTEGER', 'NUMBER']),
+      minimum: z.number().finite(),
+      maximum: z.number().finite(),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('BOOLEAN'),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('ENUM'),
+      options: z.array(shortText).min(2).max(64),
+    })
+    .strict(),
+  z
+    .object({
+      key: identifier,
+      label: shortText,
+      required: z.boolean(),
+      type: z.literal('TEXT_LIST'),
+      maxItems: z.number().int().min(1).max(128),
+      itemMaxLength: z.number().int().min(1).max(4_000),
+    })
+    .strict(),
+]);
+
+export const GenerateQuickCharacterInputSchema = z
+  .object({
+    concept: text,
+    storyPreferences: stringList,
+    contentBoundaries,
+    constitution: WorldConstitutionOutputSchema,
+    extensionDefinitions: z
+      .array(
+        z
+          .object({
+            namespace: identifier,
+            displayName: shortText,
+            schemaVersion: z.literal(1),
+            fields: z.array(quickExtensionField).min(1).max(32),
+          })
+          .strict(),
+      )
+      .max(16),
+    careerPool: z
+      .array(
+        z
+          .object({
+            id: identifier,
+            name: shortText,
+            rarity: z.enum(['COMMON', 'UNCOMMON', 'RARE', 'SPECIAL']),
+            role: text,
+            requirements: stringList,
+            legacyArchetype: z.enum(['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT']),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(64),
+  })
+  .strict();
+
+export const GenerateQuickCharacterOutputSchema = z
+  .object({
+    name: shortText,
+    nickname: shortText.nullable(),
+    gender: shortText.nullable(),
+    age: z.number().int().min(0).max(10_000).nullable(),
+    identity: text,
+    ancestry: shortText.nullable(),
+    birthplace: shortText.nullable(),
+    socialClass: shortText.nullable(),
+    faith: shortText.nullable(),
+    appearance: text,
+    personality: text,
+    values: stringList,
+    goals: stringList.min(1),
+    fears: stringList,
+    secrets: stringList,
+    family: stringList,
+    education: stringList,
+    importantPeople: stringList,
+    enemies: stringList,
+    experiences: stringList,
+    career: z
+      .object({
+        id: identifier,
+        displayName: shortText,
+        legacyArchetype: z.enum(['WARRIOR', 'ROGUE', 'SCHOLAR', 'DIPLOMAT']),
+      })
+      .strict(),
+    attributePriority: z
+      .array(attribute)
+      .length(4)
+      .refine((values) => new Set(values).size === 4, 'Attribute priority must be unique'),
+    proficiencies: stringList,
+    abilities: stringList,
+    languages: stringList,
+    traits: z.tuple([traitDraft, traitDraft]),
+    legacyBackground: z
+      .object({
+        birthplace: text,
+        formativeExperience: text,
+        adventureMotivation: text,
+        secret: text,
+        importantPerson: text,
+        tavernArrivalReason: text,
+      })
+      .strict(),
+    extensions: z
+      .array(
+        z
+          .object({
+            namespace: identifier,
+            schemaVersion: z.literal(1),
+            values: z.record(z.string(), jsonValueSchema),
+          })
+          .strict(),
+      )
+      .max(16),
+  })
+  .strict();
+
+const characterDraftAIPath = z
+  .string()
+  .trim()
+  .min(1)
+  .max(200)
+  .regex(/^[A-Za-z][A-Za-z0-9]*(?:\.[A-Za-z0-9_-]+)*$/);
+const characterDraftAIValue = z.union([text, stringList]);
+
+export const EditCharacterDraftInputSchema = z
+  .object({
+    scope: z.enum(['FIELD', 'FILL_EMPTY', 'SECTION', 'WHOLE', 'REGENERATE_UNLOCKED']),
+    fieldOperation: z.enum(['GENERATE', 'IMPROVE', 'OPTIONS', 'EXPAND', 'SHORTEN']).nullable(),
+    section: z
+      .enum([
+        'IDENTITY',
+        'INNER_LIFE',
+        'CAREER',
+        'TRAITS',
+        'BACKGROUND',
+        'BOUNDARIES',
+        'EXTENSIONS',
+      ])
+      .nullable(),
+    fieldPath: characterDraftAIPath.nullable(),
+    targetPaths: z.array(characterDraftAIPath).min(1).max(64),
+    fieldKinds: z.record(characterDraftAIPath, z.enum(['TEXT', 'TEXT_LIST'])),
+    draft: z.record(z.string(), jsonValueSchema),
+    lockedFields: z.array(characterDraftAIPath).max(128),
+    constitution: jsonValueSchema,
+    extensionDefinitions: z.array(jsonValueSchema).max(16),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    const fieldScope = input.scope === 'FIELD';
+    if (
+      fieldScope !== (input.fieldPath !== null) ||
+      fieldScope !== (input.fieldOperation !== null) ||
+      (input.scope === 'SECTION') !== (input.section !== null) ||
+      new Set(input.targetPaths).size !== input.targetPaths.length ||
+      Object.keys(input.fieldKinds).length !== input.targetPaths.length ||
+      input.targetPaths.some((path) => input.fieldKinds[path] === undefined) ||
+      (fieldScope && (input.targetPaths.length !== 1 || input.targetPaths[0] !== input.fieldPath))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['scope'],
+        message: 'Character edit scope is invalid',
+      });
+    }
+  });
+
+export const EditCharacterDraftOutputSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('FIELD_CANDIDATES'),
+      fieldPath: characterDraftAIPath,
+      candidates: z
+        .array(characterDraftAIValue)
+        .length(3)
+        .refine((values) => new Set(values.map((value) => JSON.stringify(value))).size === 3, {
+          message: 'Character field candidates must be distinct',
+        }),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('DRAFT_PATCH'),
+      updates: z
+        .array(z.object({ path: characterDraftAIPath, value: characterDraftAIValue }).strict())
+        .min(1)
+        .max(64)
+        .refine((updates) => new Set(updates.map(({ path }) => path)).size === updates.length, {
+          message: 'Character draft patch paths must be unique',
+        }),
+    })
+    .strict(),
+]);
 
 export const GenerateTavernInputSchema = z
   .object({ world: worldContext, playerConcept: text, desiredPosition: shortText.nullable() })
@@ -438,6 +664,32 @@ export const NpcReplyInputSchema = z
   .object({
     worldSummary: text,
     currentRegion: shortText,
+    relevantLore: z
+      .array(
+        z
+          .object({
+            loreEntryId: identifier,
+            title: shortText,
+            text,
+            revision: z.number().int().min(1),
+            score: z.number().min(0).max(1),
+            priority: z.number().int().min(0).max(1000),
+            matches: z
+              .array(
+                z
+                  .object({
+                    kind: z.enum(['ALWAYS', 'KEYWORD', 'ENTITY', 'LOCATION', 'QUEST']),
+                    value: text,
+                    weight: z.number().min(0).max(1),
+                  })
+                  .strict(),
+              )
+              .min(1)
+              .max(161),
+          })
+          .strict(),
+      )
+      .max(12),
     npc: npcContextCard,
     relationship,
     knowledge: z
@@ -462,7 +714,7 @@ export const NpcReplyOutputSchema = z
   .object({
     reply: text,
     mood: shortText,
-    suggestedTopics: stringList.max(5),
+    suggestedTopics: stringList.min(3).max(5),
     memoryCandidate: text.nullable(),
     relationshipProposal: z
       .object({
@@ -483,6 +735,98 @@ export const NpcReplyOutputSchema = z
     if (phrase !== null) {
       context.addIssue({ code: 'custom', path: ['reply'], message: `repeated phrase: ${phrase}` });
     }
+    const normalizedTopics = output.suggestedTopics.map((topic) =>
+      topic.toLocaleLowerCase('zh-CN'),
+    );
+    if (new Set(normalizedTopics).size !== normalizedTopics.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestedTopics'],
+        message: 'Suggested topics must be unique',
+      });
+    }
+  });
+
+const dialogueSuggestionParticipant = z
+  .object({
+    id: identifier,
+    name: shortText,
+    identity: shortText,
+    status: z.enum(['ACTIVE', 'LISTENING']),
+  })
+  .strict();
+
+export const DialogueSuggestionInputSchema = z
+  .object({
+    scopeKind: z.enum(['NPC_DIALOGUE', 'TAVERN_SCENE']),
+    scopeId: identifier,
+    world: z.object({ summary: text, currentRegion: shortText }).strict(),
+    player: z.object({ name: shortText, concept: text, personalGoal: text }).strict(),
+    participants: z.array(dialogueSuggestionParticipant).min(1).max(6),
+    relationship: relationship.nullable(),
+    recentMessages: z
+      .array(
+        z
+          .object({
+            role: z.enum(['PLAYER', 'NPC', 'SYSTEM']),
+            speakerNpcId: identifier.nullable(),
+            content: text,
+          })
+          .strict(),
+      )
+      .max(18),
+    openQuests: z
+      .array(z.object({ id: identifier, title: shortText, status: shortText }).strict())
+      .max(12),
+  })
+  .strict()
+  .superRefine((input, context) => {
+    if (
+      (input.scopeKind === 'NPC_DIALOGUE' &&
+        (input.participants.length !== 1 || input.relationship === null)) ||
+      (input.scopeKind === 'TAVERN_SCENE' && input.participants.length < 2)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['participants'],
+        message: 'Dialogue suggestion scope does not match its participants',
+      });
+    }
+    if (new Set(input.participants.map(({ id }) => id)).size !== input.participants.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['participants'],
+        message: 'Dialogue suggestion participants must be unique',
+      });
+    }
+  });
+
+export const DialogueSuggestionOutputSchema = z
+  .object({
+    suggestions: z
+      .array(
+        z
+          .object({
+            text,
+            addressedNpcId: identifier.nullable(),
+          })
+          .strict(),
+      )
+      .min(3)
+      .max(5),
+  })
+  .strict()
+  .superRefine((output, context) => {
+    const normalized = output.suggestions.map(({ text: suggestion }) =>
+      suggestion.normalize('NFKC').toLocaleLowerCase('zh-CN'),
+    );
+    if (new Set(normalized).size !== normalized.length) {
+      context.addIssue({
+        code: 'custom',
+        path: ['suggestions'],
+        message: 'Dialogue suggestions must be unique',
+      });
+    }
   });
 
 export const GenerateQuestInputSchema = z
@@ -494,6 +838,58 @@ export const GenerateQuestInputSchema = z
     playerConcept: text,
     recentQuestTitles: z.array(shortText).max(20),
     recentQuestStructures: z.array(shortText).max(20),
+    dynamicSource: z
+      .object({
+        kind: z.enum([
+          'NPC',
+          'FACTION',
+          'WORLD_EVENT',
+          'DISCOVERY',
+          'PLAYER_ACTION',
+          'CONSEQUENCE',
+        ]),
+        occurrenceId: identifier,
+        entityKind: z.enum([
+          'NPC',
+          'FACTION',
+          'GAME_EVENT',
+          'WORLD_FACT',
+          'PLAYER_ACTION',
+          'QUEST_GRAPH',
+        ]),
+        entityId: identifier,
+        summary: text,
+        actorNpcId: identifier.nullable(),
+        visibility: z.enum(['PLAYER_VISIBLE', 'HIDDEN']),
+        playerIntervened: z.boolean(),
+      })
+      .strict()
+      .optional(),
+    relevantFacts: z
+      .array(z.object({ id: identifier, statement: text }).strict())
+      .max(20)
+      .optional(),
+    constitution: z
+      .object({
+        revision: z.number().int().positive(),
+        technology: text,
+        magic: text,
+        society: text,
+        politics: text,
+        economy: text,
+        taboos: stringList,
+      })
+      .strict()
+      .optional(),
+    generationBudget: z
+      .object({
+        policyVersion: z.literal(1),
+        openQuestLimit: z.number().int().positive(),
+        currentOpenQuests: z.number().int().nonnegative(),
+        remainingSlots: z.number().int().nonnegative(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 export const GenerateQuestOutputSchema = z
@@ -821,12 +1217,79 @@ export const ExtractMemoriesOutputSchema = z
   })
   .strict();
 
+const tavernSceneAction = z.enum([
+  'SPEAK',
+  'INTERRUPT',
+  'SILENCE',
+  'EAVESDROP',
+  'LEAVE',
+  'INTERVENE',
+]);
+export const ProposeTavernSceneActionInputSchema = z
+  .object({
+    sceneId: identifier,
+    sceneRevision: z.number().int().min(1),
+    actor: z
+      .object({
+        id: identifier,
+        name: shortText,
+        populationRole: shortText,
+        currentBehavior: text,
+        personality: text.nullable(),
+        goals: stringList,
+      })
+      .strict(),
+    visibleParticipants: z
+      .array(
+        z
+          .object({
+            id: identifier,
+            name: shortText,
+            populationRole: shortText,
+            status: z.enum(['ACTIVE', 'LISTENING']),
+          })
+          .strict(),
+      )
+      .min(2)
+      .max(6),
+    authorizedKnowledge: z.array(z.object({ id: identifier, content: text }).strict()).max(50),
+    memories: z.array(z.object({ id: identifier, summary: text }).strict()).max(30),
+    recentPublicTurns: z
+      .array(z.object({ speakerNpcId: identifier.nullable(), text }).strict())
+      .max(12),
+    playerIntent: text,
+    addressedNpcId: identifier.nullable(),
+    allowedActions: z.array(tavernSceneAction).min(1).max(6),
+  })
+  .strict();
+export const ProposeTavernSceneActionOutputSchema = z
+  .object({
+    actorId: identifier,
+    action: tavernSceneAction,
+    targetNpcId: identifier.nullable(),
+    utterance: text.nullable(),
+    citedKnowledgeIds: identifierList,
+    urgency: z.number().int().min(0).max(3),
+    rationale: text,
+  })
+  .strict()
+  .superRefine((proposal, context) => {
+    const vocal = ['SPEAK', 'INTERRUPT', 'INTERVENE'].includes(proposal.action);
+    if (vocal !== (proposal.utterance !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['utterance'],
+        message: 'utterance must match vocal action',
+      });
+    }
+  });
+
 export const CheckConsistencyInputSchema = z
   .object({
     world: worldContext,
     lockedRules: stringList.max(30),
     knownFacts: stringList.max(30),
-    proposedContent: text,
+    proposedContent: sceneText,
   })
   .strict();
 export const CheckConsistencyOutputSchema = z

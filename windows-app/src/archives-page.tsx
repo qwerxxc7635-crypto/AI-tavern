@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignRoute } from './navigation.js';
 import {
   windowsSettlementService,
   type AdventureArchive,
@@ -125,7 +126,7 @@ export function ArchivesPage({
           </article>
         ))
       )}
-      <Link className="primary-action" to={`/tavern?campaignId=${encodeURIComponent(id)}`}>
+      <Link className="primary-action" to={campaignRoute(APP_PATHS.tavern, id)}>
         返回酒馆
       </Link>
     </main>

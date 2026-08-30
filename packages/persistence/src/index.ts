@@ -13,6 +13,12 @@ export type {
   DatabaseBackupOptions,
   DatabaseBackupResult,
 } from './database-backup.mjs';
+export {
+  findSecretInJson,
+  findSecretInText,
+  redactSecretsForDiagnostics,
+} from './save-secret-scanner.js';
+export type { SecretDetection } from './save-secret-scanner.js';
 export { AdventureSettlementRepository } from './adventure-settlement-repository.js';
 export type {
   AdventureSettlementCommit,
@@ -60,9 +66,72 @@ export type {
 } from './pending-ai-request-repository.js';
 export { NpcRepository, TavernRepository } from './tavern-npc-repository.js';
 export { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
+export { QuestPoolRepository } from './quest-pool-repository.js';
+export type { TransitionQuestPoolState } from './quest-pool-repository.js';
+export { QuestGraphRepository, loadEntityStates } from './quest-graph-repository.js';
+export type { EvaluateQuestGraph, ReplaceQuestGraph } from './quest-graph-repository.js';
+export { DynamicQuestSourceRepository } from './dynamic-quest-source-repository.js';
+export type { CommitDynamicQuest } from './dynamic-quest-source-repository.js';
 export { TurnTransaction } from './turn-transaction.js';
 export type { TurnCommit, TurnStatePatch } from './turn-transaction.js';
 export { WorldRepository } from './world-repository.js';
+export { WorldConstitutionRepository } from './world-constitution-repository.js';
+export { WorldSeedRepository } from './world-seed-repository.js';
+export { WorldDirectorRepository } from './world-director-repository.js';
+export type { CommitWorldDirectorRun } from './world-director-repository.js';
+export { DirectorBudgetRepository } from './director-budget-repository.js';
+export type { AdmitDirectorRun } from './director-budget-repository.js';
+export { RulesEngineRepository, RulesIdempotencyConflictError } from './rules-engine-repository.js';
+export type { CommitRulesCommand, RulesCommitResult } from './rules-engine-repository.js';
+export { KnowledgeBoundaryRepository } from './knowledge-boundary-repository.js';
+export type {
+  ForgetKnowledgeOnceInput,
+  KnowledgeCommitReceipt,
+  KnowledgeMutationIdentity,
+  SaveKnowledgeOnceInput,
+} from './knowledge-boundary-repository.js';
+export {
+  MemoryLayerRepository,
+  captureMemorySource,
+  memorySourceDigest,
+} from './memory-layer-repository.js';
+export { WorldInfoRetrievalRepository } from './world-info-retrieval-repository.js';
+export { LazyWorldGenerationRepository } from './lazy-world-generation-repository.js';
+export { PrefetchRepository } from './prefetch-repository.js';
+export type {
+  CancelLazyWorldGeneration,
+  ClaimLazyWorldGeneration,
+  CompleteLazyWorldGeneration,
+  FailLazyWorldGeneration,
+} from './lazy-world-generation-repository.js';
+export type {
+  MemoryArtifactFreshness,
+  MemoryArtifactFreshnessReason,
+  MemoryArtifactKind,
+} from './memory-layer-repository.js';
+export { UniversalCharacterRepository } from './universal-character-repository.js';
+export { CharacterCreationSessionRepository } from './character-creation-session-repository.js';
+export { CareerPoolRepository } from './career-pool-repository.js';
+export { NpcLodRepository } from './npc-lod-repository.js';
+export type { CommitNpcLodUpgrade } from './npc-lod-repository.js';
+export { DynamicLocationRepository } from './dynamic-location-repository.js';
+export type {
+  CommitLocationMaterialization,
+  CommitLocationTravel,
+  DynamicLocationSnapshot,
+} from './dynamic-location-repository.js';
+export { ActiveFactionRepository } from './active-faction-repository.js';
+export type {
+  ActiveFactionSnapshot,
+  CommitFactionAction,
+  CommitFactionActivation,
+} from './active-faction-repository.js';
+export { TavernPopulationRepository } from './tavern-population-repository.js';
+export type {
+  FocusTavernPopulation,
+  ProjectTavernPopulation,
+} from './tavern-population-repository.js';
+export type { CharacterCreationConfirmation } from './character-creation-session-repository.js';
 export { SnapshotRepository } from './snapshot-repository.js';
 export type { CreateSnapshot } from './snapshot-repository.js';
 export { exportCampaignSave } from './save-export.js';

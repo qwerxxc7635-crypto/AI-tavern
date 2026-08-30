@@ -29,12 +29,14 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_WORLD: define(
     'GENERATE_WORLD',
     'WORLD_DESIGNER',
-    'Create a coherent original world from the player concept, preferences, and boundaries. Make every requested world field concrete and mutually consistent. Faction and location names must each be unique. Every parentName must be null or exactly match another generated location name, never itself. Every factionNames entry must exactly match a generated faction name.',
+    'Create a coherent original world from the player concept, preferences, and boundaries. First define the complete structured World Constitution; make every world field obey it. technologyLevel must exactly equal constitution.technology. powerRules must include constitution.magic verbatim. Every constitution.taboos entry must also appear verbatim in forbiddenElements. Faction and location names must each be unique. Every parentName must be null or exactly match another generated location name, never itself. Every factionNames entry must exactly match a generated faction name. Do not pre-generate careers, equipment, NPCs, or quests.',
+    2,
   ),
   REFINE_WORLD: define(
     'REFINE_WORLD',
     'WORLD_DESIGNER',
-    'Revise only what the instructions require. Preserve every locked field exactly and summarize the actual changes.',
+    'Revise only what the instructions require. Keep the structured World Constitution and all world fields mutually consistent: technologyLevel must exactly equal constitution.technology, powerRules must include constitution.magic verbatim, and every constitution.taboos entry must appear verbatim in forbiddenElements. Preserve every locked field exactly, and summarize the actual changes.',
+    2,
   ),
   GENERATE_CHARACTER_TRAITS: define(
     'GENERATE_CHARACTER_TRAITS',
@@ -47,6 +49,41 @@ export const TASK_PROMPTS = Object.freeze({
     'WORLD_DESIGNER',
     'Complete a grounded character background that connects the existing concept, goal, and traits without changing them. Also provide one to four narrative initial equipment names and descriptions; the program assigns all mechanical effects.',
     2,
+  ),
+  GENERATE_QUICK_CHARACTER: define(
+    'GENERATE_QUICK_CHARACTER',
+    'WORLD_DESIGNER',
+    'Turn the single player concept into one complete editable character that obeys the locked World Constitution, player boundaries, and every supplied extension definition. Select career.id, displayName, and legacyArchetype exactly from one supplied Career Pool entry; never invent or rename a career. Return narrative content and a unique attribute priority only; never assign money, status, derived values, equipment IDs, or mechanical bonuses. Use exactly two distinct narrative Traits for the current compatibility stage, fill every required extension field, and do not invent extension namespaces or keys.',
+  ),
+  EDIT_CHARACTER_DRAFT: define(
+    'EDIT_CHARACTER_DRAFT',
+    'WORLD_DESIGNER',
+    'Edit only the exact targetPaths of the supplied universal character draft. Obey the locked World Constitution, content boundaries, extension definitions, and every locked field. FIELD with OPTIONS returns exactly three distinct candidates and no patch; every other operation returns a patch covering exactly the requested targets. Preserve value kinds, never invent paths, and never change age, attributes, derived values, skill numbers, wealth, equipment IDs, reputation, relationships, status, Trait type, Trait point values, mechanical bonuses, or any non-target field.',
+  ),
+  GENERATE_CAREER_POOL: define(
+    'GENERATE_CAREER_POOL',
+    'WORLD_DESIGNER',
+    'Generate exactly requestedCount distinct careers for the requested rarity multiset. Every career must arise from the supplied locked Constitution, repeat its four exact Constitution evidence strings, include every structured field, and choose one legacyArchetype only as a compatibility projection. Never add attribute modifiers, numeric bonuses, money, damage, defense, or equipment instances. INITIAL creates the visible world Career Pool; RUNTIME_DISCOVERY adds only careers not present in existingCareerIds or existingCareerNames.',
+  ),
+  GENERATE_ITEMS: define(
+    'GENERATE_ITEMS',
+    'WORLD_DESIGNER',
+    'Generate exactly requestedCount distinct semantic equipment candidates at requestedRarity. Names, descriptions, appearance, history, origin, narrative abilities, semantic effects, and balance tags are narrative only. Repeat the three locked Constitution evidence strings exactly. Use only supplied binding targets and allowed triggers, include at least the Quest and one NPC binding, and do not invent target IDs. Never assign or imply damage, defense, price, check modifiers, recovery values, uses, or any other numeric mechanic; the Rules Engine derives all mechanics locally. Do not duplicate existingItemIds or existingItemNames.',
+  ),
+  GENERATE_NPC_LOD: define(
+    'GENERATE_NPC_LOD',
+    'WORLD_DESIGNER',
+    'Upgrade exactly one NPC by one LOD level. Repeat npcId, identityAnchor, populationRole, every existing non-null field, every existing list entry, and the three locked Constitution evidence strings exactly. Add only the fields unlocked by targetLod. Reference only IDs supplied in allowedReferences; references are selections, never new facts, memories, relationships, quests, items, secrets, or events. Do not downgrade, rename, replace, contradict, or rewrite the existing identity. LOD1 adds name, appearance, and current behavior; LOD2 adds career, personality, goals, authorized knowledge and relationships; LOD3 may add authorized memories, secret facts, quests, items, and experiences.',
+  ),
+  GENERATE_LOCATIONS: define(
+    'GENERATE_LOCATIONS',
+    'WORLD_DESIGNER',
+    'Materialize exactly requestedCount locations around the supplied origin without expanding any other part of the world. Repeat the four locked Constitution evidence strings exactly. CHILDREN creates direct children whose parentLocationId is the origin ID. CONNECTED creates peers with the same parentLocationId as the origin and every new location must connect back to the origin. Use only allowed faction IDs and existing or newly returned location IDs in connections. Return distinct IDs and names not present in the existing lists. Every location must be detailed with atmosphere, at least one feature, and a current situation. Never generate a complete country, city, region, dungeon, or world map, and never create NPCs, factions, quests, items, rules, travel outcomes, or hidden facts.',
+  ),
+  GENERATE_FACTIONS: define(
+    'GENERATE_FACTIONS',
+    'WORLD_DESIGNER',
+    'Activate exactly the requested existing factions without creating new identities. Repeat each supplied id, name, goal, player relation, established territory, established enemy and ally references, and the four locked Constitution evidence strings exactly. Add concrete resources, leadership, and one current action. Enemy and ally references must use only allowed faction IDs, be disjoint, never self-reference, and be reciprocal when both factions are in this batch. Territory may use only allowed location IDs and must retain every established territory. Do not assign numeric mechanics, change quests, move NPCs, write facts, spend Director budget, or execute faction actions.',
   ),
   GENERATE_TAVERN: define(
     'GENERATE_TAVERN',
@@ -62,14 +99,24 @@ export const TASK_PROMPTS = Object.freeze({
   NPC_REPLY: define(
     'NPC_REPLY',
     'NPC_ACTOR',
-    'Reply only from this NPC perspective without repeating substantial phrases inside the response. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
-    3,
+    'Reply only from this NPC perspective without repeating substantial phrases inside the response. Use relevantLore only as retrieved world context and never as permission to reveal knowledge the NPC does not possess. Return 3-5 distinct suggested topics grounded in this NPC knowledge and the conversation; they are optional player suggestions with no extra authority. Treat only KNOWN Truth entries as objective, SUSPECTED Claims as uncertain, and BELIEVED Claims as the NPC subjective belief. Never infer omitted world facts, reveal another actor knowledge, or present a Claim as WorldTruth.',
+    5,
+  ),
+  GENERATE_DIALOGUE_SUGGESTIONS: define(
+    'GENERATE_DIALOGUE_SUGGESTIONS',
+    'GAME_MASTER',
+    'Create 3-5 distinct optional player dialogue suggestions using only the supplied player-visible world, participant, relationship, public transcript, and open-quest context. Every addressedNpcId must be null or exactly one supplied participant ID. Suggestions must fit the immediate conversation, must not reveal private NPC knowledge or hidden facts, must not invent outcomes, and never count as a submitted player action.',
+  ),
+  PROPOSE_TAVERN_SCENE_ACTION: define(
+    'PROPOSE_TAVERN_SCENE_ACTION',
+    'NPC_ACTOR',
+    "Propose exactly one action for the supplied actor only. Use only that actor's authorized knowledge, memories, goals, and the public scene transcript. Never infer another participant's private motive, memory, secret, or knowledge. SPEAK, INTERRUPT, and INTERVENE require an utterance; SILENCE, EAVESDROP, and LEAVE require null. Cite only supplied knowledge IDs. The program validates and arbitrates all independent proposals locally; this proposal never mutates game state.",
   ),
   GENERATE_QUEST: define(
     'GENERATE_QUEST',
     'WORLD_DESIGNER',
-    'Create a short-session quest grounded in supplied facts and NPCs. expectedTurns min and max must both be between 8 and 12 inclusive, with max at least min. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. relatedNpcIds may contain only exact IDs from availableNpcs; relatedFactIds must be empty because no fact IDs are supplied. Separate narrative content from program-controlled risk and reward proposals.',
-    2,
+    'Create a short-session quest grounded only in the supplied world, Constitution, dynamic source, relevantFacts and available NPCs. expectedTurns min and max must both be between 8 and 12 inclusive, with max at least min. Its risk, reward, turn range, and recommended-attribute structure must differ from every recentQuestStructures entry, and its content must not repeat substantial phrases. relatedNpcIds may contain only exact IDs from availableNpcs; relatedFactIds may contain only exact IDs from relevantFacts and must be empty when relevantFacts is absent. The local program owns source provenance, visibility, initial status and generationBudget; never change or spend them. Separate narrative content from program-controlled risk and reward proposals.',
+    3,
   ),
   GENERATE_ADVENTURE_PLAN: define(
     'GENERATE_ADVENTURE_PLAN',

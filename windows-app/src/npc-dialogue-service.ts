@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core';
 import {
   NpcReplyInputSchema,
   NpcReplyOutputSchema,
+  StructuredJsonStreamProjector,
   findRepeatedPhrase,
   type AIProvider,
 } from '@ember-tavern/ai-core';
@@ -12,6 +13,7 @@ import {
   generationRecordId,
   idempotencyKey,
   isoTimestamp,
+  type NpcTimelineOperation,
 } from '@ember-tavern/contracts';
 import {
   desktopAIEngine,
@@ -23,6 +25,7 @@ import {
   tauriRandomnessTemperatureSource,
   type RandomnessTemperatureSource,
 } from './randomness-settings-service.js';
+import { npcTimelineService, type NpcTimelineService } from './npc-timeline-service.js';
 
 export interface DialogueNpcView {
   readonly id: string;
@@ -56,6 +59,7 @@ export interface NpcDialogueSnapshot {
   readonly messages: readonly DialogueMessageView[];
   readonly suggestedTopics: readonly string[];
   readonly generationContext: Readonly<Record<string, unknown>>;
+  readonly timeline: NpcTimelineOperation | null;
 }
 
 interface GenerationAudit {
@@ -75,6 +79,8 @@ interface DialogueCommit {
   readonly npcId: string;
   readonly playerMessage: string;
   readonly generation: GenerationAudit;
+  readonly timelineSubmissionId: string;
+  readonly timelineAttemptId: string;
 }
 
 export interface NpcDialogueGateway {
@@ -86,6 +92,12 @@ interface RequestIdentity {
   readonly requestId: string;
   readonly generationRecordId: string;
   readonly idempotencyKey: string;
+}
+
+export interface NpcDialogueStreamOptions {
+  readonly signal: AbortSignal;
+  readonly onChunk: (content: string) => void;
+  readonly onReset?: () => void;
 }
 
 export const tauriNpcDialogueGateway: NpcDialogueGateway = {
@@ -111,58 +123,159 @@ export class WindowsNpcDialogueService {
     provider?: AIProvider | DesktopAIEngine,
     private readonly createIdentity: () => RequestIdentity = defaultIdentity,
     private readonly randomness: RandomnessTemperatureSource = balancedRandomnessTemperatureSource,
+    private readonly timeline: Pick<
+      NpcTimelineService,
+      'latest' | 'begin' | 'recordFailure'
+    > = npcTimelineService,
   ) {
     this.ai = desktopAIEngine(provider);
   }
 
   private readonly ai: DesktopAIEngine;
 
-  public load(campaign: string, npc: string): Promise<NpcDialogueSnapshot> {
+  public async load(campaign: string, npc: string): Promise<NpcDialogueSnapshot> {
     campaignId(campaign);
     requireText(npc);
-    return this.gateway.load(campaign, npc);
+    const [snapshot, timeline] = await Promise.all([
+      this.gateway.load(campaign, npc),
+      this.timeline.latest(campaign, 'NPC_DIALOGUE', npc),
+    ]);
+    return Object.freeze({
+      ...snapshot,
+      timeline: timeline !== null && timeline.status !== 'COMMITTED' ? timeline : null,
+    });
   }
 
   public async send(
     campaign: string,
     npc: string,
     playerMessage: string,
+    stream?: NpcDialogueStreamOptions,
   ): Promise<NpcDialogueSnapshot> {
-    const snapshot = await this.load(campaign, npc);
+    const latest = await this.timeline.latest(campaign, 'NPC_DIALOGUE', npc);
+    if (latest !== null && ['PENDING', 'FAILED_RETRYABLE'].includes(latest.status)) {
+      throw new NpcDialogueServiceError('TIMELINE_RETRY_REQUIRED');
+    }
+    return this.performSend(campaign, npc, playerMessage, null, stream);
+  }
+
+  public async retry(
+    campaign: string,
+    npc: string,
+    stream?: NpcDialogueStreamOptions,
+  ): Promise<NpcDialogueSnapshot> {
+    const latest = await this.timeline.latest(campaign, 'NPC_DIALOGUE', npc);
+    if (latest === null || !['PENDING', 'FAILED_RETRYABLE'].includes(latest.status)) {
+      throw new NpcDialogueServiceError('TIMELINE_RETRY_UNAVAILABLE');
+    }
+    return this.performSend(campaign, npc, latest.playerIntent, latest, stream);
+  }
+
+  private async performSend(
+    campaign: string,
+    npc: string,
+    playerMessage: string,
+    existingTimeline: NpcTimelineOperation | null,
+    stream: NpcDialogueStreamOptions | undefined,
+  ): Promise<NpcDialogueSnapshot> {
+    const snapshot = await this.gateway.load(campaign, npc);
     const input = NpcReplyInputSchema.parse({
       ...snapshot.generationContext,
+      relevantLore: snapshot.generationContext['relevantLore'] ?? [],
       playerMessage,
     });
     const identity = this.createIdentity();
-    const temperature = await this.randomness.resolveTemperature();
-    const generated = await this.ai.execute('NPC_REPLY', input, {
-      requestId: identity.requestId,
-      temperature,
-      maxOutputTokens: 2_000,
-      timeoutMs: 5_000,
+    const stableIdentity = Object.freeze({
+      ...identity,
+      idempotencyKey: existingTimeline?.attempts[0]?.idempotencyKeys[0] ?? identity.idempotencyKey,
     });
-    const output = NpcReplyOutputSchema.parse(generated.validatedOutput);
-    const repeatedPhrase = findRepeatedPhrase(
-      [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
-      snapshot.messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
-    );
-    if (repeatedPhrase !== null) {
-      throw new NpcDialogueServiceError('REPETITION_DETECTED');
-    }
-    return this.gateway.commit({
-      campaignId: campaign,
-      npcId: npc,
-      playerMessage: input.playerMessage,
-      generation: {
-        ...identity,
-        promptVersion: generated.request.promptVersion,
-        input,
-        context: { npcId: npc },
-        request: generated.request,
-        rawResponseText: generated.response.content,
-        validatedOutput: output,
+    const attemptId = `npc-timeline-attempt-${crypto.randomUUID()}`;
+    const operation = await this.timeline.begin(
+      {
+        campaignId: campaign,
+        scopeKind: 'NPC_DIALOGUE',
+        scopeId: npc,
+        playerIntent: input.playerMessage,
+        addressedNpcId: npc,
+        hardResultKey: null,
       },
-    });
+      {
+        attemptId,
+        requestIds: [stableIdentity.requestId],
+        generationRecordIds: [stableIdentity.generationRecordId],
+        idempotencyKeys: [stableIdentity.idempotencyKey],
+      },
+      existingTimeline,
+    );
+    try {
+      const temperature = await this.randomness.resolveTemperature();
+      let projector = stream === undefined ? null : new StructuredJsonStreamProjector('reply');
+      let rawChunks = 0;
+      const generated = await this.ai.execute('NPC_REPLY', input, {
+        requestId: stableIdentity.requestId,
+        temperature,
+        maxOutputTokens: 2_000,
+        timeoutMs: 5_000,
+        ...(stream === undefined
+          ? {}
+          : {
+              stream: {
+                signal: stream.signal,
+                onChunk(chunk: { readonly content: string }) {
+                  rawChunks += 1;
+                  const visible = projector?.push(chunk.content) ?? '';
+                  if (visible.length > 0) stream.onChunk(visible);
+                },
+                onReset() {
+                  projector = new StructuredJsonStreamProjector('reply');
+                  rawChunks = 0;
+                  stream.onReset?.();
+                },
+              },
+            }),
+      });
+      if (projector !== null && rawChunks > 0) {
+        const visible = projector.finish(generated.response.content);
+        if (visible.length > 0) stream?.onChunk(visible);
+      }
+      let output: ReturnType<typeof NpcReplyOutputSchema.parse>;
+      try {
+        output = NpcReplyOutputSchema.parse(generated.validatedOutput);
+      } catch (error) {
+        throw new NpcDialogueServiceError('SCHEMA_VALIDATION_FAILED', { cause: error });
+      }
+      const repeatedPhrase = findRepeatedPhrase(
+        [output.reply, ...output.suggestedTopics, output.memoryCandidate ?? ''],
+        snapshot.messages.filter(({ role }) => role === 'NPC').map(({ content }) => content),
+      );
+      if (repeatedPhrase !== null) {
+        throw new NpcDialogueServiceError('REPETITION_DETECTED');
+      }
+      const saved = await this.gateway.commit({
+        campaignId: campaign,
+        npcId: npc,
+        playerMessage: input.playerMessage,
+        generation: {
+          ...stableIdentity,
+          promptVersion: generated.request.promptVersion,
+          input,
+          context: { npcId: npc },
+          request: generated.request,
+          rawResponseText: generated.response.content,
+          validatedOutput: output,
+        },
+        timelineSubmissionId: operation.id,
+        timelineAttemptId: attemptId,
+      });
+      return Object.freeze({ ...saved, timeline: null });
+    } catch (error) {
+      const durable = await this.timeline.latest(campaign, 'NPC_DIALOGUE', npc);
+      if (durable?.status === 'COMMITTED') {
+        const saved = await this.gateway.load(campaign, npc);
+        return Object.freeze({ ...saved, timeline: null });
+      }
+      throw await this.timeline.recordFailure(operation, attemptId, error);
+    }
   }
 }
 
@@ -171,11 +284,15 @@ export const windowsNpcDialogueService = new WindowsNpcDialogueService(
   tauriDesktopAIOrchestrator,
   defaultIdentity,
   tauriRandomnessTemperatureSource,
+  npcTimelineService,
 );
 
 export class NpcDialogueServiceError extends Error {
-  public constructor(public readonly code: string) {
-    super('NPC dialogue operation failed');
+  public constructor(
+    public readonly code: string,
+    options?: ErrorOptions,
+  ) {
+    super('NPC dialogue operation failed', options);
     this.name = 'NpcDialogueServiceError';
   }
 }
@@ -222,6 +339,7 @@ function parseSnapshot(
     messages: Object.freeze(requireArray(record['messages']).map(parseMessage)),
     suggestedTopics: Object.freeze(requireArray(record['suggestedTopics']).map(requireText)),
     generationContext: Object.freeze({ ...requireRecord(record['generationContext']) }),
+    timeline: null,
   });
 }
 

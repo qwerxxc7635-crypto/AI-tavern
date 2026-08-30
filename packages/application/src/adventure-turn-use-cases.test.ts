@@ -47,6 +47,7 @@ import {
   PendingAiRequestRepository,
   PlayerCharacterRepository,
   QuestRepository,
+  QuestPoolRepository,
   SnapshotRepository,
   TavernRepository,
   WorldRepository,
@@ -232,6 +233,11 @@ describe('AdventureTurnUseCases', () => {
       expect(restored.resolvedAt).toBe(at);
       expect(new AdventureRepository(sqlite).getTurn(incompleteTurnId)).toBeNull();
       expect(new AdventureRepository(sqlite).get(adventureKey)?.currentTurnNumber).toBe(2);
+      expect(new QuestPoolRepository(sqlite).get(questKey)).toMatchObject({
+        status: 'ACTIVE',
+        revision: 1,
+      });
+      expect(new QuestPoolRepository(sqlite).transitions(questKey)).toHaveLength(1);
 
       const requests = new PendingAiRequestRepository(sqlite);
       const historicalFailureId = aiRequestId('request:historical-failure');

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-29T20:05:47+08:00",
+  "verdict": "BLOCKED_EXTERNAL",
+  "baselineCommit": "00fc1adb2d3ffc9c290d52a108b122e080c074f6",
+  "implementationCommit": "1c5f164951ca4671393784beb16dcabfb43ba427",
+  "branch": "fix/v0.3-rc-playtest-issues",
+  "findings": [
+    { "id": "RC-PLAYTEST-001", "severity": "P1", "status": "BLOCKED_EXTERNAL" },
+    { "id": "RC-PLAYTEST-002", "severity": "P1", "status": "FIXED" },
+    { "id": "RC-PLAYTEST-003", "severity": "P1", "status": "BLOCKED_EXTERNAL" }
+  ],
+  "realProvider": "THREE_AUTHORIZED_ISOLATED_RUNS_TIMEOUT_BEFORE_COMPLETE_RESPONSE",
+  "publicRelease": "NOT_AUTHORIZED_NOT_CLAIMED",
+  "checksums": "SHA256SUMS"
+}

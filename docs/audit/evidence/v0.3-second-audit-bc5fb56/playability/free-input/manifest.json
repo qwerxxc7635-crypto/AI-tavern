@@ -1,0 +1,25 @@
+{
+  "format": "EMBER_FREE_INPUT_STRESS_RUN",
+  "formatVersion": 1,
+  "runId": "free-input",
+  "sourceCommit": "bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+  "dataOrigin": "SYNTHETIC_M11",
+  "scriptSha256": "b124b3e669fced08ec417fc97ffa59bc9e0bd2d2193592db9378cdd5dabbdba1",
+  "baseRuns": [
+    {
+      "world": "fantasy",
+      "sourceDatabase": "docs/audit/evidence/v0.3-playability/m11-t02-fantasy-e8f3a3c/fantasy/campaign.sqlite3",
+      "sourceSha256": "5b7fb335d07900db374f4cd09231ac8b76265219eebebbd8aefff359e8303ab0"
+    },
+    {
+      "world": "investigation",
+      "sourceDatabase": "docs/audit/evidence/v0.3-playability/m11-t03-investigation-0779808/investigation/campaign.sqlite3",
+      "sourceSha256": "6ef8ba1aa3c4b7a970afcb96bfbb787171336067cd346c916054e317d3849c28"
+    },
+    {
+      "world": "cyberpunk",
+      "sourceDatabase": "docs/audit/evidence/v0.3-playability/m11-t04-cyberpunk-d42bae2/cyberpunk/campaign.sqlite3",
+      "sourceSha256": "d61a103587d217612dc045cc14fd306d6da45f5ba23867d345921dcf52d8477f"
+    }
+  ]
+}

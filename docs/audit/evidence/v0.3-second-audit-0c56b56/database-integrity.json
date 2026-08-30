@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T09:28:57Z",
+  "sourceCommit": "0c56b56f174e07ffcfe01a7d4b52ff741273c88c",
+  "status": "PASS",
+  "databaseCount": 6,
+  "checks": {
+    "integrityCheckExpected": "ok",
+    "foreignKeyViolationCountExpected": 0,
+    "unfinishedRequestCountExpected": 0
+  },
+  "databases": [
+    { "path": "playability/fantasy/fantasy/campaign.sqlite3", "integrityCheck": "ok", "foreignKeyViolationCount": 0, "unfinishedRequestCount": 0 },
+    { "path": "playability/investigation/investigation/campaign.sqlite3", "integrityCheck": "ok", "foreignKeyViolationCount": 0, "unfinishedRequestCount": 0 },
+    { "path": "playability/cyberpunk/cyberpunk/campaign.sqlite3", "integrityCheck": "ok", "foreignKeyViolationCount": 0, "unfinishedRequestCount": 0 },
+    { "path": "playability/free-input/fantasy/campaign.sqlite3", "integrityCheck": "ok", "foreignKeyViolationCount": 0, "unfinishedRequestCount": 0 },
+    { "path": "playability/free-input/investigation/campaign.sqlite3", "integrityCheck": "ok", "foreignKeyViolationCount": 0, "unfinishedRequestCount": 0 },
+    { "path": "playability/free-input/cyberpunk/campaign.sqlite3", "integrityCheck": "ok", "foreignKeyViolationCount": 0, "unfinishedRequestCount": 0 }
+  ]
+}

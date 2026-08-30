@@ -68,11 +68,20 @@ export interface AdventureSnapshot {
     readonly id: string;
     readonly publisherNpcId: string;
     readonly relatedNpcIds: readonly string[];
+    readonly risk: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
+    readonly rewardTier: 'BASIC' | 'NOTABLE' | 'RARE' | 'LEGENDARY';
+    readonly recommendedAttributes: readonly Attribute[];
     readonly content: {
       readonly title: string;
       readonly objective: string;
       readonly summary: string;
     };
+  };
+  readonly equipmentContext: {
+    readonly constitutionRevision: number;
+    readonly equipmentRules: string;
+    readonly technology: string;
+    readonly economy: string;
   };
   readonly clocks: readonly {
     readonly id: string;
@@ -433,6 +442,7 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
   const attributes = requireRecord(player['attributes']);
   const quest = requireRecord(record['quest']);
   const content = requireRecord(quest['content']);
+  const equipmentContext = requireRecord(record['equipmentContext']);
   const currentScene = requireText(record['currentScene']);
   const sceneFrame =
     record['sceneFrame'] === null ? null : SceneFrameSchema.parse(record['sceneFrame']);
@@ -462,11 +472,27 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): AdventureSna
       id: requireText(quest['id']),
       publisherNpcId: requireText(quest['publisherNpcId']),
       relatedNpcIds: Object.freeze(requireArray(quest['relatedNpcIds']).map(requireText)),
+      risk: enumValue(['LOW', 'MODERATE', 'HIGH', 'EXTREME'] as const, quest['risk']),
+      rewardTier: enumValue(
+        ['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY'] as const,
+        quest['rewardTier'],
+      ),
+      recommendedAttributes: Object.freeze(
+        requireArray(quest['recommendedAttributes']).map((value) =>
+          enumValue(['physique', 'agility', 'knowledge', 'charisma'] as const, value),
+        ),
+      ),
       content: Object.freeze({
         title: requireText(content['title']),
         objective: requireText(content['objective']),
         summary: requireText(content['summary']),
       }),
+    }),
+    equipmentContext: Object.freeze({
+      constitutionRevision: positiveInteger(equipmentContext['constitutionRevision']),
+      equipmentRules: requireText(equipmentContext['equipmentRules']),
+      technology: requireText(equipmentContext['technology']),
+      economy: requireText(equipmentContext['economy']),
     }),
     clocks: Object.freeze(requireArray(record['clocks']).map(parseClock)),
     items: Object.freeze(requireArray(record['items']).map(parseItem)),

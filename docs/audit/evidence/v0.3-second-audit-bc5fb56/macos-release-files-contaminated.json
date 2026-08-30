@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-28T09:14:54.641Z",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "root": "target/release/bundle/macos",
+  "files": [
+    {
+      "path": "target/release/bundle/macos/Ember Tavern Audit.app/Contents/Info.plist",
+      "bytes": 1106,
+      "sha256": "886342606c9e778363f45b41d8882ecc7c1f10f788f9ba0105a95113e3687ec3"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern Audit.app/Contents/MacOS/ember-tavern-windows",
+      "bytes": 21805824,
+      "sha256": "71042ede4c23399dd5a121e5250acb786c8d425e911026fb74e63109664306f2"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern Audit.app/Contents/Resources/icon.icns",
+      "bytes": 63344,
+      "sha256": "a3352d50b1dccc806fd0d3ef66ee270f14dff2cf85232fcf1cda8f7a128a53da"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern.app/Contents/Info.plist",
+      "bytes": 1084,
+      "sha256": "656d04295f98aaa52d3a126d6a0e202c5cc0403ba3a37bca492285270b498a1d"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern.app/Contents/MacOS/ember-tavern-windows",
+      "bytes": 25984288,
+      "sha256": "a1036c9e20d00fd08ba7fea24eed2282b89fcbd128f086aeadc6a99c1fbac8dd"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern.app/Contents/Resources/icon.icns",
+      "bytes": 63344,
+      "sha256": "a3352d50b1dccc806fd0d3ef66ee270f14dff2cf85232fcf1cda8f7a128a53da"
+    }
+  ]
+}

@@ -1,0 +1,221 @@
+{
+  "schemaVersion": 1,
+  "dataOrigin": "SYNTHETIC_M11",
+  "key": "fantasy",
+  "campaignId": "playtest-m11-fantasy",
+  "displayName": "灰烬潮下的烛湾",
+  "constitution": {
+    "worldType": "低魔黑暗奇幻港邦",
+    "era": "行会与封建领主并存的晚期中世纪",
+    "technology": "水车、帆船、锻钢与稀有炼金术",
+    "magic": "魔法依赖契约、材料与代价，不能凭空改写既成事实",
+    "peoples": [
+      "沿岸人类",
+      "盐沼矮裔",
+      "迁徙林民"
+    ],
+    "society": "行会、领主与神殿共享脆弱秩序",
+    "politics": "港务议会与巡钟团争夺潮汐税和夜间通行权",
+    "economy": "银币、货契和实物债务并行，普通物资价格稳定",
+    "combatScale": "个人与小队冲突，伤势和补给持续生效",
+    "deathRules": "死亡永久；濒死必须由明确规则和资源处理",
+    "careerRules": "职业来自行会、神殿、领主或边地生计，并带社会义务",
+    "equipmentRules": "钢铁、皮革、炼金消耗品和有代价的符文器具",
+    "npcRules": "NPC 只知道亲历、被告知或合理推断的事实，并保有私人目标",
+    "traitRules": "超常优势必须绑定可触发的代价或限制",
+    "taboos": [
+      "无代价复活",
+      "无限资源",
+      "现代火器"
+    ]
+  },
+  "careers": [
+    {
+      "id": "ash-watch",
+      "name": "灰烬守夜人",
+      "role": "巡守潮门与夜钟",
+      "skills": [
+        "警戒",
+        "长柄武器"
+      ],
+      "equipmentTags": [
+        "守夜",
+        "重甲"
+      ],
+      "socialPosition": "受巡钟团约束"
+    },
+    {
+      "id": "mist-scrivener",
+      "name": "雾钟抄契人",
+      "role": "抄录并仲裁港邦契约",
+      "skills": [
+        "古文书",
+        "谈判"
+      ],
+      "equipmentTags": [
+        "文书",
+        "灯具"
+      ],
+      "socialPosition": "行会认可的自由人"
+    },
+    {
+      "id": "marsh-guide",
+      "name": "盐沼引路者",
+      "role": "带队穿越潮沼与旧堤",
+      "skills": [
+        "追踪",
+        "野外生存"
+      ],
+      "equipmentTags": [
+        "绳索",
+        "轻装"
+      ],
+      "socialPosition": "边地居民与港商之间的中介"
+    }
+  ],
+  "equipment": [
+    {
+      "id": "chipped-silver-lantern",
+      "name": "缺口银灯",
+      "category": "TOOL",
+      "description": "能显出特定封蜡纹路的旧灯。",
+      "ruleHook": "知识检定涉及封蜡时提供有界修正"
+    },
+    {
+      "id": "thorn-weave-cloak",
+      "name": "荆纹短披风",
+      "category": "ARMOR",
+      "description": "行会猎手使用的轻便披风。",
+      "ruleHook": "只在已装备时影响一次物理防护"
+    },
+    {
+      "id": "tide-ledger-fragment",
+      "name": "潮汐账册残页",
+      "category": "CLUE",
+      "description": "记载旧盐门夜间货运的烧焦残页。",
+      "ruleHook": "作为任务证据，不提供伤害数值"
+    }
+  ],
+  "traits": [
+    {
+      "id": "trait-playtest-ember-hearing",
+      "name": "余烬听觉",
+      "description": "能从火焰细响中察觉异常，但持续噪声会使判断迟疑。",
+      "pointProfile": {
+        "type": "MIXED",
+        "positiveEffect": "余烬听觉的明确优势",
+        "negativeEffect": "余烬听觉的明确代价",
+        "buffPoints": -1,
+        "debuffPoints": 1
+      }
+    },
+    {
+      "id": "trait-playtest-oath-debt",
+      "name": "誓债在身",
+      "description": "面对公开承诺时更坚定，也更难撤回已经说出口的选择。",
+      "pointProfile": {
+        "type": "NARRATIVE",
+        "positiveEffect": null,
+        "negativeEffect": null,
+        "buffPoints": 0,
+        "debuffPoints": 0
+      }
+    }
+  ],
+  "npcs": [
+    {
+      "id": "mara",
+      "name": "玛菈",
+      "identity": "断梁酒馆掌柜",
+      "personality": "克制、观察细致",
+      "goal": "保住酒馆和住客",
+      "hiddenMotive": "她保存着失火前的半本账册",
+      "knowledgeBoundary": "不知道巡钟团内部命令"
+    },
+    {
+      "id": "alder",
+      "name": "奥尔德",
+      "identity": "疲惫的巡钟人",
+      "personality": "守规矩但容易自责",
+      "goal": "证明自己没有漏报潮钟",
+      "hiddenMotive": "他替同伴改过一次点灯时间",
+      "knowledgeBoundary": "不知道玛菈藏匿账册"
+    },
+    {
+      "id": "vesh",
+      "name": "维什",
+      "identity": "往返盐沼的旧物商",
+      "personality": "热情、精于估价",
+      "goal": "取得旧盐门的独家通行权",
+      "hiddenMotive": "他散布过一条夸大的灰潮传闻",
+      "knowledgeBoundary": "不知道账册封蜡来源"
+    }
+  ],
+  "quests": [
+    {
+      "id": "burned-tide-ledger",
+      "title": "找回失火的潮汐账册",
+      "objective": "取得账册并确认封蜡来源",
+      "failureCost": "港务议会将关闭旧盐门",
+      "risk": "MODERATE",
+      "publisherNpcId": "mara"
+    },
+    {
+      "id": "nameless-bell-oath",
+      "title": "钟塔下的无名誓约",
+      "objective": "查明谁在无名钟上刻下新誓文",
+      "failureCost": "巡钟团内部关系恶化",
+      "risk": "HIGH",
+      "publisherNpcId": "alder"
+    },
+    {
+      "id": "marsh-lanterns",
+      "title": "盐沼里熄灭的三盏灯",
+      "objective": "恢复三处安全引路灯",
+      "failureCost": "商路延误并抬高补给价格",
+      "risk": "LOW",
+      "publisherNpcId": "vesh"
+    }
+  ],
+  "extension": {
+    "namespace": "fantasy-oathcraft",
+    "displayName": "誓约与潮汐",
+    "fields": [
+      {
+        "key": "oathDebt",
+        "label": "誓债",
+        "required": true,
+        "type": "INTEGER",
+        "minimum": 0,
+        "maximum": 10
+      },
+      {
+        "key": "guildStanding",
+        "label": "行会立场",
+        "required": true,
+        "type": "ENUM",
+        "options": [
+          "疏远",
+          "中立",
+          "认可",
+          "信赖"
+        ]
+      },
+      {
+        "key": "knownRunes",
+        "label": "已识符文",
+        "required": true,
+        "type": "TEXT_LIST",
+        "maxItems": 8,
+        "itemMaxLength": 40
+      }
+    ],
+    "initialValues": {
+      "oathDebt": 1,
+      "guildStanding": "中立",
+      "knownRunes": [
+        "潮门印"
+      ]
+    }
+  }
+}

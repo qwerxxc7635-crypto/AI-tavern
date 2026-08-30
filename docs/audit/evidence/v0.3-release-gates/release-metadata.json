@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "pnpm",
+    "release:metadata"
+  ],
+  "startedAt": "2026-08-28T02:10:56.817Z",
+  "endedAt": "2026-08-28T02:10:58.431Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "{\n  \"productName\": \"Ember Tavern\",\n  \"version\": \"0.3.0\",\n  \"channel\": \"development\",\n  \"status\": \"unreleased\",\n  \"gitCommit\": \"a77eb03530ab2f90e635a18b513994b1b4dca1af\",\n  \"platform\": \"darwin\",\n  \"arch\": \"arm64\"\n}\n",
+  "stderr": "$ node scripts/release-metadata.mjs\n"
+}

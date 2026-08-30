@@ -1,0 +1,50 @@
+[
+  {
+    "code": "AUTHENTICATION_FAILED",
+    "kind": "PROVIDER",
+    "retryable": false,
+    "fallbackEligible": false,
+    "surface": "ERROR_STATE",
+    "actions": ["OPEN_SETTINGS"]
+  },
+  {
+    "code": "PROVIDER_IDENTITY_MISMATCH",
+    "kind": "GENERATION",
+    "retryable": false,
+    "fallbackEligible": false,
+    "surface": "ERROR_STATE",
+    "actions": ["DISMISS"]
+  },
+  {
+    "code": "INVALID_OUTPUT",
+    "kind": "VALIDATION",
+    "retryable": true,
+    "fallbackEligible": false,
+    "surface": "ERROR_STATE",
+    "actions": ["RETRY", "CANCEL"]
+  },
+  {
+    "code": "LOCAL_STORAGE_UNAVAILABLE",
+    "kind": "PERSISTENCE",
+    "retryable": true,
+    "fallbackEligible": false,
+    "surface": "ERROR_STATE",
+    "actions": ["RETRY", "CANCEL"]
+  },
+  {
+    "code": "WORLD_BUSINESS_RULE_INVALID",
+    "kind": "RULE",
+    "retryable": false,
+    "fallbackEligible": false,
+    "surface": "ERROR_STATE",
+    "actions": ["DISMISS"]
+  },
+  {
+    "code": "NETWORK_FAILED",
+    "kind": "NETWORK",
+    "retryable": true,
+    "fallbackEligible": true,
+    "surface": "TOAST",
+    "actions": ["RETRY", "CANCEL", "USE_FALLBACK"]
+  }
+]

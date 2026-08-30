@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "artifact": "target/release/bundle/macos/Ember Tavern.app",
+  "bundle": {
+    "displayName": "Ember Tavern",
+    "identifier": "com.embertavern.windows",
+    "executable": "ember-tavern-windows",
+    "shortVersion": "0.3.0",
+    "bundleVersion": "0.3.0"
+  },
+  "files": [
+    {
+      "path": "Contents/Info.plist",
+      "bytes": 1084,
+      "sha256": "656d04295f98aaa52d3a126d6a0e202c5cc0403ba3a37bca492285270b498a1d"
+    },
+    {
+      "path": "Contents/MacOS/ember-tavern-windows",
+      "bytes": 25983936,
+      "sha256": "523df5ad9ba83285f2671ee56d36b87e96fdf68bd8c98df5d56bec9619462e59"
+    },
+    {
+      "path": "Contents/Resources/icon.icns",
+      "bytes": 63344,
+      "sha256": "a3352d50b1dccc806fd0d3ef66ee270f14dff2cf85232fcf1cda8f7a128a53da"
+    }
+  ],
+  "systemWebKitLinked": true,
+  "codesign": "adhoc linker-signed; no public-release identity claimed"
+}

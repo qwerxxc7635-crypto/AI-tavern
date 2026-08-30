@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T09:28:57Z",
+  "sourceCommit": "0c56b56f174e07ffcfe01a7d4b52ff741273c88c",
+  "status": "PASS",
+  "browser": "GStack Chromium",
+  "routeScreenshotCount": 13,
+  "matrixScreenshotCount": 3,
+  "allScreenshotsManuallyInspected": true,
+  "consoleErrorCount": 0,
+  "viewports": [
+    { "width": 860, "height": 600, "route": "/settings", "documentOverflowX": 0, "bodyOverflowX": 0 },
+    { "width": 1366, "height": 768, "route": "/saves", "documentOverflowX": 0, "bodyOverflowX": 0 },
+    { "width": 1920, "height": 1080, "route": "/unknown", "documentOverflowX": 0, "bodyOverflowX": 0 }
+  ],
+  "keyboard": {
+    "firstTabTag": "A",
+    "firstTabText": "跳到主要内容",
+    "firstTabHref": "#app-main",
+    "status": "PASS"
+  },
+  "nativeBridgeBoundary": "The Vite browser session intentionally lacks the Tauri bridge. Native-data routes showed the designed unavailable/error fallback; production native behavior is covered by Rust/TypeScript tests, desktop build, and deterministic playtests."
+}

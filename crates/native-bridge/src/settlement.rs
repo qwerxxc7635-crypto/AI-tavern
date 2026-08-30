@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    quest_pool::transition_quest_pool_in_transaction, validate_id,
 };
 
 #[derive(Debug, Deserialize)]
@@ -16,6 +17,7 @@ pub struct AdventureSettlementCommit {
     pub outcome: String,
     pub summary: TavernGenerationAudit,
     pub world_event: TavernGenerationAudit,
+    pub equipment: TavernGenerationAudit,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -88,6 +90,47 @@ struct ClockAdvance {
     reason: String,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EquipmentOutput {
+    schema_version: i64,
+    items: Vec<EquipmentCandidate>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EquipmentCandidate {
+    id: String,
+    name: String,
+    description: String,
+    category: String,
+    appearance: String,
+    history: String,
+    origin: String,
+    narrative_abilities: Vec<String>,
+    semantic_effects: Vec<String>,
+    balance_tags: Vec<String>,
+    bindings: Vec<EquipmentBinding>,
+    constitution_evidence: EquipmentEvidence,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EquipmentBinding {
+    kind: String,
+    target_id: String,
+    trigger: String,
+    summary: String,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct EquipmentEvidence {
+    equipment_rules: String,
+    technology: String,
+    economy: String,
+}
+
 impl CampaignStore {
     pub fn list_adventure_archives(
         &self,
@@ -127,8 +170,12 @@ impl CampaignStore {
         let world: WorldEventOutput =
             serde_json::from_value(command.world_event.validated_output.clone())
                 .map_err(|_| CampaignStoreError::InvalidData)?;
+        let equipment: EquipmentOutput =
+            serde_json::from_value(command.equipment.validated_output.clone())
+                .map_err(|_| CampaignStoreError::InvalidData)?;
         validate_audit(&command.summary, "SUMMARIZE_ADVENTURE")?;
         validate_audit(&command.world_event, "GENERATE_WORLD_EVENT")?;
+        validate_audit(&command.equipment, "GENERATE_ITEMS")?;
         if command
             .summary
             .context
@@ -137,6 +184,12 @@ impl CampaignStore {
             != Some(command.adventure_id.as_str())
             || command
                 .world_event
+                .context
+                .get("adventureId")
+                .and_then(Value::as_str)
+                != Some(command.adventure_id.as_str())
+            || command
+                .equipment
                 .context
                 .get("adventureId")
                 .and_then(Value::as_str)
@@ -168,7 +221,7 @@ impl CampaignStore {
             return Err(CampaignStoreError::NotFound);
         }
         let at = current_timestamp()?;
-        let (quest_id, publisher_id, reward_tier): (String, String, String) = tx.query_row("SELECT q.id,q.publisher_npc_id,q.reward_tier FROM quests q JOIN adventures a ON a.quest_id=q.id WHERE a.id=?1 AND q.campaign_id=?2 AND q.status='ACTIVE'", params![command.adventure_id, command.campaign_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?))).map_err(|_| CampaignStoreError::InvalidState)?;
+        let (quest_id, publisher_id, risk, reward_tier, recommended_attributes, related_npcs): (String, String, String, String, String, String) = tx.query_row("SELECT q.id,q.publisher_npc_id,q.risk,q.reward_tier,q.recommended_attributes_json,q.related_npc_ids_json FROM quests q JOIN adventures a ON a.quest_id=q.id JOIN quest_pool_states qp ON qp.quest_id=q.id WHERE a.id=?1 AND q.campaign_id=?2 AND qp.status='ACTIVE'", params![command.adventure_id, command.campaign_id], |r| Ok((r.get(0)?,r.get(1)?,r.get(2)?,r.get(3)?,r.get(4)?,r.get(5)?))).map_err(|_| CampaignStoreError::InvalidState)?;
         let character_id: String = tx.query_row(
             "SELECT id FROM player_characters WHERE campaign_id=?1",
             [&command.campaign_id],
@@ -216,19 +269,52 @@ impl CampaignStore {
                 tavern_id
             ],
         )?;
-        tx.execute(
-            "UPDATE quests SET status='COMPLETED',updated_at=?1 WHERE id=?2",
-            params![at, quest_id],
+        transition_quest_pool_in_transaction(
+            &tx,
+            &command.campaign_id,
+            &quest_id,
+            None,
+            Some("ACTIVE"),
+            "COMPLETED",
+            "ADVENTURE",
+            "Adventure settlement completed the quest",
+            &format!("quest:settlement:{}", command.adventure_id),
+            &at,
         )?;
         let reward = reward_from(&summary.state_patch_proposals)?;
         let mut item_ids = Vec::new();
-        if let Some((name, description, tier)) = reward {
+        if let Some(tier) = reward {
             if tier != reward_tier {
                 return Err(CampaignStoreError::InvalidData);
             }
-            let id = format!("reward:{}", command.adventure_id);
-            tx.execute("INSERT INTO items(id,campaign_id,owner_character_id,source_adventure_id,content_json,reward_tier,effect_json,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![id,command.campaign_id,character_id,command.adventure_id,json!({"name":name,"description":description}).to_string(),tier,json!({"kind":"CHECK_MODIFIER","attribute":"knowledge","modifier":1}).to_string(),at])?;
-            item_ids.push(id);
+            let fact_ids = world
+                .new_facts
+                .iter()
+                .enumerate()
+                .map(|(index, _)| format!("settlement-fact:{}:{index}", command.adventure_id))
+                .collect::<Vec<_>>();
+            let related_npcs: Vec<String> =
+                serde_json::from_str(&related_npcs).map_err(|_| CampaignStoreError::InvalidData)?;
+            let primary_attribute = serde_json::from_str::<Vec<String>>(&recommended_attributes)
+                .map_err(|_| CampaignStoreError::InvalidData)?
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| "knowledge".to_owned());
+            let stored = build_semantic_equipment(
+                &tx,
+                &command,
+                equipment,
+                &quest_id,
+                &publisher_id,
+                &related_npcs,
+                &fact_ids,
+                &risk,
+                &reward_tier,
+                &primary_attribute,
+                &at,
+            )?;
+            tx.execute("INSERT INTO items(id,campaign_id,owner_character_id,source_adventure_id,content_json,reward_tier,effect_json,created_at) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",params![stored.id,command.campaign_id,character_id,command.adventure_id,stored.content.to_string(),reward_tier,stored.effect.to_string(),at])?;
+            item_ids.push(stored.id);
             insert_event(
                 &tx,
                 &command.campaign_id,
@@ -276,6 +362,13 @@ impl CampaignStore {
         insert_generation(
             &tx,
             &command.campaign_id,
+            "GENERATE_ITEMS",
+            &command.equipment,
+            &at,
+        )?;
+        insert_generation(
+            &tx,
+            &command.campaign_id,
             "GENERATE_WORLD_EVENT",
             &command.world_event,
             &at,
@@ -291,7 +384,7 @@ impl CampaignStore {
             .filter(|c| c.get("discoveredInTurnId").is_some_and(Value::is_null))
             .filter_map(|c| c.get("id").and_then(Value::as_str))
             .collect::<Vec<_>>();
-        let ending = json!({"adventureId":command.adventure_id,"outcome":command.outcome,"summary":summary.summary,"keyDecisions":summary.key_decisions,"unresolvedThreads":summary.unresolved_threads,"nextDirections":summary.next_directions,"unresolvedClueIds":unresolved_clue_ids,"participantNpcIds":[publisher_id],"acquiredItemIds":item_ids,"worldFactIds":fact_ids,"tavernChangeId":change_id,"summaryGenerationRecordId":command.summary.generation_record_id,"worldEventGenerationRecordId":command.world_event.generation_record_id,"completedAt":at});
+        let ending = json!({"adventureId":command.adventure_id,"outcome":command.outcome,"summary":summary.summary,"keyDecisions":summary.key_decisions,"unresolvedThreads":summary.unresolved_threads,"nextDirections":summary.next_directions,"unresolvedClueIds":unresolved_clue_ids,"participantNpcIds":[publisher_id],"acquiredItemIds":item_ids,"worldFactIds":fact_ids,"tavernChangeId":change_id,"summaryGenerationRecordId":command.summary.generation_record_id,"worldEventGenerationRecordId":command.world_event.generation_record_id,"equipmentGenerationRecordId":command.equipment.generation_record_id,"completedAt":at});
         tx.execute("UPDATE adventures SET state='SETTLED',ending_json=?1,updated_at=?2 WHERE id=?3 AND state='ENDING'",params![ending.to_string(),at,command.adventure_id])?;
         tx.execute("UPDATE campaigns SET state='TAVERN',resume_state=NULL,updated_at=?1 WHERE id=?2 AND state='ADVENTURE'",params![at,command.campaign_id])?;
         insert_event(
@@ -390,7 +483,7 @@ fn validate_world_event(world: &WorldEventOutput) -> Result<(), CampaignStoreErr
     }
     Ok(())
 }
-fn reward_from(p: &[Value]) -> Result<Option<(String, String, String)>, CampaignStoreError> {
+fn reward_from(p: &[Value]) -> Result<Option<String>, CampaignStoreError> {
     let Some(v) = p
         .iter()
         .find(|v| v.get("kind").and_then(Value::as_str) == Some("ITEM_REWARD"))
@@ -403,11 +496,366 @@ fn reward_from(p: &[Value]) -> Result<Option<(String, String, String)>, Campaign
             .map(str::to_owned)
             .ok_or(CampaignStoreError::InvalidData)
     };
-    Ok(Some((
-        get("name")?,
-        get("description")?,
-        get("rewardTier")?,
-    )))
+    get("name")?;
+    get("description")?;
+    get("questId")?;
+    Ok(Some(get("rewardTier")?))
+}
+
+struct StoredSemanticEquipment {
+    id: String,
+    content: Value,
+    effect: Value,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn build_semantic_equipment(
+    tx: &rusqlite::Transaction<'_>,
+    command: &AdventureSettlementCommit,
+    output: EquipmentOutput,
+    quest_id: &str,
+    publisher_id: &str,
+    related_npcs: &[String],
+    fact_ids: &[String],
+    risk: &str,
+    rarity: &str,
+    primary_attribute: &str,
+    at: &str,
+) -> Result<StoredSemanticEquipment, CampaignStoreError> {
+    if output.schema_version != 1 || output.items.len() != 1 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let input = command
+        .equipment
+        .input
+        .as_object()
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let source = input
+        .get("source")
+        .and_then(Value::as_object)
+        .ok_or(CampaignStoreError::InvalidData)?;
+    if input.get("schemaVersion").and_then(Value::as_i64) != Some(1)
+        || input.get("requestedCount").and_then(Value::as_i64) != Some(1)
+        || input.get("requestedRarity").and_then(Value::as_str) != Some(rarity)
+        || source.get("kind").and_then(Value::as_str) != Some("QUEST_REWARD")
+        || source.get("questId").and_then(Value::as_str) != Some(quest_id)
+        || source.get("adventureId").and_then(Value::as_str) != Some(command.adventure_id.as_str())
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let maximum = match risk {
+        "LOW" => "BASIC",
+        "MODERATE" => "NOTABLE",
+        "HIGH" => "RARE",
+        "EXTREME" => "LEGENDARY",
+        _ => return Err(CampaignStoreError::InvalidData),
+    };
+    if rarity_rank(rarity)? > rarity_rank(maximum)? {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let locked: Option<(i64, String, String, String)> = tx
+        .query_row(
+            "SELECT revision,equipment_rules,technology,economy FROM world_constitutions WHERE campaign_id=?1 AND status='LOCKED'",
+            [&command.campaign_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .optional()?;
+    let (revision, equipment_rules, technology, economy) = if let Some(locked) = locked {
+        locked
+    } else {
+        let technology: String = tx
+            .query_row(
+                "SELECT technology_level FROM world_bibles WHERE campaign_id=?1",
+                [&command.campaign_id],
+                |row| row.get(0),
+            )
+            .map_err(|_| CampaignStoreError::InvalidData)?;
+        (
+            1,
+            "Legacy portable archive: preserve existing item effects and validate new mechanics locally."
+                .to_owned(),
+            technology,
+            "Legacy portable archive economy is unspecified.".to_owned(),
+        )
+    };
+    let expected_evidence = json!({
+        "equipmentRules": equipment_rules,
+        "technology": technology,
+        "economy": economy,
+    });
+    if input.get("constitutionEvidence") != Some(&expected_evidence)
+        || input
+            .get("context")
+            .and_then(|value| value.get("worldId"))
+            .and_then(Value::as_str)
+            != Some(command.campaign_id.as_str())
+        || input
+            .get("context")
+            .and_then(|value| value.get("constitutionRevision"))
+            .and_then(Value::as_i64)
+            != Some(revision)
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let candidate = output
+        .items
+        .into_iter()
+        .next()
+        .ok_or(CampaignStoreError::InvalidData)?;
+    validate_id(&candidate.id)?;
+    for text in [
+        &candidate.name,
+        &candidate.description,
+        &candidate.appearance,
+        &candidate.history,
+        &candidate.origin,
+    ] {
+        validate_text(text)?;
+    }
+    if ![
+        "WEAPON",
+        "ARMOR",
+        "TOOL",
+        "CONSUMABLE",
+        "CLUE",
+        "TREASURE",
+        "OTHER",
+    ]
+    .contains(&candidate.category.as_str())
+        || candidate.balance_tags.is_empty()
+        || candidate.narrative_abilities.is_empty()
+        || candidate.semantic_effects.is_empty()
+        || candidate.narrative_abilities.len() > 24
+        || candidate.semantic_effects.len() > 24
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    candidate
+        .narrative_abilities
+        .iter()
+        .chain(&candidate.semantic_effects)
+        .chain(&candidate.balance_tags)
+        .try_for_each(|text| validate_text(text))?;
+    if candidate
+        .balance_tags
+        .iter()
+        .map(|tag| normalize_equipment_name(tag))
+        .collect::<HashSet<_>>()
+        .len()
+        != candidate.balance_tags.len()
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    if candidate.constitution_evidence.equipment_rules != expected_evidence["equipmentRules"]
+        || candidate.constitution_evidence.technology != expected_evidence["technology"]
+        || candidate.constitution_evidence.economy != expected_evidence["economy"]
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    validate_equipment_bindings(
+        input,
+        &candidate.bindings,
+        quest_id,
+        publisher_id,
+        related_npcs,
+        fact_ids,
+    )?;
+    let mut statement = tx.prepare("SELECT id,content_json FROM items WHERE campaign_id=?1")?;
+    let rows = statement.query_map([&command.campaign_id], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    let normalized_name = normalize_equipment_name(&candidate.name);
+    for row in rows {
+        let (id, raw) = row?;
+        let content: Value =
+            serde_json::from_str(&raw).map_err(|_| CampaignStoreError::InvalidData)?;
+        if id == candidate.id
+            || content
+                .get("name")
+                .and_then(Value::as_str)
+                .is_some_and(|name| normalize_equipment_name(name) == normalized_name)
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    let (price, damage, defense, effect, budget, cost) =
+        equipment_mechanics(&candidate.category, rarity, primary_attribute)?;
+    let rationale = std::iter::once(format!("rarity:{rarity}"))
+        .chain(std::iter::once(format!("category:{}", candidate.category)))
+        .chain(
+            candidate
+                .balance_tags
+                .iter()
+                .map(|tag| format!("semantic:{tag}")),
+        )
+        .collect::<Vec<_>>();
+    let semantic = json!({
+        "kind": "SEMANTIC_EQUIPMENT",
+        "schemaVersion": 1,
+        "id": candidate.id,
+        "campaignId": command.campaign_id,
+        "constitutionRevision": revision,
+        "content": {
+            "name": candidate.name,
+            "description": candidate.description,
+            "category": candidate.category,
+            "appearance": candidate.appearance,
+            "history": candidate.history,
+            "origin": candidate.origin,
+            "narrativeAbilities": candidate.narrative_abilities,
+            "semanticEffects": candidate.semantic_effects,
+        },
+        "mechanics": {
+            "rarity": rarity,
+            "price": price,
+            "damage": damage,
+            "defense": defense,
+            "numericEffect": effect,
+            "balance": {
+                "policyVersion": 1,
+                "budget": budget,
+                "cost": cost,
+                "rationale": rationale,
+            },
+        },
+        "bindings": candidate.bindings,
+        "constitutionEvidence": expected_evidence,
+        "source": {"kind":"QUEST_REWARD","questId":quest_id,"adventureId":command.adventure_id},
+        "generationRecordId": command.equipment.generation_record_id,
+        "createdAt": at,
+    });
+    Ok(StoredSemanticEquipment {
+        id: candidate.id,
+        content: json!({
+            "name": semantic["content"]["name"],
+            "description": semantic["content"]["description"],
+            "semanticEquipment": semantic,
+        }),
+        effect,
+    })
+}
+
+fn validate_equipment_bindings(
+    input: &serde_json::Map<String, Value>,
+    bindings: &[EquipmentBinding],
+    quest_id: &str,
+    publisher_id: &str,
+    related_npcs: &[String],
+    fact_ids: &[String],
+) -> Result<(), CampaignStoreError> {
+    let targets = input
+        .get("bindingTargets")
+        .and_then(Value::as_array)
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let mut has_quest = false;
+    let mut has_npc = false;
+    let mut unique = HashSet::new();
+    for binding in bindings {
+        validate_text(&binding.summary)?;
+        let declared = targets.iter().any(|target| {
+            target.get("kind").and_then(Value::as_str) == Some(binding.kind.as_str())
+                && target.get("targetId").and_then(Value::as_str)
+                    == Some(binding.target_id.as_str())
+                && target
+                    .get("allowedTriggers")
+                    .and_then(Value::as_array)
+                    .is_some_and(|values| values.iter().any(|value| value == &binding.trigger))
+        });
+        let valid = match binding.kind.as_str() {
+            "QUEST" => {
+                has_quest = true;
+                binding.target_id == quest_id && binding.trigger == "QUEST_CONTEXT"
+            }
+            "NPC" => {
+                has_npc = true;
+                (binding.target_id == publisher_id || related_npcs.contains(&binding.target_id))
+                    && ["NPC_RECOGNITION", "RELATIONSHIP_HOOK"].contains(&binding.trigger.as_str())
+            }
+            "WORLD_FACT" => {
+                fact_ids.contains(&binding.target_id) && binding.trigger == "FACT_EVIDENCE"
+            }
+            _ => false,
+        };
+        if !unique.insert(format!(
+            "{}:{}:{}",
+            binding.kind, binding.target_id, binding.trigger
+        )) || !declared
+            || !valid
+        {
+            return Err(CampaignStoreError::InvalidData);
+        }
+    }
+    if !has_quest || !has_npc {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(())
+}
+
+fn equipment_mechanics(
+    category: &str,
+    rarity: &str,
+    attribute: &str,
+) -> Result<(i64, i64, i64, Value, i64, i64), CampaignStoreError> {
+    if !["physique", "agility", "knowledge", "charisma"].contains(&attribute) {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let rank = rarity_rank(rarity)?;
+    let budget = [0, 2, 4, 7, 10][rank as usize];
+    let base_price = [0, 25, 100, 500, 2500][rank as usize];
+    let (factor, damage, defense, effect, cost) = match category {
+        "WEAPON" => (3, rank, 0, json!({"kind":"NONE"}), rank),
+        "ARMOR" => (4, 0, rank, json!({"kind":"NONE"}), rank),
+        "TOOL" => {
+            let modifier = (rank + 1) / 2;
+            (
+                2,
+                0,
+                0,
+                json!({"kind":"CHECK_MODIFIER","attribute":attribute,"modifier":modifier}),
+                modifier * 2,
+            )
+        }
+        "CONSUMABLE" => (
+            1,
+            0,
+            0,
+            json!({"kind":"CONSUMABLE_RECOVERY","resource":"STRESS","amount":rank * 4,"uses":1}),
+            rank,
+        ),
+        "CLUE" => (0, 0, 0, json!({"kind":"NONE"}), 0),
+        "TREASURE" => (5, 0, 0, json!({"kind":"NONE"}), 0),
+        "OTHER" => (1, 0, 0, json!({"kind":"NONE"}), 0),
+        _ => return Err(CampaignStoreError::InvalidData),
+    };
+    if cost > budget {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok((base_price * factor, damage, defense, effect, budget, cost))
+}
+
+fn rarity_rank(rarity: &str) -> Result<i64, CampaignStoreError> {
+    match rarity {
+        "BASIC" => Ok(1),
+        "NOTABLE" => Ok(2),
+        "RARE" => Ok(3),
+        "LEGENDARY" => Ok(4),
+        _ => Err(CampaignStoreError::InvalidData),
+    }
+}
+
+fn normalize_equipment_name(value: &str) -> String {
+    value
+        .chars()
+        .map(|character| match character as u32 {
+            0x3000 => ' ',
+            code @ 0xff01..=0xff5e => char::from_u32(code - 0xfee0).unwrap_or(character),
+            _ => character,
+        })
+        .collect::<String>()
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
 }
 fn insert_generation(
     tx: &rusqlite::Transaction<'_>,
@@ -574,7 +1022,11 @@ fn load_generation_uses(
     e: &Value,
 ) -> Result<Vec<Value>, CampaignStoreError> {
     let mut result = Vec::new();
-    for key in ["summaryGenerationRecordId", "worldEventGenerationRecordId"] {
+    for key in [
+        "summaryGenerationRecordId",
+        "worldEventGenerationRecordId",
+        "equipmentGenerationRecordId",
+    ] {
         let id = e
             .get(key)
             .and_then(Value::as_str)
@@ -618,6 +1070,7 @@ mod tests {
         let connection = store.connect().expect("connection");
         connection.execute_batch("BEGIN;
           INSERT INTO campaigns(id,schema_version,state,resume_state,created_at,updated_at) VALUES('campaign',1,'ADVENTURE',NULL,'2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z');
+          INSERT INTO world_constitutions VALUES('campaign',1,1,'LOCKED','Harbor','Late','Late medieval','Low','[]','Guilds','Councils','Fishing and coastal trade','Human','Ordinary','Guild work','Equipment follows local craft.','Grounded','Narrative','[]','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z');
           INSERT INTO player_characters VALUES('character','campaign','Mira',NULL,NULL,'Scout','[]','{}','SCHOLAR','Scholar','{\"physique\":0,\"agility\":0,\"knowledge\":1,\"charisma\":0}','[]','Learn','{}','[]','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z');
           INSERT INTO taverns VALUES('tavern','campaign','harbor','Hearth','Road','Warm','[]','Storm','owner','[]','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z');
           INSERT INTO npcs VALUES('owner','campaign','tavern','OWNER','Ilyra','Keeper','Tall','Steady','Help','None','Quiet','Worried','ACTIVE',NULL,'[]','2026-01-01T00:00:00.000Z','2026-01-01T00:00:00.000Z');
@@ -678,6 +1131,18 @@ mod tests {
                 .expect("items"),
             1
         );
+        let (content, effect): (String, String) = connection
+            .query_row("SELECT content_json,effect_json FROM items", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .expect("semantic item");
+        let content: Value = serde_json::from_str(&content).expect("content JSON");
+        let effect: Value = serde_json::from_str(&effect).expect("effect JSON");
+        assert_eq!(content["semanticEquipment"]["mechanics"]["damage"], 0);
+        assert_eq!(content["semanticEquipment"]["mechanics"]["price"], 200);
+        assert_eq!(effect["kind"], "CHECK_MODIFIER");
+        assert_eq!(effect["modifier"], 1);
+        assert_eq!(archive.generation_uses.len(), 3);
         assert_eq!(
             connection
                 .query_row(
@@ -700,7 +1165,7 @@ mod tests {
                 "summary-generation",
                 "summary-key",
                 "SUMMARIZE_ADVENTURE",
-                json!({"summary":"The beacon burns.","keyDecisions":["Stayed"],"unresolvedThreads":[],"nextDirections":["Rest"],"npcUpdates":[{"npcId":"owner","currentMood":"Relieved","relationshipPatch":{"trust":1}}],"tavernChange":{"kind":"TROPHY","description":"A lens hangs above the hearth."},"statePatchProposals":[{"kind":"QUEST","targetId":"model-symbol","rationale":"Done","payload":{"status":"COMPLETED"}},{"kind":"RELATIONSHIP","targetId":"owner","rationale":"Trusted","payload":{"trust":1}},{"kind":"ITEM_REWARD","targetId":null,"rationale":"Reward","payload":{"questId":"model-symbol","name":"Compass","description":"Stormglass","rewardTier":"NOTABLE"}}]}),
+                json!({"summary":"The beacon burns.","keyDecisions":["Stayed"],"unresolvedThreads":[],"nextDirections":["Rest"],"npcUpdates":[{"npcId":"owner","currentMood":"Relieved","relationshipPatch":{"trust":1}}],"tavernChange":{"kind":"TROPHY","description":"A lens hangs above the hearth."},"statePatchProposals":[{"kind":"QUEST","targetId":"quest","rationale":"Done","payload":{"status":"COMPLETED"}},{"kind":"RELATIONSHIP","targetId":"owner","rationale":"Trusted","payload":{"trust":1}},{"kind":"ITEM_REWARD","targetId":null,"rationale":"Reward","payload":{"questId":"quest","name":"Compass","description":"Stormglass","rewardTier":"NOTABLE"}}]}),
             ),
             world_event: audit(
                 "world-request",
@@ -709,7 +1174,51 @@ mod tests {
                 "GENERATE_WORLD_EVENT",
                 json!({"title":"Storm tide","description":"Road floods","newFacts":["The road is flooded."],"clockAdvances":[{"clockId":"clock","amount":1,"reason":"Storm"}]}),
             ),
+            equipment: equipment_audit(),
         }
+    }
+    fn equipment_audit() -> TavernGenerationAudit {
+        let mut audit = audit(
+            "equipment-request",
+            "equipment-generation",
+            "equipment-key",
+            "GENERATE_ITEMS",
+            json!({"schemaVersion":1,"items":[{
+                "id":"item-stormglass-compass",
+                "name":"Stormglass Compass",
+                "description":"Stories claim +99 damage, but this prose has no rules authority.",
+                "category":"TOOL",
+                "appearance":"A clouded glass compass.",
+                "history":"Carried by a lost route warden.",
+                "origin":"The lantern guild workshop.",
+                "narrativeAbilities":["Reveals faded route marks"],
+                "semanticEffects":["Recognized by route wardens"],
+                "balanceTags":["NON_COMBAT"],
+                "bindings":[
+                    {"kind":"QUEST","targetId":"quest","trigger":"QUEST_CONTEXT","summary":"Recovered during the beacon quest."},
+                    {"kind":"NPC","targetId":"owner","trigger":"NPC_RECOGNITION","summary":"The owner recognizes the guild mark."},
+                    {"kind":"WORLD_FACT","targetId":"settlement-fact:adventure:0","trigger":"FACT_EVIDENCE","summary":"The compass records the flooded road."}
+                ],
+                "constitutionEvidence":{"equipmentRules":"Equipment follows local craft.","technology":"Late medieval","economy":"Fishing and coastal trade"}
+            }]}),
+        );
+        audit.input = json!({
+            "schemaVersion":1,
+            "context":{"worldId":"campaign","constitutionRevision":1,"contextSummary":"Harbor"},
+            "purpose":"Quest reward",
+            "requestedCount":1,
+            "requestedRarity":"NOTABLE",
+            "source":{"kind":"QUEST_REWARD","questId":"quest","adventureId":"adventure"},
+            "bindingTargets":[
+                {"kind":"QUEST","targetId":"quest","allowedTriggers":["QUEST_CONTEXT"],"summary":"Quest"},
+                {"kind":"NPC","targetId":"owner","allowedTriggers":["NPC_RECOGNITION","RELATIONSHIP_HOOK"],"summary":"Owner"},
+                {"kind":"WORLD_FACT","targetId":"settlement-fact:adventure:0","allowedTriggers":["FACT_EVIDENCE"],"summary":"Fact"}
+            ],
+            "constitutionEvidence":{"equipmentRules":"Equipment follows local craft.","technology":"Late medieval","economy":"Fishing and coastal trade"},
+            "existingItemIds":[],
+            "existingItemNames":[]
+        });
+        audit
     }
     fn audit(
         request: &str,

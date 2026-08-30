@@ -24,9 +24,11 @@ use super::{
 };
 
 const FORMAT_VERSION: u64 = 1;
-const DATABASE_SCHEMA_VERSION: u64 = 2;
+const DATABASE_SCHEMA_VERSION: u64 = 3;
 const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
-const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 8;
+const V2_DATABASE_SCHEMA_VERSION: u64 = 2;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 32;
+const WORLD_SCHEMA_VERSION: u64 = 1;
 const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
 const MAX_COMPRESSION_RATIO: u64 = 100;
@@ -60,7 +62,7 @@ const LEGACY_CAMPAIGN_TABLES: [&str; 14] = [
     "items",
     "world_clocks",
 ];
-const CAMPAIGN_TABLES: [&str; 15] = [
+const V2_CAMPAIGN_TABLES: [&str; 15] = [
     "world_bibles",
     "world_facts",
     "player_characters",
@@ -77,7 +79,78 @@ const CAMPAIGN_TABLES: [&str; 15] = [
     "items",
     "world_clocks",
 ];
-const INSERT_ORDER: [&str; 15] = CAMPAIGN_TABLES;
+const CAMPAIGN_TABLES: [&str; 69] = [
+    "world_bibles",
+    "world_facts",
+    "player_characters",
+    "taverns",
+    "npcs",
+    "npc_knowledge",
+    "npc_relationships",
+    "quests",
+    "adventures",
+    "scene_frames",
+    "adventure_turns",
+    "conversations",
+    "messages",
+    "items",
+    "world_clocks",
+    "world_constitutions",
+    "world_seeds",
+    "world_random_streams",
+    "character_rule_states",
+    "rules_events",
+    "world_truths",
+    "knowledge_claims",
+    "actor_knowledge",
+    "knowledge_memories",
+    "character_extension_definitions",
+    "universal_character_profiles",
+    "character_creation_sessions",
+    "career_pools",
+    "npc_lod_profiles",
+    "npc_lod_transitions",
+    "dynamic_locations",
+    "location_connections",
+    "campaign_location_states",
+    "location_travel_events",
+    "active_factions",
+    "faction_action_events",
+    "tavern_population_states",
+    "tavern_population_members",
+    "tavern_population_cycles",
+    "tavern_population_focus_events",
+    "tavern_scenes",
+    "tavern_scene_participants",
+    "tavern_scene_turns",
+    "tavern_scene_actor_proposals",
+    "npc_timeline_operations",
+    "npc_timeline_attempts",
+    "quest_pool_states",
+    "quest_pool_transitions",
+    "quest_graphs",
+    "quest_graph_edges",
+    "quest_graph_revisions",
+    "quest_graph_evaluations",
+    "quest_pool_creation_intents",
+    "dynamic_quest_sources",
+    "world_director_runs",
+    "world_director_proposals",
+    "director_budget_states",
+    "director_budget_admissions",
+    "director_budget_entries",
+    "director_budget_cooldowns",
+    "director_budget_decisions",
+    "historical_summaries",
+    "world_lore_entries",
+    "memory_artifact_sources",
+    "world_lore_retrieval_rules",
+    "lazy_world_generation_plans",
+    "lazy_world_generation_transitions",
+    "event_ledger",
+    "ai_candidates",
+];
+const INSERT_ORDER: [&str; 69] = CAMPAIGN_TABLES;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -91,6 +164,9 @@ pub enum CampaignArchiveImportMode {
 pub struct CampaignArchiveInspection {
     pub campaign_id: String,
     pub campaign_exists: bool,
+    pub save_schema_version: u64,
+    pub world_schema_version: u64,
+    pub migration_required: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -103,6 +179,7 @@ pub struct CampaignArchiveExportResult {
 #[derive(Debug)]
 struct ParsedArchive {
     campaign_id: String,
+    database_schema_version: u64,
     campaign: Map<String, Value>,
     tables: BTreeMap<String, Vec<Map<String, Value>>>,
     events: Vec<Map<String, Value>>,
@@ -128,6 +205,9 @@ impl CampaignStore {
         Ok(CampaignArchiveInspection {
             campaign_id: parsed.campaign_id,
             campaign_exists,
+            save_schema_version: DATABASE_SCHEMA_VERSION,
+            world_schema_version: WORLD_SCHEMA_VERSION,
+            migration_required: parsed.database_schema_version < DATABASE_SCHEMA_VERSION,
         })
     }
 
@@ -217,10 +297,23 @@ impl CampaignStore {
             transaction.execute("DELETE FROM campaigns WHERE id = ?1", [&parsed.campaign_id])?;
         }
         insert_row(&transaction, "campaigns", &parsed.campaign)?;
+        if parsed.database_schema_version == DATABASE_SCHEMA_VERSION {
+            prepare_portable_restore(&transaction, &parsed.campaign_id)?;
+        }
         for row in &parsed.generations {
             insert_row(&transaction, "generation_records", row)?;
         }
         for table in INSERT_ORDER {
+            if parsed.database_schema_version == DATABASE_SCHEMA_VERSION
+                && table == "world_constitutions"
+            {
+                clear_legacy_projections(&transaction, &parsed.campaign_id)?;
+            }
+            if table == "world_constitutions" {
+                for row in &parsed.events {
+                    insert_row(&transaction, "game_events", row)?;
+                }
+            }
             let rows = parsed
                 .tables
                 .get(table)
@@ -229,15 +322,15 @@ impl CampaignStore {
                 insert_row(&transaction, table, row)?;
             }
         }
-        for row in &parsed.events {
-            insert_row(&transaction, "game_events", row)?;
-        }
         assert_foreign_keys(&transaction)?;
         validate_imported_state(&transaction, &parsed)?;
         create_import_snapshot(&transaction, &parsed, &imported_at)?;
         assert_foreign_keys(&transaction)?;
         let campaign = load_campaign(&transaction, &parsed.campaign_id)?
             .ok_or(CampaignStoreError::ArchiveInvalid)?;
+        if parsed.database_schema_version == DATABASE_SCHEMA_VERSION {
+            finish_portable_restore(&transaction, &parsed.campaign_id)?;
+        }
         transaction.commit()?;
         Ok(campaign)
     }
@@ -365,38 +458,97 @@ impl CampaignStore {
     }
 }
 
+fn prepare_portable_restore(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+) -> Result<(), CampaignStoreError> {
+    transaction.execute(
+        "INSERT INTO quest_pool_restore_sessions (campaign_id) VALUES (?1)",
+        [campaign_id],
+    )?;
+    for table in [
+        "quest_graph_revisions",
+        "quest_graphs",
+        "universal_character_profiles",
+        "character_rule_states",
+        "npc_lod_profiles",
+    ] {
+        transaction.execute(
+            &format!(
+                "DELETE FROM {} WHERE campaign_id = ?1",
+                quote_identifier(table)
+            ),
+            [campaign_id],
+        )?;
+    }
+    Ok(())
+}
+
+fn finish_portable_restore(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+) -> Result<(), CampaignStoreError> {
+    transaction.execute(
+        "DELETE FROM quest_pool_restore_sessions WHERE campaign_id = ?1",
+        [campaign_id],
+    )?;
+    Ok(())
+}
+
+fn clear_legacy_projections(
+    transaction: &Transaction<'_>,
+    campaign_id: &str,
+) -> Result<(), CampaignStoreError> {
+    for table in [
+        "universal_character_profiles",
+        "character_rule_states",
+        "npc_lod_profiles",
+    ] {
+        transaction.execute(
+            &format!(
+                "DELETE FROM {} WHERE campaign_id = ?1",
+                quote_identifier(table)
+            ),
+            [campaign_id],
+        )?;
+    }
+    Ok(())
+}
+
 fn query_campaign_table(
     connection: &Connection,
     table: &str,
     campaign_id: &str,
 ) -> Result<Vec<Map<String, Value>>, CampaignStoreError> {
-    let sql = match table {
-        "world_bibles" => "SELECT * FROM world_bibles WHERE campaign_id = ?1 ORDER BY campaign_id",
-        "world_facts" => "SELECT * FROM world_facts WHERE campaign_id = ?1 ORDER BY id",
-        "player_characters" => "SELECT * FROM player_characters WHERE campaign_id = ?1 ORDER BY id",
-        "taverns" => "SELECT * FROM taverns WHERE campaign_id = ?1 ORDER BY id",
-        "npcs" => "SELECT * FROM npcs WHERE campaign_id = ?1 ORDER BY id",
-        "npc_knowledge" => {
-            "SELECT npc_knowledge.* FROM npc_knowledge JOIN npcs ON npcs.id = npc_knowledge.npc_id WHERE npcs.campaign_id = ?1 ORDER BY npc_knowledge.npc_id"
-        }
-        "npc_relationships" => {
-            "SELECT npc_relationships.* FROM npc_relationships JOIN npcs ON npcs.id = npc_relationships.npc_id WHERE npcs.campaign_id = ?1 ORDER BY npc_relationships.npc_id"
-        }
-        "quests" => "SELECT * FROM quests WHERE campaign_id = ?1 ORDER BY id",
-        "adventures" => "SELECT * FROM adventures WHERE campaign_id = ?1 ORDER BY id",
-        "scene_frames" => "SELECT * FROM scene_frames WHERE campaign_id = ?1 ORDER BY adventure_id",
-        "adventure_turns" => {
-            "SELECT adventure_turns.* FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id WHERE adventures.campaign_id = ?1 ORDER BY adventure_turns.adventure_id, adventure_turns.turn_number, adventure_turns.id"
-        }
-        "conversations" => "SELECT * FROM conversations WHERE campaign_id = ?1 ORDER BY id",
-        "messages" => {
-            "SELECT messages.* FROM messages JOIN conversations ON conversations.id = messages.conversation_id WHERE conversations.campaign_id = ?1 ORDER BY messages.conversation_id, messages.sequence_number, messages.id"
-        }
-        "items" => "SELECT * FROM items WHERE campaign_id = ?1 ORDER BY id",
-        "world_clocks" => "SELECT * FROM world_clocks WHERE campaign_id = ?1 ORDER BY id",
-        _ => return Err(CampaignStoreError::ArchiveInvalid),
+    let indirect_sql = match table {
+        "npc_knowledge" => Some(
+            "SELECT npc_knowledge.* FROM npc_knowledge JOIN npcs ON npcs.id = npc_knowledge.npc_id WHERE npcs.campaign_id = ?1 ORDER BY npc_knowledge.rowid",
+        ),
+        "npc_relationships" => Some(
+            "SELECT npc_relationships.* FROM npc_relationships JOIN npcs ON npcs.id = npc_relationships.npc_id WHERE npcs.campaign_id = ?1 ORDER BY npc_relationships.rowid",
+        ),
+        "adventure_turns" => Some(
+            "SELECT adventure_turns.* FROM adventure_turns JOIN adventures ON adventures.id = adventure_turns.adventure_id WHERE adventures.campaign_id = ?1 ORDER BY adventure_turns.rowid",
+        ),
+        "messages" => Some(
+            "SELECT messages.* FROM messages JOIN conversations ON conversations.id = messages.conversation_id WHERE conversations.campaign_id = ?1 ORDER BY messages.rowid",
+        ),
+        "npc_timeline_attempts" => Some(
+            "SELECT npc_timeline_attempts.* FROM npc_timeline_attempts JOIN npc_timeline_operations ON npc_timeline_operations.id = npc_timeline_attempts.operation_id WHERE npc_timeline_operations.campaign_id = ?1 ORDER BY npc_timeline_attempts.rowid",
+        ),
+        _ => None,
     };
-    query_rows(connection, table, sql, campaign_id)
+    if let Some(sql) = indirect_sql {
+        return query_rows(connection, table, sql, campaign_id);
+    }
+    if !CAMPAIGN_TABLES.contains(&table) {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    let sql = format!(
+        "SELECT * FROM {} WHERE campaign_id = ?1 ORDER BY rowid",
+        quote_identifier(table)
+    );
+    query_rows(connection, table, &sql, campaign_id)
 }
 
 fn query_one_row(
@@ -430,7 +582,16 @@ fn query_rows(
             let value = match row.get_ref(index)? {
                 ValueRef::Null => Value::Null,
                 ValueRef::Integer(value) => Value::Number(Number::from(value)),
-                ValueRef::Real(_) | ValueRef::Blob(_) => {
+                ValueRef::Real(value) => {
+                    Value::Number(Number::from_f64(value).ok_or_else(|| {
+                        rusqlite::Error::InvalidColumnType(
+                            index,
+                            column.clone(),
+                            rusqlite::types::Type::Real,
+                        )
+                    })?)
+                }
+                ValueRef::Blob(_) => {
                     return Err(rusqlite::Error::InvalidColumnType(
                         index,
                         column.clone(),
@@ -571,8 +732,17 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         .get("databaseSchemaVersion")
         .and_then(Value::as_u64)
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
-    if ![LEGACY_DATABASE_SCHEMA_VERSION, DATABASE_SCHEMA_VERSION].contains(&database_version) {
-        return Err(CampaignStoreError::IncompatibleSchema);
+    if database_version > DATABASE_SCHEMA_VERSION {
+        return Err(CampaignStoreError::ArchiveTooNew);
+    }
+    if ![
+        LEGACY_DATABASE_SCHEMA_VERSION,
+        V2_DATABASE_SCHEMA_VERSION,
+        DATABASE_SCHEMA_VERSION,
+    ]
+    .contains(&database_version)
+    {
+        return Err(CampaignStoreError::ArchiveInvalid);
     }
     let campaign_id = require_text(manifest.get("campaignId"))?.to_owned();
     validate_id(&campaign_id)?;
@@ -613,7 +783,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
             "records",
         ],
     )?;
-    let campaign = parse_stored_row(
+    let mut campaign = parse_stored_row(
         require_object(campaign_document.get("campaign"))?,
         "campaigns",
     )?;
@@ -627,11 +797,35 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
     {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
-    let table_root = require_object(campaign_document.get("tables"))?;
-    let archive_tables: &[&str] = if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
-        &LEGACY_CAMPAIGN_TABLES
+    if database_version == DATABASE_SCHEMA_VERSION {
+        if campaign.get("save_schema_version").and_then(Value::as_u64)
+            != Some(DATABASE_SCHEMA_VERSION)
+            || campaign.get("world_schema_version").and_then(Value::as_u64)
+                != Some(WORLD_SCHEMA_VERSION)
+        {
+            return Err(CampaignStoreError::ArchiveInvalid);
+        }
     } else {
-        &CAMPAIGN_TABLES
+        if campaign.contains_key("save_schema_version")
+            || campaign.contains_key("world_schema_version")
+        {
+            return Err(CampaignStoreError::ArchiveInvalid);
+        }
+        campaign.insert(
+            "save_schema_version".to_owned(),
+            Value::Number(Number::from(DATABASE_SCHEMA_VERSION)),
+        );
+        campaign.insert(
+            "world_schema_version".to_owned(),
+            Value::Number(Number::from(WORLD_SCHEMA_VERSION)),
+        );
+    }
+    let table_root = require_object(campaign_document.get("tables"))?;
+    let archive_tables: &[&str] = match database_version {
+        LEGACY_DATABASE_SCHEMA_VERSION => &LEGACY_CAMPAIGN_TABLES,
+        V2_DATABASE_SCHEMA_VERSION => &V2_CAMPAIGN_TABLES,
+        DATABASE_SCHEMA_VERSION => &CAMPAIGN_TABLES,
+        _ => return Err(CampaignStoreError::IncompatibleSchema),
     };
     require_exact_keys(table_root, archive_tables)?;
     let mut tables = BTreeMap::new();
@@ -662,8 +856,10 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         tables.insert(table.to_owned(), rows);
     }
     upgrade_legacy_rumor_rows(&mut tables)?;
-    if database_version == LEGACY_DATABASE_SCHEMA_VERSION {
-        tables.insert("scene_frames".to_owned(), Vec::new());
+    if database_version != DATABASE_SCHEMA_VERSION {
+        for table in CAMPAIGN_TABLES {
+            tables.entry(table.to_owned()).or_default();
+        }
     }
     let generation_values = require_array(generation_document.get("records"))?;
     validate_record_count(generation_values.len(), MAX_GENERATION_RECORDS)?;
@@ -694,6 +890,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
     validate_manifest_counts(&manifest, events.len(), generations.len())?;
     Ok(ParsedArchive {
         campaign_id,
+        database_schema_version: database_version,
         campaign,
         tables,
         events,
@@ -820,7 +1017,9 @@ fn parse_stored_row(
     let mut result = Map::new();
     for (column, value) in source {
         if !matches!(value, Value::Null | Value::String(_) | Value::Number(_))
-            || value.as_number().is_some_and(|number| !number.is_i64())
+            || value.as_number().is_some_and(|number| {
+                number.as_i64().is_none() && !number.as_f64().is_some_and(|value| value.is_finite())
+            })
         {
             return Err(CampaignStoreError::ArchiveInvalid);
         }
@@ -839,8 +1038,10 @@ fn parse_stored_row(
                 return Err(CampaignStoreError::ArchiveInvalid);
             }
         }
-        if !value.is_null() && (column == "id" || column.ends_with("_id")) {
-            validate_id(value.as_str().ok_or(CampaignStoreError::ArchiveInvalid)?)?;
+        if (column == "id" || column.ends_with("_id"))
+            && let Some(value) = value.as_str()
+        {
+            validate_id(value)?;
         }
         if !value.is_null() && column.ends_with("_at") {
             validate_timestamp(value.as_str().ok_or(CampaignStoreError::ArchiveInvalid)?)?;
@@ -1001,6 +1202,13 @@ fn validate_json_container(
     column: &str,
     value: &Value,
 ) -> Result<(), CampaignStoreError> {
+    if table != "campaigns"
+        && table != "generation_records"
+        && table != "game_events"
+        && !V2_CAMPAIGN_TABLES.contains(&table)
+    {
+        return Ok(());
+    }
     let object = matches!(
         (table, column),
         ("campaigns", "task_model_overrides_json")
@@ -1078,7 +1286,7 @@ fn assert_no_secret_keys(value: &Value) -> Result<(), CampaignStoreError> {
     Ok(())
 }
 
-fn assert_no_secret_text(text: &str) -> Result<(), CampaignStoreError> {
+pub(crate) fn assert_no_secret_text(text: &str) -> Result<(), CampaignStoreError> {
     if secret_patterns()
         .iter()
         .any(|pattern| pattern.is_match(text))
@@ -1111,70 +1319,71 @@ fn secret_patterns() -> &'static [Regex] {
 }
 
 fn is_json_column(table: &str, column: &str) -> bool {
-    matches!(
-        (table, column),
-        ("campaigns", "task_model_overrides_json")
-            | (
-                "world_bibles",
-                "power_rules_json"
-                    | "factions_json"
-                    | "locations_json"
-                    | "forbidden_elements_json"
-                    | "story_hooks_json"
-                    | "locked_fields_json"
-            )
-            | ("world_facts", "faction_ids_json" | "detail_json")
-            | (
-                "player_characters",
-                "story_preferences_json"
-                    | "content_boundaries_json"
-                    | "attributes_json"
-                    | "traits_json"
-                    | "background_json"
-                    | "initial_equipment_ids_json"
-            )
-            | ("taverns", "special_rules_json" | "changes_json")
-            | ("npcs", "visit_json" | "memories_json")
-            | (
-                "npc_knowledge",
-                "known_fact_ids_json"
-                    | "suspected_fact_ids_json"
-                    | "false_belief_fact_ids_json"
-                    | "excluded_secret_fact_ids_json"
-                    | "provenance_json"
-            )
-            | (
-                "quests",
-                "content_json"
-                    | "recommended_attributes_json"
-                    | "related_npc_ids_json"
-                    | "related_fact_ids_json"
-            )
-            | ("adventures", "plan_json" | "clues_json" | "ending_json")
-            | (
-                "scene_frames",
-                "participants_json"
-                    | "pressure_json"
-                    | "affordances_json"
-                    | "pending_consequences_json"
-                    | "return_point_json"
-            )
-            | (
-                "adventure_turns",
-                "speaker_npc_ids_json"
-                    | "suggested_actions_json"
-                    | "player_action_json"
-                    | "check_request_json"
-                    | "dice_result_json"
-            )
-            | ("items", "content_json" | "effect_json")
-            | ("world_clocks", "stages_json")
-            | ("game_events", "payload_json")
-            | (
-                "generation_records",
-                "request_json" | "validated_output_json" | "validation_error_json"
-            )
-    )
+    column.ends_with("_json")
+        || matches!(
+            (table, column),
+            ("campaigns", "task_model_overrides_json")
+                | (
+                    "world_bibles",
+                    "power_rules_json"
+                        | "factions_json"
+                        | "locations_json"
+                        | "forbidden_elements_json"
+                        | "story_hooks_json"
+                        | "locked_fields_json"
+                )
+                | ("world_facts", "faction_ids_json" | "detail_json")
+                | (
+                    "player_characters",
+                    "story_preferences_json"
+                        | "content_boundaries_json"
+                        | "attributes_json"
+                        | "traits_json"
+                        | "background_json"
+                        | "initial_equipment_ids_json"
+                )
+                | ("taverns", "special_rules_json" | "changes_json")
+                | ("npcs", "visit_json" | "memories_json")
+                | (
+                    "npc_knowledge",
+                    "known_fact_ids_json"
+                        | "suspected_fact_ids_json"
+                        | "false_belief_fact_ids_json"
+                        | "excluded_secret_fact_ids_json"
+                        | "provenance_json"
+                )
+                | (
+                    "quests",
+                    "content_json"
+                        | "recommended_attributes_json"
+                        | "related_npc_ids_json"
+                        | "related_fact_ids_json"
+                )
+                | ("adventures", "plan_json" | "clues_json" | "ending_json")
+                | (
+                    "scene_frames",
+                    "participants_json"
+                        | "pressure_json"
+                        | "affordances_json"
+                        | "pending_consequences_json"
+                        | "return_point_json"
+                )
+                | (
+                    "adventure_turns",
+                    "speaker_npc_ids_json"
+                        | "suggested_actions_json"
+                        | "player_action_json"
+                        | "check_request_json"
+                        | "dice_result_json"
+                )
+                | ("items", "content_json" | "effect_json")
+                | ("world_clocks", "stages_json")
+                | ("game_events", "payload_json")
+                | (
+                    "generation_records",
+                    "request_json" | "validated_output_json" | "validation_error_json"
+                )
+        )
 }
 
 fn insert_row(
@@ -1232,10 +1441,17 @@ fn json_to_sql(value: &Value) -> Result<SqlValue, CampaignStoreError> {
     match value {
         Value::Null => Ok(SqlValue::Null),
         Value::String(value) => Ok(SqlValue::Text(value.clone())),
-        Value::Number(value) => value
-            .as_i64()
-            .map(SqlValue::Integer)
-            .ok_or(CampaignStoreError::ArchiveInvalid),
+        Value::Number(value) => {
+            if let Some(value) = value.as_i64() {
+                Ok(SqlValue::Integer(value))
+            } else {
+                value
+                    .as_f64()
+                    .filter(|value| value.is_finite())
+                    .map(SqlValue::Real)
+                    .ok_or(CampaignStoreError::ArchiveInvalid)
+            }
+        }
         _ => Err(CampaignStoreError::ArchiveInvalid),
     }
 }
@@ -1248,6 +1464,18 @@ fn validate_imported_state(
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
     if campaign.id != parsed.campaign_id {
         return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    if parsed.database_schema_version == DATABASE_SCHEMA_VERSION {
+        for table in CAMPAIGN_TABLES {
+            let expected = parsed
+                .tables
+                .get(table)
+                .ok_or(CampaignStoreError::ArchiveInvalid)?;
+            let actual = query_campaign_table(transaction, table, &parsed.campaign_id)?;
+            if &actual != expected {
+                return Err(CampaignStoreError::ArchiveInvalid);
+            }
+        }
     }
     for (table, rows) in &parsed.tables {
         let expected = i64::try_from(rows.len()).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
@@ -1781,17 +2009,64 @@ mod tests {
     }
 
     #[test]
+    fn migrates_the_typescript_v2_fixture_without_rewriting_it() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let archive_path = directory.path().join("typescript-export-v2.emtavern");
+        let fixture = include_bytes!(
+            "../../../packages/persistence/test-fixtures/typescript-export-v2.emtavern"
+        );
+        fs::write(&archive_path, fixture).expect("write TypeScript v2 fixture");
+        let before = fs::read(&archive_path).expect("read source fixture");
+        let store =
+            CampaignStore::open(directory.path().join("v2-import.sqlite")).expect("open database");
+
+        assert_eq!(
+            store
+                .inspect_campaign_archive(&archive_path)
+                .expect("inspect v2 fixture"),
+            CampaignArchiveInspection {
+                campaign_id: "campaign-export".to_owned(),
+                campaign_exists: false,
+                save_schema_version: 3,
+                world_schema_version: 1,
+                migration_required: true,
+            }
+        );
+
+        let imported = store
+            .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
+            .expect("import v2 fixture");
+        assert_eq!(imported.id, "campaign-export");
+        assert_eq!(
+            fs::read(&archive_path).expect("reread source fixture"),
+            before
+        );
+        let connection = store.connect().expect("inspect migrated campaign");
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT save_schema_version,world_schema_version FROM campaigns
+                     WHERE id='campaign-export'",
+                    [],
+                    |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)),
+                )
+                .expect("portable schema versions"),
+            (3, 1)
+        );
+    }
+
+    #[test]
     fn current_archive_interop_gate_imports_typescript_and_emits_rust() {
         let fallback = tempfile::tempdir().unwrap();
         let typescript_archive = std::env::var_os("EMBER_TS_ARCHIVE_INPUT")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
                 Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../packages/persistence/test-fixtures/typescript-export-v2.emtavern")
+                    .join("../../packages/persistence/test-fixtures/typescript-export-v3.emtavern")
             });
         let rust_archive = std::env::var_os("EMBER_RUST_ARCHIVE_OUTPUT")
             .map(PathBuf::from)
-            .unwrap_or_else(|| fallback.path().join("rust-export-v2.emtavern"));
+            .unwrap_or_else(|| fallback.path().join("rust-export-v3.emtavern"));
         let work_directory = std::env::var_os("EMBER_ARCHIVE_INTEROP_WORK")
             .map(PathBuf::from)
             .unwrap_or_else(|| fallback.path().join("work"));
@@ -1850,6 +2125,26 @@ mod tests {
                 [FIRST_TIME],
             )
             .expect("seed fact");
+        let semantic_content = json!({
+            "name":"Archive Compass",
+            "description":"A portable semantic item.",
+            "semanticEquipment":{
+                "kind":"SEMANTIC_EQUIPMENT","schemaVersion":1,"id":"item-transfer",
+                "campaignId":"campaign-transfer","constitutionRevision":1,
+                "content":{"name":"Archive Compass","description":"A portable semantic item.","category":"CLUE","appearance":"Brass","history":"Old","origin":"Harbor","narrativeAbilities":["Identifies a route"],"semanticEffects":["Recognized by pilots"]},
+                "mechanics":{"rarity":"BASIC","price":0,"damage":0,"defense":0,"numericEffect":{"kind":"NONE"},"balance":{"policyVersion":1,"budget":2,"cost":0,"rationale":["rarity:BASIC","category:CLUE"]}},
+                "bindings":[{"kind":"QUEST","targetId":"quest-archive","trigger":"QUEST_CONTEXT","summary":"Archive fixture"}],
+                "constitutionEvidence":{"equipmentRules":"Grounded","technology":"Sail","economy":"Trade"},
+                "source":{"kind":"QUEST_REWARD","questId":"quest-archive","adventureId":"adventure-archive"},
+                "generationRecordId":"generation-archive","createdAt":FIRST_TIME
+            }
+        });
+        connection
+            .execute(
+                "INSERT INTO items(id,campaign_id,owner_character_id,source_adventure_id,content_json,reward_tier,effect_json,created_at) VALUES('item-transfer','campaign-transfer',NULL,NULL,?1,'BASIC','{\"kind\":\"NONE\"}',?2)",
+                params![semantic_content.to_string(), FIRST_TIME],
+            )
+            .expect("seed semantic item");
         connection
             .execute(
                 "INSERT INTO app_settings (key, value_json, updated_at)
@@ -1925,6 +2220,19 @@ mod tests {
                 .expect("snapshot count"),
             1
         );
+        let restored: String = connection
+            .query_row(
+                "SELECT content_json FROM items WHERE id='item-transfer'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("restored semantic item");
+        let restored: Value = serde_json::from_str(&restored).expect("semantic item JSON");
+        assert_eq!(
+            restored["semanticEquipment"]["content"]["name"],
+            "Archive Compass"
+        );
+        assert_eq!(restored["semanticEquipment"]["mechanics"]["damage"], 0);
     }
 
     #[test]
@@ -2031,6 +2339,70 @@ mod tests {
             store.list().expect("list campaigns")[0].state,
             "CREATING_WORLD"
         );
+    }
+
+    #[test]
+    fn future_archive_version_is_rejected_without_mutating_local_state() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let source_path = directory.path().join("source.sqlite");
+        let source = CampaignStore::open(&source_path).expect("open source");
+        source
+            .create_at(
+                "campaign-future-source".to_owned(),
+                "2026-08-01T13:00:00.000Z".to_owned(),
+            )
+            .expect("create source campaign");
+        let bytes = source
+            .capture_archive(
+                "campaign-future-source",
+                "2026-08-01T13:01:00.000Z",
+                "0.3.0",
+            )
+            .expect("capture archive");
+        let mut archive = ZipArchive::new(Cursor::new(bytes)).expect("open archive");
+        let mut files = BTreeMap::new();
+        for name in [
+            "manifest.json",
+            "campaign.json",
+            "events.ndjson",
+            "generations.json",
+        ] {
+            let mut bytes = Vec::new();
+            archive
+                .by_name(name)
+                .expect("archive entry")
+                .read_to_end(&mut bytes)
+                .expect("read archive entry");
+            if name != "events.ndjson" {
+                let mut document: Value = serde_json::from_slice(&bytes).expect("parse document");
+                document["databaseSchemaVersion"] = Value::Number(Number::from(99));
+                bytes = canonical_document_bytes(&document).expect("encode future document");
+            }
+            files.insert(name.to_owned(), bytes);
+        }
+        let checksum = json!({
+            "algorithm": "SHA-256",
+            "files": files.iter().map(|(name, bytes)| (name.clone(), Value::String(sha256(bytes)))).collect::<Map<_, _>>(),
+            "formatVersion": FORMAT_VERSION
+        });
+        files.insert(
+            "checksum.json".to_owned(),
+            canonical_document_bytes(&checksum).expect("encode checksum"),
+        );
+        let future_path = directory.path().join("future.emtavern");
+        fs::write(
+            &future_path,
+            encode_zip(&files).expect("encode future archive"),
+        )
+        .expect("write future archive");
+
+        let target =
+            CampaignStore::open(directory.path().join("target.sqlite")).expect("open target");
+        assert!(matches!(
+            target.inspect_campaign_archive(&future_path),
+            Err(CampaignStoreError::ArchiveTooNew)
+        ));
+        assert!(target.list().expect("list target").is_empty());
     }
 
     #[test]

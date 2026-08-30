@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "zsh",
+    "-lc",
+    "pnpm test:windows-e2e"
+  ],
+  "startedAt": "2026-08-28T09:21:21.302Z",
+  "endedAt": "2026-08-28T09:21:24.984Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\nrunning 1 test\ntest windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 100 filtered out; finished in 1.95s\n\n",
+  "stderr": "$ cargo test -p ember-native-bridge windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.83s\n     Running unittests src/lib.rs (target/debug/deps/ember_native_bridge-a0bf835ee91962e5)\n"
+}

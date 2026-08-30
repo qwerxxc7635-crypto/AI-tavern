@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "databases": 3,
+  "integrityCheck": "ok",
+  "foreignKeyViolations": 0,
+  "unfinishedRequests": 0,
+  "targetCareerPoolsPerDatabase": 1,
+  "targetCareersPerDatabase": 4,
+  "targetCareerGenerationRecordsPerDatabase": 1,
+  "partialCareerPools": 0,
+  "duplicateCareerPools": 0,
+  "duplicateGenerationRecords": 0,
+  "idempotentReplayStable": true,
+  "userDatabaseOpenedOrModified": false
+}

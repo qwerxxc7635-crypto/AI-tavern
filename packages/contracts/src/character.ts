@@ -5,6 +5,7 @@ import type {
   ItemId,
   PlayerCharacterId,
 } from './foundation.js';
+import type { TraitPointProfile } from './trait-points.js';
 
 export const CHARACTER_ATTRIBUTE_NAMES = ['physique', 'agility', 'knowledge', 'charisma'] as const;
 export type CharacterAttributeName = (typeof CHARACTER_ATTRIBUTE_NAMES)[number];
@@ -48,6 +49,7 @@ export interface CharacterTrait {
   readonly id: CharacterTraitId;
   readonly name: string;
   readonly description: string;
+  readonly pointProfile?: TraitPointProfile;
 }
 
 export interface CharacterBackground {
@@ -83,7 +85,7 @@ export interface PlayerCharacter {
   readonly classArchetype: ClassArchetype;
   readonly classDisplayName: string;
   readonly attributes: PlayerAttributes;
-  readonly traits: readonly [CharacterTrait, CharacterTrait];
+  readonly traits: readonly CharacterTrait[];
   readonly personalGoal: string;
   readonly background: CharacterBackground;
   readonly initialEquipment: readonly InitialEquipmentReference[];

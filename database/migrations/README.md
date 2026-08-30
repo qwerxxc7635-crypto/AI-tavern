@@ -3,3 +3,13 @@
 Versioned SQLite migrations live in this directory and are applied in numeric order by the persistence migration runner. A migration version is recorded only after its SQL commits successfully; an already recorded version is skipped on later startups.
 
 - `0001_initial.sql`: v0.1 core schema defined by `docs/data-model.md`.
+- `0011_rules_engine.sql`: versioned character rule state plus immutable, idempotent rules audit events.
+- `0012_knowledge_boundary.sql`: separate World Truth, Claim, actor-scoped Knowledge, provenance, and subjective Memory records.
+- `0013_universal_character.sql`: versioned universal character profiles and Constitution-bound world extension definitions with V0.2 row compatibility.
+- `0014_character_creation_sessions.sql`: durable Quick/Advanced drafts, field locks, cancellation/resume, and confirmation audit state.
+- `0025_dynamic_quest_sources.sql`: one-shot Quest Pool creation intents plus append-only, source-validated Dynamic Quest provenance.
+- `0026_world_director.sql`: append-only, trigger-bound World Director pacing runs and ordered explainable proposals.
+- `0028_memory_layers.sql`: source-backed Historical Summary and World Lore artifacts plus shared provenance snapshots for derived memory.
+- `0029_world_info_retrieval.sql`: explainable World Lore trigger, priority, budget, revision, and cache-invalidation configuration.
+- `0030_lazy_world_generation.sql`: durable core-world materialization plans, idempotent execution state, artifact verification, and append-only transition audit.
+- `0031_prefetch.sql`: admitted Director predictions, provisional prefetch lifecycle, invalidation, and hit/miss metrics without cached-content persistence.

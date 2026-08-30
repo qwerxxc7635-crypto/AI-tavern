@@ -2042,3 +2042,1445 @@ UI Gate固定覆盖存档、世界、车卡、酒馆、NPC、任务、冒险、�
 ### 影响与边界
 
 证据bundle、Application Support目录和`.emtavern`归档只属于隔离QA标识；不访问或修改正式用户数据。流程只使用确定性Fake Provider，不配置真实API Key，不调用真实Provider或付费API，也不启动iOS。该Gate关闭SR2-010并将严格下一任务推进到M10-T01 Windows v0.2 Build。
+
+## DEC-100：V0.3 采用增量演进而非推倒 V0.2 架构
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M0-T01`、`docs/V0.3_SPEC.md`、V0.2 两轮审计与可玩性证据
+
+### 背景
+
+V0.3 的产品范围显著扩大，包含动态实体、多任务图、Character Creation 2.0、World Director、Rules Engine 扩展和全新的生成/上下文基础设施。同时，V0.2 已经具备统一 AI 编排、Provider 抽象、安全凭据、SQLite 事务、事件、知识 provenance、Context budget、缓存遥测、恢复、导入导出和平台门禁。若以“大版本”为由另建并行栈，会重新引入已经关闭的 Provider 绕行、双真源、凭据生命周期和跨语言合同风险。
+
+### 决定与理由
+
+V0.3 在现有分层上增量演进：Generator Framework 组合或替换现有桌面编排入口，但不得建立第二套 Provider 调用栈；新规则和实体先进入共享合同与领域层，再进入迁移、Repository、Application 和 UI；SQLite 继续是唯一事实源。现有 V0.2 数据通过版本化兼容投影和明确迁移升级，不以删除旧结构换取开发便利。
+
+任务编号按 V0.3 产品里程碑重新建立 M0–M12。历史 v0.1 规格继续保留在 `docs/spec.md`，历史 v0.2 任务保留在 `docs/TASKS_V0.2.md`；`docs/TASKS.md` 从本任务起成为 V0.3 的唯一执行顺序。
+
+### 影响与边界
+
+每项任务必须证明所解决的问题并优先复用现有能力。V0.3 不提前全面开发 iOS，不以接入更多 Provider 为目标，不把 TTS、图像、多人、云同步或插件商店纳入核心交付。若后续证据表明某个 V0.2 模块必须替换，需要新增 Decision，说明兼容、迁移、回滚和测试策略。
+
+## DEC-101：借鉴 SillyTavern 的上下文控制力但拒绝可刷新事实和开放执行面
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M0-T02`、`docs/V0.3_ST_FEATURE_MATRIX.md`
+
+### 决定与理由
+
+V0.3 高度覆盖 SillyTavern 在 Character、Persona、World Info、Prompt、Preset、Context、Memory、Multi-character Scene、Import/Export 和生成交互上的产品能力，但在 Ember 自有架构中独立实现。SillyTavern 的 Swipe、Regenerate、历史编辑和 Branch 适合可塑聊天；Ember 正式游戏的 NPC 回复、D20、Quest 后果、死亡和世界事实必须进入不可随意改写的 SQLite 时间线，因此普通 Swipe/Regenerate 不进入正式玩法。
+
+SillyTavern 的扩展生态展示了可扩展价值，也暴露了第三方代码执行和凭据风险。V0.3 只提供内部 typed ports 和受限 preset/action seam，不开放任意第三方 JavaScript、Server Plugin、SQL、HTTP 或文件访问。未来插件能力必须先设计沙箱、权限、签名、供应链和撤销模型。
+
+### 影响与边界
+
+Prompt Manager 必须区分 User Editable 与不可覆盖的 Core Rule Prompt；导入的角色、Lore、Memory 和外部资料必须经过隔离解析与授权，不能直接成为 WorldTruth。AI Inspector 提供可观察性但默认遮罩秘密且不能编辑正式事实。本决定不复制 SillyTavern 的 AGPL 源码、UI、CSS、品牌或素材。
+
+## DEC-102：V0.3 参考审计采用选择性模式而非框架迁移
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M0-T03`、`docs/V0.3_REFERENCE_AUDIT.md`
+
+### 决定与理由
+
+保留现有Tauri、React、共享TypeScript领域、Rust原生适配和SQLite事实库。TypeChat的schema-first validate/repair、LangGraph/XState的显式阶段与恢复、Evennia/Bevy的数据驱动实体、ink的可测试条件/后果、Actual Budget的local-first迁移和Radix的headless无障碍行为只作为可独立实现的设计参考。
+
+不在M0承诺引入LangGraph、XState、Bevy、Evennia、ink或Radix runtime dependency。具体任务只有在问题证据、bundle/维护成本、License、安全、跨平台和测试收益评估后才能新增依赖。尤其禁止建立第二套Agent checkpoint、ECS事实库或云同步模型。
+
+### 影响与边界
+
+V0.3按现有分层渐进增加Generator、Rules、Entity和UI能力。GPL/AGPL项目只作clean-room研究；permissive license项目也不默认复制代码或资产。任何实际依赖引入必须记录精确包、版本、License、替代方案和回滚路径。
+
+## DEC-103：活动凭据引用优先于延迟清理队列
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M1-T01`
+
+### 背景
+
+Provider配置中的不透明`credential_ref`由SQLite持久化，秘密值只存在操作系统安全存储。凭据替换、清除和失败回滚使用SQLite清理队列实现可重试删除；旧版本中，启动重试会直接删除队列指向的秘密。若旧数据库、恢复备份或中断流程留下一个后来再次被Provider使用的过期队列项，重试会误删仍在使用的秘密，表现为设置成功后经过游戏流程或重启突然缺少API Key。
+
+### 决定与理由
+
+SQLite中的活动Provider引用是设备凭据所有权的唯一权威。执行任何延迟秘密删除前，原生层必须在`IMMEDIATE`事务中检查`provider_configs`：若引用仍活动，只删除过期队列项并保留操作系统秘密；若没有活动引用，才允许调用安全存储删除并完成队列项。React状态、页面生命周期和生成任务不能拥有或清理正式凭据。
+
+### 影响与边界
+
+- 设置流程仍通过`KEEP`、`REPLACE`和`CLEAR`表达明确意图；探测用临时秘密仍在未被正式配置认领时清理。
+- Provider替换或清除后，不再被任何配置引用的秘密仍按原有队列重试删除，不形成永久遗留。
+- 活动性判断与队列丢弃在同一SQLite事务内完成；操作系统安全存储仍是秘密值唯一存放处，SQLite、日志、Inspector和存档只允许出现不透明引用或布尔状态。
+- 回归测试必须覆盖世界、角色、NPC、任务、冒险、D20与总结生成，至少两次数据库重开，并验证每次请求都从安全存储取得同一凭据。
+
+## DEC-104：URL只承载定位上下文并由统一导航合同生成
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M1-T02`
+
+### 背景
+
+V0.2页面各自拼接路径与查询参数。侧栏会复制当前页面的完整查询字符串，使`npcId`等子实体参数泄漏到无关栏目；若干返回链接又会丢失`campaignId`。存档继续、恢复和页面内跳转分别维护Campaign状态映射，存在同一状态恢复到不同页面的风险。缺失、重复或非规范参数也会延迟到页面服务调用后才表现为通用读取失败。
+
+### 决定与理由
+
+所有桌面路径、查询参数编码、Campaign状态恢复目标和父级返回目标由`navigation.ts`统一定义。URL只允许承载当前定位所需的`campaignId`、`npcId`和`questId`，不得成为游戏状态真源；刷新或深链后，页面仍必须按这些标识从SQLite重新加载实体事实。侧栏跨栏目只保留合法`campaignId`，不传播子实体参数。
+
+路由边界在加载业务页面前拒绝缺失、重复、带首尾空白、控制字符或超长的必要标识，并提供回到存档首页的安全出口。Campaign状态到页面的映射只保留一份：恢复类状态进入恢复页，世界/角色创建状态进入对应流程，冒险和结算进入冒险页，其余可玩状态进入酒馆。
+
+### 影响与边界
+
+- React Router/HashRouter继续负责桌面历史与浏览器返回；NPC、冒险和设置等层级页提供确定性的可访问面包屑，不依赖是否存在历史栈。
+- 面包屑和页面内返回链接通过统一构造器保留Campaign上下文；设备级“我的”和模型设置在没有Campaign时仍可直接访问。
+- URL合法只代表定位格式合法，不证明实体存在或授权成立；Repository/Application仍必须从SQLite读取并校验Campaign与实体关系。
+- 不在本任务引入第二套路由库、全局业务状态或URL持久化，也不改动数据库schema。
+
+## DEC-105：细粒度诊断码投影为六类稳定产品错误
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M1-T03`、`docs/V0.3_SPEC.md` 6.3
+
+### 背景
+
+现有系统已有Provider标准码和AI编排内部类别，但Tauri命令只返回`code/message`，页面据此各自决定是否显示重试或模型设置。内部十类AI诊断并不能覆盖Persistence和Rule，也不适合作为长期UI合同。若直接用单一`retryable`布尔值推断备用模型，认证、额度、Schema、规则或本地存储失败可能被错误地跨Provider重试。
+
+### 决定与理由
+
+保留现有细粒度错误码和内部编排类别用于诊断，同时向产品层投影为且仅为六类：`PROVIDER`、`GENERATION`、`VALIDATION`、`PERSISTENCE`、`RULE`、`NETWORK`。稳定合同包含`code`、`kind`、`retryable`、`fallbackEligible`、`actions`和`surface`，其中actions只能来自`RETRY`、`CANCEL`、`USE_FALLBACK`、`OPEN_SETTINGS`和`DISMISS`，surface只能是`TOAST`或`ERROR_STATE`。
+
+只有瞬态Provider可用性、限流、超时和网络失败可标记`fallbackEligible`；且fallback必须同时可重试并属于Provider或Network。认证、额度、模型配置、凭据、Validation、Persistence和Rule永远不可通过模型fallback绕过。Validation技术重试允许使用同一意图、幂等键和已锁定硬结果，但不赋予改变事实的权限。
+
+### 影响与边界
+
+- TypeScript分类器不显示上游原始message，只保留经过格式限制的诊断code；`cause`仅用于内部链路，不进入玩家文案。
+- Rust `CommandError`序列化同一六类字段；TS与Rust读取同一代表性fixture，防止类别、动作和fallback资格漂移。
+- AI内部`configuration/credential/schema/domain_policy`等类别继续保留，`AITaskExecutionError`同时暴露稳定六类投影，不做破坏性重命名。
+- UI按合同显示可用动作并区分Toast/Error State；没有回调时不伪造可执行按钮。实际fallback仍要求已配置且已授权的备用模型。
+- 本决定不改变SQLite事务、pending请求幂等和硬结果规则；失败或取消不得留下部分事实，相关Repository/Application回归继续作为门禁。
+
+## DEC-106：性能证据使用内容无关的有界指标合同
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M1-T04`、`docs/V0.3_SPEC.md` 11.1
+
+### 背景
+
+V0.3需要在优化前建立world、NPC、quest、action和D20基线，但直接保存请求、Prompt、玩家输入或Provider响应会把游戏内容与秘密带入遥测。Fake Provider又不报告token和cache usage；若将未知值写成0，后续与真实Provider对比会得到错误结论。受控失败和重试也不能伪装成自然故障率。
+
+### 决定与理由
+
+性能证据只允许固定字段：任务、Fake/Real证据身份、Normal/Controlled场景、成功状态、总延迟、队列等待、四类可空usage计数、重试次数和格式受限的错误码。Prompt、messages、玩家全文、request ID、凭据、上下文和任意扩展字段均被schema拒绝。未知usage保持`null`并传播到汇总，不折算成0。
+
+Fake与Real报告必须显式区分；Fake报告必须标记真实Provider为`NOT_RUN`。汇总由原始样本重算，限定样本数、时间和计数上界，并拒绝证据身份或汇总不一致。受控失败/重试必须经过标准错误路径且在场景字段中显式声明。
+
+### 影响与边界
+
+- 基线工具要求调用者提供一个不存在的新输出路径，不覆盖旧证据，也不默认上传或写入应用数据库。
+- M1-T04只测现有Fake Provider，不读取正式Key、不调用真实模型；真实证据需要未来单独授权并生成独立报告。
+- Fake延迟只代表本机调度、协议和序列化开销，不是网络或模型SLA；M12-T03可沿用合同进行可比回归门禁。
+- 性能优化不能通过删除校验、失败记录、隐私边界或硬事实规则取得表面改善。
+
+## DEC-107：视觉值采用三层Token并在语义层切换主题
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T01`、`docs/V0.3_SPEC.md` 7.1
+
+### 背景
+
+现有Windows样式以一组扁平深色变量为主，NPC对话、任务和冒险又各自在组合选择器内重定义同名纸张色。颜色、字体、间距、圆角、阴影、motion和layer没有统一层次；若直接全量重写三千余行CSS，会扩大回归面并提前侵入M2-T02/T03组件任务。
+
+### 决定与理由
+
+正式视觉值采用Primitive、Semantic、Component三层CSS custom properties。Primitive使用`--et-*`并集中保存原始值；Semantic按用途引用Primitive，是深色Ember与浅色Paper主题唯一允许覆盖的层；Component只引用Semantic。应用壳和核心Paper页面先迁移，旧变量保留为指向Semantic的兼容别名，后续按页面删除。
+
+排版、spacing、radius、shadow、motion和layer与颜色一起进入同一合同。WCAG适用阈值通过直接计算Primitive配色验证；`prefers-reduced-motion`在Semantic层将界面时长降为1ms，并继续显式关闭导航、加载和D20动画，不改变业务超时或游戏规则。
+
+### 影响与边界
+
+- 新组件不得在TSX中写视觉值，Component token不得直接使用hex/rgb或Primitive颜色名；主题切换不进入React业务状态或SQLite。
+- M2-T01只迁移应用壳、My核心卡片及三个Paper核心页背景/主面板，不一次重写全部旧CSS，不引入CSS框架或主题runtime。
+- 四个固定桌面视口必须同时通过静态布局合同和真实浏览器无横向溢出检查；后续调色必须更新对比度和视觉证据，不能降低WCAG阈值。
+- layer固定为content 0、navigation 10、sticky 20、overlay 100、modal 200、toast 300，未来Primitive和Modal使用这些语义层级。
+
+## DEC-108：首批UI Primitives优先使用原生语义且不引入框架迁移
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T02`、`docs/V0.3_SPEC.md` 7.1
+
+### 背景
+
+V0.3需要Button、Field、Overlay、Tabs和Feedback等统一primitives，但仓库没有Tailwind、Radix或shadcn。为14类基础组件引入完整CSS框架和第三方状态层会扩大bundle、主题迁移和供应链面，也会与M2-T02“不做无必要框架迁移”的边界冲突。现有React、浏览器原生控件和M2-T01 token足以覆盖当前行为。
+
+### 决定与理由
+
+首批primitives使用原生button、input、textarea、select、dialog和progress，并以React受控props组合Card、Tabs、Tooltip、Toast、Skeleton、Empty和Error。组件只持有展示与无障碍所需的局部状态；业务加载、保存、错误分类和事实写入由调用页面拥有。
+
+Modal/Drawer采用原生`showModal`焦点陷阱、cancel语义和显式焦点归还；Tabs实现WAI-ARIA roving tabindex与方向键/Home/End；表单错误同时连接label、description、`aria-invalid`和alert。CSS只消费正式token，并覆盖reduced-motion、forced-colors和44px舒适target。
+
+### 影响与边界
+
+- 暂不新增shadcn、Radix、Tailwind、表单库或Toast runtime；未来只有出现可复现的原生实现缺口时，才能在独立任务评估依赖、License、bundle和回滚。
+- Primitives不得导入Repository、SQLite、Provider、AI orchestrator或业务合同；Overlay只发出关闭意图，不能自行保存或回滚。
+- 页面按组件族渐进迁移；M2-T02只迁移通用错误边界作为接入证明，不机械替换所有既有控件。
+- 六类产品错误、fallback资格和玩家文案仍由M1-T03合同决定，Error/Toast primitive不推断业务含义。
+
+## DEC-109：Game Components只投影视图并以页面拥有业务状态
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T03`、`docs/V0.3_SPEC.md` 7.2
+
+### 背景
+
+任务、NPC、特质、物品、对话和生成状态在多个页面重复呈现。若共享组件直接读取Repository或调用Provider，会把SQLite事实所有权和AI验证边界带入展示层；若在M2-T03完整实现AIFieldAssist与ActionComposer，又会提前侵入M2-T04/T05的并发、锁定、恢复和统一提交验收。
+
+### 决定与理由
+
+十个明确命名的Game Components只接收只读view model与用户意图callback。页面/Application继续拥有读取、生成、验证、规则、事务和导航。卡片、Dialogue、Generation与Status可以统一视觉及空/错/加载态，同时保持业务依赖单向。
+
+ActionComposer和AIFieldAssist在本任务只建立presentation contract；M2-T04/M2-T05在同一组件上增加专属state machine与页面集成，不建立第二套组件。任务文档中的“九类”与原始目标十个名称不一致时，以明确名称和Spec为准，全部覆盖而不删除后续任务。
+
+### 影响与边界
+
+- Game Components不得导入SQLite、Tauri invoke、Provider、AI orchestrator、Repository或动态实体规则；callback不能返回未经页面验证就持久化的事实。
+- 页面迁移按重复度渐进进行；M2-T03先迁移QuestCard、NpcCard和DialogueView，保留现有服务与状态所有权。
+- 选择状态必须同时使用原生checked/`aria-pressed`与结构标记，不只改变颜色；empty/error/loading复用M2-T02 primitives。
+- 领域对象先在页面适配为最小view model，组件不以类型依赖反向绑定领域schema。
+
+## DEC-110：字段生成采用候选先行并由页面唯一提交
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T04`、`docs/V0.3_SPEC.md` 7.3
+
+### 背景
+
+自然语言输入分散在世界、角色、NPC与冒险页面。现有世界整体生成会提交草稿，而M2阶段尚未建立M3的通用Generator；若字段组件直接复用持久化命令或临时写死候选，会让AI绕过玩家采用、结构验证和SQLite事实边界。取消后的迟到响应、同时生成及确认后的世界锁定也需要同一规则。
+
+### 决定与理由
+
+所有字段生成先返回有界候选，字段值只在玩家显式采用时改变。纯状态机拥有操作、请求ID、候选、采用前值、错误和锁定；React适配器只接收无持久化能力的`generate(operation, value, signal)`并在采用/撤销后通知页面。Provider不能获得Repository或save callback。
+
+每字段同一时间只允许一个活动请求；编辑、二次生成和锁定在请求期间拒绝。取消通过AbortSignal通知生成器，并以请求ID忽略迟到/失序结果。软锁可由页面解锁；已确认世界事实使用硬锁，字段辅助不能解锁、编辑或刷新。
+
+### 影响与边界
+
+- 21个现有自然语言输入具有唯一清单ID和页面marker；配置、枚举、数值与搜索字段不伪装为AI创作字段。
+- 不合规候选在状态机边界拒绝，不能进入采用态；未来M3仍须执行Schema、业务规则和安全验证，UI验证不能替代Generator验证。
+- M2-T04不调用真实模型、不复用会直接提交草稿的世界生成命令、不写死候选。M3只需实现无持久化生成适配器，不另建字段状态机。
+- NPC与冒险自由输入已纳入清单，但其3–5建议、streaming和统一提交由紧邻的M2-T05完成，不提前侵入。
+
+## DEC-111：候选与自由行动共享同一提交权力
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M2-T05`、`docs/V0.3_SPEC.md` 7.4
+
+### 背景
+
+NPC建议话题和冒险建议行动各自使用按钮填充Textarea，但NPC只生成1–2项，表单、键盘和并发保护重复实现。若候选直接走专用命令或携带额外规则身份，AI建议将获得自由输入没有的权限；若为“调查”提前增加无后端页面，则会制造伪集成。
+
+### 决定与理由
+
+候选只选择草稿，提交时与自由输入归一为同一ActionSubmission和既有Application入口。origin和suggestionId只用于UI/审计，不改变验证、检定、规则或持久化。新生成的活动场景候选统一为3–5个唯一值；无候选时自由输入仍存在，旧存档较少候选可以安全显示。
+
+统一状态机以submission ID处理submit、stream、cancel、fail、retry和recovery；活动提交拒绝重复操作，迟到事件忽略。NPC与冒险页面复用同一组件，但保留各自既有Application和SQLite事务边界。调查由现有OBSERVE意图承载，不创建第二条提交路径。
+
+### 影响与边界
+
+- NPC Reply输出schema和prompt升级v4，明确3–5候选及无额外权限；Fake输出同步升级，不改变既有正式消息事实。
+- 页面服务目前返回终态结果；组件/状态机预留真实stream与cancel合同，但不伪造Provider流。M3-T02与M10-T03随后接线，不另建Composer。
+- retry保留原文本；恢复SQLite待处理提交时不重新发送。冒险既有幂等/恢复状态机继续是持久化权威，Composer不是事实源。
+- UI组件不导入Repository、Provider或规则引擎，建议选择永远可以被编辑、清除或忽略。
+
+## DEC-112：Generator只编排边界并以事务端口提交事实与事件
+
+- 日期：2026-08-13
+- 状态：已采纳
+- 依据：`M3-T01`、`docs/V0.3_SPEC.md` 8.1
+
+### 背景
+
+现有DesktopAIOrchestrator、AITurnOrchestrator及多个Application use case都包含部分Context、Prompt、Provider和验证流程，但生命周期形状不同。直接一次迁移所有生成器会扩大数据库与Provider回归面；把SQLite或具体Provider放进共享基类又会形成第二套事实源或厂商耦合。
+
+### 决定与理由
+
+Generator使用泛型阶段接口与Runner组合，不拥有Provider、Repository或SQL。九个阶段分别接收/返回不同类型；parse/validate失败最多repair一次并重新经过两阶段，rules拒绝不能进入persist。Persist与emitEvents由调用方事务端口包裹，`ALREADY_COMMITTED`跳过事件实现幂等重放。
+
+审计只记录stage/status/安全code，不记录内容。首个迁移选择Windows共享桌面结构化生成链，继续委托原Provider栈并把通过验证的候选交回Application；它不直接保存游戏事实。其他业务生成器逐切片迁移，不建立并行Provider或一次性重写。
+
+### 影响与边界
+
+- ai-core只声明Transaction Port，不依赖Persistence；Application adapter负责SQLite事务、revision、Repository与Event ID。
+- emitEvents失败必须使persist回滚；重放幂等键返回既有值且不重复发事件。框架测试使用可回滚内存端口证明合同，真实SQLite回归仍由现有AITurn测试覆盖。
+- Desktop结果新增不可变lifecycle trace，旧request/response/validatedOutput/model/cache字段不变；fallback仍读取既有稳定错误码。
+- M3-T01不迁移全部生成器、不实现Queue、不改变Prompt业务内容、不新增真实模型调用或数据库schema。
+
+## DEC-113：生成队列预留前台容量并以整体Deadline限制重试
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M3-T02`、`docs/V0.3_SPEC.md` 8.2
+
+### 背景
+
+P0玩家交互、P1即将使用内容和P2后台预生成需要共享有限模型容量。单纯严格优先会让后台永远饥饿；普通FIFO又可能让P2占满槽位阻塞NPC回复。若每次retry重置timeout，失败Provider可无限放大总等待时间；若Queue直接选择厂商或持久化，则会复制现有编排与事实边界。
+
+### 决定与理由
+
+Queue只调度注入的execute回调。P0优先且每四个P0给等待中的低优先级一个有界轮转机会；P1/P2交替。并发大于1时P2最多占`concurrency-1`，保留一个前台槽。队列/运行任务共享cancel handle，timeout覆盖所有attempt的整体deadline。
+
+Retry先在同一路径内按稳定错误策略执行至有界上限，之后才允许一次显式fallback；认证、额度、规则和持久化错误不可fallback。hardResultKey在所有route/attempt保持不变，Queue不拥有D20或游戏状态。
+
+### 影响与边界
+
+- intentKey只做活动任务去重；完成后允许新意图。pending和concurrency均有硬上限，不支持无限后台任务。
+- metric只含任务类别、优先级、终态、route、attempt与时长/安全错误码，不含内容或身份；Queue不自动上传或写SQLite。
+- 取消/超时终止execute并忽略迟到结果；成功结果仍必须经过M3-T01 rules/persist事务，Queue不能直接提交事实。
+- M3-T02不改变现有Provider选择、Prompt、Repository、数据库schema或真实模型授权；消费者按后续任务逐切片接入。
+
+## DEC-114：实体Schema只证明结构可解释，业务合法性继续由规则层裁决
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M3-T03`、`docs/V0.3_SPEC.md` 8.3、9至13节
+
+### 背景
+
+V0.3的World Constitution、Career、Trait、Item、Location、Faction、NPC LOD、Quest Graph和Director Action不能只保存长文本。现有AITask Schema面向V0.1任务响应，无法表达这些新实体的版本、资源上限和演进边界。若把引用存在性、Trait平衡、LOD迁移、Quest状态或Director预算也塞进Zod，结构解析会依赖当前SQLite事实并与Rules Engine重复。
+
+### 决定与理由
+
+新增独立闭集`STRUCTURED_ENTITY_SCHEMAS`，九类实体分别拥有严格的version 1 input/output Schema。版本同时存在于registry和payload；对象拒绝未知字段，枚举、字符串、数组及生成数量都有硬上限。AI输出仍是提案，parse成功只表示有限且可解释。
+
+跨语言边界使用同一JSON fixture：TypeScript执行完整Zod解析，Rust固定实体闭集、version、顶层必需字段和资源上限。Rust不复制整套Zod定义，避免两套字段实现独立漂移；未来原生真正消费某类实体时，再为该持久/命令边界增加对应强类型。
+
+### 影响与边界
+
+- 引用存在性、Constitution revision匹配、LOD延续、Trait/Item平衡、Quest状态迁移、Director预算与冷却必须在Generator rulesCheck或Domain validator执行。
+- 未知版本和字段直接失败，不静默丢弃；破坏性修改必须升级版本并提供显式兼容路径。
+- 资源上限是防止生成放大的结构安全边界，不代表业务允许生成到上限。
+- M3-T03不新增SQLite表、Repository、Provider、Prompt或事实提交入口，也不提前实现M4至M8的领域功能。
+
+## DEC-115：AI Inspector采用会话只读投影并按模式逐级遮罩
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M3-T04`、`docs/V0.3_SPEC.md` 6.3、8.3
+
+### 背景
+
+现有Context Inspector只显示装配清单，无法同时定位Provider、latency、tokens、raw、validation和repair；GenerationRecord又是事务审计证据，不适合作为可任意展开的调试UI。直接把完整Prompt、模型响应或SQLite记录展示到“我的”页面，会泄露Core Prompt、秘密、未授权World Truth甚至凭据，并诱使UI成为第二事实源。
+
+### 决定与理由
+
+Inspector复用Windows共享DesktopAIOrchestrator与Generator audit，在生成边界创建有界、会话内、只读投影。玩家模式返回空；高级模式只显示指标、清单和结构，遮罩Prompt/raw/parsed值；开发模式允许查看有界净化内容，但Core Prompt、合并Prompt中`[TASK_INPUT]`之前的稳定前缀、凭据和秘密字段始终不可见。
+
+记录过程best-effort，失败不能替换原生成结果或错误。Gateway只有按模式读取能力，没有save/retry/edit；UI必须显式开启高级检查器。失败记录以null/empty表达未到达阶段，并保留稳定错误、validation issue、repair结果和lifecycle用于定位。
+
+### 影响与边界
+
+- 会话最多保留20个内部投影，单段、消息、字段、数组、深度、issue和lifecycle均有上限，不能用Inspector转储完整数据库。
+- Context只复用既有无内容manifest；cache观察、tokens和latency来自实际请求/响应，不伪造Provider计费缓存命中。
+- API Key、Authorization、Cookie、Password、Credential、secret/hidden/unrevealed和World Truth字段在高级/开发模式均遮罩。
+- M3-T04不改变GenerationRecord schema、不持久化或导出Inspector、不提供事实编辑/重放，也不提前实现M4领域存储。
+
+## DEC-116：World Constitution与World同批提案、独立存储并在确认时锁定
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M4-T01`、`docs/V0.3_SPEC.md` 9.1
+
+### 背景
+
+World Constitution若只存在于Prompt，重启后无法证明后续内容遵守哪个版本；若由独立模型调用生成，又会产生World与规则不同步、额外成本及双重重试。把它塞进World Bible长文本同样无法提供revision、并发确认和数据库级不可变性。
+
+### 决定与理由
+
+`GENERATE_WORLD`与`REFINE_WORLD` v2在一次结构化响应中同时提案World和version 1 Constitution。Schema完成结构验证后，本地规则验证technology、magic和taboo投影；二者在同一SQLite事务提交。Constitution使用独立`world_constitutions`表与递增revision，玩家确认以expected revision锁定，SQLite trigger禁止对旧状态为LOCKED的记录做任何更新。
+
+下游内容携带campaign与constitutionRevision并通过共享Domain binding入口，只有已锁定且完全匹配的revision可进入后续业务规则。AI不拥有锁定权，结构有效也不等于业务合法。
+
+### 影响与边界
+
+- World review期间的AI局部修订可以同步修改Constitution并增加revision；手动修改World若违反投影关系会被本地边界拒绝。
+- TypeScript Repository与Rust Windows命令共享字段、资源上限、revision及锁定语义；SQLite重开保持完整记录。
+- 违反Constitution的生成结果记录安全错误并整批拒绝，不写入半个World或半个Constitution；repair仍只用于Schema/解析技术失败，不可绕过规则拒绝。
+- M4-T01不提前生成Career、Trait、Item、NPC、Quest或完整世界；portable archive schema集中迁移留在M10-T05，避免逐表破坏跨语言格式。
+
+## DEC-117：程序随机采用Seed加命名cursor，D20保留独立受信源
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M4-T02`、`docs/V0.3_SPEC.md` 9.2
+
+### 背景
+
+单个可变PRNG会使地图抽样次数改变事件结果，重启后若只保存Seed又会从头重放；直接使用全局随机则无法复现测试。把同一个Seed接入D20会让用户通过复制Seed或恢复cursor重投硬结果。模型温度只是内容多样性设置，也不能冒充程序确定性。
+
+### 决定与理由
+
+每个Campaign持久一个不可变128-bit Seed，并按用途保存独立命名流cursor。Repository以单条SQLite语句原子预留draw区间；纯TypeScript/Rust `EMBER_STREAM_V1`算法根据Seed、stream与position随机访问结果。抽样器只消费预留区间并在耗尽时失败。
+
+Seed在Campaign创建事务内写入，migration 10为旧Campaign一次性回填。`d20`/`dice`命名空间在四层边界拒绝，程序抽样器不实现`nextD20`；现有D20继续依赖独立注入的受信随机源及持久DiceResult。
+
+### 影响与边界
+
+- 同一Seed与cursor状态得到相同程序选择；不同用途流互不扰动，重开继续已持久position。
+- 已写入SQLite的事实始终优先，不能因Seed重算而改写；reservation推进只说明程序随机已被消费。
+- LLM文本、Provider采样温度和技术retry不承诺由Seed决定；Seed也不暴露为玩家重置或重投功能。
+- M4-T02不提前开发地图、事件池或Director；portable archive加入新V0.3表仍集中留给M10-T05。
+
+## DEC-118：视觉规范沿用既有组件体系并在M10末统一收敛
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`、`docs/V0.3_SPEC.md` 7节、`M2-T01`至`M2-T05`
+
+### 背景
+
+视觉手册在M2基础任务完成后加入。M2已经建立三层Token、14类Primitives、十类Game Components、AIFieldAssist和ActionComposer，但遵循当时任务边界只迁移核心页面；M5至M10还会产生角色、Trait、实体、酒馆、多NPC、Quest、Streaming和恢复UI。立即返工M0至M4-T02页面会中断M4-T03、扩大业务任务并增加状态机与存档回归面，只依赖M12最终审查又会让Legacy迁移过晚且缺少可玩性前门禁。
+
+### 决定与理由
+
+视觉手册成为V0.3+全局UI/UX/CSS规范，实施沿用现有`Design Tokens → UI Primitives → Game Components`体系。M5至M10在新增或自然触及UI时完成Feature级渐进迁移；新增M10-T07在功能与性能收口后统一执行Legacy迁移和视觉一致性审查，M11可玩性以其完成为依赖，M12再独立复核。
+
+所有历史差异登记在`docs/V0.3_VISUAL_MIGRATION.md`。Token最终是颜色、字体、间距、Border、Radius、Shadow和Motion的唯一视觉值来源；共享组件只能迁移和扩展，不创建平行实现。统一方向为黑暗奇幻酒馆、TRPG冒险手册与现代桌面游戏HUD，AI采用命运/世界生成身份并后置于游戏内容。
+
+### 影响与边界
+
+- M0至M4-T02完成状态和历史验收保持不变；M4-T03不因视觉规范返工旧页面或重构Rules Engine。
+- M10-T07加入M10-T06之后并成为M11-T01的新依赖，不改变既有里程碑顺序或其他业务依赖。
+- 视觉迁移不得改变业务语义、状态机、数据合同、SQLite事实、存档兼容性或Provider/Rules权限；发生冲突时功能正确性、数据合同和存档兼容性优先，例外必须显式记录。
+- M12-T01逐页复核Token唯一来源、组件复用、Feature/Legacy完成度、四视口、WCAG AA、焦点、非颜色状态和reduced-motion，不能以换色或背景替代完整验收。
+
+## DEC-119：数值状态只通过本地命令事务演进并追加不可变事件
+
+- 日期：2026-08-14
+- 状态：已采纳
+- 依据：`M4-T03`、`docs/V0.3_SPEC.md` 9.3节
+
+### 背景
+
+既有角色属性、D20、物品、金钱、世界时钟和Quest分别已有局部合同，但缺少统一的角色数值状态、revision、幂等命令和审计事件。让AI patch、叙事文本或各Feature直接更新表会产生多套裁决入口，无法证明回滚、重放和恢复后的状态一致；把完整DND/COC规则提前复制又会超出V0.3范围，并与后续Trait/Character任务耦合。
+
+### 决定与理由
+
+新增version 1 `CharacterRuleState`及闭集`RulesCommand`。合同只承认`LOCAL_RULE`、`PLAYER_ACTION`和`SYSTEM` authority；AI proposal validator显式拒绝规则命令和属性变更。所有命令先通过严格结构、所属关系与业务边界校验，再在同一SQLite即时事务中更新角色规则状态、可选Quest状态并追加`rules_events`。
+
+提交以expected revision防止并发漂移，以idempotency key与canonical command实现安全重放；同key不同命令、越界、引用错误或事件冲突全部回滚。事件保存前后状态、revision、Quest迁移与时间戳且append-only。TypeScript Repository和Windows原生命令共享相同权限、边界及迁移11数据合同。
+
+### 影响与边界
+
+- 基础属性在角色表与规则状态副本中均由SQLite trigger保持不可变；技能、HP、状态、装备、钱、时间、Trait修正和资源只能通过规则命令演进。
+- D20继续使用独立受信随机源，修正只取本地状态与角色实际拥有且已装备的合法物品；叙事文本不能产生数值。
+- M4-T03只提供通用Trait修正边界，不提前实现M5的点数、频率或协同平衡，也不提前实现M4-T04知识模型。
+- 本地schema 11可完整关闭重开；portable archive仍为v2，尚不携带规则状态与事件，统一格式迁移保留给M10-T05。
+- 后续Feature必须复用该命令/validator/事务入口，不得创建平行数值写通道；视觉迁移不得改变已验证的规则语义和状态机。
+
+## DEC-120：知识边界由Actor授权行和本地投影共同执行
+
+- 日期：2026-08-19
+- 状态：已采纳
+- 依据：`M4-T04`、`docs/V0.3_SPEC.md` 9.4节
+
+### 背景
+
+V0.2已有`world_facts`、一NPC一行的`npc_knowledge`和Prompt隔离，但没有Player Knowledge通用持久模型，也无法用同一事务表达Truth、Claim、Knowledge和Memory的来源、revision与遗忘。继续把完整事实集合交给Context Builder再依赖Prompt克制，会使缺失授权、跨NPC投影和主观摘要反向升级无法由本地系统证明。
+
+### 决定与理由
+
+schema 12分别持久`world_truths`、`knowledge_claims`、`actor_knowledge`与`knowledge_memories`。Truth authority不包含AI；Claim和Memory永不自动升级Truth。Knowledge以Campaign、Actor和Truth/Claim目标组成不可变授权身份，LEARN、UPDATE和FORGET通过expected revision、幂等operation和`KNOWLEDGE_COMMITTED` ledger在单一事务中演进。
+
+NPC Dialogue和多NPC Adventure只读取Campaign与Actor精确匹配的授权投影；秘密Truth必须有显式授权，`KNOWN Claim`仍是Claim，Player Character使用独立Actor行。数据库trigger复核Actor、目标、Event和Memory来源的Campaign归属，Prompt仅表达行为约束而不承担安全边界。
+
+### 影响与边界
+
+- schema 7/8旧事实与NPC认知在migration 12中保守回填；新Actor尚无通用授权行时保留既有安全投影回退，一旦存在新行就不拼接旧列表，避免双真源泄漏。
+- `SHARED`不自动广播；传播必须由后续显式领域事务为接收Actor创建Knowledge并记录provenance。
+- 本地schema 12支持关闭重开；portable`.emtavern`仍为v2且尚不携带四张通用知识表，完整导入导出升级严格留给M10-T05。
+- M4-T04不改变Provider、Rules Engine、D20、Quest/NPC/Adventure业务合同，也不提前进入M5。
+
+## DEC-121：通用角色以兼容扩展档案演进而不改写V0.2根合同
+
+- 日期：2026-08-19
+- 状态：已采纳
+- 依据：`M5-T01`、`docs/V0.3_SPEC.md` 10.1节
+
+### 背景
+
+V0.2 `PlayerCharacter`已被角色创建、Rules Engine、Quest、NPC Dialogue、Windows原生桥接和portable archive共同依赖，且固定两项Trait与四种职业原型。直接向该接口追加全部V0.3字段会迫使已完成纵向切片同时重构；为修仙、调查和Cyberpunk分别加核心列又会把世界差异固化成不可扩展闭集。只保存任意JSON则无法证明字段版本、资源上限、Constitution约束或未知数据处理。
+
+### 决定与理由
+
+schema 13新增一对一`universal_character_profiles`和Campaign级`character_extension_definitions`。通用档案完整表达角色共有字段，以原`player_characters`身份为根；世界字段由版本1定义声明TEXT、INTEGER、NUMBER、BOOLEAN、ENUM或TEXT_LIST及其边界，并必须绑定同Campaign已锁定的World Constitution revision。
+
+migration保守回填旧角色，旧表继续作为V0.2兼容面。显式投影在两项Trait和旧职业原型可表达时生成原合同；不能无损表示时拒绝，而不截断或伪造。未知namespace、版本、字段、缺失required值和越界数据全部fail closed。
+
+### 影响与边界
+
+- M4-T03继续是属性与数值状态authority；Universal Profile不能修改基础属性，技能名/财富/状态必须与`character_rule_states`投影一致并由规则更新trigger同步，也不从AI内容直接写规则状态。
+- 旧PlayerCharacter写入口由trigger同步兼容字段，同时保留V0.3-only字段；可无损投影的Profile更新也在同一事务镜像旧行，不兼容档案不覆盖旧兼容面。M5-T02后续在此合同上建立草稿/确认流程，不另建角色真相体系。
+- 三类世界fixture证明扩展机制，不代表核心类型只支持这三种世界；新世界复用同一定义合同。
+- 本地schema 13可关闭重开。portable`.emtavern` v2尚不携带完整通用档案与扩展定义，统一格式迁移留给M10-T05。
+- M5-T01不提前实现Quick/Advanced UI、AI Everywhere、Trait点数、Career Pool或后续实体生成。
+
+## DEC-122：角色创建以持久草稿会话隔离候选与正式事实
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T02`、`docs/V0.3_SPEC.md` 10.2节
+
+### 背景
+
+Quick需要从一句概念产生完整候选，Advanced需要编辑相同通用字段，两种模式还必须切换、锁定、取消和恢复。若只把草稿保存在React状态，关闭应用后会丢失；若每次编辑直接更新`player_characters`，未确认内容就会成为SQLite正式事实。让Provider直接返回属性值、财富或状态又会绕过M4-T03 Rules Engine authority。
+
+### 决定与理由
+
+schema 14新增唯一Campaign级`character_creation_sessions`，以revision化`UniversalCharacterDraft`承载两种模式。会话绑定已锁定Constitution revision，锁定路径和草稿持久化；`ACTIVE`、`READY_TO_CONFIRM`、`CANCELLED`、`CONFIRMED`是唯一状态。普通保存使用expected revision和Native服务端时间戳，不能伪造Quick generation provenance。
+
+Quick只使用统一`GENERATE_QUICK_CHARACTER`任务生成叙事字段、属性优先级和世界扩展；属性4/3/2/1、Trait ID、规则/entity-owned空初值均由本地建立。Advanced和Quick都必须经本地完整性校验进入`READY_TO_CONFIRM`。只有显式确认事务才写V0.2兼容角色、规则初态和V0.3档案，并推进Campaign；失败完整回滚，重复确认幂等。
+
+### 影响与边界
+
+- 页面草稿和AI输出不是真相；SQLite会话是可恢复创建进度，正式角色仍只由确认事务产生。
+- 模式切换与Quick重生保持已锁字段；未保存页面改动会禁用确认，不能误确认旧持久版本。
+- M5-T02只保留当前两项叙事Trait和旧职业映射，不实现M5-T03字段AI、M5-T04点数或M5-T05平衡。
+- 新UI复用现有Token和角色创建布局，完整Legacy视觉迁移仍由M10-T07执行；视觉调整不改变Rules、Provider、Generator、SQLite或存档合同。
+- 本地schema 14支持关闭重开；portable archive新增表与历史fixture迁移仍统一留给M10-T05。
+
+## DEC-123：角色全字段AI复用候选状态机并由本地白名单收口
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T03`、`docs/V0.3_SPEC.md` 7.3节和10.2节
+
+### 背景
+
+M2已提供`AIFieldAssist`、可撤销候选和并发/迟到响应隔离，M5-T02则建立了通用角色草稿、锁定路径和确认门禁。若为角色字段再建第二套候选状态机，会产生两种采用、撤销和取消语义；若把整张草稿直接交给Provider回写，又会让数值、实体引用与规则状态绕过本地authority。
+
+### 决定与理由
+
+新增统一`EDIT_CHARACTER_DRAFT`任务，只接受本地计算的精确`targetPaths`、字段类型、当前草稿、当前未保存锁定集、锁定Constitution和世界扩展定义。单字段`OPTIONS`必须返回三个不同候选；其他单字段、补空、区域、整卡和未锁重生必须精确覆盖请求目标。输出先经本地路径/类型/资源/锁定校验，再复用`CHECK_CONSISTENCY`检查角色与世界矛盾。
+
+页面字段复用既有`AIFieldAssist`及hook；候选不自动写草稿，整卡类操作先生成预览，显式采用后仍可整批撤销。输入时的当前草稿与锁定集始终由页面显式传入，而不只读取上次已保存会话。
+
+### 影响与边界
+
+- 只有文本、文本列表和叙事Trait叶子进入生成白名单；年龄、属性、派生值、规则技能、财富、装备ID、声望、关系、状态、布尔边界和非叙事扩展类型不可生成。
+- 应用patch后逐项对比Rules/entity-owned投影，任一变化均fail closed；AI不获得SQLite、Rules Engine或正式角色写权。
+- 世界扩展草稿允许逐字段编辑，但已存档Profile与确认阶段仍严格要求已提供namespace的required字段完整，不放宽正式事实门禁。
+- 界面只使用现有Token、布局与共享Game Component，并将AI文案收敛为“命运”身份；不在M5-T03提前开始M10-T07整体视觉迁移。
+- M5-T03不实现Trait点数、平衡或Career Pool，不改变M5-T04及后续依赖。
+
+## DEC-124：Trait 点数只由本地重算并以可选档案兼容演进
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T04`、`docs/V0.3_SPEC.md` 10.3节、`DEC-121`至`DEC-123`
+
+### 背景
+
+M5-T04要求Buff、Debuff、Mixed和Narrative四类Trait、-5至+5点数与严格净0门禁，并明确空集合可开始。既有M5-T01兼容根固定两项Trait，M5-T02 Quick默认生成两项叙事Trait，M5-T03又只允许AI修改自然语言字段。若把净点数存为可信字段或让AI自评点值，会产生第二个Rules authority；若继续要求恰好两项，则无法满足空集合验收并会把当前UI切片误当领域规则。
+
+### 决定与理由
+
+`CharacterTrait`增加可选`pointProfile`，统一保存type、正负效果与各自点数；旧记录缺失时只按Narrative 0解释。合同严格拒绝未知字段、错误符号、越界和效果/类型矛盾，不持久化net。Domain每次从点值生成逐Trait审计明细和角色总点数，准备与确认都独立要求严格等于0；空数组按数学空和合法。
+
+`PlayerCharacter.traits`由固定二元组兼容演进为有界数组，旧两项JSON不变，V0.3 Profile投影到旧根时只写id/name/description，完整点数仍留在Profile JSON。当前页面沿用现有切片最多编辑两项，但该上限不进入共享规则。`pointProfile`嵌入既有JSON，因此不新增SQLite migration；TypeScript Repository和Rust Native边界镜像校验。
+
+### 影响与边界
+
+- AI只可修改当前类型要求的正面/负面效果文本；类型、Buff点和Debuff点不进入生成白名单，应用patch后还会再次比较规则字段。
+- 非零草稿可以保存并恢复，但保持`ACTIVE`；准备、确认和开始门禁必须本地重算为0，UI显示值不具authority。
+- Trait点数不会自动成为M4-T03检定修正，也不改变Rules事务、D20、Quest、Provider、SQLite真相或存档状态机。
+- M5-T04不判断效果强度、频率、条件或组合套利；`TraitBalanceValidator`与`TraitSynergyValidator`严格留给M5-T05。
+- portable `.emtavern` v2仍未覆盖完整通用档案；跨语言格式升级继续由M10-T05集中处理。
+
+## DEC-125：Trait 平衡采用显式十维证据和结构化协同裁决
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M5-T05`、`docs/V0.3_SPEC.md` 10.3节、`DEC-124`
+
+### 背景
+
+M5-T04只能证明点数结构与总和，无法仅凭“看清黑暗”或“无法拒绝求助”等自然语言，可靠判断触发频率、适用环境、四类影响、永久性、可规避性、稀有度和条件。让LLM直接给出最终分值不可重复审计；只比较正负点总和又允许高强度优势用名义弱点换点，或通过另一优势直接消除弱点和触发条件。
+
+### 决定与理由
+
+策略版本1要求每个机械正负效果分别声明十维0至3序数，并声明机制、授予、所需和抵消标签。十维总分以公开区间`0–5/6–11/12–17/18–23/24–30`映射到1至5点；至少一个战斗、社交、剧情或经济影响非零，非无条件效果必须有显式条件标签。`TraitBalanceValidator`逐维输出breakdown、总分、建议点、Trait和字段路径，不从文本推导。
+
+`TraitSynergyValidator`拒绝正面效果抵消计点弱点、正面集合自供且实际造成低档折扣的条件，以及正面效果间的自维持触发闭环；普通主题/机制重叠和不改变点数档位的条件协作不自动失败。报告绑定锁定Constitution身份与策略版本；`TraitGenerationFeedback`组合稳定issue供生成修复，但接受权仍只属于本地规则。
+
+### 影响与边界
+
+- M5-T04缺少声明的旧机械Profile保持可读、可编辑和可恢复，但不能重新进入`READY_TO_CONFIRM`；Narrative 0与空集合继续合法，不伪造迁移数据。
+- 页面实时展示十维声明、本地建议档位和中文解释；不匹配或套利只禁用准备/确认，不阻止保存未完成草稿。
+- TypeScript合同、Domain和Rust Native镜像策略版本1的枚举、边界、分档与确认门禁；声明嵌入既有JSON，不新增SQLite migration。
+- AI可接收结构化反馈或建议修改，但不能改Trait类型、点值、平衡声明或最终accepted状态；M4-T03 `TraitRuleModifier`、D20和其他Rules事务不变。
+- 本任务不实现M6 Career Pool、动态实体生成或从Constitution自然语言自动推断世界权重；同Campaign和Constitution revision是当前不可变世界规则身份。
+
+## DEC-126：职业池是 Constitution 绑定的世界事实并以显式旧原型投影兼容
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T01`、`docs/V0.3_SPEC.md` 8.2与11.1节、`DEC-121`至`DEC-122`
+
+### 背景
+
+V0.2角色合同只有四个固定职业原型，而V0.3要求每个世界产生符合Constitution、具rarity和社会结构差异的动态职业。若继续把四原型作为玩家选择，世界差异无法成立；若让AI直接写自由文本职业，角色引用无法稳定恢复、去重或验证。把职业叙事映射为数值又会绕过M4 Rules Engine。
+
+### 决定与理由
+
+schema 15新增每Campaign唯一、revision化的`CareerPool`，职业绑定锁定Constitution revision，并逐项保存career rules、society、technology和economy精确证据。统一`GENERATE_CAREER_POOL`提出候选，Domain验证requested rarity、结构、世界证据与规范化去重，Native再以generation audit和expected revision在单一事务提交。初始池固定覆盖COMMON、UNCOMMON、RARE、SPECIAL各一项；运行时发现只能追加合法新项。
+
+职业生成使用既有Generation Queue P2通道；取消或超时后在事实提交前再次检查signal。角色只保存池内精确ID、显示名和显式`legacyArchetype`；四原型不再玩家可见，只作为V0.2投影。职业合同不含数值修正，不从名称、技能或描述反解析属性、财富、装备或D20效果。
+
+### 影响与边界
+
+- TypeScript Repository与Rust Native在读取时都重新核对锁定Constitution证据，持久JSON篡改会fail closed；SQLite禁止在Campaign存在时删除池并要求更新revision严格加一。
+- Quick输入携带当前池且输出必须精确选择其中职业；Advanced保存、准备和确认复核同一引用。旧`career.id = null`档案继续可读，动态职业通过显式旧原型映射投影。
+- 本地SQLite支持初始生成、运行时追加、幂等重放和关闭重开；portable archive携带职业池及历史迁移仍由M10-T05统一处理。
+- UI复用现有Token和角色组件，不建立第二套视觉/组件体系，也不提前执行M10-T07；M6-T01不实现装备、NPC、地点或势力。
+
+## DEC-127：语义装备嵌入兼容物品行，机械层只由本地 Quest 来源派生
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T02`、`docs/V0.3_SPEC.md` 11.2节、`DEC-119`与`DEC-027`
+
+### 背景
+
+V0.3要求装备具有世界相关的名称、历史、来源、剧情能力和Quest/NPC/Fact触发，同时要求damage、defense、rarity、price和numeric bonus由Rules Engine控制。既有`items`已经参与角色归属、D20、结算和portable archive；新建平行装备表会产生两套身份与归属。继续让结算摘要同时决定叙事和固定`knowledge +1`，则无法表达类别、来源和世界差异，也会把AI文本与数值authority混在一起。
+
+### 决定与理由
+
+新增严格version 1 `SemanticEquipmentDefinition`和`GENERATE_ITEMS`。AI只生成叙事、类别、平衡标签及本地允许目标内的绑定，并逐字回传锁定Constitution的equipment rules、technology和economy。Domain/Native只依据当前已完成Quest的risk、reward tier、推荐属性和类别，以公开策略version 1派生价格、伤害、防御、物品效果和预算；任何叙事数字都不会进入计算。
+
+完整定义嵌入既有`items.content_json.semanticEquipment`，顶层name/description、`reward_tier`和`effect_json`继续作为旧合同与Rules投影。Native成功结算将装备生成审计、语义/机械对象、归属、Fact、Clock、Quest和Adventure ending原子提交；至少要求当前Quest与一个关联NPC绑定，Fact只能引用同一事务的确定性ID。
+
+### 影响与边界
+
+- 旧物品没有语义对象时继续可读；不新增schema migration、第二套Item组件或第二个装备真相源。
+- portable archive本来就完整携带item JSON列，语义对象可在format v2中原样round-trip；这不代表M10-T05其他V0.3表的格式升级已提前完成。
+- M10-T05前的历史portable v2缺少Constitution时，进行中的Adventure使用带固定Legacy标识、来自World Bible technology的保守生成证据以保持可继续；不伪造Constitution行，存在锁定版本时禁止回退。
+- Unicode规范化ID/名称重复、Constitution伪造、越权绑定、无来源高阶奖励和机械预算超限均fail closed。
+- D20仍只读取角色实际拥有且装备的`effect_json`；语义触发不会自动修改状态，后续消费者必须使用显式事件。
+- UI沿用现有Item/Character/Adventure合同并遵循视觉手册，完整Legacy迁移仍属于M10-T07；M6-T02不进入NPC LOD、地点或势力。
+
+## DEC-128：NPC LOD以独立身份投影渐进具体化并复用既有知识边界
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T03`、`docs/V0.3_SPEC.md` 11.3节、`DEC-120`
+
+### 背景
+
+既有`npcs`合同要求名字、外貌、人格、目标和秘密全部非空，适合已经进入酒馆或对话的完整NPC，却无法诚实表达只有背景角色的LOD0。用占位文本塞入旧表会把“尚未生成”伪装为世界事实；直接放宽旧表又会破坏已通过测试的Tavern、Dialogue、Quest和Archive合同。另一方面，LOD2/3若接受模型自由写知识、秘密和关系，会绕过M5-T01建立的Actor Knowledge authority。
+
+### 决定与理由
+
+schema 16新增`npc_lod_profiles`和append-only`npc_lod_transitions`。低LOD只保存不可变identity anchor、人口角色和按级解锁字段，不创建伪完整`npcs`行；既有完整NPC在迁移和后续insert事务中保守投影为LOD3，旧业务合同保持原样。
+
+晋升固定为`OBSERVED`、`INTERACTED`、`RECURRING`三步，每步只加一LOD和一revision。统一`GENERATE_NPC_LOD`必须重复既有字段与锁定Constitution证据，并只能选择Native按当前Actor Knowledge、Memory、NPC、Quest、语义Item和Event计算的ID白名单。Native重新构造输入、验证raw/validated一致性，在immediate transaction中原子写generation audit、profile与transition；expected revision和idempotency key分别处理竞争与重放。
+
+### 影响与边界
+
+- 世界创建不生成任何人口清单；只有显式seed创建单个LOD0，M7-T01才负责根据酒馆上下文选择和晋升人口。
+- 低LOD身份成为既有Knowledge/Memory/Actor Claim trigger认可的NPC Actor，但跨Campaign、跨Actor及未授权Truth仍被拒绝。
+- 已有非空文本和引用只能延续，不能删除、替换或由LOD升级改写；LOD3不可重新生成。
+- 本地SQLite支持关闭重开；portable archive新增表和历史fixture迁移仍由M10-T05统一处理。
+- UI不在M6-T03逐页返工；后续展示复用既有NPC组件和视觉Token，完整Legacy迁移仍属于M10-T07。
+- 本任务不修改Rules Engine、D20、Provider栈、Career/Equipment、Quest/Adventure语义、World Seed或存档状态机，也不提前实现M6-T04地点与M6-T05势力。
+
+## DEC-129：动态地点采用稀疏事实图与显式渐进物化
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T04`、`docs/V0.3_SPEC.md` 11.4节、`DEC-118`与`DEC-123`
+
+### 背景
+
+既有地点只嵌在`world_bibles.locations_json`，可以恢复初始世界，却不能独立查询层级、连接、玩家当前位置或旅行历史。若在世界创建时生成完整地图，会增加成本并把未被玩家触达的模型输出提前固化；若只把当前位置留在UI状态，则关闭重开后无法可靠继续。把新地点直接并回WorldBible还会让已确认世界合同承担运行时revision和并发写入。
+
+### 决定与理由
+
+schema 17新增`dynamic_locations`、`location_connections`、`campaign_location_states`和append-only`location_travel_events`，形成无坐标的稀疏事实图。Constitution锁定时只把既有WorldBible地点投影为OUTLINE，并建立父子连接；运行时只有显式`CHILDREN`或`CONNECTED`请求才调用`GENERATE_LOCATIONS`物化一至八个DETAILED节点。
+
+候选必须逐字重复锁定Constitution的technology、magic、society和politics，只能引用WorldBible中存在的Faction ID，并通过稳定ID、规范化名称、父节点存在、最大八层、无环及连接存在性校验。Native重新构造输入，在immediate transaction中原子提交generation audit、地点与连接；幂等重放还必须匹配原输入、上下文、generation ID和输出。
+
+移动完全是本地事务，只允许父子或显式相邻节点，以expected revision仲裁竞争，并先追加旅行事件再更新当前位置。没有坐标、距离、寻路或AI移动决定。
+
+### 影响与边界
+
+- 玩家可以通过CONNECTED物化离开预设城市，关闭重开后地点图、当前位置和旅行历史不变。
+- WorldBible、Constitution、Rules Engine、D20、Quest/NPC/Adventure合同和Provider栈保持不变；新投影不成为第二个世界规则来源。
+- portable archive对schema 17表的正式升级仍由M10-T05负责；M6-T04不提前改变`.emtavern`格式。
+- 当前任务不新增地图页面或返工旧UI。后续地点展示复用既有视觉Token与组件，完整Legacy迁移和一致性审查仍属于M10-T07。
+- 本任务不实现M6-T05势力行动、地图网格、战棋、全图生成或坐标寻路。
+
+## DEC-130：主动势力采用既有身份渐进激活与本地预算行动事务
+
+- 日期：2026-08-20
+- 状态：已采纳
+- 依据：`M6-T05`、`docs/V0.3_SPEC.md` 11.5节、`DEC-118`、`DEC-123`与`DEC-129`
+
+### 背景
+
+World Bible 已保存 Faction 身份、目标和关系，但缺少独立 revision、资源、领导、领地、当前行动、玩家关系与行动历史。让模型直接更新 Quest、关系或世界事实会绕过 SQLite、Rules 与事务；在 M6 提前实现每日 Director budget 又会破坏 M8-T04/T05 的任务依赖。
+
+### 决定与理由
+
+schema 18 新增 `active_factions` 与 append-only `faction_action_events`。Constitution 锁定时只把既有 WorldBible Faction 投影为 OUTLINE，领地直接从同一 WorldBible Location 所属关系计算；不因触发器顺序丢失事实，也不编造资源、领导或行动。
+
+`GENERATE_FACTIONS` 只能把显式请求的既有身份补全为 ACTIVE，必须逐字延续 name、goal、player relation、既有 territory/relations 和 Constitution evidence，并通过引用与双向关系校验。生成审计和全部档案在一个 immediate transaction 提交。
+
+行动使用固定最高六点的本地成本表，并接受只能收紧上限的调用者 budget envelope。Native 重新验证所需资源、目标语义、双向关系、Quest 状态机和单个 World Fact 限额，把所有受影响实体与 append-only event 原子提交。PLAYER、WORLD_EVENT 和未来 DIRECTOR 共用该入口；M8 再增加持久的每日预算、恢复和 cooldown。
+
+### 影响与边界
+
+- SQLite 是八项 Faction 状态和行动历史的唯一真实来源；AI与Director都只能提出候选。
+- 世界事件接口可提交已预算行动并产生至多一个 Fact，但没有固定势力剧情、自动日程或全世界模拟。
+- Quest 只走既有合法状态迁移；Rules Engine、D20、NPC/Adventure合同、World Seed与Provider保持不变。
+- portable archive对schema 18表的升级仍由M10-T05负责，本任务不提前改变format v2。
+- 本任务不新增势力页面或返工旧UI；后续展示复用既有Token和组件，完整视觉收敛仍属于M10-T07。
+
+## DEC-131：动态酒馆人口采用本地事实投影与稳定来源身份
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T01`、`docs/V0.3_SPEC.md` 12节、`DEC-128`至`DEC-130`
+
+### 背景
+
+既有 Tavern 初始化会一次生成 owner、resident 和 temporary visitor，适合建立首个可玩纵向切片，但不能响应地点、时间、势力、事件和玩家历史。每次进入页面重新生成名单会改变身份并丢失互动历史；把投影只保存在 React state 又会让 UI 成为事实来源。为所有可能人物提前生成完整 NPC 则违背 NPC LOD 与懒生成边界。
+
+### 决定与理由
+
+schema 19 以 `tavern_population_states`、`members`、append-only `cycles` 和 `focus_events` 保存人口投影。既有完整 Tavern NPC 继续作为 OWNER/ESTABLISHED 来源；Location、Clock、ACTIVE Faction 和最新 Event 以 `(tavern, source kind, source id)` 唯一映射到一个绑定锁定 Constitution 的 LOD0 身份。同一 Context 与机会不产生新 cycle，也不增加 encounter；事实变化只更新受影响来源。
+
+人口机会只读取既有 Rumor、AVAILABLE Quest、Faction current action、Clock 和 Event，不执行后果或发明事实。聚焦 LOD0 时先复用既有 NPC LOD Generator 晋升该单一身份，Native 再验证 profile 与 population revision 并标记 important；important、来源身份和 encounter history 均不可倒退。UI、AI 和未来 Scene 都只能消费该快照。
+
+### 影响与边界
+
+- SQLite 是人口状态、来源身份与历史的唯一真实来源；不每次进酒馆重生全员，不用临时 UI 列表保存事实。
+- 既有 Tavern/NPC/Relationship/Knowledge/Quest 合同保持不变；人口投影不改 Rules Engine、D20、Provider、Generator/Queue、World Seed/Constitution 或存档状态机。
+- M7-T01 不新增人口模型任务；只有显式 LOD focus 复用 `GENERATE_NPC_LOD`。M7-T02 才实现多 NPC Scene、speaker arbitration 和对应 UI。
+- 仅 owner 且没有机会是合法并持久化的 empty state；动态 important 身份在来源失活后仍保留。
+- portable archive 对 schema 19 的正式升级留给 M10-T05；本任务的 save/reopen 指本地 SQLite 关闭重开，不冒充 portable round-trip。
+- 本任务没有返工 Tavern 页面或建立第二套组件体系；M7-T02 自然触及 UI 时遵循视觉手册，Legacy 迁移仍由 M10-T07 收敛。
+
+## DEC-132：多 NPC 场景采用逐 Actor 生成与本地单次仲裁
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T02`、`docs/V0.3_SPEC.md` 12节、`DEC-123`、`DEC-128`与`DEC-131`
+
+### 背景
+
+把全部 NPC、目标、秘密和知识放进一个模型请求虽然容易生成连贯群聊，却会形成全知 Agent，使 Actor Knowledge 边界失效。固定轮询能避免同时发言，但无法表达沉默、偷听、离开、介入或由目标驱动的打断，并让参与顺序成为隐藏规则。
+
+### 决定与理由
+
+每个在场 Actor 独立获得一份 canonical Context：自己的 LOD、目标、授权 Knowledge、Memory，其他人的公开身份，公开 Turn 与玩家意图。`PROPOSE_TAVERN_SCENE_ACTION` 只产生该 Actor 的一个结构化行动提案；Native 从 SQLite 重建每份输入，验证 Actor、Action、Target、Knowledge 引用和 generation audit。
+
+本地仲裁最多选中一个发言行动，同时保留沉默、偷听和离开等非发言结果。点名、知识引用、有限 urgency 和行动语义决定优先级，稳定 Actor ID 仅作平局键，不按参与者数组轮询。scene revision、全部 generation record/proposal、仲裁结果和离开状态在 schema 20 的 immediate transaction 中原子提交。
+
+### 影响与边界
+
+- SQLite 是参与者、状态、Turn 与 proposal provenance 的唯一真实来源；UI 和模型都不能直接改 Scene。
+- 其他 Actor 的人格、目标、秘密、Memory 与 Knowledge 永不进入当前 Actor 输入；引用越权 fail closed。
+- Tavern UI 复用 `NpcCard`、`DialogueView` 和 `ActionComposer`，新增 CSS 只使用既有 Token；不建立平行组件体系，不提前执行 M10-T07。
+- M7-T02 不实现成功回复不可 Swipe、技术 Retry、事实冲突修复或不可变正式时间线，这些仍属于 M7-T03。
+- portable archive 对 schema 20 的升级留给 M10-T05；本地 SQLite 关闭重开已经保存完整场景。
+
+## DEC-133：正式 NPC 时间线采用先锁意图、技术 Attempt 与原子封存
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T03`、`docs/V0.3_SPEC.md` 12 节、`DEC-123`、`DEC-132`
+
+### 背景
+
+既有单 NPC 和多 NPC 服务只在 Native 成功提交时留下 generation 记录。Provider 调用前没有持久的玩家意图与 Attempt 身份，页面 Retry 会重新走 send，因此应用中断、响应丢失或结构/事实冲突后无法证明重试使用原意图，也无法在 SQLite 层阻止成功回复再次生成。仅隐藏 Swipe 按钮不能建立正式时间线。
+
+### 决定与理由
+
+schema 21 新增 `npc_timeline_operations` 与 append-only `npc_timeline_attempts`。Windows 在 Provider 调用前锁定 Campaign/Scope、玩家意图、点名 NPC 和可选硬结果引用；每次技术尝试保存新的 request/generation ID，并沿用首个 Attempt 的稳定 idempotency key。应用中断的 STARTED Attempt 先以 `APP_INTERRUPTED` 结案，再在同一 Operation 下恢复。
+
+允许 Retry 的失败闭集为网络、Provider 暂时不可用、结构/重复、明确事实冲突和应用中断。TypeScript Domain 与 Rust Native 独立计算同一政策，调用者不能声明任意失败可重试。认证、配额、规则、持久化与未知失败终止 Operation。
+
+单 NPC 消息或多 NPC Scene Turn、全部 request/generation provenance 及 Timeline 在一个 Native immediate transaction 原子提交。Native 验证提交引用属于锁定 Scope；成功 Operation 和 Attempt 不可再变更。正式 NPC 回复及紧邻玩家输入由 SQLite trigger 保护为 append-only；旧的非 Timeline 消息不被本任务追溯锁定，保持既有恢复兼容。
+
+### 影响与边界
+
+- UI 没有普通 Swipe；Retry 使用专用入口并拒绝新意图覆盖未解决 Operation。
+- Native 已提交但响应丢失时，应用读取 durable COMMITTED 并重载结果，不重复提交。
+- 多 NPC Retry 保持 Actor 顺序与每 Actor 稳定 key；D20 硬结果只作为不可变引用延续，绝不重投。
+- 事实变化造成 canonical Context 不匹配时返回 `FACT_CONFLICT`，随后以同一意图在最新授权事实上技术修复；AI 不能直接修改事实。
+- 本决定不改变 Adventure regeneration、Rules Engine、D20、Quest/NPC/Adventure 核心合同、Provider/Queue、World Seed/Constitution 或存档状态机。
+- portable archive 的 schema 21 表升级仍由 M10-T05 统一完成；M7-T04 对话建议及 M10-T07 Legacy UI 迁移没有提前实现。
+
+## DEC-134：对话建议采用公开 Context 的精确派生缓存
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T04`、`DEC-123`、`DEC-132`与`DEC-133`
+
+### 背景
+
+既有单 NPC 回复携带建议话题，但首次进入对话没有建议，多 NPC 页面只按参与者姓名拼出固定按钮。二者都没有独立的当前世界缓存身份；继续显示旧回复携带的话题可能在关系、Quest、场景或世界变化后失真。复用可确认的 `ai_candidates` 又会错误地给派生 UI 建议正式候选权限。
+
+### 决定与理由
+
+新增统一 `GENERATE_DIALOGUE_SUGGESTIONS`，输入只含玩家可见的世界摘要、玩家、参与者公开身份/状态、关系、公开对话与开放 Quest。Secret、私有 Knowledge/Memory 和隐藏事实不进入模型。输出严格为三至五条文本及合法可选点名对象。
+
+schema 22 使用独立 immutable `dialogue_suggestion_cache`。Native 将 Campaign、Scope、公开输入和 NPC/Scene、World Fact、Clock、Faction、Location、Population、Event、Quest 等失效信号计算为 SHA-256 digest；只允许精确 digest 命中。提交前在 immediate transaction 内重建 Context，过期输入 fail closed，generation audit 与缓存原子写入。
+
+### 影响与边界
+
+- 建议是派生 UI 辅助，不是 `ai_candidates`、Message、Scene Turn、Event 或玩家行动；不能自动发送或改事实。
+- 单 NPC 与多人 UI 复用现有 `ActionComposer`。生成失败、取消或无建议不阻塞自由输入；选择后仍需玩家提交。
+- 页面取消后的晚到生成不会提交；世界变化只产生新 digest，不修改或伪装复用旧缓存。
+- M7-T04 不改变 Immutable Timeline、Rules/D20、Provider/Queue、Quest/NPC/Adventure 或存档状态机，也不实现 M7-T05 Prompt Manager。
+- UI 沿用视觉手册、Design Token 与既有 Game Component；不新增 CSS，不提前执行 M10-T07 Legacy 迁移。
+- portable archive format v2 保持不变，schema 22 的正式归档策略由 M10-T05 统一处理。
+
+## DEC-135：Prompt Manager 采用不可覆盖 Core 与末尾 User Guidance
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M7-T05`、`DEC-123`、`DEC-127`与`docs/V0.3_PROMPT_MANAGER.md`
+
+### 背景
+
+统一 Prompt catalog、稳定缓存前缀、Context Assembly 和结构修复已经存在，但玩家无法保存叙事风格。若把完整 system prompt 暴露为可编辑文本，用户配置可以删除知识边界、输出 Schema 或本地状态权限；若每次 fallback/repair 重新读取设置，同一技术执行又可能使用两个不同 Prompt 身份。把 preset 当 Campaign 事实保存还会污染可移植存档和跨 Campaign 语义。
+
+### 决定与理由
+
+稳定 Prompt 固定为六段。前五段 Core 由应用代码和当前任务/世界事实生成，用户只能在末尾 `USER_GUIDANCE` 增加有序、可禁用、可按 task 筛选的风格块。该段自身重申低权限：不能覆盖此前段落、访问缺失知识、改变结构或提交状态。
+
+Preset 以严格version 1快照保存在device-local `app_settings.prompt_manager_v1`。manager revision和preset version采用单个`BEGIN IMMEDIATE`事务乐观并发；缺失设置等同默认，活动ID可清空恢复默认。非法持久快照只能通过Native事务内再次确认非法的安全重置清除；无revision调用不能删除有效快照。Bundle只导入导出用户preset并复用秘密扫描，Core永不序列化。
+
+桌面编排与Model Settings并行读取一次活动preset，在primary、fallback和structural repair间冻结。Stable profile升级到version 3，manager revision、preset身份/version和有序块进入cache prefix，使设置变化自然失效旧前缀。
+
+### 影响与边界
+
+- AI仍只是内容候选；Context、Knowledge、Schema、Rules和SQLite事务权限没有放宽。
+- “我的”页只展示Core只读说明和User preset编辑；没有system safety/rule覆盖入口，也不复制SillyTavern UI。
+- Prompt设置不是Campaign事实，不进入portable `.emtavern`；API Key和凭据仍只在系统凭据库。
+- 本任务不修改Rules Engine、D20、Provider协议、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure合同或存档状态机。
+- UI复用现有页面/控件和Design Token；完整视觉迁移与Legacy审查仍由M10-T07执行。
+
+## DEC-136：Quest Pool 以独立生命周期表兼容旧 Adventure 投影
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T01`、`DEC-040`、[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)
+
+### 背景
+
+V0.2 的 `quests.status` 只有 AVAILABLE/ACCEPTED/ACTIVE 与终态，Quest UI 和接取入口还假定同时只有一个主任务。Adventure、结算、Rules Engine 与 Faction 已经依赖该列和外键。直接扩列或删除 ACCEPTED 会破坏旧存档与已通过测试的 Adventure 合同；继续把旧列作为真相又无法表达隐藏、发现、阻塞、更新和过期，也会让玩家实际介入被传统接受按钮门禁。
+
+### 决定与理由
+
+schema 23 新增一对一 `quest_pool_states` 作为 V0.3 生命周期唯一真相，并新增 append-only `quest_pool_transitions` 保存来源、原因、operation、revision 和时间。旧 `quests.status` 保留为兼容投影，不扩展其 CHECK；迁移原样回填所有旧状态，新代码统一读取 Pool。旧入口只在投影未分叉时同步，已由新状态机推进的 Quest 拒绝旧列覆盖。
+
+完整状态图由 TypeScript Domain、Rust Native 与 SQLite trigger 独立验证。`ACCEPTED` 仅作为旧流程可选中间态保留；玩家介入可从可见候选直接进入 ACTIVE，且不取消其他 Active Quest。COMPLETED、FAILED、EXPIRED、ABANDONED 不可逆，生成和业务入口均不能删除或重开。
+
+### 影响与边界
+
+- Rules Engine、Faction、Adventure 开始与结算在原业务事务内调用 Pool 转换；其原子性、幂等和审计保持不变。
+- Quest 内容、NPC发布者、Adventure外键和既有身份不迁移、不重造；portable archive format v2仍不扩展，schema 23正式归档留给M10-T05。
+- M8-T01只提供来源枚举和转换合同；NPC/Event/Discovery/Player Action等创建适配器及细化provenance仍按依赖留给M8-T03。
+- UI隐藏HIDDEN、允许多个Active并直接介入，继续复用既有组件与Design Token；Legacy视觉迁移仍由M10-T07执行。
+
+## DEC-137：Quest Graph 采用本地有向无环图与 append-only 求值审计
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T02`、`DEC-136`、[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)
+
+### 背景
+
+只有多任务状态机仍会让每个Quest成为孤立记录：Quest、NPC、Faction、Location或World Fact改变后，没有统一且可解释的方式更新依赖任务。若把依赖判断交给Generator或LLM，会绕过Quest Pool合法转换、终态保护和SQLite事务，并且同一世界状态可能得到不同结果。
+
+### 决定与理由
+
+每个Campaign使用一个本地有向图。边来源闭集为Quest、World Fact、NPC、Faction和Location；同目标PREREQUISITE使用AND，CONSEQUENCE使用显式priority。Quest→Quest边必须无环；同priority冲突、悬空引用、重复语义和前置政策冲突全部fail closed。
+
+求值按稳定拓扑序执行，并在同一事务内消费前序Quest的新状态，从而确定性传播链与分支。终态保持不可逆，每个目标变化仍由Quest Pool合法转换验证。schema 24将当前边、完整图修订和每次触发/参与边/变化作为SQLite事实，其中修订与求值历史append-only。
+
+### 影响与边界
+
+- Quest根转换和Faction实体变化在原事务内触发重算；后续M8-T03来源适配器必须复用同一Native入口。
+- AI只能生成候选内容，不能声明谓词结果、依赖满足或Quest状态；UI只提供读取和调试投影。
+- 内部快照保存schema 24图和审计；portable archive format v2不变，正式升级留给M10-T05。
+- Quest、NPC、Faction、Location、World Fact、Adventure、D20、Rules Engine和Provider既有合同不重构。
+- 页面复用现有Quest组件与Design Token，不新增CSS；Legacy视觉迁移仍由M10-T07统一执行。
+
+## DEC-138：Dynamic Quest 使用 durable occurrence 适配与本地提交裁决
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T03`、`DEC-136`、`DEC-137`与[`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)
+
+### 背景
+
+Quest Pool 和 Quest Graph 已能表达多任务与确定性后果，但 NPC 回复、Faction 行动、世界事件、事实发现、玩家自由行为和图后果仍缺少统一的 Quest 创建入口。若由模型选择来源、可见性、状态或是否超过数量限制，会绕过 SQLite 事实、知识边界和本地状态机；若每次玩家行动都自动生成，又会提前实现 World Director 并制造任务洪水。
+
+### 决定与理由
+
+六类适配器只接受已经提交的 durable occurrence。Native 准备阶段投影公开来源、锁定 Constitution、公开 NPC/Fact 白名单、可见 Quest 历史和开放任务同步安全上限，并对规范 JSON 生成 SHA-256 digest。Windows 只在显式调用时运行 `GENERATE_QUEST`；Native 提交事务重新准备并精确比较 input/context/digest，重验 Schema、引用和重复结构后，原子写 Generation、Quest、Pool 初始转换及 append-only provenance。
+
+schema 25 以唯一 `(campaign, source kind, occurrence)` 去重，并用一次性 creation intent 将 HIDDEN/DISCOVERED/ACTIVE 初始态安全桥接到旧 `quests.status` 兼容列。隐藏 Quest 保留在完整 SQLite 图中，但玩家 Quest Board、生成历史和 Windows 图出口统一过滤。开放任务 12 的上限只是一条适配器 fail-closed 安全阀，不替代 M8-T05 的持久 Director budget/cooldown。
+
+### 影响与边界
+
+- NPC 来源只使用玩家已见的正式回复；Actor-private Knowledge、secret 和未发现事实不进入生成上下文。
+- 玩家行动必须由业务显式选择来源，不自动为每个行动生成 Quest；自动调度严格留给 M8-T04。
+- portable archive format v2 不升级，schema 25 跨版本归档留给 M10-T05。
+- Rules Engine、D20、Provider、Queue、World Seed/Constitution 与 NPC/Quest/Adventure 合同不修改。
+- 本任务不新增 UI/CSS；后续 Quest 视觉迁移仍复用既有组件并由 M10-T07 执行。
+
+## DEC-139：World Director 采用确定性本地调度与只提案权限
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T04`、`DEC-136`至`DEC-138`与[`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md)
+
+### 背景
+
+Quest Pool、Quest Graph 和动态来源已有合法状态、依赖与内容入口，但仍缺少统一节奏判断：安静世界需要机会，临界时钟需要压力或伏笔，长期未解决任务需要自然过期，过载时则必须停止继续制造内容。若让模型自行决定调度、直接写事实或持续后台运行，会绕过 Rules/SQLite、产生固定主线倾向和无限调用风险；若在本任务持久化每日额度，又会提前进入 M8-T05。
+
+### 决定与理由
+
+Director 固定为无模型依赖的本地确定性评估器。它读取锁定 Constitution revision、当前地点、Quest Pool、Clocks、Faction公开行动和近期已提交记录，计算有界压力分段并按稳定顺序输出最多八项可解释提案。过载只保留收敛性的Quest过期提案；其他新内容提案记录明确抑制原因。Quest过期依据自创建后数据库累计的世界时钟推进数，不受最近事件窗口挤压。
+
+提案只路由到Rules、Generator或Faction Rules，不执行结果。schema 26保存append-only run/source snapshot/proposal审计。Windows只接受显式durable trigger，相同在途触发合并；Native提交事务重算context digest，拒绝陈旧上下文和冲突重放。服务无AI Provider、timer或后台生成循环。
+
+### 影响与边界
+
+- Director不能插入或更新World Fact、Quest、Clock、Faction、NPC、Adventure、Message或Game Event；SQLite和既有规则事务继续裁决事实。
+- 最多八项是单次载荷安全上限，不是每日预算。持久budget/cooldown、day rollover与starvation严格由M8-T05实现。
+- 来源只取当前实体ID和已提交状态，不设置主Quest或固定剧情路线。
+- 内部快照保存schema 26审计；portable archive format v2不变，正式升级留给M10-T05。
+- 本任务不新增UI/CSS；视觉手册和M10-T07渐进收敛门禁保持有效，不重构既有业务组件。
+
+## DEC-140：Director Budget 使用游戏时钟预约与持久防饥饿队列
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M8-T05`、`DEC-139`与[`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)
+
+### 背景
+
+World Director 已能产生有界提案，但单次八项上限不能控制跨 run 的内容洪水。依赖 Prompt 自律、墙钟或内存计数会在重启、重试和模型变化时失效；直接把玩家行动放入同一队列又会违反 P0 不可丢弃门禁。
+
+### 决定与理由
+
+预算只接收已经提交的 Director proposal，以 Rules Engine `game_time_minutes` 为唯一时钟。schema 27 持久化 run admission、日用量、proposal 队列、cooldown 和 append-only decision。批准即预约容量，延后保留明确原因与下一游戏时间；优先级叠加最多三天 waiting age，旧低优先级最终可越过新高优先级，但永不绕过硬容量或冷却。
+
+Quest维护不消耗内容额度；Opportunity 同时受四个Active Quest预约限制和每日事件限制；紧急事件同时消耗每日与紧急额度。P0玩家操作完全位于预算通道之外，PLAYER_ACTION trigger 只预算其后派生的世界提案。
+
+### 影响与边界
+
+- TypeScript、Rust Native、Tauri和Windows服务共享相同政策；无Provider、timer或后台模型循环。
+- Director仍不写World Fact、Quest、NPC、Faction、Clock、Adventure、Message或Event；下游原合同继续裁决。
+- 内部快照和SQLite重开保存schema 27状态；portable format v2正式升级仍留给M10-T05。
+- 本任务不新增UI/CSS，不提前执行M9或M10-T07；视觉规范、视觉债务和渐进迁移门禁保持不变。
+
+## DEC-141：所有生产 Generator 共用一个分层 Context Boundary
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M9-T01`、`DEC-123`、`DEC-127`与[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)
+
+### 背景
+
+已有Context block、budget、Inspector和NPC/Adventure/World Event安全adapter，但Desktop与Application主编排仍把最终输入包装成一个task block。这样无法统一证明层级顺序、逐层相关性、省略原因或所有Generator都经过同一dump/credential门禁；若为各页面另写构建器则会形成平行上下文栈。
+
+### 决定与理由
+
+新增单一`buildUnifiedTaskContext`，按SYSTEM、Constitution、Lore、Location、Player、Actor Knowledge、Quest/State、Memory、Recent、Action闭集分类。现有领域adapter继续负责SQLite相关性和知识授权，共享入口负责block provenance/hash、预算、可选字段relevance、可审计省略及数据库dump/credential fail-closed。
+
+Windows所有production Generator都经DesktopAIEngine进入该边界；Application回合和primary helper直接复用。一次构建结果在primary、fallback和repair之间冻结。manifest不含内容；Application沿用Generation audit持久化，Desktop沿用session Inspector，无新schema。
+
+### 影响与边界
+
+- 不修改AI task输出Schema、Rules/D20硬逻辑、Provider、Queue、SQLite事实或业务提交合同。
+- 不把完整DB、其他Actor知识、未授权Fact、凭据或API Key放入Prompt。
+- M9-T01不生成Summary/Long-term Memory，不升级Truth，不加入向量数据库；这些严格留给M9-T02/T03。
+- 本任务不新增UI/CSS；视觉规范与M10-T07渐进迁移保持不变。
+
+## DEC-142：派生 Memory 以来源快照失效，不成为第二套 Truth
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M9-T02`、`DEC-123`、`DEC-141`与[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)
+
+### 背景
+
+V0.3已经有World Truth/Claim/Actor Knowledge、原始Message/Event/Turn、旧NPC记忆、通用Actor Memory和Adventure Summary，但缺少一个共同规则证明摘要来自哪些行、来源变化后是否仍可用、World Lore是否误当事实，以及旧史压缩后原记录是否保留。另建Memory Truth或把摘要覆盖历史都会破坏SQLite authority与审计。
+
+### 决定与理由
+
+保留五层：Structured Fact、Recent、Summary、Long-term Memory、World Lore。Summary/Lore和新写入Long-term Memory保存有序source ID/revision/hash/time；Repository只对当前SQLite来源计算freshness，删除或变化使派生物stale。派生物无Truth authority，AI只能产生待验证文本，程序绑定来源、Actor、Campaign、generation record和revision。
+
+schema 28仅新增`historical_summaries`、`world_lore_entries`和共享`memory_artifact_sources`；通用Long-term Memory继续使用`knowledge_memories`。`EXTRACT_MEMORIES`必须同时有模型可引用的turn citation与程序验证的Actor Knowledge/Event来源，提交后保留legacy NPC兼容视图并写通用Memory。NPC上下文优先current通用Memory，无可用通用记录时才回退隔离后的legacy列表。
+
+### 影响与边界
+
+- 压缩从不删除Message/Event/Turn/Fact；Summary不能成为唯一历史。
+- World Lore只有来源和生成审计，触发、priority、budget、cache和未来RAG port留给M9-T03。
+- 内部snapshot加入schema 12/28表并兼容旧payload；portable `.emtavern` format v2不变，统一跨语言迁移仍由M10-T05负责。
+- 不修改Rules/D20、Provider、Queue、Constitution、Quest/NPC/Adventure提交语义；不增加UI/CSS或向量数据库。
+
+## DEC-143：World Info 采用可解释本地选择与可替换 Candidate Source
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M9-T03`、`DEC-141`、`DEC-142`与[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)
+
+### 背景
+
+Source-backed World Lore 已有生成审计和失效规则，但缺少统一方式按玩家文本、实体、地点和Quest选择条目。把完整Lore塞入Prompt会破坏最小Context与预算；依赖向量服务会让V0.3离线纵向切片不可用；让各页面自行检索则会形成平行Context栈和不可解释缓存。
+
+### 决定与理由
+
+定义稳定`WorldInfoCandidateSource` port，V0.3由SQLite adapter返回同Campaign的Lore、规则和freshness。纯Domain selector计算closed trigger evidence、ANY/ALL、priority、relevance和entry/total token budget，并为所有候选输出明确manifest。关键词对Latin使用完整边界、对CJK使用规范化substring，结果按priority、score和ID确定排序。
+
+schema 29新增一对一版本化rule；Repository和SQLite共同验证结构、Campaign引用与CAS revision。应用层使用规范query digest与完整corpus digest组成的有界LRU key，因此Lore、来源freshness、规则或query任一变化都会失效。未来RAG只能替换candidate source，仍须经过相同本地裁决。
+
+### 影响与边界
+
+- NPC_REPLY v5是首个生产消费者，通过既有Unified Context的LORE层注入；Lore不授予Actor Knowledge，输出和提交状态机不变。
+- 不增加外部向量依赖、不复制Lorebook、不增加Provider或Context旁路，也不修改Rules/D20、Queue、Constitution、Quest/NPC/Adventure业务合同。
+- 内部snapshot保存schema 29 rule；portable format v2不变，正式跨语言迁移仍由M10-T05处理。
+- 本任务不新增UI/CSS；后续World Info/Inspector展示复用现有Token和组件，Legacy视觉收敛仍属于M10-T07。
+
+## DEC-144：核心世界与具体化 Artifact 使用持久计划分离
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T01`、`DEC-116`、`DEC-117`与[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)
+
+### 背景
+
+世界确认已只生成Constitution、Seed、Bible和outline实体，职业池、酒馆、NPC LOD、地点与势力也已有各自按需入口，但缺少一个跨进程的共同计划证明哪些内容尚未生成、哪个run拥有执行权、失败是否可重试，以及模型响应丢失后是否已经提交。只靠页面内Promise去重无法覆盖重启；把outline当成完整内容又会成为占位假数据。
+
+### 决定与理由
+
+schema 30新增Campaign-scoped materialization plan与append-only transition。世界确认在锁定Constitution的同一事务中建立三个P0按需计划和每个outline Location/Faction的P2后台候选；不生成Quest、Item、完整NPC或其他全世界内容。状态机使用run ownership、attempt、CAS revision、dependency、retryability和明确reason，SQLite success trigger只有在真实artifact存在时才允许成功。
+
+职业池、酒馆和阵容沿用现有生成与验证合同，在其SQLite提交事务末尾原子reconcile计划；旧Campaign没有bootstrap计划时保持兼容。重开把已有artifact的RUNNING计划收敛成功，否则标记可重试中断；内部snapshot保存计划与历史。M10-T01只记录后台资格，不执行预测或预取。
+
+### 影响与边界
+
+- SQLite仍是唯一真相；计划不是事实、Quest或内容缓存，AI输出不能直接推进它。
+- 部分失败或取消不回滚核心世界或已成功兄弟artifact；同run幂等，冲突run fail closed。
+- portable `.emtavern`仍为format v2，schema 30的正式跨语言迁移留给M10-T05。
+- 不修改Rules/D20、Provider、Generation Queue、Quest/NPC/Adventure语义，也不进入M10-T02。
+- 不新增UI/CSS；未来状态展示遵循视觉手册，Legacy收敛继续由M10-T07处理。
+
+## DEC-145：预取只持久化审计，生成候选保持进程内
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T02`、`DEC-140`、`DEC-144`与[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)
+
+### 背景
+
+schema 30 已标记可后台具体化的 outline Location/Faction，但直接生成并提交会把玩家尚未选择的路线变成事实；只用内存Promise又无法审计预算、失效、命中率或重启。保存完整候选则会形成第二套内容数据库，并扩大隐藏信息与存档泄漏面。
+
+### 决定与理由
+
+Director预测只读取已admit run、预算结果和有限lazy plan。批准目标为P1，其余按background剩余容量成为P2，总量最多四项；任何未完成P0都抢占并失效预取。Application planning/coordinator复用共享Generation Queue，队列饱和只记录失败，不阻断前台工作。
+
+schema 31只保存候选身份、context digest、process/execution状态、append-only事件和时间指标，不保存Prompt、源snapshot或生成内容。候选体只存在进程内；精确Campaign/kind/target/digest命中后才交给原Feature事务，原有验证与提交仍是唯一具体化路径。重启、Director supersede、P0抢占和context drift均显式失效。
+
+### 影响与边界
+
+- 候选、READY和HIT都不是World Fact或artifact success；未采用玩家行为永不提交。
+- SQLite trigger重复校验Director admission、P1批准、P2容量和schema-30资格；内部snapshot只恢复审计，portable format v2正式升级留给M10-T05。
+- 不修改Rules/D20、Provider、Quest/NPC/Adventure、World Seed/Constitution或已有Feature提交语义。
+- 本任务不新增UI/CSS；后续状态展示遵循视觉手册，Legacy视觉收敛仍由M10-T07执行。
+
+## DEC-146：Streaming 仅传输临时投影，完整结果仍走原提交事务
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T03`、`DEC-118`、`DEC-123`与[`V0.3_STREAMING.md`](V0.3_STREAMING.md)
+
+### 背景
+
+NPC回复与世界介绍已有完整结构化生成、验证和SQLite提交合同，但长响应只能等待整体完成。若逐chunk写Message/World会让取消、超时、畸形final与重开留下半事实；若把Streaming改成Provider必需能力，会破坏本地模型和旧配置兼容；若直接展示结构化JSON，又会泄露实现格式并产生错误游戏文本。
+
+### 决定与理由
+
+`AIProvider.generate`保持必需，`generateStream`仅为capability-gated可选接口。Native复用secure HTTP整体deadline/byte limit，以SSE decoder处理跨byte UTF-8和frame，再用Tauri Channel发送request-scoped连续片段；有界Cancellation registry覆盖取消早于command注册的竞态。TypeScript再次验证序号、大小及chunk拼接值与final content精确一致。
+
+结构化流只经本地projector展示顶层玩家字段：NPC为`reply`，初始世界介绍为`summary`。projector处理escape、Unicode与surrogate pair，不展示原始JSON。NPC继续先写durable timeline PENDING，完整输出通过原Schema、重复与业务验证后才在既有事务一次提交；World同样只调用原完整commit。取消、超时、顺序错误或畸形final不写正式内容。
+
+### 影响与边界
+
+- 已输出片段后不切换fallback，避免跨模型拼接；无片段失败和非流式Provider沿用既有路径。
+- Chunk、流草稿与Prompt不持久化；SQLite仍是唯一事实，timeline只记录操作状态。
+- Repair不流式展示；完整final仍可进入既有一次repair边界。
+- 不修改Rules/D20、Queue、Constitution、Quest/NPC/Adventure业务语义，不进入M10-T04。
+- 新UX复用ActionComposer及现有stream样式；视觉手册全局有效，Legacy全面迁移仍由M10-T07执行。
+
+## DEC-147：缓存身份绑定实际稳定规则字节，Provider 与会话证据分离
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T04`、`DEC-067`～`DEC-070`、[`V0.3_CACHE_OPTIMIZATION.md`](V0.3_CACHE_OPTIMIZATION.md)
+
+### 背景
+
+桌面主调用链原先只对 Stable Prompt Profile 计算哈希，Unified Context 的 Constitution/locked rules 仍只存在于完整 Task Input；旧 Context Cache Layout 也没有接入该生产链。相同哈希因此不能完整表达应用期望稳定的 Constitution/Rules/Prompt。另一方面，会话中重复出现同一哈希只能证明本机见过该前缀，不能证明 Provider 计费缓存命中。
+
+### 决定与理由
+
+Stable Profile v4 从已完成知识授权与预算的 Unified Context 中，只投影 `stable/rules` block。投影包含规范内容、source revision 和block version，不包含随机block/source ID；UUID、时间、request/cache/UI元数据被排除。完整原输入继续位于动态尾部，因而优化不会删除正确上下文。桌面primary/fallback/repair冻结并复用同一assembly，Application默认turn formatter使用同一投影。
+
+DeepSeek usage明确返回的hit/miss是唯一Provider observation，并继续有界持久化200项。进程内另设只含hash的200项LRU，输出`PREFIX_FIRST_SEEN/PREFIX_REUSED`且明确标记session observation。AI Inspector分别显示两者，并保留token/latency的unknown语义。
+
+### 影响与边界
+
+- Profile/Prompt Manager、Constitution revision或稳定规则变化会失效；Recent、Action与私密Knowledge变化不污染稳定前缀。
+- prefix hash描述应用控制并实际发送的UTF-8稳定内容，不伪造Provider线路角色封装或计费结果。
+- 缓存指标仍是device telemetry，不进入SQLite游戏事实或portable archive；不新增schema。
+- 本任务不修改Rules/D20、Provider协议、Queue、Quest/NPC/Adventure或Save合同；M10-T05仍是下一任务。
+
+## DEC-148：冻结Save Schema 3 / World Schema 1并让Windows启动迁移只切换已验证副本
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T05`、V0.3 Spec 15.3、[`save-format.md`](save-format.md)
+
+### 背景
+
+本地SQLite已演进到schema 31，但Campaign没有独立save/world版本；portable schema 2只携带15张V0.2表，V0.3持久事实散落在本地表中。TypeScript启动工具已有备份、隔离副本、校验和原子切换，Windows实际Rust启动却仍在活动文件直接执行migration。继续这种分叉会让Windows升级失败无法证明原件保持不变，也会让portable round-trip静默缺失V0.3状态。
+
+### 决定与理由
+
+本地migration 32为Campaign增加`save_schema_version=3`和`world_schema_version=1`硬约束；不修改任何业务字段。Windows Rust启动先创建一致完整备份，从备份建立隔离工作文件，在工作文件执行全部历史migration，并完成integrity、foreign key、schema history和Campaign领域重载；仅验证通过后rename原子切换，失败保留原文件字节。
+
+`.emtavern`五文件结构不变，因此`formatVersion`仍为1；portable `databaseSchemaVersion`升到3。schema 3携带69张Campaign持久事实/状态/审计表，包含Event Ledger和已终结AI Candidate；排除设备配置/凭据、pending request、内部snapshot、Dialogue/Prefetch缓存和restore session。v1/v2继续读取，转换只增加Campaign save/world版本并依靠当前业务触发器建立合理兼容投影，不伪造旧档不存在的Constitution等世界事实，也不改写源文件。
+
+### 影响与边界
+
+- TypeScript/Rust使用镜像固定清单，导入后逐表精确重载并继续执行已有领域Repository校验；覆盖导入仍先备份并用单事务提交。
+- 历史TS/Rust v1/v2 fixture永久保留并加入hash门禁；v3使用新fixture，interop双向再生成/交叉导入。
+- UI在导入前显示历史迁移、目标save/world版本及“原文件不改写”；未来版本明确要求升级应用。
+- 不接入云同步/CRDT，不导出设备秘密，不改变Rules/D20、Provider、Queue、Quest/NPC/Adventure业务语义或存档ID。
+
+## DEC-149：性能回归以跨批 P95 中位数和长期增长双门禁
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T06`、`DEC-106`、`docs/V0.3_PERFORMANCE_BASELINE.md`
+
+### 背景
+
+M1-T04 已建立内容无关的五类 Fake Provider 基线，但单批亚毫秒结果容易受本机调度影响，也没有覆盖 M10 新增 GenerationQueue、长期 SQLite 存档和 Unified Context 增长。直接比较单次最快值会掩盖尾延迟；把 Fake Provider 未提供的 token/cache usage 写成 0 又会制造虚假改善。
+
+### 决定与理由
+
+M10-T06 对冷启动三批和同实例热运行三批分别采集每任务十个样本，对每批 P95 再取中位数。核心 latency/queue 阈值固定为 `max(M1 P95 × 3, M1 P95 + 5 ms)`：相对门捕捉有意义增长，绝对余量隔离亚毫秒基线的调度噪声。另设真实 GenerationQueue P95 ≤ 50 ms、SQLite 100→1000 回合增量 ≤ 4096 bytes/turn、Unified Context ≤ 2048 tokens 且增长 ≤ 1.05×。
+
+Fake usage 继续保持 unknown/NOT_EVALUATED。自动门为未来真实证据固定 input tokens 每样本平均 ≤ 16384、Provider cache hit ratio ≥ 0.50；cache hit/miss 只接受 Provider usage，不接受本地 prefix reuse。任一已评估失败使 CLI 非零退出；只能修复回归或另建明确决策接受，禁止按结果下调阈值。
+
+### 影响与边界
+
+- 自动报告只保存 commit、环境、汇总、阈值和内容无关增长数字，不保存 Prompt、messages、玩家文本、request ID、Context 内容或凭据。
+- SQLite 增长使用 `page_count × page_size`，Context 使用既有 Unified Context token 估算；长期历史仍完整持久化，只限制模型投影。
+- 本决定不修改 Rules Engine、Provider 合同、GenerationQueue 行为、SQLite schema、业务事务或存档格式。
+- 真实模型的网络 latency、token 和计费 cache 仍需单独授权，不能由 Fake 结果外推。
+
+## DEC-150：视觉值冻结为三层 Token 单一来源，Legacy class 只保留兼容边界
+
+- 日期：2026-08-24
+- 状态：已采纳
+- 依据：`M10-T07`、[`EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`](EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md)、[`audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md`](audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md)
+
+### 背景
+
+M2 已建立三层 Token、UI Primitives 和 Game Components，但历史页面仍有 41 处 raw color/rgba、冷蓝灰色板、重复字体/间距/圆角/阴影/动效值，以及只能以 Tab 顺序绕过侧栏的应用壳。一次性改写所有 JSX 会扩大回归面并威胁已通过测试的业务状态机；只换颜色又无法满足完整视觉手册与唯一来源要求。
+
+### 决定与理由
+
+Primitive 冻结原始暖黑、深木、羊皮纸、余烬金、功能色、字体、4px 间距、6/10/14/16px 圆角、Border、Shadow、Motion 和 layer。Semantic 提供主题含义，Component 只引用 Semantic；`theme.css` 与两套共享组件 CSS 禁止 raw color 和直接 `--et-*`。自动门同时检查 typography、spacing、radius、border、shadow 与 animation timing/easing，防止后续重新散落硬编码。
+
+现有 Button/Input/Card/Overlay/State 与 Character/NPC/Quest/Trait/Dialogue/Action/AI/Generation/Status 组件继续是唯一共享体系。历史 class 不复制成新组件，也不为改名大规模重写页面；它们只作为兼容适配边界读取同一 Semantic/Component Token，并由生产页面复用测试固定。应用壳新增 HashRouter 安全的 skip link，D20 跳过操作复用共享 Button，但硬结果、reveal 回调和业务计时不变。
+
+### 影响与边界
+
+- Paper 只在 NPC 对话、Quest 与 Adventure 等手册型页面局部启用；Settings/My 保持低装饰桌面 HUD，不展示机器人、GPT/LLM 品牌或夸张火焰/金边。
+- 四个既定视口继续沿用 860×600、1180×760、1366×768、1920×1080；不改变已有里程碑、门禁或页面业务合同。
+- media breakpoint、运行时几何宽高、百分比和 keyframe transform 不是可主题化视觉值，不包装成无意义 Token；其余差异必须通过静态门或进入 M12 findings ledger。
+- 本决定不修改 Rules Engine、AI Provider、Generator/Queue、SQLite、Persistence、Save/Resume、World Seed/Constitution、D20 硬结果或 Quest/NPC/Adventure 核心语义。
+
+## DEC-151：三世界长测使用不可变场景 Hash、独立 SQLite 与显式 Evidence 状态机
+
+- 日期：2026-08-26
+- 状态：已采纳
+- 依据：`M11-T01`、V0.3 Spec 16.2、[`V0.3_PLAYTEST_HARNESS.md`](V0.3_PLAYTEST_HARNESS.md)
+
+### 背景
+
+仓库已有三种世界的局部领域测试，但没有一个可被 M11 长测共同复用的运行身份、隔离目录、动作顺序、重置/回放语义或证据格式。若各长测临时自建 fixture，容易把三个世界做成换名样本、交叉污染 SQLite、复制上次结果，或把 Fake 单元测试误写成真实模型证据。
+
+### 决定与理由
+
+在既有 `@ember-tavern/test-fixtures` 包建立三个 `SYNTHETIC_M11` 场景。每世界拥有不同 Constitution、Career、Equipment、Trait、NPC、Quest 和 Extension 结构，以及 32 个不预判结果的有序玩家动作。Manifest 分别计算 fixture/script SHA-256，再组合为 scenario hash，并绑定 source commit。
+
+每个世界使用独立目录和 `campaign.sqlite3`。Reset 只删除目标世界的已知 SQLite/WAL/SHM 与动作证据文件，保留不可变场景；Replay 以新 run ID 从 `NOT_RUN` 开始，但相同输入保持相同 hash。Evidence v1 按动作追加 outcome、latency、持久化和要求的观察类型，并保存 P0–P3 finding；只有完成全部脚本才允许标记 `COMPLETE`，但完整执行不等于通过。
+
+### 影响与边界
+
+- fixture 和 evidence 复用 portable save 秘密扫描；只记录 Provider/Model 显示身份，不记录 Credential、API Key、Prompt 或正式用户数据。
+- 结构差异门检查 Technology/Magic/Economy、装备类别、Trait 点型、Quest 风险和扩展 schema，禁止只换名称。
+- M11-T02～T04 负责把 production 服务接入独立 SQLite 并形成真实长测证据；M11-T01 不预填剧情结果、不冒充真实模型验证。
+- 本决定不改变 Rules Engine、Provider、Generator/Queue、SQLite schema、Save、D20 或 Quest/NPC/Adventure 业务合同。
+
+## DEC-152：Fantasy 长测以单存档生产纵切和显式 Fake 身份取证
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T02`、V0.3 Spec 16.2、[`audit/V0_3_FANTASY_LONG_PLAYTEST.md`](audit/V0_3_FANTASY_LONG_PLAYTEST.md)
+
+### 背景
+
+M11-T01 只冻结了场景、动作与证据合同，不能证明生产应用服务、SQLite 事务、恢复和 portable archive 在长序列中能共同工作。若用多个临时数据库拼接 32 项结果，会掩盖状态漂移和外键问题；若把 Fake Provider 的确定性结果表述为真实模型质量，又会产生错误发布证据。
+
+### 决定与理由
+
+Fantasy 32 项行为通过 Windows production native bridge 在一个保留路径的 SQLite Campaign 上顺序执行。Career、角色/Trait、酒馆/NPC/知识、多 NPC scene、Quest/Adventure、D20/Rules、装备/经济、时间/旅行、Director、正常重开、失败恢复和 portable overwrite import 都必须产生可查询的持久事实；run 绑定 source commit，并提交数据库、archive、逐动作 evidence、summary、截图和 SHA-256。
+
+Provider 身份固定为 `FAKE`。它验证生产编排、结构校验、事务和持久化，不外推真实模型的叙事质量、网络延迟、token 或计费缓存；真实 Provider 保持 `NOT_RUN`。浏览器壳截图只验证视觉与安全状态，不能替代 Tauri/SQLite 证据。
+
+长测发现 `npc_lod_profiles` 不存在 `population_role` 列，而角色实际位于 `profile_json.$.populationRole`。修复只让 scene 查询遵循既有 LOD 存储合同，并以人口投影、两名 focus NPC 和已提交 scene turn 回归；不新增 schema 或第二套 scene 状态。
+
+### 影响与边界
+
+- `COMPLETE` 表示 32 项执行完整；finding 仍必须保留状态和严重度。本次 `M11-FAN-001` 为 P1/FIXED，开放 finding 为 0。
+- archive 恢复使用生产 `Overwrite` 路径，不用原始 SQL 删除 Campaign 绕开外键和领域重载。
+- 性能数字是 32 项生产流总墙钟时间的摊销观察，不是 Provider billing latency，也不替代 M10 回归门。
+- Investigation、Cyberpunk、free-input stress 和 M12 必须独立执行；本决定不提前进入 M11-T03。
+- 除修复既有 NPC LOD 查询外，不改变 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同。
+
+## DEC-153：Investigation 长测以扩展隔离、可追踪误导和确定失败推进取证
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T03`、V0.3 Spec 16.2、[`audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md`](audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md)
+
+### 背景
+
+调查世界不能只证明奇幻流程换名可跑；它必须验证世界扩展、有限认知、误导信息、失败推进和多 Quest 一致性，同时避免复制受版权保护的商业 TRPG 规则。随机 D20 又不能稳定提供“失败后继续”的回归证据。
+
+### 决定与理由
+
+使用原创架空一九二〇年代雾港场景，在单一 SQLite Campaign 上顺序执行 32 项生产行为。`investigation-resilience` 以现有 world extension schema 表达镇定、机运、信用和线索负荷；初始 fixture 仅以局部 `json_set` 写入 extensions/revision/time，继续经过现有 revision 与基础属性不可变触发器，不新增调查专用核心 schema。
+
+传闻分别持久化 FALSE/PARTIAL/TRUE 与来源；NPC 回复明确区分亲历、传闻和未知。失败推进使用合法 difficulty 17、体魄 1 和 Rules Engine 的 `-5` 临时状态，使自然 20 的总计也低于门槛；D20 仍由既有本地硬结果逻辑投掷和持久化，测试不写入骰值、不重骰。失败回合之后仍提交七个回合、线索、结算和第二条开放 Quest。
+
+### 影响与边界
+
+- Fake Provider 只验证生产编排、结构校验、事务和持久化；真实模型继续 `NOT_RUN`，不外推叙事质量、网络延迟、token 或计费缓存。
+- 初始 extension definition/value 是合成 fixture 输入；AI 输出仍不能直接修改游戏状态。后续 Rules、Quest、Adventure、Director、恢复和 archive 全部使用生产服务。
+- 不引入 COC 品牌、专有角色、文本或规则；“调查”“信用”“幸运”等一般概念不映射商业规则表。
+- 本次开放 finding 为 0。夹具编写时被既有白名单、防重复和不可变触发器拒绝的无效值只修正夹具，不降低产品校验。
+- 不修改 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同；Cyberpunk、free-input stress 与 M12 必须独立执行。
+
+## DEC-154：Cyberpunk 长测以通用扩展、动态势力后果和有界经济取证
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T04`、V0.3 Spec 16.2、[`audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md`](audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md)
+
+### 背景
+
+Cyberpunk 长测不能是 Fantasy 的名称替换。它必须同时验证义体负荷、声望与权限等世界扩展，动态势力的激活和跨地点后果，以及信用点、装备与奖励不会因科幻题材产生数值膨胀；同时不得为该世界新增专用核心 schema 或绕过既有生产事务。
+
+### 决定与理由
+
+使用原创 2089 年霓虹堤岸断网场景，在单一 SQLite Campaign 上顺序执行 32 项生产行为。`cyberpunk-augmentation` 继续通过通用 extension definition/value 表达神经负荷、街区声望、追踪热度、植入插槽和网络权限；初始合成 fixture 只局部更新 extensions/revision/time，不修改基础属性。
+
+动态势力由既有 Active Faction 生成、校验和提交链激活。一次生产势力行动扩展七码头互助网领地、将玩家关系更新为 `FRIENDLY` 并写入可追踪世界事实；正常重开和 portable overwrite import 后仍保留两个活跃势力和同一行动。经济取证同时检查 Rules Engine 信用点余额、显式装备替换、Adventure 语义奖励数量和奖励价格上界，禁止用单纯抬高数值制造科幻感。
+
+### 影响与边界
+
+- Fake Provider 只验证生产编排、结构校验、事务与持久化；真实模型继续 `NOT_RUN`，不外推叙事质量、网络延迟、token 或计费缓存。
+- 最终 32/32 `COMPLETE`、开放 finding 为 0；义体扩展、跨地点、双 Quest、失败推进、势力行动和 archive 恢复均有数据库证据。
+- 不新增 Cyberpunk 专用表，不修改 Rules、D20、Provider、Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 业务合同。
+- 三世界固定长测均已完成；free-input stress、综合可玩性报告和 M12 必须独立执行，本决定不提前进入 M11-T05。
+
+## DEC-155：自由输入压力复用既有领域事务并以持久状态判定结果
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T05`、V0.3 Spec 16.3、[`audit/V0_3_FREE_INPUT_STRESS_TEST.md`](audit/V0_3_FREE_INPUT_STRESS_TEST.md)
+
+### 背景
+
+三世界固定脚本已经证明主要纵向流程可以运行，但不能证明玩家拒绝、欺骗、越界交易、离开推荐路线或改变阵营时仍有合理后果。若为八个测试输入增加专用解析器、直接写数据库或复制预期标签，会形成第二套状态机并产生虚假证据；若改用正式用户存档，又会破坏数据边界。
+
+### 决定与理由
+
+从三份已提交 `SYNTHETIC_M11` 长测数据库按固定 SHA-256 复制隔离运行，保留其长期状态而不修改原证据。八个精确输入都经过既有 NPC 对话校验与提交；需要改变游戏状态时只调用现有 `QuestPoolTransitionCommand`、`DynamicLocationTravelCommand` 或 `FactionActionCommand`。失败和拒绝同样提交可解释回复与必要关系后果，不把未知输入折叠为“无法解析”。
+
+运行器从重开后的 SQLite 指标推导实际 `SUCCEEDED/FAILED/REJECTED`，再与脚本预期比较；不把预期结果直接当作实际结果。三个数据库必须保持 `TAVERN`、完整性正常、无外键错误和无未完成请求，并各自产出 portable archive。证据目录不可覆盖，manifest 记录来源哈希、source commit 和 Fake Provider 身份。
+
+### 影响与边界
+
+- 八类行为得到四项成功、两项失败和两项规则拒绝；全部精确输入和回复持久化，`suggestionRequired=false`，开放 finding 为 0。
+- Fake Provider 只验证结构、生产编排、后果事务和持久化；真实模型继续 `NOT_RUN`，不外推开放式叙事质量或网络延迟。
+- 不新增自由输入命令语言、专用表或预设动作路由，不修改 Rules、D20、Provider、Generator/Queue、SQLite schema、Save format 或 Quest/NPC/Adventure 合同。
+- M11-T06 必须独立复算并汇总 M11 全部证据；本决定不提前进入报告或 M12。
+
+## DEC-156：可玩性报告从已哈希证据复算，并将 Fake 可玩性与真实模型质量分离
+
+- 日期：2026-08-27
+- 状态：已采纳
+- 依据：`M11-T06`、V0.3 Spec 16、[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)
+
+### 背景
+
+M11-T02～T05 分别保存了长测和自由输入证据，但人工汇总容易漏记失败、混淆同一存档上的额外行为、错误相加不同计时方法，或把 Fake Provider 的稳定结果外推成真实模型质量。仅在 Markdown 中手填统计也无法证明报告仍与已提交证据一致。
+
+### 决定与理由
+
+新增 `playtest:report` 复算门，直接读取四个权威证据目录并验证各自 `SHA256SUMS`。测试重新计算三世界 96 项固定行为、8 项自由输入、Provider/Model 身份、延迟、outcome、findings 和持久化健康状态，再与不可覆盖的 `EMBER_PLAYABILITY_REPORT_SUMMARY` 逐字段比较；同时检查报告章节、证据链接和必须披露的限制。
+
+评分使用五个显式维度，每项最高 2 分：执行/恢复、知识/人格、Quest/世界一致性、系统/Context、玩家能动性。三个固定世界每个都有 32 项行为，因此等行为权重；Fantasy/Investigation/Cyberpunk 为 8.6/8.8/8.9，综合 8.8，置信度 MEDIUM。评分不包含真实模型文风、网络性能、token 或计费缓存；这些项目在本轮统一标为 `NOT_EVALUATED`。
+
+### 影响与边界
+
+- M11 共 104 项已执行行为；唯一 `M11-FAN-001` 为已修复 P1，当前开放 P0/P1/P2/P3 均为 0。失败与规则拒绝仍保留为自由输入 outcome，不伪装成全部成功。
+- 不把四个运行的不同计时方法合并成 Provider SLA；固定长测与压力事务分别报告。
+- V0.2 真实 DeepSeek 证据只作为历史背景，不能替代 V0.3 M11 真实模型验证。
+- 本决定不改变任何游戏、Provider、Rules、SQLite、Save 或 UI 合同；M11 完成只允许进入 M12 第一轮完整审计，不提前给出发布或 `READY FOR SECOND AUDIT` 判断。
+
+## DEC-157：第二轮审计准入与公开发布批准必须分离
+
+- 日期：2026-08-28
+- 状态：已采纳
+- 依据：`M12-T01`～`M12-T04`、[`V0.3_FIRST_AUDIT_REPORT.md`](V0.3_FIRST_AUDIT_REPORT.md)、[`audit/V0_3_RELEASE_GATES.md`](audit/V0_3_RELEASE_GATES.md)
+
+### 背景
+
+V0.3 第一轮 findings 已关闭或按非发布平台范围显式接受，当前开放 P0/P1/P2/P3 均为0；核心纵向、三世界可玩性和当前主机适用门禁有证据。但当前没有临时Windows runner执行NSIS/Credential Manager/WebView2/安装启动卸载，也没有临时macOS runner执行完整Keychain/启动/数据库/清理生命周期；真实Provider长测、真实token与计费cache同样没有授权证据。若把“可以接受第二轮独立审计”与“可以公开发布”合并为一个布尔结论，会把这些外部未知错误地写成已验证。
+
+### 决定与理由
+
+将最终状态明确拆成两层：
+
+1. `READY FOR SECOND AUDIT`：要求P0/P1为0，核心架构、Rules/D20、SQLite/迁移、Credential边界、三世界可玩性和所有当前适用质量/构建门有可信证据；平台不可用项必须明确`BLOCKED_EXTERNAL`。
+2. `NOT READY FOR PUBLIC RELEASE`：在绑定最终候选commit的Windows与macOS生命周期、真实Provider验收，以及所需签名/notarization/发布授权完成前保持该状态。
+
+Fake Provider性能和可玩性只证明确定性生产编排、规则、事务与持久化。真实Provider的token、计费cache、网络与叙事质量继续为`NOT_EVALUATED`；本地prefix reuse不冒充计费cache hit。V0.2的历史真实DeepSeek或平台证据不替代V0.3。
+
+### 影响与边界
+
+- 第二轮审计可以立即从当前提交和已哈希证据开始，不需要重复M0～M12第一轮任务。
+- 第二轮审计不得把两个`BLOCKED_EXTERNAL`、真实Provider未知或unsigned状态改写为PASS；公开发布门仍需独立完成。
+- Linux GTK3/glib告警保持`DEFERRED_ACCEPTED`，只在V0.3不发布Linux的范围内成立；未来Linux发行前必须重审。
+- 本决定只定义审计/发布状态，不改变Rules、D20、Provider、Generator/Queue、SQLite、Save/Resume、World、Quest/NPC/Adventure或视觉组件合同。
+
+## DEC-158：世界生成使用分层有界时限、统一队列意图与端到端取消
+
+- 日期：2026-08-29
+- 状态：已采纳
+- 依据：V0.3 RC 实测 `RC-PLAYTEST-001`、[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)
+
+### 背景
+
+世界构筑是最大 8,000 输出 token 的结构化任务。旧实现绕过 `GenerationQueue`，并把 DNS、连接、发送和完整响应体压进约 60 秒的统一传输时限；正常但较慢的真实 Provider 响应会被误判为 `TIMEOUT`。仅放大或删除超时会失去故障边界，也不能解决同一 Campaign 并发、取消和重复提交。
+
+### 决定与理由
+
+世界生成与局部重绘统一进入单并发 `GenerationQueue`，按 `world:<campaignId>:<task>` 去重。队列等待和真正执行分开计时；外层操作预算为 270 秒，用于容纳一个 120 秒 Provider 请求加一次结构修复或获准 fallback，以及有界校验/事务提交。secure HTTP 同时保留 DNS 10 秒、连接 15 秒和单次完整传输 120 秒上限，因此任何层都不会无限等待。
+
+`AbortSignal` 从 UI 贯穿 Queue、Desktop orchestrator、Tauri 非流式命令和 secure HTTP cancellation token。Provider 错误分类不改写；只有真实超时映射为 `TIMEOUT`。结构与业务校验完成前不进入 SQLite commit；相同意图并发共享结果，取消、超时和失败均不产生部分写入。
+
+### 影响与边界
+
+- 该预算只适用于 V0.3 世界生成/重绘，不把所有 AI 任务统一扩大到 270 秒。
+- fallback 仍由 Desktop orchestrator 的既有政策决定，Queue 不额外重试或叠加 fallback。
+- 不修改 Provider 业务合同、SQLite schema、Save 格式、Rules/D20 或世界状态机。
+- 真实 Provider SLA、token 与计费 cache 仍需独立授权验证；本决定不构成公开发布批准。
+
+## DEC-159：模型 JSON 只做确定性规范化，finish reason 与完整验证层级必须可区分
+
+- 日期：2026-08-29
+- 状态：已采纳
+- 依据：V0.3 RC 实测 `RC-PLAYTEST-003`、[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)
+
+### 背景
+
+世界生成 Provider 可能返回裸 JSON、单层 Markdown JSON 围栏、短说明包围的唯一对象，或因 token 上限返回截断内容。把所有情况直接交给裸 `JSON.parse` 会误拒可确定规范化的响应；反过来，从多个对象猜一个、放宽必填字段或跳过业务规则会破坏 AI 不可信边界。旧错误链还不能稳定区分 JSON、Schema、业务规则、截断和 repair 自身失败，世界构筑 UI 又误用了冒险阶段的“已锁定硬结果”文案。
+
+### 决定与理由
+
+Provider 响应先检查 finish reason：`LENGTH` 明确为 `RESPONSE_TRUNCATED`，内容过滤和未知未完成原因独立分类。内容只允许三种输入：完整 JSON、完整单层 JSON 围栏、最多一个由短说明文字包围的唯一顶层 JSON 对象；多个候选一律 `AMBIGUOUS_JSON`。规范化之后始终执行同一权威 TypeScript Schema 与业务规则；repair 最多沿用既有一次机会，使用独立 Provider 请求预算，并从头复验。仍失败则不进入 SQLite。
+
+Prompt 输出 Schema 继续直接来自 `AI_TASK_SCHEMAS`；Rust commit 继续复核本地 ID、envelope/validated output/world 一致性、业务规则和原子事务。错误链保留 INITIAL/REPAIR、脱敏验证 code 和字段路径，但不记录 API Key、Authorization 或原始敏感响应。普通 UI 显示适合世界构筑阶段的失败层级，不显示内部 Schema 内容，也不声称存在已锁定硬结果。
+
+### 影响与边界
+
+- 不把必填字段改 optional/nullable，不静默删除关键字段，不把任意文本写入 SQLite。
+- `JSON_OBJECT` Provider 能力不等于严格 `JSON_SCHEMA` 保证；本地完整校验不可省略。
+- 失败 raw response 按现有安全合同不持久化，因此历史截图的具体字段可能无法追溯；新的 session inspector 只保留脱敏定位信息。
+- 真实 Provider 若在完整响应前超时，JSON/Schema/business/commit 验收必须标为 `BLOCKED_EXTERNAL`，Fake 或浏览器 mock 不得替代。
+
+## DEC-160：DeepSeek 世界任务显式禁用 thinking，结构 Schema 与业务规则保持分层同权
+
+- 日期：2026-08-30
+- 状态：已采纳
+- 依据：V0.3 RC A–D 差分诊断、[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)
+
+### 背景
+
+`/models` 与最小 JSON 都能快速完成，但完整世界请求在默认 thinking 下可能把大量时间和 token 用于当前客户端不消费的 `reasoning_content`，最终撞上 120 秒完整流 deadline。追加生产 D 同时证明 Desktop 结构验证与 Rust commit 之间存在 Constitution 跨字段业务规则漂移。把所有问题归因于网络、无限增加 timeout、放宽 Schema 或把业务矛盾伪装成结构错误都会掩盖真实边界。
+
+### 决定与理由
+
+仅当 preset 为 DeepSeek 且 task 为 `GENERATE_WORLD` 或 `REFINE_WORLD` 时，在 OpenAI-compatible 请求中显式序列化 `thinking:{type:"disabled"}`。Provider 默认策略仍是 omission，因此其他任务、Qwen、OpenRouter、Ollama 与 custom endpoint 不接收未经证明的扩展。世界输出上限按成功样本与三次真实验收校准为 4096，同时保留 120 秒 Provider 与 270 秒 operation 上限。
+
+世界 JSON Schema 继续负责语法、字段、类型、枚举、长度和引用完整性；Constitution 的 `technologyLevel`、`powerRules`、`forbiddenElements` 三条恒等关系继续属于业务规则。Desktop `RULES_CHECK`、application use case 和 Rust transaction boundary 使用同一规则语义，业务冲突映射为 `WORLD_BUSINESS_RULE_INVALID`，不触发结构 repair；JSON/Schema 错误仍最多 repair 一次并从头复验。
+
+### 影响与边界
+
+- 不消费或展示 reasoning 内容，不把 thinking policy 推广到未经验证的任务或 Provider。
+- 不降低任何必填、枚举、引用或 Rust commit 约束；业务错误与 Schema 错误在 UI 和证据中保持可区分。
+- 4096 不是无限保证；`finishReason=LENGTH` 仍明确进入截断/结构修复或 fail-closed 流程。
+- 三次真实世界生成只使用隔离存档与 OS Credential Store opaque reference；该验证不授予公开发布、签名或部署权限。
+## DEC-161：结构生成使用任务级 reasoning、无进度与总时限预算
+
+- 日期：2026-08-30
+- 状态：已采纳
+- 依据：RC 真人实测世界/职业池 TIMEOUT 与 `docs/audit/evidence/v0.3-rc-profession-timeout-914165e/`
+
+### 背景
+
+DeepSeek 的严格 JSON 任务若使用 Provider 默认 thinking，可在没有可用 content 的情况下消耗任务时间。原职业池又把 12 秒 Queue 总时限、Provider 时限和 commit 分开配置，造成 UI 失败、后台请求可继续与重复 commit 窗口。
+
+### 决定
+
+对 DeepSeek 的世界、职业、特质、角色和一致性等严格结构任务显式关闭 thinking，叙事/推理任务保留默认。Provider timeout 表示首包/无进度时限，合法分块重置它；传输仍有 300 秒安全总上限。业务 Queue 独立提供 operation 总时限与取消，repair 使用新的 Provider 无进度预算。同一 intent 的准备与事务提交必须位于同一去重 Queue 内。
+
+### 影响与可逆性
+
+职业池以真实样本校准为 4096 token、60 秒无进度、150 秒 operation。其他任务仍保留自身 Schema/历史预算，不因本决定统一放大 token。具体数值可随脱敏统计调整，fail-closed、信号贯穿和单事务边界不可撤销。

@@ -90,6 +90,27 @@ describe('CacheMetricsRepository', () => {
       database.close();
     }
   });
+
+  it('retains only the latest 200 Provider observations', async () => {
+    const { database, repository } = await setup();
+    try {
+      for (let index = 0; index < 205; index += 1) {
+        repository.record({
+          taskType: 'GENERATE_DIALOGUE_SUGGESTIONS',
+          promptCacheHitTokens: index,
+          promptCacheMissTokens: 1,
+          prefixHash: index.toString(16).padStart(64, '0'),
+          recordedAt: new Date(Date.UTC(2026, 7, 8, 8, 0, index)).toISOString(),
+        });
+      }
+      const metrics = repository.list();
+      expect(metrics).toHaveLength(200);
+      expect(metrics[0]?.promptCacheHitTokens).toBe(5);
+      expect(metrics.at(-1)?.promptCacheHitTokens).toBe(204);
+    } finally {
+      database.close();
+    }
+  });
 });
 
 async function setup() {

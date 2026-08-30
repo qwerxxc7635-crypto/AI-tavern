@@ -1,27 +1,37 @@
 import { useEffect, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useSearchParams } from 'react-router-dom';
 
 import {
   sessionContextInspectorGateway,
   type ContextInspectorGateway,
   type ContextInspectorSnapshot,
 } from './context-inspector-service.js';
+import {
+  sessionAIInspectorGateway,
+  type AIInspectorGateway,
+  type AIInspectorSnapshot,
+} from './ai-inspector-service.js';
 import { tauriVersionGateway, type VersionGateway } from './version-service.js';
 import { RELEASE_INFO } from './generated-release-info.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, optionalCampaignRoute } from './navigation.js';
 import {
   tauriRandomnessSettingsGateway,
   type RandomnessProfile,
   type RandomnessSettingsGateway,
   type RandomnessSettingsSnapshot,
 } from './randomness-settings-service.js';
+import { PromptManagerPanel } from './prompt-manager-panel.js';
+import type { PromptManagerGateway } from './prompt-manager-service.js';
 
 export const MY_SECTIONS = [
   { id: 'api', label: 'API', description: '连接与模型档案' },
   { id: 'routing', label: '默认与备用', description: '任务路由与切换策略' },
   { id: 'generation', label: '生成参数', description: '采样、长度与超时' },
+  { id: 'prompt-manager', label: '提示词管理器', description: '只读核心规则与用户风格预设' },
   { id: 'deepseek-cache', label: 'DeepSeek 缓存', description: '稳定前缀与缓存观测' },
   { id: 'context', label: '上下文', description: '预算、来源与装配清单' },
+  { id: 'ai-inspector', label: 'AI 检查器', description: '高级生成诊断与遮罩视图' },
   { id: 'privacy', label: '隐私', description: '联网、凭据与诊断边界' },
   { id: 'version', label: '版本与更新记录', description: '版本、渠道与变更说明' },
 ] as const;
@@ -30,11 +40,16 @@ export function MyPage({
   versionGateway = tauriVersionGateway,
   randomnessGateway = tauriRandomnessSettingsGateway,
   contextInspectorGateway = sessionContextInspectorGateway,
+  aiInspectorGateway = sessionAIInspectorGateway,
+  promptManagerGateway,
 }: {
   readonly versionGateway?: VersionGateway;
   readonly randomnessGateway?: RandomnessSettingsGateway;
   readonly contextInspectorGateway?: ContextInspectorGateway;
+  readonly aiInspectorGateway?: AIInspectorGateway;
+  readonly promptManagerGateway?: PromptManagerGateway;
 }) {
+  const [search] = useSearchParams();
   const [version, setVersion] = useState<string | null>(null);
 
   useEffect(() => {
@@ -75,7 +90,10 @@ export function MyPage({
             <SectionCopy eyebrow={playerText.coreUi.connectionProfiles} title="API">
               管理本机Provider连接与模型能力登记。API Key只进入系统凭据库，不进入SQLite存档。
             </SectionCopy>
-            <NavLink className="quiet-action" to="/settings">
+            <NavLink
+              className="quiet-action"
+              to={optionalCampaignRoute(search, APP_PATHS.settings)}
+            >
               打开模型设置
             </NavLink>
           </section>
@@ -99,11 +117,27 @@ export function MyPage({
             </SectionCopy>
           </section>
 
+          <section id="prompt-manager" className="my-hub__entry">
+            <SectionCopy eyebrow="命运叙事风格" title="提示词管理器">
+              核心规则保持只读；可编辑预设只调整叙事风格，不能改变知识边界、输出结构或本地游戏状态。
+            </SectionCopy>
+            <PromptManagerPanel
+              {...(promptManagerGateway === undefined ? {} : { gateway: promptManagerGateway })}
+            />
+          </section>
+
           <section id="context" className="my-hub__entry">
             <SectionCopy eyebrow={playerText.coreUi.contextAssembly} title="上下文">
               查看ContextBlock预算、来源、版本与纳入原因；秘密内容默认不在检查器中展示。
             </SectionCopy>
             <ContextInspectorPanel gateway={contextInspectorGateway} />
+          </section>
+
+          <section id="ai-inspector" className="my-hub__entry">
+            <SectionCopy eyebrow="高级诊断" title="AI 检查器">
+              显式启用后查看最近一次生成的阶段和遮罩诊断；检查器只读且不会成为游戏事实来源。
+            </SectionCopy>
+            <AIInspectorPanel gateway={aiInspectorGateway} />
           </section>
 
           <section id="privacy" className="my-hub__entry">
@@ -130,11 +164,133 @@ export function MyPage({
         </div>
       </div>
 
-      <NavLink className="text-link" to="/saves">
+      <NavLink className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </NavLink>
     </main>
   );
+}
+
+function AIInspectorPanel({ gateway }: { readonly gateway: AIInspectorGateway }) {
+  const [enabled, setEnabled] = useState(false);
+  const [snapshot, setSnapshot] = useState<AIInspectorSnapshot | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  async function load() {
+    try {
+      setSnapshot(await gateway.load('ADVANCED'));
+    } finally {
+      setLoaded(true);
+    }
+  }
+
+  useEffect(() => {
+    if (enabled) void load();
+    else {
+      setSnapshot(null);
+      setLoaded(false);
+    }
+  }, [enabled, gateway]);
+
+  return (
+    <div className="ai-inspector" aria-label="AI 检查器">
+      <label>
+        <input
+          type="checkbox"
+          checked={enabled}
+          onChange={(event) => setEnabled(event.currentTarget.checked)}
+        />
+        启用高级检查器
+      </label>
+      {!enabled ? (
+        <p>玩家模式不会读取或显示生成诊断。</p>
+      ) : !loaded ? (
+        <p>读取中…</p>
+      ) : snapshot === null ? (
+        <p>本次会话尚无可检查的 AI 生成记录。</p>
+      ) : (
+        <>
+          <div className="ai-inspector__heading">
+            <strong>
+              {snapshot.generation.task} · {snapshot.generation.status}
+            </strong>
+            <button type="button" className="quiet-action" onClick={() => void load()}>
+              刷新检查器
+            </button>
+          </div>
+          <dl className="ai-inspector__metrics">
+            <div>
+              <dt>Provider / 模型</dt>
+              <dd>
+                {snapshot.provider.displayName ?? '未到达'} / {snapshot.provider.model ?? '未到达'}
+              </dd>
+            </div>
+            <div>
+              <dt>延迟</dt>
+              <dd>{snapshot.latencyMs} 毫秒</dd>
+            </div>
+            <div>
+              <dt>Provider 缓存</dt>
+              <dd>{snapshot.cache.providerObservation}</dd>
+            </div>
+            <div>
+              <dt>会话前缀观测</dt>
+              <dd>{snapshot.cache.sessionObservation}</dd>
+            </div>
+            <div>
+              <dt>令牌</dt>
+              <dd>
+                输入 {snapshot.tokens.input ?? '未知'} / 输出 {snapshot.tokens.output ?? '未知'}
+              </dd>
+            </div>
+            <div>
+              <dt>验证</dt>
+              <dd>
+                {snapshot.validation.status}
+                {snapshot.validation.code === null ? '' : ` · ${snapshot.validation.code}`}
+              </dd>
+            </div>
+            <div>
+              <dt>修复</dt>
+              <dd>{snapshot.repair.status}</dd>
+            </div>
+          </dl>
+          <details>
+            <summary>上下文清单</summary>
+            <pre>{safeInspectorText(snapshot.context)}</pre>
+          </details>
+          <details>
+            <summary>提示视图</summary>
+            <pre>{safeInspectorText(snapshot.prompt)}</pre>
+          </details>
+          <details>
+            <summary>原始输出视图</summary>
+            <pre>{safeInspectorText(snapshot.raw)}</pre>
+          </details>
+          <details>
+            <summary>解析结果视图</summary>
+            <pre>{safeInspectorText(snapshot.parsed)}</pre>
+          </details>
+          <details>
+            <summary>验证、修复与阶段</summary>
+            <pre>
+              {safeInspectorText({
+                validation: snapshot.validation,
+                repair: snapshot.repair,
+                lifecycle: snapshot.lifecycle,
+              })}
+            </pre>
+          </details>
+          <p>高级模式默认遮罩提示、原始内容、解析值、秘密与未授权世界信息。</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+function safeInspectorText(value: unknown): string {
+  const serialized = JSON.stringify(value, null, 2);
+  return serialized === undefined ? '无' : serialized;
 }
 
 function ContextInspectorPanel({ gateway }: { readonly gateway: ContextInspectorGateway }) {

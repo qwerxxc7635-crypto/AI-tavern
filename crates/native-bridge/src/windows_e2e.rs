@@ -2,13 +2,23 @@ use serde_json::{Value, json};
 
 use super::*;
 
-const CAMPAIGN_ID: &str = "campaign-windows-e2e";
+const CAMPAIGN_ID: &str = "playtest-m11-fantasy";
 
 #[test]
 fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
     let directory = tempfile::tempdir().expect("temporary release directory");
-    let database_path = directory.path().join("ember-tavern.sqlite");
-    let archive_path = directory.path().join("windows-release.emtavern");
+    let database_path = std::env::var_os("EMBER_FANTASY_PLAYTEST_DATABASE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("ember-tavern.sqlite"));
+    let archive_path = std::env::var_os("EMBER_FANTASY_PLAYTEST_ARCHIVE")
+        .map(std::path::PathBuf::from)
+        .unwrap_or_else(|| directory.path().join("windows-release.emtavern"));
+    if let Some(parent) = database_path.parent() {
+        std::fs::create_dir_all(parent).expect("create playtest database directory");
+    }
+    if let Some(parent) = archive_path.parent() {
+        std::fs::create_dir_all(parent).expect("create playtest archive directory");
+    }
     let store = CampaignStore::open(&database_path).expect("open release database");
     assert!(store.list().expect("first-launch campaign list").is_empty());
     assert!(
@@ -24,6 +34,18 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             "2026-08-01T14:00:00.000Z".to_owned(),
         )
         .expect("create campaign");
+    let seed = store
+        .world_seed(CAMPAIGN_ID)
+        .expect("persistent world seed");
+    assert_eq!(seed.algorithm, "EMBER_STREAM_V1");
+    assert_eq!(seed.seed.len(), 32);
+    assert_eq!(
+        store
+            .reserve_world_random(CAMPAIGN_ID, "map.initial", 2)
+            .expect("reserve deterministic map stream")
+            .start_position,
+        0
+    );
 
     let world = world_draft();
     let world_output = serde_json::to_value(&world).expect("serialize world output");
@@ -57,12 +79,16 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
             .campaign_state,
         "CREATING_CHARACTER"
     );
+    let career_pool = store
+        .commit_career_pool_generation(fantasy_career_pool_command(&store))
+        .expect("generate fantasy career pool");
+    assert_eq!(career_pool.careers.len(), 3);
 
     let character = character_draft();
     let trait_output = json!({
         "traits": [
-            {"name":"Keen Listener","description":"Notices quiet changes."},
-            {"name":"Roadwise","description":"Reads signs on the road."},
+            {"name":"余烬听觉","description":"能从火焰细响中察觉异常，但持续噪声会使判断迟疑。"},
+            {"name":"誓债在身","description":"面对公开承诺时更坚定，也更难撤回已经说出口的选择。"},
             {"name":"Steady Hands","description":"Works calmly under pressure."},
             {"name":"Harborwise","description":"Knows port customs."},
             {"name":"Quiet Courage","description":"Acts despite fear."},
@@ -100,8 +126,8 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         "importantPerson":"A missing sibling.",
         "tavernArrivalReason":"Seeking the last caravan.",
         "initialEquipment":[
-            {"name":"Trail Compass","description":"A weathered brass compass."},
-            {"name":"Travel Cloak","description":"A waxed cloak."}
+            {"name":"缺口银灯","description":"能显出特定封蜡纹路的旧灯。"},
+            {"name":"荆纹短披风","description":"行会猎手使用的轻便披风。"}
         ]
     });
     let background_input = json!({
@@ -144,18 +170,25 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         })
         .expect("confirm character");
     assert_eq!(completed_character.campaign_state, "GENERATING_TAVERN");
+    let player_character_id = completed_character
+        .character
+        .as_ref()
+        .expect("confirmed player")
+        .draft
+        .id
+        .clone();
 
     let source = store
         .tavern_snapshot(CAMPAIGN_ID)
         .expect("tavern source")
         .source;
     let tavern_output = json!({
-        "name":"Ember Rest",
-        "position":"The harbor crossroads",
-        "environment":"A warm stone hall filled with salt air.",
-        "specialRules":["Weapons remain sheathed beside the common fire."],
-        "longTermProblem":"A strange light appears beneath the cellar.",
-        "owner": npc_output("Ilyra Venn"),
+        "name":"断梁酒馆",
+        "position":"烛湾东门与旧盐路交会处",
+        "environment":"深木梁柱围住低矮炉火，潮气从石墙缝隙渗入。",
+        "specialRules":["公开立誓必须记入炉边账簿。"],
+        "longTermProblem":"第三声潮钟之后，灰潮正在反常倒流。",
+        "owner": npc_output("玛菈"),
     });
     let tavern = store
         .commit_tavern_generation(TavernGenerationCommit {
@@ -180,14 +213,14 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
     let owner = tavern_snapshot.npcs.first().expect("owner");
     let roster_output = json!({
         "npcs": [
-            roster_npc("RESIDENT", "Tomas Reed", Value::Null),
-            roster_npc("RESIDENT", "Nessa Vale", Value::Null),
-            roster_npc("TEMPORARY_VISITOR", "Sera Holt", json!("Waiting for the causeway."))
+            roster_npc("RESIDENT", "奥尔德", Value::Null),
+            roster_npc("RESIDENT", "维什", Value::Null),
+            roster_npc("TEMPORARY_VISITOR", "旧盐门守卫", json!("等待退潮后返回东门。"))
         ],
         "rumors": [
-            {"statement":"A light moves below the cellar.","sourceNpcName":"Tomas Reed","sourceBasis":"WITNESS","confidence":0.9,"veracity":"TRUE"},
-            {"statement":"The guild pays for tunnel maps.","sourceNpcName":"Nessa Vale","sourceBasis":"FACTION_MESSAGE","confidence":0.6,"veracity":"PARTIAL"},
-            {"statement":"The courier crossed alone.","sourceNpcName":"Sera Holt","sourceBasis":"HEARSAY","confidence":0.4,"veracity":"UNKNOWN"}
+            {"statement":"灰潮会在第三声钟响后倒流。","sourceNpcName":"奥尔德","sourceBasis":"WITNESS","confidence":0.9,"veracity":"TRUE"},
+            {"statement":"河港行会愿为烧焦账册付银币。","sourceNpcName":"维什","sourceBasis":"FACTION_MESSAGE","confidence":0.6,"veracity":"PARTIAL"},
+            {"statement":"昨夜只有巡钟人穿过旧盐门。","sourceNpcName":"旧盐门守卫","sourceBasis":"HEARSAY","confidence":0.4,"veracity":"UNKNOWN"}
         ]
     });
     let completed_tavern = store
@@ -220,6 +253,249 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         .tavern
         .expect("complete tavern")
         .owner_npc_id;
+    let scene_npc_ids = completed_tavern
+        .npcs
+        .iter()
+        .take(2)
+        .map(|npc| npc.id.clone())
+        .collect::<Vec<_>>();
+    assert_eq!(scene_npc_ids.len(), 2);
+    let projected_population = store
+        .project_tavern_population(TavernPopulationProjectCommand {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            trigger: "ENTERED".to_owned(),
+            operation_id: "fantasy-population-project".to_owned(),
+            cycle_id: "fantasy-population-cycle".to_owned(),
+        })
+        .expect("project tavern population");
+    assert_eq!(
+        projected_population
+            .state
+            .as_ref()
+            .expect("population state")
+            .revision,
+        1
+    );
+    for (index, npc_id) in scene_npc_ids.iter().enumerate() {
+        store
+            .focus_tavern_population(TavernPopulationFocusCommand {
+                campaign_id: CAMPAIGN_ID.to_owned(),
+                npc_id: npc_id.clone(),
+                expected_revision: index as i64 + 1,
+                operation_id: format!("fantasy-population-focus-op-{index}"),
+                event_id: format!("fantasy-population-focus-{index}"),
+            })
+            .expect("focus tavern scene participant");
+    }
+    store
+        .start_tavern_scene(TavernSceneStart {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            scene_id: "fantasy-tavern-scene".to_owned(),
+            operation_id: "fantasy-tavern-scene-start".to_owned(),
+            participant_npc_ids: scene_npc_ids,
+            listening_npc_ids: Vec::new(),
+        })
+        .expect("start multi NPC tavern scene");
+    let scene_intent = "Ask who witnessed the third bell after midnight.";
+    let prepared_scene = store
+        .prepare_tavern_scene_turn(TavernScenePrepare {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            scene_id: "fantasy-tavern-scene".to_owned(),
+            player_intent: scene_intent.to_owned(),
+            addressed_npc_id: Some(owner_id.clone()),
+        })
+        .expect("prepare multi NPC tavern scene turn");
+    let actor_generations = prepared_scene
+        .actor_inputs
+        .iter()
+        .enumerate()
+        .map(|(index, actor)| {
+            let speaks = actor.actor_id == owner_id;
+            let output = json!({
+                "actorId": actor.actor_id,
+                "action": if speaks { "SPEAK" } else { "SILENCE" },
+                "targetNpcId": null,
+                "utterance": if speaks { Some("I saw only the gatekeeper leave before the third bell.") } else { None },
+                "citedKnowledgeIds": [],
+                "urgency": if speaks { 2 } else { 0 },
+                "rationale": if speaks { "Answer the player without inventing another witness." } else { "Yield the floor to the addressed tavern keeper." },
+            });
+            TavernSceneActorGeneration {
+                actor_id: actor.actor_id.clone(),
+                generation: character_audit(
+                    &format!("tavern-scene-{index}"),
+                    "PROPOSE_TAVERN_SCENE_ACTION",
+                    actor.input.clone(),
+                    json!({"actorId":actor.actor_id,"sceneId":"fantasy-tavern-scene"}),
+                    output,
+                ),
+            }
+        })
+        .collect();
+    let committed_scene = store
+        .commit_tavern_scene_turn(TavernSceneCommit {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            scene_id: "fantasy-tavern-scene".to_owned(),
+            expected_revision: 1,
+            turn_id: "fantasy-tavern-scene-turn-1".to_owned(),
+            operation_id: "fantasy-tavern-scene-turn-op-1".to_owned(),
+            player_intent: scene_intent.to_owned(),
+            addressed_npc_id: Some(owner_id.clone()),
+            generations: actor_generations,
+            timeline_submission_id: None,
+            timeline_attempt_id: None,
+        })
+        .expect("commit multi NPC tavern scene turn");
+    assert_eq!(committed_scene.turns.len(), 1);
+
+    let owned_item_ids = {
+        let connection = store.connect().expect("query initial equipment");
+        let mut statement = connection
+            .prepare(
+                "SELECT id FROM items WHERE campaign_id=?1 AND owner_character_id=?2 ORDER BY id",
+            )
+            .expect("prepare initial equipment query");
+        statement
+            .query_map(params![CAMPAIGN_ID, player_character_id], |row| {
+                row.get::<_, String>(0)
+            })
+            .expect("query initial equipment")
+            .collect::<Result<Vec<_>, _>>()
+            .expect("collect initial equipment")
+    };
+    assert_eq!(owned_item_ids.len(), 2);
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        1,
+        "equip-lamp",
+        RulesAuthority::PlayerAction,
+        RulesAction::EquipItem {
+            item_id: owned_item_ids[0].clone(),
+        },
+    );
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        2,
+        "sell-copper-button",
+        RulesAuthority::LocalRule,
+        RulesAction::ChangeMoney { delta: 15 },
+    );
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        3,
+        "travel-to-salt-gate",
+        RulesAuthority::LocalRule,
+        RulesAction::AdvanceTime { minutes: 45 },
+    );
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        4,
+        "unequip-lamp",
+        RulesAuthority::PlayerAction,
+        RulesAction::UnequipItem {
+            item_id: owned_item_ids[0].clone(),
+        },
+    );
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        5,
+        "equip-cloak",
+        RulesAuthority::PlayerAction,
+        RulesAction::EquipItem {
+            item_id: owned_item_ids[1].clone(),
+        },
+    );
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        6,
+        "buy-lamp-oil",
+        RulesAuthority::LocalRule,
+        RulesAction::ChangeMoney { delta: -3 },
+    );
+    apply_rules_action(
+        &store,
+        &player_character_id,
+        7,
+        "cross-midnight",
+        RulesAuthority::LocalRule,
+        RulesAction::AdvanceTime { minutes: 720 },
+    );
+    let rules_state = store
+        .character_rules_state(&player_character_id)
+        .expect("rules state after equipment economy and time actions");
+    assert_eq!(
+        rules_state.equipped_item_ids,
+        vec![owned_item_ids[1].clone()]
+    );
+    assert_eq!(rules_state.money, 12);
+    assert_eq!(rules_state.game_time_minutes, 765);
+
+    let initial_location = store
+        .dynamic_location_snapshot(CAMPAIGN_ID)
+        .expect("initial location graph");
+    let origin_location_id = initial_location.state.current_location_id.clone();
+    let location_generation = store
+        .dynamic_location_generation_snapshot(DynamicLocationGenerationRequest {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            origin_location_id: origin_location_id.clone(),
+            expansion_mode: "CONNECTED".to_owned(),
+            requested_count: 1,
+        })
+        .expect("prepare old salt gate");
+    let location_output = json!({
+        "schemaVersion": 1,
+        "locations": [{
+            "id": "fantasy-old-salt-gate",
+            "name": "旧盐门",
+            "kind": "RUIN",
+            "parentLocationId": null,
+            "description": "A drowned gatehouse beyond the harbor wall.",
+            "atmosphere": "Cold tidewater moves beneath broken bells.",
+            "features": ["A collapsed bell tower", "A sealed guild door"],
+            "factionIds": [],
+            "connections": [origin_location_id],
+            "currentSituation": "The falling tide exposes a route for less than an hour.",
+            "constitutionEvidence": location_generation.input["constitutionEvidence"],
+        }]
+    });
+    let location_context = json!({
+        "campaignId": CAMPAIGN_ID,
+        "originLocationId": origin_location_id,
+        "expansionMode": "CONNECTED",
+        "requestedCount": 1,
+    });
+    store
+        .commit_dynamic_location_generation(DynamicLocationGenerationCommit {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            origin_location_id: origin_location_id.clone(),
+            expansion_mode: "CONNECTED".to_owned(),
+            requested_count: 1,
+            generation: character_audit(
+                "old-salt-gate",
+                "GENERATE_LOCATIONS",
+                location_generation.input,
+                location_context,
+                location_output,
+            ),
+        })
+        .expect("commit old salt gate");
+    let away = store
+        .travel_dynamic_location(DynamicLocationTravelCommand {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            target_location_id: "fantasy-old-salt-gate".to_owned(),
+            expected_revision: 1,
+            mode: "ROAD".to_owned(),
+            event_id: "fantasy-travel-salt-gate".to_owned(),
+            operation_id: "fantasy-travel-op-salt-gate".to_owned(),
+        })
+        .expect("travel to old salt gate");
+    assert_eq!(away.state.current_location_id, "fantasy-old-salt-gate");
 
     let first_dialogue = store
         .npc_dialogue_snapshot(CAMPAIGN_ID, &owner_id)
@@ -245,10 +521,10 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         .expect("quest publisher");
     let quest_output = json!({
         "content": {
-            "title":"The Fading Beacon",
-            "summary":"Investigate the failing lighthouse.",
-            "objective":"Restore the beacon.",
-            "failureCost":"Ships remain trapped."
+            "title":"找回失火的潮汐账册",
+            "summary":"取得烧焦账册并确认封蜡来源。",
+            "objective":"在灰潮封门前把账册带回断梁酒馆。",
+            "failureCost":"港务议会将关闭旧盐门。"
         },
         "risk":"MODERATE",
         "recommendedAttributes":["knowledge","agility"],
@@ -287,6 +563,65 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         .accept_quest(CAMPAIGN_ID, &quest_id)
         .expect("accept quest");
 
+    let branch_board = store
+        .quest_board_snapshot(CAMPAIGN_ID)
+        .expect("branch quest board");
+    let branch_publisher = branch_board
+        .source
+        .available_npcs
+        .iter()
+        .find(|npc| npc.id == owner_id)
+        .expect("branch quest publisher");
+    let branch_output = json!({
+        "content": {
+            "title":"钟塔下的无名誓约",
+            "summary":"追查藏在断裂钟塔下的烧焦誓文。",
+            "objective":"查明谁抹去了旧誓并保护仍活着的见证人。",
+            "failureCost":"巡钟团内部关系恶化。"
+        },
+        "risk":"HIGH",
+        "recommendedAttributes":["charisma","knowledge"],
+        "expectedTurns":{"min":8,"max":10},
+        "rewardTier":"RARE",
+        "relatedNpcIds":[],
+        "relatedFactIds":[]
+    });
+    let branch_generated = store
+        .commit_quest_generation(QuestGenerationCommit {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            publisher_npc_id: owner_id.clone(),
+            generation: audit(
+                "quest-branch",
+                "GENERATE_QUEST",
+                json!({
+                    "world": branch_board.source.world,
+                    "tavernName": branch_board.source.tavern_name,
+                    "publisher": branch_publisher,
+                    "availableNpcs": branch_board.source.available_npcs,
+                    "playerConcept": branch_board.source.player_concept,
+                    "recentQuestTitles": branch_board.source.recent_quest_titles,
+                    "recentQuestStructures": branch_board.source.recent_quest_structures,
+                }),
+                json!({
+                    "tavernId": branch_board.source.tavern_id,
+                    "playerCharacterId": branch_board.source.player_character_id,
+                    "publisherNpcId": owner_id,
+                }),
+                branch_output,
+            ),
+        })
+        .expect("generate branch quest");
+    let branch_quest_id = branch_generated
+        .quests
+        .iter()
+        .find(|quest| quest.content.title == "钟塔下的无名誓约")
+        .expect("generated branch quest")
+        .id
+        .clone();
+    store
+        .accept_quest(CAMPAIGN_ID, &branch_quest_id)
+        .expect("accept branch quest");
+
     let initial_adventure = store
         .adventure_snapshot(CAMPAIGN_ID, Some(&quest_id))
         .expect("adventure preparation");
@@ -300,7 +635,7 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
                 initial_adventure.plan_input,
                 json!({
                     "questId": quest_id,
-                    "playerCharacterId": completed_character.character.expect("player").draft.id,
+                "playerCharacterId": player_character_id,
                 }),
                 adventure_plan_output(),
             ),
@@ -370,6 +705,18 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
     assert_eq!(ending.state.as_deref(), Some("ENDING"));
     assert_eq!(ending.current_turn_number, 8);
 
+    let returned = store
+        .travel_dynamic_location(DynamicLocationTravelCommand {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            target_location_id: origin_location_id,
+            expected_revision: 2,
+            mode: "ROAD".to_owned(),
+            event_id: "fantasy-travel-return".to_owned(),
+            operation_id: "fantasy-travel-op-return".to_owned(),
+        })
+        .expect("return to the harbor");
+    assert_eq!(returned.travel_history.len(), 2);
+
     let clock_id = store
         .tavern_snapshot(CAMPAIGN_ID)
         .expect("settlement clock")
@@ -377,10 +724,34 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         .id
         .clone();
     let settlement = store
-        .commit_adventure_settlement(settlement_command(&adventure_id, &owner_id, &clock_id))
+        .commit_adventure_settlement(settlement_command(
+            &adventure_id,
+            &quest_id,
+            &owner_id,
+            &clock_id,
+        ))
         .expect("settle adventure");
     assert_eq!(settlement.outcome, "SUCCESS");
     assert_eq!(store.list().expect("campaign list")[0].state, "TAVERN");
+
+    let director_preparation = store
+        .prepare_world_director(WorldDirectorPrepareCommand {
+            campaign_id: CAMPAIGN_ID.to_owned(),
+        })
+        .expect("prepare world director observation");
+    let director_run = store
+        .commit_world_director(WorldDirectorCommitCommand {
+            id: "fantasy-director-run-after-settlement".to_owned(),
+            campaign_id: CAMPAIGN_ID.to_owned(),
+            trigger: WorldDirectorTrigger {
+                kind: "MANUAL".to_owned(),
+                id: "fantasy-director-manual-after-settlement".to_owned(),
+            },
+            expected_context_digest: director_preparation.context_digest,
+            occurred_at: "2026-08-01T14:20:00.000Z".to_owned(),
+        })
+        .expect("commit world director observation");
+    assert!(director_run.pressure_score <= 99);
 
     let first_models = store
         .save_model_settings(model_update(
@@ -447,12 +818,12 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         .execute_batch(
             "UPDATE campaigns
                SET state = 'RECOVERY_REQUIRED', resume_state = 'TAVERN'
-               WHERE id = 'campaign-windows-e2e';
+               WHERE id = 'playtest-m11-fantasy';
              INSERT INTO pending_ai_requests (
                id, campaign_id, turn_id, idempotency_key, task, status, model_profile_id,
                input_json, context_json, attempt_count, last_error_json, created_at, updated_at
              ) VALUES (
-               'e2e-interrupted-request', 'campaign-windows-e2e', NULL,
+               'e2e-interrupted-request', 'playtest-m11-fantasy', NULL,
                'e2e:interrupted-request', 'NPC_REPLY', 'SENDING', NULL,
                '{}', '{}', 1, NULL,
                '2026-08-01T14:30:00.000Z', '2026-08-01T14:30:00.000Z'
@@ -505,14 +876,8 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
         CAMPAIGN_ID
     );
     recovered
-        .connect()
-        .expect("connect for local delete")
-        .execute("DELETE FROM campaigns WHERE id = ?1", [CAMPAIGN_ID])
-        .expect("delete local campaign");
-    assert!(recovered.list().expect("empty campaign list").is_empty());
-    recovered
-        .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
-        .expect("reimport campaign");
+        .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Overwrite)
+        .expect("restore campaign from portable archive");
     drop(recovered);
 
     let imported = CampaignStore::open(&database_path).expect("restart imported campaign");
@@ -554,39 +919,158 @@ fn completes_the_windows_release_vertical_slice_on_one_persistent_save() {
 
 fn world_draft() -> WorldDraft {
     WorldDraft {
-        name: "Ember Coast".to_owned(),
-        current_region: "Ash Harbor".to_owned(),
-        summary: "A storm-bound coast.".to_owned(),
-        core_conflict: "The beacon is fading.".to_owned(),
-        technology_level: "Early industrial".to_owned(),
-        power_rules: vec!["Weather magic has a cost.".to_owned()],
+        constitution: WorldConstitutionDraft {
+            schema_version: 1,
+            world_type: "低魔黑暗奇幻港邦".to_owned(),
+            era: "行会与封建领主并存的晚期中世纪".to_owned(),
+            technology: "水车、帆船、锻钢与稀有炼金术".to_owned(),
+            magic: "魔法依赖契约、材料与代价，不能凭空改写既成事实".to_owned(),
+            peoples: vec![
+                "沿岸人类".to_owned(),
+                "盐沼矮裔".to_owned(),
+                "迁徙林民".to_owned(),
+            ],
+            society: "行会、领主与神殿共享脆弱秩序".to_owned(),
+            politics: "港务议会与巡钟团争夺潮汐税和夜间通行权".to_owned(),
+            economy: "银币、货契和实物债务并行，普通物资价格稳定".to_owned(),
+            combat_scale: "个人与小队冲突，伤势和补给持续生效".to_owned(),
+            death_rules: "死亡永久；濒死必须由明确规则和资源处理".to_owned(),
+            career_rules: "职业来自行会、神殿、领主或边地生计，并带社会义务".to_owned(),
+            equipment_rules: "钢铁、皮革、炼金消耗品和有代价的符文器具".to_owned(),
+            npc_rules: "NPC 只知道亲历、被告知或合理推断的事实，并保有私人目标".to_owned(),
+            trait_rules: "超常优势必须绑定可触发的代价或限制".to_owned(),
+            taboos: vec![
+                "无代价复活".to_owned(),
+                "无限资源".to_owned(),
+                "现代火器".to_owned(),
+            ],
+        },
+        name: "灰烬潮下的烛湾".to_owned(),
+        current_region: "烛湾".to_owned(),
+        summary: "灰潮、行会旧约与夜钟共同维系的低魔港邦。".to_owned(),
+        core_conflict: "巡钟团与港务议会争夺旧盐门和失火潮汐账册。".to_owned(),
+        technology_level: "水车、帆船、锻钢与稀有炼金术".to_owned(),
+        power_rules: vec!["魔法依赖契约、材料与代价，不能凭空改写既成事实".to_owned()],
         factions: vec![FactionDraft {
-            name: "Harbor Guild".to_owned(),
-            description: "Keeps the sea roads open.".to_owned(),
-            goals: vec!["Restore the beacon.".to_owned()],
+            name: "巡钟团".to_owned(),
+            description: "维持潮门夜钟与东门通行秩序。".to_owned(),
+            goals: vec!["找回潮汐账册并保住夜间通行权。".to_owned()],
         }],
         locations: vec![LocationDraft {
-            name: "Ash Harbor".to_owned(),
-            description: "A port beneath a dark lighthouse.".to_owned(),
+            name: "烛湾".to_owned(),
+            description: "建在潮门与断裂钟塔阴影下的港城。".to_owned(),
             parent_name: None,
-            faction_names: vec!["Harbor Guild".to_owned()],
+            faction_names: vec!["巡钟团".to_owned()],
         }],
-        narrative_style: "Grounded mystery.".to_owned(),
-        forbidden_elements: Vec::new(),
-        tavern_reason: "Travelers wait out storms.".to_owned(),
-        story_hooks: vec!["A light moves beneath the harbor.".to_owned()],
+        narrative_style: "克制、可追溯后果的黑暗奇幻调查。".to_owned(),
+        forbidden_elements: vec![
+            "无代价复活".to_owned(),
+            "无限资源".to_owned(),
+            "现代火器".to_owned(),
+        ],
+        tavern_reason: "旅人、巡钟人和行会商人在退潮前交换消息。".to_owned(),
+        story_hooks: vec!["第三声钟后灰潮倒流，失火账册再次出现。".to_owned()],
+    }
+}
+
+fn fantasy_career_pool_command(store: &CampaignStore) -> CareerPoolGenerationCommit {
+    let constitution = world_draft().constitution;
+    let revision = store
+        .connect()
+        .expect("query locked constitution revision")
+        .query_row(
+            "SELECT revision FROM world_constitutions WHERE campaign_id=?1 AND status='LOCKED'",
+            [CAMPAIGN_ID],
+            |row| row.get::<_, i64>(0),
+        )
+        .expect("locked constitution revision");
+    let constitution_value = json!({
+        "schemaVersion": constitution.schema_version,
+        "worldType": constitution.world_type,
+        "era": constitution.era,
+        "technology": constitution.technology,
+        "magic": constitution.magic,
+        "peoples": constitution.peoples,
+        "society": constitution.society,
+        "politics": constitution.politics,
+        "economy": constitution.economy,
+        "combatScale": constitution.combat_scale,
+        "deathRules": constitution.death_rules,
+        "careerRules": constitution.career_rules,
+        "equipmentRules": constitution.equipment_rules,
+        "npcRules": constitution.npc_rules,
+        "traitRules": constitution.trait_rules,
+        "taboos": constitution.taboos,
+    });
+    let evidence = json!({
+        "careerRules": constitution_value["careerRules"],
+        "society": constitution_value["society"],
+        "technology": constitution_value["technology"],
+        "economy": constitution_value["economy"],
+    });
+    let career = |id: &str, name: &str, rarity: &str, archetype: &str, role: &str| {
+        json!({
+            "id": id,
+            "name": name,
+            "rarity": rarity,
+            "role": role,
+            "skills": ["Contract lore", "Tide reading"],
+            "equipmentTags": ["Guild papers", "Weather lamp"],
+            "socialPosition": "Licensed worker owing service to a harbor institution.",
+            "relationshipHooks": ["Answers to a guild patron"],
+            "risks": ["Old obligations can be called due"],
+            "requirements": ["Recognized apprenticeship"],
+            "constitutionEvidence": evidence,
+            "legacyArchetype": archetype,
+        })
+    };
+    let output = json!({
+        "schemaVersion": 1,
+        "careers": [
+            career("ash-watch", "灰烬守夜人", "COMMON", "WARRIOR", "巡守潮门与夜钟。"),
+            career("mist-scrivener", "雾钟抄契人", "UNCOMMON", "SCHOLAR", "抄录并仲裁港邦契约。"),
+            career("marsh-guide", "盐沼引路者", "RARE", "ROGUE", "带队穿越潮沼与旧堤。"),
+        ]
+    });
+    let input = json!({
+        "schemaVersion": 1,
+        "context": {
+            "worldId": CAMPAIGN_ID,
+            "constitutionRevision": revision,
+            "contextSummary": constitution_value.to_string(),
+        },
+        "generationMode": "INITIAL",
+        "requestedCount": 3,
+        "requestedRarities": ["COMMON", "UNCOMMON", "RARE"],
+        "existingCareerIds": [],
+        "existingCareerNames": [],
+    });
+    CareerPoolGenerationCommit {
+        campaign_id: CAMPAIGN_ID.to_owned(),
+        expected_revision: 0,
+        generation: character_audit(
+            "career-pool",
+            "GENERATE_CAREER_POOL",
+            input,
+            json!({
+                "campaignId": CAMPAIGN_ID,
+                "constitutionRevision": revision,
+                "expectedPoolRevision": 0,
+            }),
+            output,
+        ),
     }
 }
 
 fn character_draft() -> CharacterDraftInput {
     CharacterDraftInput {
-        id: "character-windows-e2e".to_owned(),
+        id: "fantasy-character-scrivener".to_owned(),
         campaign_id: CAMPAIGN_ID.to_owned(),
-        name: "Mira".to_owned(),
+        name: "伊岚".to_owned(),
         gender: None,
         age: Some(27),
-        concept: "Curious scout".to_owned(),
-        story_preferences: vec!["Exploration".to_owned()],
+        concept: "背负旧誓的雾钟抄契人".to_owned(),
+        story_preferences: vec!["契约谜团".to_owned(), "行会冲突".to_owned()],
         content_boundaries: CharacterContentBoundaries {
             allow_horror: false,
             allow_permanent_death: false,
@@ -594,15 +1078,15 @@ fn character_draft() -> CharacterDraftInput {
             allow_betrayal: true,
             excluded_content: Vec::new(),
         },
-        class_archetype: "ROGUE".to_owned(),
-        class_display_name: "Wayfinder".to_owned(),
+        class_archetype: "SCHOLAR".to_owned(),
+        class_display_name: "雾钟抄契人".to_owned(),
         attributes: CharacterAttributes {
             physique: 2,
             agility: 4,
             knowledge: 3,
             charisma: 1,
         },
-        personal_goal: "Find a lost sibling.".to_owned(),
+        personal_goal: "查清家族旧誓为何从潮门账簿中被抹去。".to_owned(),
     }
 }
 
@@ -710,6 +1194,8 @@ fn dialogue_command(
             json!({"npcId":npc_id}),
             output,
         ),
+        timeline_submission_id: None,
+        timeline_attempt_id: None,
     }
 }
 
@@ -764,6 +1250,7 @@ fn adventure_turn_output(ending: bool) -> Value {
 
 fn settlement_command(
     adventure_id: &str,
+    quest_id: &str,
     publisher_id: &str,
     clock_id: &str,
 ) -> AdventureSettlementCommit {
@@ -788,9 +1275,9 @@ fn settlement_command(
                 }],
                 "tavernChange":{"kind":"TROPHY","description":"A lens hangs above the hearth."},
                 "statePatchProposals":[
-                    {"kind":"QUEST","targetId":"model-symbol","rationale":"Done","payload":{"status":"COMPLETED"}},
+                    {"kind":"QUEST","targetId":quest_id,"rationale":"Done","payload":{"status":"COMPLETED"}},
                     {"kind":"RELATIONSHIP","targetId":publisher_id,"rationale":"Trusted","payload":{"trust":1}},
-                    {"kind":"ITEM_REWARD","targetId":null,"rationale":"Reward","payload":{"questId":"model-symbol","name":"Compass","description":"Stormglass","rewardTier":"NOTABLE"}}
+                    {"kind":"ITEM_REWARD","targetId":null,"rationale":"Reward","payload":{"questId":quest_id,"name":"Compass","description":"Stormglass","rewardTier":"NOTABLE"}}
                 ]
             }),
         ),
@@ -806,7 +1293,63 @@ fn settlement_command(
                 "clockAdvances":[{"clockId":clock_id,"amount":1,"reason":"The storm breaks."}]
             }),
         ),
+        equipment: audit(
+            "settlement-equipment",
+            "GENERATE_ITEMS",
+            json!({
+                "schemaVersion":1,
+                "context":{"worldId":CAMPAIGN_ID,"constitutionRevision":2,"contextSummary":"Harbor"},
+                "purpose":"Quest reward",
+                "requestedCount":1,
+                "requestedRarity":"NOTABLE",
+                "source":{"kind":"QUEST_REWARD","questId":quest_id,"adventureId":adventure_id},
+                "bindingTargets":[
+                    {"kind":"QUEST","targetId":quest_id,"allowedTriggers":["QUEST_CONTEXT"],"summary":"Quest"},
+                    {"kind":"NPC","targetId":publisher_id,"allowedTriggers":["NPC_RECOGNITION"],"summary":"Publisher"},
+                    {"kind":"WORLD_FACT","targetId":format!("settlement-fact:{adventure_id}:0"),"allowedTriggers":["FACT_EVIDENCE"],"summary":"Fact"}
+                ],
+                "constitutionEvidence":{"equipmentRules":"钢铁、皮革、炼金消耗品和有代价的符文器具","technology":"水车、帆船、锻钢与稀有炼金术","economy":"银币、货契和实物债务并行，普通物资价格稳定"},
+                "existingItemIds":[],"existingItemNames":[]
+            }),
+            json!({"adventureId":adventure_id}),
+            json!({"schemaVersion":1,"items":[{
+                "id":format!("reward-semantic-{adventure_id}"),
+                "name":"Stormglass Compass","description":"A grounded route-finding relic.","category":"TOOL",
+                "appearance":"Clouded blue glass in dark brass.","history":"Carried by a route warden.","origin":"The lantern guild.",
+                "narrativeAbilities":["Reveals faded route marks"],"semanticEffects":["Recognized by wardens"],"balanceTags":["NON_COMBAT"],
+                "bindings":[
+                    {"kind":"QUEST","targetId":quest_id,"trigger":"QUEST_CONTEXT","summary":"Recovered during this quest."},
+                    {"kind":"NPC","targetId":publisher_id,"trigger":"NPC_RECOGNITION","summary":"The publisher recognizes it."},
+                    {"kind":"WORLD_FACT","targetId":format!("settlement-fact:{adventure_id}:0"),"trigger":"FACT_EVIDENCE","summary":"It records the restored beacon."}
+                ],
+                "constitutionEvidence":{"equipmentRules":"钢铁、皮革、炼金消耗品和有代价的符文器具","technology":"水车、帆船、锻钢与稀有炼金术","economy":"银币、货契和实物债务并行，普通物资价格稳定"}
+            }]}),
+        ),
     }
+}
+
+fn apply_rules_action(
+    store: &CampaignStore,
+    player_character_id: &str,
+    expected_revision: i64,
+    suffix: &str,
+    authority: RulesAuthority,
+    action: RulesAction,
+) {
+    store
+        .apply_rules_command(RulesApplyCommand {
+            event_id: format!("fantasy-rules-event-{suffix}"),
+            idempotency_key: format!("fantasy-rules:{suffix}"),
+            expected_revision,
+            occurred_at: format!("2026-08-01T14:{expected_revision:02}:00.000Z"),
+            command: RulesCommand {
+                campaign_id: CAMPAIGN_ID.to_owned(),
+                player_character_id: player_character_id.to_owned(),
+                authority,
+                action,
+            },
+        })
+        .expect("apply fantasy playtest rules action");
 }
 
 fn model_update(

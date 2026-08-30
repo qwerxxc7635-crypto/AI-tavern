@@ -5,9 +5,18 @@ export const AI_TASKS = [
   'REFINE_WORLD',
   'GENERATE_CHARACTER_TRAITS',
   'COMPLETE_CHARACTER_BACKGROUND',
+  'GENERATE_QUICK_CHARACTER',
+  'EDIT_CHARACTER_DRAFT',
+  'GENERATE_CAREER_POOL',
+  'GENERATE_ITEMS',
+  'GENERATE_NPC_LOD',
+  'GENERATE_LOCATIONS',
+  'GENERATE_FACTIONS',
   'GENERATE_TAVERN',
   'GENERATE_NPCS',
   'NPC_REPLY',
+  'GENERATE_DIALOGUE_SUGGESTIONS',
+  'PROPOSE_TAVERN_SCENE_ACTION',
   'GENERATE_QUEST',
   'GENERATE_ADVENTURE_PLAN',
   'GENERATE_ADVENTURE_TURN',
@@ -133,6 +142,20 @@ export interface NormalizedAIResponse {
   readonly receivedAt: IsoTimestamp;
 }
 
+export interface AIStreamChunk {
+  readonly sequence: number;
+  readonly content: string;
+}
+
+export interface AIStreamOptions {
+  readonly signal: AbortSignal;
+  readonly onChunk: (chunk: AIStreamChunk) => void;
+}
+
+export interface AIRequestOptions {
+  readonly signal?: AbortSignal;
+}
+
 export type ConnectionErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'AUTHENTICATION'
@@ -156,5 +179,14 @@ export interface AIProvider {
   readonly id: string;
   listModels(): Promise<readonly ModelInfo[]>;
   testConnection(config: ProviderConfig): Promise<TestResult>;
-  generate(request: NormalizedAIRequest, config: ProviderConfig): Promise<NormalizedAIResponse>;
+  generate(
+    request: NormalizedAIRequest,
+    config: ProviderConfig,
+    options?: AIRequestOptions,
+  ): Promise<NormalizedAIResponse>;
+  generateStream?(
+    request: NormalizedAIRequest,
+    config: ProviderConfig,
+    options: AIStreamOptions,
+  ): Promise<NormalizedAIResponse>;
 }

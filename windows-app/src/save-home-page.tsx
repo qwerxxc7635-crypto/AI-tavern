@@ -9,6 +9,7 @@ import {
 import { confirmPlayerAction } from './confirmation-service.js';
 import { tauriSaveTransferGateway, type SaveTransferGateway } from './save-transfer-gateway.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, destinationForCampaign } from './navigation.js';
 
 const STATE_LABELS: Readonly<Record<CampaignSummary['state'], string>> = {
   CREATING_WORLD: '构筑世界',
@@ -87,10 +88,11 @@ export function SaveHomePage({
   }, [transferGateway]);
 
   async function createCampaign() {
+    if (busyIdRef.current !== null) return;
     markBusy('new');
     try {
-      await gateway.create();
-      await reload();
+      const created = await gateway.create();
+      navigate(destinationForCampaign(created));
     } catch {
       setError('新存档没有创建成功，本地数据未被修改。');
     } finally {
@@ -102,19 +104,7 @@ export function SaveHomePage({
     markBusy(campaign.id);
     try {
       const continued = await gateway.continueCampaign(campaign.id);
-      const destination =
-        continued.state === 'GENERATION_FAILED' ||
-        continued.state === 'WAITING_FOR_MODEL' ||
-        continued.state === 'RECOVERY_REQUIRED'
-          ? '/recovery'
-          : continued.state === 'CREATING_WORLD' || continued.state === 'REVIEWING_WORLD'
-            ? '/world'
-            : continued.state === 'CREATING_CHARACTER'
-              ? '/character/create'
-              : continued.state === 'ADVENTURE'
-                ? '/adventure'
-                : '/tavern';
-      navigate(`${destination}?campaignId=${encodeURIComponent(continued.id)}`);
+      navigate(destinationForCampaign(continued));
     } catch {
       setError('无法继续该存档。请返回列表后重试。');
       markBusy(null);
@@ -177,6 +167,12 @@ export function SaveHomePage({
     try {
       const inspection = await transferGateway.inspect(path);
       let mode: 'CREATE' | 'OVERWRITE' = 'CREATE';
+      if (inspection.migrationRequired) {
+        const accepted = await confirmPlayerAction(
+          `这是旧版存档。导入时会从原文件的兼容副本升级到存档结构 ${inspection.saveSchemaVersion} / 世界结构 ${inspection.worldSchemaVersion}；原文件不会被改写。确定继续吗？`,
+        );
+        if (!accepted) return;
+      }
       if (inspection.campaignExists) {
         const accepted = await confirmPlayerAction(
           `本地已存在存档 ${inspection.campaignId.slice(0, 8)}。覆盖前会创建完整数据库备份，确定继续吗？`,
@@ -187,12 +183,14 @@ export function SaveHomePage({
       const imported = await transferGateway.importArchive(path, mode);
       await reload();
       setTransferNotice(
-        imported.state === 'ARCHIVED'
-          ? `已导入归档存档 ${imported.id.slice(0, 8)}；它仍保留归档状态。`
-          : `已导入存档 ${imported.id.slice(0, 8)}，现在可以继续游玩。`,
+        inspection.migrationRequired
+          ? `旧版存档 ${imported.id.slice(0, 8)} 已在隔离导入事务中升级；原文件保持不变。`
+          : imported.state === 'ARCHIVED'
+            ? `已导入归档存档 ${imported.id.slice(0, 8)}；它仍保留归档状态。`
+            : `已导入存档 ${imported.id.slice(0, 8)}，现在可以继续游玩。`,
       );
-    } catch {
-      setError('导入失败：文件未通过校验或无法写入；本地存档保持原状。');
+    } catch (importError) {
+      setError(importArchiveErrorMessage(importError));
     } finally {
       markBusy(null);
     }
@@ -227,7 +225,7 @@ export function SaveHomePage({
           <p>每一页都保存在这台设备的 SQLite 存档中。</p>
         </div>
         <div className="save-home__header-actions">
-          <NavLink className="quiet-action" to="/my">
+          <NavLink className="quiet-action" to={APP_PATHS.my}>
             我的
           </NavLink>
           <button
@@ -375,6 +373,25 @@ export function SaveHomePage({
       </footer>
     </main>
   );
+}
+
+function importArchiveErrorMessage(error: unknown): string {
+  if (typeof error === 'string') {
+    try {
+      return importArchiveErrorMessage(JSON.parse(error) as unknown);
+    } catch {
+      return '导入失败：文件未通过校验或无法写入；本地存档保持原状。';
+    }
+  }
+  if (
+    error !== null &&
+    typeof error === 'object' &&
+    'code' in error &&
+    error.code === 'SAVE_ARCHIVE_FUTURE'
+  ) {
+    return '该存档来自更新版本；请升级 Ember Tavern 后再导入。本地存档保持原状。';
+  }
+  return '导入失败：文件未通过校验或无法写入；本地存档保持原状。';
 }
 
 function formatLastPlayed(value: string): string {

@@ -207,7 +207,7 @@ erDiagram
 | `campaign_id` | TEXT FK → campaigns.id ON DELETE CASCADE | 所属存档 |
 | `publisher_npc_id` | TEXT FK → npcs.id ON DELETE RESTRICT | 发布者 |
 | `content_json` | TEXT JSON | 标题、简介、目标、失败代价 |
-| `status` | TEXT CHECK QuestStatus | AVAILABLE至ABANDONED |
+| `status` | TEXT CHECK V0.2 QuestStatus | V0.3仅作旧Adventure与迁移兼容投影 |
 | `risk` | TEXT CHECK QuestRisk | 风险 |
 | `recommended_attributes_json` | TEXT JSON | 推荐属性数组 |
 | `expected_turns_min` | INTEGER CHECK >= 1 | 最少回合 |
@@ -219,6 +219,78 @@ erDiagram
 | `updated_at` | TEXT | 修改时间 |
 
 索引：`idx_quests_campaign_status(campaign_id, status)`、`idx_quests_publisher(publisher_npc_id)`。
+
+### 3.9.1 `quest_pool_states`（schema 23）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `quest_id` | TEXT PK/FK → quests.id ON DELETE CASCADE | Quest稳定身份 |
+| `campaign_id` | TEXT FK → campaigns.id ON DELETE CASCADE | 所属存档 |
+| `status` | TEXT CHECK QuestStatus | V0.3生命周期唯一真相 |
+| `revision` | INTEGER CHECK >= 1 | 乐观并发revision |
+| `last_source` | TEXT CHECK QuestTransitionSource | 最近变化来源 |
+| `last_reason` | TEXT | 最近变化原因 |
+| `last_operation_id` | TEXT UNIQUE | 幂等操作ID |
+| `created_at` | TEXT | 建立时间 |
+| `updated_at` | TEXT | 最近转换时间 |
+
+`idx_quest_pool_campaign_status(campaign_id, status, updated_at, quest_id)`支持多任务投影。数据库 trigger 校验完整状态图、revision递增、玩家介入/放弃权限和终态不可逆；旧`quests.status`不能覆盖已经分叉的Pool状态。
+
+### 3.9.2 `quest_pool_transitions`（schema 23）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `operation_id` | TEXT PK | 幂等操作ID |
+| `quest_id` | TEXT FK → quest_pool_states | Quest身份 |
+| `campaign_id` | TEXT FK → quest_pool_states | Campaign身份 |
+| `from_status` | TEXT NULL CHECK QuestStatus | 初始化时为空 |
+| `to_status` | TEXT CHECK QuestStatus | 提交后的状态 |
+| `source` | TEXT CHECK QuestTransitionSource | 权威来源 |
+| `reason` | TEXT | 可审计原因 |
+| `before_revision` | INTEGER CHECK >= 0 | 提交前revision |
+| `after_revision` | INTEGER = before + 1 | 提交后revision |
+| `occurred_at` | TEXT | 发生时间 |
+
+转换账本append-only。Campaign删除允许级联清理；Campaign存在时不能修改或删除单条历史。完整兼容与事务边界见[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)。
+
+### 3.9.3 `quest_pool_restore_sessions`（schema 23）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `campaign_id` | TEXT PK/FK → campaigns.id ON DELETE CASCADE | 正在完整恢复内部快照的Campaign |
+
+该表是事务级恢复门禁，不是游戏状态。Snapshot Repository在立即事务内先插入、完整重建Quest Pool后删除；提交或回滚后必须为空。只有存在该门禁时，Quest重插入可跳过自动初始化且账本可被完整替换。普通业务路径仍受append-only trigger保护。
+
+### 3.9.4 `quest_graphs` / `quest_graph_edges`（schema 24）
+
+`quest_graphs`以`campaign_id`为主键，保存当前`revision`与`updated_at`。`quest_graph_edges`保存PREREQUISITE/CONSEQUENCE、来源种类与ID、受限谓词和值、目标Quest、满足/不满足状态政策、priority和建立时间。
+
+来源与目标必须属于同一Campaign；数据库trigger拒绝悬空引用与Quest→Quest循环。Repository与Native进一步拒绝语义重复、前置政策冲突和同优先级结果冲突。当前边可替换，但只能通过乐观revision事务替换，不能由模型或UI直接写入。
+
+### 3.9.5 `quest_graph_revisions`（schema 24）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `operation_id` | TEXT PK | 幂等图配置操作 |
+| `campaign_id` | TEXT FK → quest_graphs | 所属Campaign |
+| `revision` | INTEGER UNIQUE per Campaign | 图修订号 |
+| `edges_json` | TEXT JSON array | 该修订的完整边快照 |
+| `occurred_at` | TEXT | 提交时间 |
+
+历史append-only；只允许内部快照恢复事务在`quest_pool_restore_sessions`门禁下完整重建。
+
+### 3.9.6 `quest_graph_evaluations`（schema 24）
+
+| 字段 | 类型/约束 | 含义 |
+| --- | --- | --- |
+| `operation_id` | TEXT PK | 幂等求值操作 |
+| `campaign_id` / `graph_revision` | 复合FK → quest_graph_revisions | 使用的图身份 |
+| `trigger_kind` / `trigger_id` | TEXT CHECK / TEXT | Quest、事实、实体或手动触发来源 |
+| `evaluated_edge_ids_json` | TEXT JSON array | 参与求值的边 |
+| `changes_json` | TEXT JSON array | Quest状态变化与决定边 |
+| `occurred_at` | TEXT | 求值时间 |
+
+求值历史append-only；每项变化还会在`quest_pool_transitions`留下`LOCAL_RULE`转换。完整合同见[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)。
 
 ### 3.10 `adventures`
 
@@ -431,6 +503,8 @@ erDiagram
 
 保留键`randomness_profile_v1`保存`profile`与`customTemperature`：CONSERVATIVE/BALANCED/HIGH必须分别解析为0.2/0.7/1.1且自定义值为空，CUSTOM必须携带0至2的有限自定义值。该设置只控制生成请求采样，导出存档不携带，也不得改变本地D20或其他Hard Logic。
 
+保留键`prompt_manager_v1`保存schema version 1、manager revision、活动preset ID及有界preset列表。Preset只含名称、递增version和有序User Guidance块；不能保存Core Rule Prompt、完整运行时Context、Campaign事实或秘密。所有修改在SQLite立即事务内比较manager/preset revision，导入导出格式与安全边界见[`V0.3_PROMPT_MANAGER.md`](V0.3_PROMPT_MANAGER.md)。
+
 ## 5. JSON列清单与边界
 
 | 表 | JSON列 |
@@ -473,3 +547,57 @@ erDiagram
 规格第24.2节的核心表全部覆盖：
 
 `campaigns`、`world_bibles`、`world_facts`、`player_characters`、`taverns`、`npcs`、`npc_knowledge`、`npc_relationships`、`quests`、`adventures`、`adventure_turns`、`conversations`、`messages`、`items`、`world_clocks`、`game_events`、`generation_records`、`pending_ai_requests`、`save_snapshots`、`model_profiles`、`provider_configs`、`app_settings`。
+
+## 8. V0.3 Dynamic Quest 来源扩展
+
+schema 25 的 `dynamic_quest_sources` 以 `quest_id` 为主键，并对 `(campaign_id, source_kind, occurrence_id)` 建唯一约束。它保存六类来源的实体标识、可见性、玩家是否介入、公开摘要、来源快照、相关事实 ID、SHA-256 Context 摘要、Generation Record、预算快照和创建时间；所有引用必须属于同一 Campaign，普通更新和删除被 trigger 拒绝。
+
+`quest_pool_creation_intents` 是同一事务内的一次性表。动态 Quest 插入前写入本地裁定的初始状态、原因和 operation ID，`quests` insert trigger 将其投影为 Quest Pool 初始转换后立即删除。该表在稳定状态必须为空，不是第二个 Quest 状态真相源。详细合同见 [`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)。
+
+## 9. V0.3 World Director 审计扩展
+
+schema 26 的 `world_director_runs` 以 run ID 为主键，并对 `(campaign_id, trigger_kind, trigger_id)` 建唯一约束。它保存 context digest、pace、pressure score、signals、suppression、完整只读来源快照和时间。`world_director_proposals` 以 `(run_id, ordinal)` 为主键，保存最多八项有序 action kind、actor/targets、理由、候选效果、urgency、future cooldown key 和 Rules/Generator/Faction Rules route。
+
+两表均为 append-only 决策审计，不是 World Fact、Quest、Faction、Clock 或事件真相源；触发器验证事件/玩家行为/Quest转换/结算引用属于同一 Campaign。内部快照按 run 后 proposal 的顺序恢复，schema 26 前快照缺失两表时为空集合兼容。完整合同见 [`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md)。
+
+## 10. V0.3 Director Budget 扩展
+
+schema 27 的 `director_budget_states` 保存由 Rules Engine `game_time_minutes` 推导的游戏日、四类日用量和 revision；`director_budget_admissions` 对每个 Director run 建立幂等标记，即使 run 没有 proposal 也不会重复推进预算。`director_budget_entries` 保存 proposal 的类别、批准/延后状态、原因和下一可用游戏分钟，`director_budget_cooldowns` 保存 Campaign/key 的冷却，`director_budget_decisions` 保存 append-only 求值历史。
+
+批准只是下游容量预约，不是事实提交。每日恢复、优先级 aging 和 cooldown 都由本地代码与 SQLite 事务裁决，Prompt/模型无权放宽；玩家 P0 操作不进入这些表。内部快照按 admission/state/entry/cooldown/decision 外键顺序保存恢复；M10-T05起portable schema 3携带这些持久表。完整合同见 [`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)。
+
+## 11. V0.3 Unified Context Manifest
+
+M9-T01不增加SQLite表或schema版本。`ContextAssembly`继续由有序block与manifest组成；manifest只保存block ID/type、source ID/revision、stability、version、content hash、privacy class、token估算、relevance、required/included和省略原因，不保存block内容。Application路径把manifest写入既有`generation_records.request_json`，Desktop Inspector只保存当前session的脱敏投影。
+
+Actor Knowledge和Memory source在Inspector中遮罩；实际内容只存在于当次有界请求。完整层级、dump/credential门禁与Generator迁移矩阵见[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)。
+
+## 12. V0.3 Memory Layers（schema 28）
+
+`historical_summaries`保存Campaign/Actor/Adventure/Conversation范围、摘要文本、覆盖时间、source digest、可选generation record和连续revision。`world_lore_entries`保存来源约束的世界说明，但不具有Truth authority。`memory_artifact_sources`按顺序保存Summary、Long-term Memory与World Lore的source kind/ID/revision/SHA-256/时间；读取时对SQLite当前来源重算，删除为`SOURCE_DELETED`，revision/hash/time变化为`SOURCE_UPDATED`。
+
+原`knowledge_memories`继续是唯一Actor Long-term Memory表；M9-T02新增来源快照而不平行建表。Recent仍是`messages`、`game_events`、`adventure_turns`原行，压缩Summary不会删除原历史。内部snapshot新增schema 12四张知识表和schema 28三张表；旧snapshot缺失时按空集合兼容。M10-T05起portable schema 3携带这些持久表。完整合同见[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)。
+
+## 13. V0.3 World Info Retrieval（schema 29）
+
+`world_lore_retrieval_rules`与`world_lore_entries`一对一，保存Campaign、关键词、闭集实体引用、Location/Quest ID、always-active、ANY/ALL、priority、entry token budget、enabled和连续revision。SQLite trigger与Repository共同验证Lore归属、JSON元素形状、不可变身份和revision；Repository额外验证所有引用属于同一Campaign。
+
+规则只是World Lore选择配置，不是Fact、Knowledge或Truth。检索先检查Lore source freshness，再本地计算可解释trigger/score，按priority→score→ID稳定排序并执行entry/total预算。应用层LRU只缓存规范query digest与完整corpus digest对应的结果，SQLite仍是唯一真相。内部snapshot携带schema 29规则且旧payload按空表兼容；M10-T05起portable schema 3携带规则。完整合同见[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)。
+
+## 14. V0.3 Lazy World Generation（schema 30）
+
+`lazy_world_generation_plans`以intent key为主键，并对Campaign/kind/target建立唯一约束。它保存按需或后台候选模式、P0/P1/P2优先级、可选依赖、`PLANNED/RUNNING/SUCCEEDED/FAILED/CANCELLED`状态、attempt、active run、真实artifact引用、错误、retryability、revision和时间。插入要求同Campaign已有World Bible、World Seed与锁定Constitution；Location/Faction目标必须来自同Campaign outline投影。
+
+`lazy_world_generation_transitions`按递增ID保存每次revision变化，是append-only生命周期审计。SQLite success trigger按kind检查Career Pool、Tavern、完整Roster、从目标outline扩展出的DETAILED Location或ACTIVE Faction，禁止占位完成。内部snapshot按artifact→plan→transition顺序恢复，并允许旧payload缺失两表；M10-T05起portable schema 3携带两表。完整合同见[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)。
+
+## 15. V0.3 Prefetch（schema 31）
+
+`prefetch_candidates`保存已admit Director run、schema-30 lazy intent、Location/Faction target、P1/P2、批准action证据、context digest、process/execution ownership、闭集状态、错误、revision和时间。SQLite insert trigger复核同Campaign run/context、budget admission、P1批准、P2剩余容量、后台计划资格与每run最多四项；update trigger固定身份并限制生命周期。表中没有Prompt、raw response、validated output、候选内容或Actor Knowledge。
+
+`prefetch_events`以递增ID保存prediction/start/ready/hit/miss/invalidate/cancel/fail与有界queue/generation时间，是append-only指标审计；unpredicted miss允许没有candidate外键。生成体只在进程内，READY重开必须按`PROCESS_RESTART`失效。内部snapshot保存两表且旧payload按空集合兼容；portable schema 3明确排除这两张进程/缓存表。完整合同见[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)。
+
+## 16. V0.3 Save Schema（schema 32）
+
+`campaigns.save_schema_version`固定为3，`campaigns.world_schema_version`固定为1，并由SQLite `NOT NULL`/`CHECK`约束。schema 32不改写任何Rules、Quest、NPC或Adventure业务字段，只冻结恢复协议版本，并让NPC LOD删除保护在既有`quest_pool_restore_sessions`事务边界内支持已验证portable恢复。
+
+`.emtavern`继续使用容器format 1，portable schema升级为3并携带69张Campaign持久表；设备配置、秘密、pending request、内部snapshot与可重建cache排除。历史portable v1/v2只增加上述Campaign版本列，并由当前触发器建立允许的兼容投影；源文件不改写。完整表集、顺序、备份/隔离迁移、精确重载和跨语言fixtures见[`save-format.md`](save-format.md)。

@@ -33,6 +33,15 @@ import { PlayerCharacterRepository } from './player-character-repository.js';
 import { AdventureRepository, QuestRepository } from './quest-adventure-repository.js';
 import { SnapshotRepository } from './snapshot-repository.js';
 import {
+  LEGACY_CAMPAIGN_TABLES,
+  PORTABLE_CAMPAIGN_TABLES,
+  PORTABLE_SAVE_SCHEMA_VERSION,
+  V2_CAMPAIGN_TABLES,
+  WORLD_SCHEMA_VERSION,
+  portableTableQuery,
+  type PortableCampaignTable,
+} from './portable-save-schema.js';
+import {
   MAX_ARCHIVE_BYTES,
   MAX_EVENT_RECORDS,
   MAX_GENERATION_RECORDS,
@@ -56,8 +65,9 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 type ImportMode = 'CREATE' | 'OVERWRITE';
 
 const FORMAT_VERSION = 1;
-const ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_SAVE_SCHEMA_VERSION;
 const LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
+const V2_ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -74,60 +84,7 @@ const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, index) => {
   return value >>> 0;
 });
 
-type CampaignTable =
-  | 'world_bibles'
-  | 'world_facts'
-  | 'player_characters'
-  | 'taverns'
-  | 'npcs'
-  | 'npc_knowledge'
-  | 'npc_relationships'
-  | 'quests'
-  | 'adventures'
-  | 'scene_frames'
-  | 'adventure_turns'
-  | 'conversations'
-  | 'messages'
-  | 'items'
-  | 'world_clocks';
-
-const CAMPAIGN_TABLES = [
-  'world_bibles',
-  'world_facts',
-  'player_characters',
-  'taverns',
-  'npcs',
-  'npc_knowledge',
-  'npc_relationships',
-  'quests',
-  'adventures',
-  'scene_frames',
-  'adventure_turns',
-  'conversations',
-  'messages',
-  'items',
-  'world_clocks',
-] as const satisfies readonly CampaignTable[];
-
-const LEGACY_CAMPAIGN_TABLES = CAMPAIGN_TABLES.filter((table) => table !== 'scene_frames');
-
-const INSERT_ORDER = [
-  'world_bibles',
-  'world_facts',
-  'player_characters',
-  'taverns',
-  'npcs',
-  'npc_knowledge',
-  'npc_relationships',
-  'quests',
-  'adventures',
-  'scene_frames',
-  'adventure_turns',
-  'conversations',
-  'messages',
-  'items',
-  'world_clocks',
-] as const satisfies readonly CampaignTable[];
+const INSERT_ORDER = PORTABLE_CAMPAIGN_TABLES;
 
 export interface CampaignSaveImportOptions {
   readonly mode: ImportMode;
@@ -178,11 +135,22 @@ export async function importCampaignSave(
       database.prepare('DELETE FROM campaigns WHERE id = ?').run(parsed.campaignId);
     }
     insertRow(database, 'campaigns', parsed.campaign);
+    if (parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+      preparePortableRestore(database, parsed.campaignId);
+    }
     for (const row of parsed.generations) insertRow(database, 'generation_records', row);
     for (const table of INSERT_ORDER) {
+      if (
+        parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION &&
+        table === 'world_constitutions'
+      ) {
+        clearLegacyProjections(database, parsed.campaignId);
+      }
+      if (table === 'world_constitutions') {
+        for (const row of parsed.events) insertRow(database, 'game_events', row);
+      }
       for (const row of parsed.tables[table]) insertRow(database, table, row);
     }
-    for (const row of parsed.events) insertRow(database, 'game_events', row);
     assertForeignKeys(database);
     validateImportedDomain(database, parsed);
     const snapshot = new SnapshotRepository(database).createInCurrentTransaction({
@@ -199,6 +167,9 @@ export async function importCampaignSave(
     const campaign = new CampaignRepository(database).get(parsed.campaignId);
     if (campaign === null)
       throw new PersistenceDataError('Imported campaign could not be reloaded');
+    if (parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+      finishPortableRestore(database, parsed.campaignId);
+    }
     database.exec('COMMIT');
     return Object.freeze({
       campaign,
@@ -222,7 +193,7 @@ interface ParsedArchive {
   readonly campaignId: CampaignId;
   readonly databaseSchemaVersion: number;
   readonly campaign: StoredRow;
-  readonly tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>;
+  readonly tables: Readonly<Record<PortableCampaignTable, readonly StoredRow[]>>;
   readonly events: readonly StoredRow[];
   readonly generations: readonly StoredRow[];
 }
@@ -274,6 +245,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
   );
   if (
     databaseVersion !== LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION &&
+    databaseVersion !== V2_ARCHIVE_DATABASE_SCHEMA_VERSION &&
     databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION
   ) {
     throw new PersistenceDataError(
@@ -302,7 +274,10 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     ['campaignId', 'databaseSchemaVersion', 'formatVersion', 'records'],
     'generations.json',
   );
-  const campaign = parseStoredRow(campaignDocument['campaign'], 'campaigns');
+  const campaign = upgradeCampaignSchema(
+    parseStoredRow(campaignDocument['campaign'], 'campaigns'),
+    databaseVersion,
+  );
   if (
     campaign['id'] !== importedCampaignId ||
     campaign['default_model_profile_id'] !== null ||
@@ -315,10 +290,12 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
   const archiveTables =
     databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION
       ? LEGACY_CAMPAIGN_TABLES
-      : CAMPAIGN_TABLES;
+      : databaseVersion === V2_ARCHIVE_DATABASE_SCHEMA_VERSION
+        ? V2_CAMPAIGN_TABLES
+        : PORTABLE_CAMPAIGN_TABLES;
   requireExactKeys(tableRoot, [...archiveTables], 'campaign.tables');
   const parsedTables = campaignTableRecord((table) =>
-    databaseVersion === LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION && table === 'scene_frames'
+    !archiveTables.includes(table as never)
       ? Object.freeze([])
       : Object.freeze(
           requireRecordArray(tableRoot[table], `campaign.tables.${table}`, MAX_TABLE_RECORDS).map(
@@ -364,7 +341,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
 }
 
 function validateSceneFrameArchive(
-  tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>,
+  tables: Readonly<Record<PortableCampaignTable, readonly StoredRow[]>>,
   events: readonly StoredRow[],
   expectedCampaignId: CampaignId,
 ): void {
@@ -603,6 +580,48 @@ function insertRow(database: TransactionalSqliteDatabase, table: string, row: St
     .run(...allowed.map((column) => row[column] as SqliteValue));
 }
 
+function preparePortableRestore(
+  database: TransactionalSqliteDatabase,
+  importedCampaignId: CampaignId,
+): void {
+  database
+    .prepare('INSERT INTO quest_pool_restore_sessions (campaign_id) VALUES (?)')
+    .run(importedCampaignId);
+  database
+    .prepare('DELETE FROM quest_graph_revisions WHERE campaign_id = ?')
+    .run(importedCampaignId);
+  database.prepare('DELETE FROM quest_graphs WHERE campaign_id = ?').run(importedCampaignId);
+  database
+    .prepare('DELETE FROM universal_character_profiles WHERE campaign_id = ?')
+    .run(importedCampaignId);
+  database
+    .prepare('DELETE FROM character_rule_states WHERE campaign_id = ?')
+    .run(importedCampaignId);
+  database.prepare('DELETE FROM npc_lod_profiles WHERE campaign_id = ?').run(importedCampaignId);
+}
+
+function finishPortableRestore(
+  database: TransactionalSqliteDatabase,
+  importedCampaignId: CampaignId,
+): void {
+  database
+    .prepare('DELETE FROM quest_pool_restore_sessions WHERE campaign_id = ?')
+    .run(importedCampaignId);
+}
+
+function clearLegacyProjections(
+  database: TransactionalSqliteDatabase,
+  importedCampaignId: CampaignId,
+): void {
+  database
+    .prepare('DELETE FROM universal_character_profiles WHERE campaign_id = ?')
+    .run(importedCampaignId);
+  database
+    .prepare('DELETE FROM character_rule_states WHERE campaign_id = ?')
+    .run(importedCampaignId);
+  database.prepare('DELETE FROM npc_lod_profiles WHERE campaign_id = ?').run(importedCampaignId);
+}
+
 function tableColumns(database: TransactionalSqliteDatabase, table: string): readonly string[] {
   const rows = database.prepare(`PRAGMA table_info(${quoteIdentifier(table)})`).all();
   if (rows.length === 0) throw new PersistenceDataError(`Unknown import table: ${table}`);
@@ -625,6 +644,17 @@ function validateImportedDomain(
   if (campaign.get(parsed.campaignId) === null)
     throw new PersistenceDataError('Campaign is invalid');
   campaign.getModelSwitchPolicy(parsed.campaignId);
+  if (parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+    for (const table of PORTABLE_CAMPAIGN_TABLES) {
+      const reloaded = database
+        .prepare(portableTableQuery(table))
+        .all(parsed.campaignId)
+        .map((row) => parseStoredRow(row, table));
+      if (canonicalJson(reloaded) !== canonicalJson(parsed.tables[table])) {
+        throw new PersistenceDataError(`Imported ${table} rows did not reload exactly`);
+      }
+    }
+  }
   const worlds = new WorldRepository(database);
   if (parsed.tables.world_bibles.length > 0 && worlds.getBible(parsed.campaignId) === null) {
     throw new PersistenceDataError('World bible is invalid');
@@ -740,6 +770,26 @@ function parseStoredRow(value: unknown, label: string): StoredRow {
   );
 }
 
+function upgradeCampaignSchema(row: StoredRow, archiveSchemaVersion: number): StoredRow {
+  if (archiveSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+    if (
+      row['save_schema_version'] !== PORTABLE_SAVE_SCHEMA_VERSION ||
+      row['world_schema_version'] !== WORLD_SCHEMA_VERSION
+    ) {
+      throw new PersistenceDataError('Portable save/world schema versions are invalid');
+    }
+    return row;
+  }
+  if ('save_schema_version' in row || 'world_schema_version' in row) {
+    throw new PersistenceDataError('Historical archive contains unexpected schema version fields');
+  }
+  return Object.freeze({
+    ...row,
+    save_schema_version: PORTABLE_SAVE_SCHEMA_VERSION,
+    world_schema_version: WORLD_SCHEMA_VERSION,
+  });
+}
+
 function upgradeLegacyKnowledgeRow(row: StoredRow): StoredRow {
   if ('provenance_json' in row) return row;
   const learnedAt = requireString(row['updated_at'], 'npc_knowledge.updated_at');
@@ -788,8 +838,8 @@ function upgradeLegacyKnowledgeRow(row: StoredRow): StoredRow {
 }
 
 function upgradeLegacyRumorRows(
-  tables: Readonly<Record<CampaignTable, readonly StoredRow[]>>,
-): Readonly<Record<CampaignTable, readonly StoredRow[]>> {
+  tables: Readonly<Record<PortableCampaignTable, readonly StoredRow[]>>,
+): Readonly<Record<PortableCampaignTable, readonly StoredRow[]>> {
   const sourceByFact = new Map<string, string>();
   for (const knowledge of tables.npc_knowledge) {
     const npc = requireString(knowledge['npc_id'], 'npc_knowledge.npc_id');
@@ -1105,25 +1155,11 @@ function requireExactKeys(
 }
 
 function campaignTableRecord(
-  values: (table: CampaignTable) => readonly StoredRow[],
-): Record<CampaignTable, readonly StoredRow[]> {
-  return {
-    world_bibles: values('world_bibles'),
-    world_facts: values('world_facts'),
-    player_characters: values('player_characters'),
-    taverns: values('taverns'),
-    npcs: values('npcs'),
-    npc_knowledge: values('npc_knowledge'),
-    npc_relationships: values('npc_relationships'),
-    quests: values('quests'),
-    adventures: values('adventures'),
-    scene_frames: values('scene_frames'),
-    adventure_turns: values('adventure_turns'),
-    conversations: values('conversations'),
-    messages: values('messages'),
-    items: values('items'),
-    world_clocks: values('world_clocks'),
-  };
+  values: (table: PortableCampaignTable) => readonly StoredRow[],
+): Record<PortableCampaignTable, readonly StoredRow[]> {
+  return Object.fromEntries(
+    PORTABLE_CAMPAIGN_TABLES.map((table) => [table, values(table)]),
+  ) as Record<PortableCampaignTable, readonly StoredRow[]>;
 }
 
 function canonicalJson(value: unknown): string {

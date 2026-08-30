@@ -1,6 +1,5 @@
 import {
-  assembleTaskContext,
-  contextBudgetForTask,
+  buildUnifiedTaskContext,
   resolveModelConfig,
   routeModel,
   StandardAIError,
@@ -35,7 +34,11 @@ import {
   type TransactionalSqliteDatabase,
   type TurnCommit,
 } from '@ember-tavern/persistence';
-import { formatTaskPrompt, type FormattedTaskPrompt } from '@ember-tavern/prompts';
+import {
+  formatTaskPrompt,
+  stableWorldTruthsFromContext,
+  type FormattedTaskPrompt,
+} from '@ember-tavern/prompts';
 
 import { AITaskOrchestrator, type AIRouteKind } from './ai-task-orchestrator.js';
 
@@ -120,16 +123,13 @@ export class AITurnOrchestrator {
     }
 
     let context: JsonValue;
-    let contextAssembly: Awaited<ReturnType<typeof assembleTaskContext>>['assembly'];
+    let contextAssembly: Awaited<ReturnType<typeof buildUnifiedTaskContext>>['assembly'];
     try {
       context = toJsonValue(await command.buildContext(), '$context');
-      const prepared = await assembleTaskContext(
-        command.task,
-        command.requestId,
-        1,
-        context,
-        contextBudgetForTask(command.task).maxCharacters,
-      );
+      const prepared = await buildUnifiedTaskContext(command.task, context, {
+        sourceId: command.campaignId,
+        sourceRevision: 1,
+      });
       context = prepared.content;
       contextAssembly = prepared.assembly;
       this.requests.setContext(command.requestId, context, this.now());
@@ -194,7 +194,9 @@ export class AITurnOrchestrator {
       selectedModelProfileId = selectedProfile.id;
       const formatted =
         command.formatPrompt?.(context, decision.model.capabilities) ??
-        formatTaskPrompt(command.task, context, decision.model.capabilities);
+        formatTaskPrompt(command.task, context, decision.model.capabilities, {
+          stableWorldTruths: stableWorldTruthsFromContext(contextAssembly),
+        });
       request = Object.freeze({
         requestId: command.requestId,
         task: command.task,

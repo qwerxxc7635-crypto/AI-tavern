@@ -18,6 +18,16 @@ const initial: readonly PromptHistoryEntry[] = AI_TASKS.map((task) =>
 export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
   ...initial,
   Object.freeze({
+    task: 'GENERATE_WORLD',
+    version: promptVersion(2),
+    change: 'Generate a structured World Constitution before downstream world details.',
+  }),
+  Object.freeze({
+    task: 'REFINE_WORLD',
+    version: promptVersion(2),
+    change: 'Keep revised world content consistent with the structured Constitution.',
+  }),
+  Object.freeze({
     task: 'GENERATE_CHARACTER_TRAITS',
     version: promptVersion(2),
     change: 'Generate six candidates so the player can choose exactly two.',
@@ -89,8 +99,24 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     change: 'Reject substantial phrase repetition inside a generated reply.',
   }),
   Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(4),
+    change: 'Require 3-5 distinct optional Action Composer topics.',
+  }),
+  Object.freeze({
+    task: 'NPC_REPLY',
+    version: promptVersion(5),
+    change: 'Consume explainably retrieved World Lore without broadening NPC knowledge authority.',
+  }),
+  Object.freeze({
     task: 'GENERATE_QUEST',
     version: promptVersion(2),
     change: 'Avoid recent quest structures and substantial repeated phrases.',
+  }),
+  Object.freeze({
+    task: 'GENERATE_QUEST',
+    version: promptVersion(3),
+    change:
+      'Ground dynamic sources in locked Constitution, visible facts, local provenance and adapter budget.',
   }),
 ]);

@@ -5,7 +5,8 @@ use uuid::Uuid;
 
 use crate::npc_dialogue::validate_knowledge_provenance;
 use crate::{
-    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp, validate_id,
+    CampaignStore, CampaignStoreError, TavernGenerationAudit, current_timestamp,
+    quest_pool::transition_quest_pool_in_transaction, validate_id,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -19,6 +20,7 @@ pub struct AdventureSnapshot {
     pub plan_input: Value,
     pub player: Value,
     pub quest: Value,
+    pub equipment_context: Value,
     pub clocks: Vec<Value>,
     pub items: Vec<Value>,
     pub clues: Vec<Value>,
@@ -291,11 +293,27 @@ impl CampaignStore {
              WHERE id = ?2 AND campaign_id = ?3 AND state = 'PREPARING'",
             params![at, adventure_id, campaign_id],
         )?;
-        transaction.execute(
-            "UPDATE quests SET status = 'ACTIVE', updated_at = ?1
-             WHERE id = ?2 AND campaign_id = ?3 AND status = 'ACCEPTED'",
-            params![at, quest_id, campaign_id],
+        let pool_status: String = transaction.query_row(
+            "SELECT status FROM quest_pool_states WHERE quest_id=?1 AND campaign_id=?2",
+            params![quest_id, campaign_id],
+            |row| row.get(0),
         )?;
+        if pool_status == "ACCEPTED" {
+            transition_quest_pool_in_transaction(
+                &transaction,
+                campaign_id,
+                &quest_id,
+                None,
+                Some("ACCEPTED"),
+                "ACTIVE",
+                "ADVENTURE",
+                "Adventure started from a compatible accepted quest",
+                &format!("quest:adventure-start:{adventure_id}"),
+                &at,
+            )?;
+        } else if pool_status != "ACTIVE" {
+            return Err(CampaignStoreError::InvalidState);
+        }
         transaction.execute(
             "UPDATE campaigns SET state = 'ADVENTURE', updated_at = ?1
              WHERE id = ?2 AND state = 'TAVERN'",
@@ -540,19 +558,15 @@ impl CampaignStore {
         let check: Value = turn.check_request.ok_or(CampaignStoreError::InvalidData)?;
         let attribute = text_field(&check, "attribute")?;
         let difficulty = integer_field(&check, "difficulty")?;
-        let character = character_data(&transaction, campaign_id)?;
-        let attributes = record_field(&character, "attributes")?;
-        let attribute_value = attributes
-            .get(&attribute)
-            .and_then(Value::as_i64)
-            .ok_or(CampaignStoreError::InvalidData)?;
+        let (attribute_value, status_modifier) =
+            crate::rules_engine::character_check_modifiers(&transaction, campaign_id, &attribute)?;
         let equipment_modifier = equipment_modifier(&transaction, campaign_id, &attribute)?;
         let dice = resolve_d20_hard_logic(
             &text_field(&check, "id")?,
             roll_unbiased_d20(),
             attribute_value,
             equipment_modifier,
-            0,
+            status_modifier,
             difficulty,
         )?;
         let at = current_timestamp()?;
@@ -678,6 +692,7 @@ fn load_snapshot(
     };
     let player = character_data(connection, campaign_id)?;
     let quest = quest_data(connection, campaign_id, &quest_id)?;
+    let equipment_context = equipment_context(connection, campaign_id)?;
     let plan_input = plan_input(connection, campaign_id, &quest_id)?;
     let clocks = load_json_rows(
         connection,
@@ -697,6 +712,7 @@ fn load_snapshot(
             plan_input,
             player,
             quest: quest.clone(),
+            equipment_context: equipment_context.clone(),
             clocks,
             items,
             clues: Vec::new(),
@@ -762,6 +778,7 @@ fn load_snapshot(
         plan_input,
         player,
         quest,
+        equipment_context,
         clocks,
         items,
         clues,
@@ -774,6 +791,46 @@ fn load_snapshot(
     })
 }
 
+fn equipment_context(
+    connection: &Connection,
+    campaign_id: &str,
+) -> Result<Value, CampaignStoreError> {
+    let locked = connection
+        .query_row(
+            "SELECT revision, equipment_rules, technology, economy
+             FROM world_constitutions
+             WHERE campaign_id = ?1 AND status = 'LOCKED'",
+            [campaign_id],
+            |row| {
+                Ok(json!({
+                    "constitutionRevision": row.get::<_, i64>(0)?,
+                    "equipmentRules": row.get::<_, String>(1)?,
+                    "technology": row.get::<_, String>(2)?,
+                    "economy": row.get::<_, String>(3)?,
+                }))
+            },
+        )
+        .optional()?;
+    if let Some(context) = locked {
+        return Ok(context);
+    }
+    connection
+        .query_row(
+            "SELECT technology_level FROM world_bibles WHERE campaign_id = ?1",
+            [campaign_id],
+            |row| {
+                Ok(json!({
+                    "constitutionRevision": 1,
+                    "equipmentRules": "Legacy portable archive: preserve existing item effects and validate new mechanics locally.",
+                    "technology": row.get::<_, String>(0)?,
+                    "economy": "Legacy portable archive economy is unspecified.",
+                }))
+            },
+        )
+        .optional()?
+        .ok_or(CampaignStoreError::InvalidData)
+}
+
 fn plan_input(
     connection: &Connection,
     campaign_id: &str,
@@ -781,7 +838,8 @@ fn plan_input(
 ) -> Result<Value, CampaignStoreError> {
     let world = world_context(connection, campaign_id)?;
     let quest = quest_data(connection, campaign_id, quest_id)?;
-    if text_field(&quest, "status")? != "ACCEPTED"
+    let status = text_field(&quest, "status")?;
+    if !["ACCEPTED", "ACTIVE"].contains(&status.as_str())
         && !["ADVENTURE"].contains(&campaign_state(connection, campaign_id)?.as_str())
     {
         return Err(CampaignStoreError::InvalidState);
@@ -1476,10 +1534,11 @@ fn quest_data(
 ) -> Result<Value, CampaignStoreError> {
     connection
         .query_row(
-            "SELECT id, publisher_npc_id, content_json, status, risk, recommended_attributes_json,
+            "SELECT q.id, q.publisher_npc_id, q.content_json, pool.status, q.risk, q.recommended_attributes_json,
                     expected_turns_min, expected_turns_max, reward_tier,
                     related_npc_ids_json, related_fact_ids_json
-             FROM quests WHERE id = ?1 AND campaign_id = ?2",
+             FROM quests q JOIN quest_pool_states pool ON pool.quest_id=q.id
+             WHERE q.id = ?1 AND q.campaign_id = ?2",
             params![quest_id, campaign_id],
             |row| {
                 Ok(json!({
@@ -1590,6 +1649,12 @@ fn adventure_npc_knowledge(
         .filter_map(|value| value.as_str().map(str::to_owned))
         .take(12)
     {
+        if let Some(knowledge) =
+            generic_adventure_actor_knowledge(connection, campaign_id, &npc_id)?
+        {
+            result.push(knowledge);
+            continue;
+        }
         let knowledge = connection
             .query_row(
                 "SELECT known_fact_ids_json, suspected_fact_ids_json,
@@ -1634,6 +1699,68 @@ fn adventure_npc_knowledge(
         }
     }
     Ok(result)
+}
+
+fn generic_adventure_actor_knowledge(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Option<Value>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT knowledge.knowledge_state,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.subject ELSE claims.subject END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.predicate ELSE claims.predicate END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.object_json ELSE claims.object_json END
+         FROM actor_knowledge AS knowledge
+         LEFT JOIN world_truths AS truths
+           ON knowledge.target_kind = 'TRUTH' AND truths.id = knowledge.truth_id
+              AND truths.campaign_id = knowledge.campaign_id
+         LEFT JOIN knowledge_claims AS claims
+           ON knowledge.target_kind = 'CLAIM' AND claims.id = knowledge.claim_id
+              AND claims.campaign_id = knowledge.campaign_id
+         WHERE knowledge.campaign_id = ?1 AND knowledge.actor_type = 'NPC'
+           AND knowledge.actor_id = ?2
+         ORDER BY knowledge.id LIMIT 101",
+    )?;
+    let rows = statement
+        .query_map(params![campaign_id, npc_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, Option<String>>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if rows.is_empty() {
+        return Ok(None);
+    }
+    if rows.len() > 100 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    let mut known = Vec::new();
+    let mut suspected = Vec::new();
+    let mut believed = Vec::new();
+    for (state, subject, predicate, object_json) in rows {
+        let subject = subject.ok_or(CampaignStoreError::InvalidData)?;
+        let predicate = predicate.ok_or(CampaignStoreError::InvalidData)?;
+        let object: Value = from_json(object_json.ok_or(CampaignStoreError::InvalidData)?)?;
+        let object = serde_json::to_string(&object).map_err(|_| CampaignStoreError::InvalidData)?;
+        let value = format!("{subject} {predicate} {object}");
+        validate_text(&value, 4_000)?;
+        match state.as_str() {
+            "KNOWN" => known.push(value),
+            "SUSPECTED" => suspected.push(value),
+            "BELIEVED" => believed.push(value),
+            _ => return Err(CampaignStoreError::InvalidData),
+        }
+    }
+    Ok(Some(json!({
+        "npcId": npc_id,
+        "knownFacts": known,
+        "suspectedFacts": suspected,
+        "falseBeliefs": believed,
+    })))
 }
 
 fn fact_statements(
@@ -2015,13 +2142,19 @@ fn apply_fact_patches(
     Ok(())
 }
 
-fn equipment_modifier(
+pub(crate) fn equipment_modifier(
     connection: &Connection,
     campaign_id: &str,
     attribute: &str,
 ) -> Result<i64, CampaignStoreError> {
     let mut statement = connection.prepare(
-        "SELECT effect_json FROM items WHERE campaign_id = ?1 AND owner_character_id IS NOT NULL",
+        "SELECT items.effect_json
+         FROM character_rule_states
+         JOIN json_each(character_rule_states.equipped_item_ids_json) AS equipped
+         JOIN items ON items.id = equipped.value
+         WHERE character_rule_states.campaign_id = ?1
+           AND items.campaign_id = character_rule_states.campaign_id
+           AND items.owner_character_id = character_rule_states.player_character_id",
     )?;
     let effects = statement
         .query_map([campaign_id], |row| from_json::<Value>(row.get(0)?))?
@@ -2539,7 +2672,7 @@ mod tests {
         assert_eq!(
             imported_transaction
                 .query_row(
-                    "SELECT revision FROM event_ledger
+                    "SELECT MAX(revision) FROM event_ledger
                      WHERE aggregate_type = 'SCENE' AND aggregate_id = ?1",
                     [&adventure_id],
                     |row| row.get::<_, i64>(0),
@@ -2684,6 +2817,80 @@ mod tests {
         }
     }
 
+    #[test]
+    fn multi_npc_adventure_projection_is_scoped_per_actor() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_adventure(&store);
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                "INSERT INTO npcs (
+                   id, campaign_id, tavern_id, residency, name, identity, appearance,
+                   personality, goal, secret, speech_style, current_mood, current_status,
+                   visit_json, memories_json, created_at, updated_at
+                 ) VALUES (
+                   'npc-scout', 'campaign-adventure', 'tavern-rest', 'RESIDENT', 'Tomas',
+                   'Scout', 'Gray cloak.', 'Cautious.', 'Map the coast.', 'Reef route.',
+                   'Short replies.', 'Alert', 'ACTIVE', NULL, '[]',
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO world_truths (
+                   id, campaign_id, subject, predicate, object_json, authority, visibility,
+                   source_event_id, revision, created_at, updated_at
+                 ) VALUES (
+                   'truth-owner-only', 'campaign-adventure', 'owner_route', 'opens_at',
+                   '\"moonrise\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'truth-scout-only', 'campaign-adventure', 'scout_route', 'crosses',
+                   '\"black reef\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'truth-ungranted-adventure', 'campaign-adventure', 'director_secret', 'is',
+                   '\"not actor knowledge\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO actor_knowledge (
+                   id, campaign_id, actor_type, actor_id, target_kind, truth_id, claim_id,
+                   knowledge_state, visibility, provenance_kind, provenance_source_id,
+                   provenance_event_id, learned_at, confidence, revision, updated_at
+                 ) VALUES (
+                   'knowledge-owner-only', 'campaign-adventure', 'NPC', 'npc-owner',
+                   'TRUTH', 'truth-owner-only', NULL, 'KNOWN', 'ACTOR_PRIVATE', 'LOCAL_RULE',
+                   'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
+                   '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'knowledge-scout-only', 'campaign-adventure', 'NPC', 'npc-scout',
+                   'TRUTH', 'truth-scout-only', NULL, 'KNOWN', 'ACTOR_PRIVATE', 'LOCAL_RULE',
+                   'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
+                   '2026-08-14T12:00:00.000Z'
+                 );",
+            )
+            .expect("seed multi actor knowledge");
+
+        let projection = adventure_npc_knowledge(
+            &connection,
+            "campaign-adventure",
+            &json!({ "relatedNpcIds": ["npc-owner", "npc-scout"] }),
+        )
+        .expect("project related actors");
+        assert_eq!(projection.len(), 2);
+        assert_eq!(
+            projection[0]["knownFacts"],
+            json!(["owner_route opens_at \"moonrise\""])
+        );
+        assert_eq!(
+            projection[1]["knownFacts"],
+            json!(["scout_route crosses \"black reef\""])
+        );
+        let serialized = serde_json::to_string(&projection).expect("serialize projection");
+        assert!(!serialized.contains("not actor knowledge"));
+        assert!(!projection[0].to_string().contains("black reef"));
+        assert!(!projection[1].to_string().contains("moonrise"));
+    }
+
     fn seed_adventure(store: &CampaignStore) {
         let connection = store.connect().expect("connect");
         connection
@@ -2693,6 +2900,19 @@ mod tests {
                  ) VALUES (
                    'campaign-adventure', 1, 'TAVERN', NULL,
                    '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z'
+                 );
+                 INSERT INTO world_constitutions (
+                   campaign_id, schema_version, revision, status, world_type, era,
+                   technology, magic, peoples_json, society, politics, economy,
+                   combat_scale, death_rules, career_rules, equipment_rules,
+                   npc_rules, trait_rules, taboos_json, created_at, updated_at, locked_at
+                 ) VALUES (
+                   'campaign-adventure', 1, 1, 'LOCKED', 'Coastal fantasy', 'Late medieval',
+                   'Late medieval', 'Bounded warmth', '[]', 'Harbor guilds', 'Councils',
+                   'Fishing and coastal trade', 'Personal', 'Permanent', 'Guild careers',
+                   'Equipment follows local craft.', 'Bounded knowledge', 'Balanced traits', '[]',
+                   '2026-07-31T06:00:00.000Z', '2026-07-31T06:00:00.000Z',
+                   '2026-07-31T06:00:00.000Z'
                  );
                  INSERT INTO world_facts (
                    id, campaign_id, kind, statement, location_id, faction_ids_json,

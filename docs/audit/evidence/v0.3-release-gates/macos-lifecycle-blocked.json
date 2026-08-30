@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "startedAt": "2026-08-28T02:10:29.012Z",
+  "endedAt": "2026-08-28T02:10:29.013Z",
+  "success": false,
+  "environment": {
+    "ci": null,
+    "runnerOs": null,
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "keychain": null,
+  "appBundle": null,
+  "wkWebView": null,
+  "platformPaths": null,
+  "launch": null,
+  "cleanup": {
+    "removed": [],
+    "authorized": false
+  },
+  "error": "macOS release gate is restricted to an ephemeral CI macOS runner."
+}

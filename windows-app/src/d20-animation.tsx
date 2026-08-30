@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 import type { D20HardResultView } from './d20-hard-result.js';
+import { Button } from './ui/primitives.js';
 
 const FALLBACK_DURATION_MS = 1_200;
 
@@ -49,9 +50,9 @@ export function D20Animation({
       </p>
       <em>{result.result === 'SUCCESS' ? '成功' : '失败'}</em>
       <small>动画仅展示已保存的结果；跳过、刷新或重放都不会重新投掷。</small>
-      <button type="button" onClick={reveal} disabled={revealed}>
+      <Button type="button" variant="quiet" onClick={reveal} disabled={revealed}>
         {revealed ? '正在生成结果叙事…' : '跳过动画'}
-      </button>
+      </Button>
     </div>
   );
 }

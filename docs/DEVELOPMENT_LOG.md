@@ -3611,3 +3611,1442 @@
 
 - P0=0、P1=0、P2=0；第一轮整改结论更新为`READY FOR SECOND AUDIT`。
 - 用户既有`.gitignore`修改全程保留，整改提交不会纳入该文件；不merge、不push。
+
+## 2026-08-13 — M0-T01 V0.3 规格冻结
+
+### Repo 与 Git 基线
+
+- 仓库根目录为`/Users/mac/Desktop/item/4D`；起始分支`chatgpt/v0.2-second-audit-fixes`，起始commit `0af183391a5d83406874db326ed02b175ba24e6e`。
+- 开始时唯一未提交修改为用户已有`.gitignore`中的`.gstack/`；本任务不覆盖、不暂存该修改。
+- 完整阅读仓库规则、README、历史规格/任务、V0.2两轮审计与可玩性报告，并核对现有workspace、AI、domain、persistence、native和Windows页面结构。
+
+### 规格与任务
+
+- 新增`docs/V0.3_SPEC.md`，冻结“AI creates. Rules decide. SQLite remembers.”、不可刷新硬事实、自由玩家行动、Windows桌面优先、V0.3范围/非目标、分层架构和最终验收。
+- 将`docs/TASKS.md`切换为V0.3 M0–M12权威顺序；每个Task均明确Status、Dependency、Deliverable、Acceptance、Tests和Do Not。
+- 统一原提示中重复的M5编号：Character Creation与Trait共同属于V0.3 M5；后续里程碑顺延并保持产品依赖顺序。
+- README增加V0.3入口，同时保留v0.1规格和v0.2历史任务链接。
+
+### 架构决定
+
+- 新增`DEC-100`：V0.3增量演进现有V0.2架构，不建立第二套Provider、事实库或持久化链；`docs/TASKS.md`成为V0.3权威执行顺序。
+- 当前任务只冻结规格和任务，未修改产品代码、数据库或真实Provider配置，未开始M0-T02。
+
+### 验证
+
+- Prettier定向写入及检查通过：README、V0.3 Spec、Tasks、Decisions和Development Log全部符合格式。
+- V0.3任务结构检查通过：59个Task，每项均包含Status、Dependency、Deliverable、Acceptance、Tests和Do Not六个字段。
+- 文档目标检查通过；V0.3入口、历史v0.1规格、v0.2任务和两份v0.2审计/可玩性报告均存在。
+- 首次组合shell检查因使用变量名`path`覆盖zsh特殊`$path`数组，导致末尾两个`git`命令未被找到；文档检查本身已通过，Git检查随后以独立命令重跑，不修改系统或仓库配置。
+
+## 2026-08-13 — M0-T02 SillyTavern 功能审计
+
+### 研究
+
+- 核对官方SillyTavern仓库、1.18.0 Release和官方文档，覆盖Character Card、Persona、World Info/Lorebook、Prompt Manager、Preset、Chat、Group Chat、Context、Memory、Branch/Checkpoint、Model Settings、Import/Export、Extension、Roleplay UX和生成交互。
+- 定位本机`SillyTavern-1.13.3`整合包；只读取package版本、AGPL-3.0 License、README标题和内置扩展目录，未读取兑换码、secret、用户聊天或其他数据，也未启动或联网该包。
+- 官方2026年安全公告将1.17.0之前版本视为不安全；因此本机包仅作为历史结构样本，不作为可运行参考。
+
+### 输出与决定
+
+- 新增`docs/V0.3_ST_FEATURE_MATRIX.md`，逐项标记Ember已有、缺失、V0.3采用、不采用和后续考虑，并附官方直接来源。
+- 新增`DEC-101`：采用SillyTavern的角色/Persona/Lore/Prompt/Context/Memory/多角色和生成UX控制力；拒绝正式游戏Swipe、静默历史编辑和开放第三方执行面。
+- 本任务只修改审计与项目文档，未修改产品代码、数据库、Provider配置或用户本机整合包，未开始M0-T03。
+
+### 验证
+
+- Prettier定向写入和检查通过。首次提交前的tracked diff检查通过；文件暂存后检查发现新矩阵末尾多一个空行，随即删除、复核并修订同一任务commit。
+- 矩阵结构检查通过：26行表格数据，Character、Persona、World Info、Prompt、Preset、Chat、Group Chat、Context、Memory、Branch、Model、Import/Export、Extension和生成UX等必需类别及五种Ember分类均存在。
+- 文档包含16处官方/直接参考链接；秘密样式扫描通过，未发现Key或Bearer token样式内容。
+- 首次验证命令因shell正则内引号组合导致zsh在执行前报parse error；未产生写入。随后改用Node执行同等秘密与结构检查并完整通过。
+- Git状态复核只包含本任务四份文档以及用户原有`.gitignore`修改；后者不纳入暂存和提交。
+
+## 2026-08-13 — M0-T03 GitHub Reference Audit
+
+### 研究
+
+- 使用官方GitHub仓库、官方架构/产品文档和仓库License研究12个项目：SillyTavern、RisuAI、Tauri、Actual Budget、SQLite/rusqlite、TypeChat、LangGraph.js、XState、Evennia、ink、Bevy和Radix Primitives。
+- 覆盖AI Roleplay、Character/Lore/Prompt、Tauri桌面边界、offline-first SQLite、Structured Output、workflow/state machine、持久文字世界、Quest/narrative graph、数据驱动实体和Design System/a11y。
+- 对每个项目记录GitHub地址、License、模块、优点、缺点、Ember适用性、采用判断和拒绝原因；未只研究单一项目或以Star数量作为采用依据。
+
+### 输出与决定
+
+- 新增`docs/V0.3_REFERENCE_AUDIT.md`及子系统选择矩阵、License/复制策略和最终决定。
+- 新增`DEC-102`：V0.3不做框架大迁移；选择性吸收TypeChat、LangGraph/XState、Evennia/Bevy、ink、Actual/SQLite和Radix思想，任何实际依赖须在具体任务单独证明。
+- 明确LangGraph、Bevy、Evennia和ink不作为V0.3 runtime dependency；XState/Radix只在具体复杂度和测试收益证据成立时逐项评估。
+- 本任务只修改文档，未复制第三方源码/资产，未修改产品代码、依赖、数据库或Provider，未开始M1-T01。
+
+### 验证
+
+- Prettier定向写入与检查通过。首次暂存检查发现新审计文档末尾多一个空行，删除后重新暂存复核；未降低检查标准。
+- 参考审计结构检查通过：12个项目，每个项目均包含GitHub、License、研究模块、优点、缺点、适用性、采用判断和不采用原因八个字段。
+- 文档包含15处官方仓库/文档链接；秘密样式扫描通过。
+- Git状态复核只包含本任务四份文档和用户原有`.gitignore`修改；后者不纳入暂存和提交。
+
+## 2026-08-13 — M1-T01 Credential Lifecycle
+
+### 根因与修复
+
+- 审计设置页、Tauri命令、SQLite Provider配置、操作系统安全存储和启动恢复链，确认正式秘密从未以明文写入React状态真源或SQLite。
+- 定位延迟清理竞态：旧数据库、备份恢复或中断流程可能留下一个后来又成为活动Provider引用的清理项；原启动重试未复核活动所有权，会删除仍在使用的安全存储秘密。
+- 在native bridge增加事务化活动引用检查。清理重试发现`provider_configs`仍引用目标时，只丢弃过期队列项；无活动引用时才执行原有安全存储删除。
+- 新增`DEC-103`，固定“SQLite活动引用优先于清理队列”的凭据所有权规则；未新增Provider、未读取正式用户Key，也未调用真实模型API。
+
+### 生命周期回归
+
+- 新增原生端到端测试，使用运行时生成并存入操作系统安全存储的临时秘密和本机mock OpenAI-compatible服务。
+- 同一已保存Provider依次执行世界生成、角色背景、NPC生成、NPC回复、任务生成、冒险计划、冒险回合、D20结果和冒险总结九类请求；mock服务逐次验证Bearer凭据存在。
+- 测试在流程中注入过期清理项，并在冒险前及完整流程后两次关闭和重开SQLite；每一步均验证默认模型引用、安全存储秘密和生成结果仍可用。测试结束显式删除临时秘密。
+- 现有替换、保留、清除、缺失、回滚恢复、秘密扫描和平台安全存储合同测试继续通过。
+
+### 验证
+
+- 定向测试`cargo test -p ember-tavern-windows credential_survives_the_full_game_generation_chain_cleanup_and_reopen -- --nocapture`通过（1项）。首次误用native bridge package过滤同名测试，结果为0项执行；发现后立即改用测试实际所属package重跑，不将空执行视为通过。
+- `cargo fmt --all -- --check`、workspace全target/all-feature Clippy（`-D warnings`）和`cargo test --workspace`通过；Rust workspace执行96项、0失败，另有1项需显式真实DeepSeek凭据的测试保持默认忽略。
+- `pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 87文件/477项、Node 27项；完整Rust工作区和TypeScript/Rust存档互操作均通过。
+- 用户已有`.gitignore`修改保持未暂存；本任务只提交凭据修复、回归测试和三份项目文档，不merge、不push。
+
+## 2026-08-13 — M1-T02 Unified Navigation
+
+### 导航合同
+
+- 新增单一`navigation.ts`，集中定义桌面路径、规范查询参数编码、Campaign父级链接、可选Campaign设备页链接，以及Campaign状态到继续/恢复页面的唯一映射。
+- 修复侧栏复制完整查询字符串的问题：跨栏目只保留合法`campaignId`，不再把`npcId`或`questId`泄漏到无关页面。
+- 将世界、角色、酒馆、NPC、任务、冒险、结算档案、恢复、我的、模型设置与AI错误入口迁移到统一构造器；层级页返回链接不再丢失Campaign上下文。
+- `SETTLEMENT`与`ADVENTURE`统一恢复到冒险页面；失败、等待模型和需恢复状态统一进入恢复页，避免存档首页与恢复页维护不同映射。
+
+### 深链、返回与错误边界
+
+- 在React Router层增加必要上下文边界。世界、角色创建、恢复和五个Campaign主栏目要求唯一合法`campaignId`；NPC对话额外要求唯一合法`npcId`。
+- 缺失、重复、首尾空白、控制字符或超过256字符的参数在业务页面加载前被拒绝，显示不修改事实的安全错误页并可返回存档首页；实体是否存在仍由SQLite服务校验。
+- AppShell增加“当前位置”面包屑：NPC返回酒馆、冒险返回任务、模型设置返回我的；链接保留Campaign且不依赖历史栈。HashRouter历史和系统返回行为保持由React Router管理。
+- 新增13项纯导航合同测试，并扩展AppRoutes/AppShell测试，覆盖六栏目、实体参数隔离、缺失/重复/非法深链、Campaign状态恢复、面包屑跳转和上下文保持。
+
+### 验证
+
+- 定向TypeScript与导航测试采用红绿修复：首次编译发现三个消息组件引用页面局部`campaignId`及exact optional property类型问题；改为从统一查询合同生成安全父级后通过。首次UI测试发现重复文本选择器及非法参数下AppShell提前构造链接，收紧查询范围并让Shell仅使用已验证Campaign后通过。
+- `pnpm exec vitest run`通过：88文件/496项；`pnpm --dir windows-app build`通过，Vite production构建207个模块。
+- `pnpm check:shared`首次在ESLint阶段发现控制字符正则违反`no-control-regex`和一个迁移后未使用import；改为code point校验并删除遗留import后从头重跑通过。
+- 最终统一门禁通过Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript、Vitest 88文件/496项、Node 27项、完整Rust workspace（96项执行、0失败、1项真实API测试默认忽略）及TypeScript/Rust存档互操作。
+- 审计硬编码路径时，首次`rg`命令因zsh将未引用模式中的反引号与通配符解释为命令/文件匹配而在读取前失败；改用单引号模式重跑通过，未产生文件写入。
+- 用户已有`.gitignore`修改保持未暂存；本任务不修改SQLite、Provider或真实模型配置，不merge、不push。
+
+## 2026-08-13 — M1-T03 Error Architecture
+
+### 六类合同与跨语言映射
+
+- 在AI core新增稳定`ApplicationError`合同，产品错误严格投影为Provider、Generation、Validation、Persistence、Rule和Network六类，同时保留原有细粒度code与AI内部十类诊断。
+- 合同统一携带`retryable`、`fallbackEligible`、允许actions和Toast/Error State surface；构造器拒绝不可重试fallback，以及Validation/Persistence/Rule等非Provider/Network fallback伪造。
+- 新增六类代表性JSON fixture；TypeScript分类测试与Rust Tauri测试共同读取，逐项验证kind、retry、fallback、surface和actions。
+- Rust `CommandError`继续提供安全中文message和原code，同时序列化六类合同字段；未将原始Provider响应、秘密或内部异常文本暴露给UI。
+
+### 编排与UI策略
+
+- Desktop AI fallback改为读取统一`fallbackEligible`，不再维护独立code白名单；新增回归证明网络错误仍使用已保存备用模型，而认证、额度、Validation、Rule和Persistence均只调用主模型一次并原样失败。
+- `AITaskExecutionError`保留operation/request和内部category，同时增加稳定kind、fallback资格和actions投影。
+- AI错误组件现在按六类显示安全、具体的玩家文案与错误code，并只在合同和回调同时允许时展示Retry、Cancel、显式备用或Dismiss；认证/额度/模型问题提供模型设置入口。
+- Toast与持久Error State使用明确data contract和轻量视觉区分；Rule文案明确不能靠更换模型绕过，Validation文案明确技术重试不改变锁定硬结果。
+
+### 验证
+
+- 定向TypeScript测试通过：Application Error 11项、AI Task Orchestrator 8项、Desktop Orchestrator 11项、Error Notice 14项；Rust跨语言策略定向测试1项通过。
+- `pnpm check:shared`一次完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 89文件/518项、Node 27项；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- 完整门禁同时覆盖pending请求重试幂等、事务回滚、无部分事实写入、D20硬结果和恢复用例；未删除或降低既有校验。
+- `pnpm --dir windows-app build`通过，Vite production构建208个模块。
+- 用户已有`.gitignore`修改保持未暂存；本任务不调用真实模型、不修改SQLite schema、不merge、不push。
+
+## 2026-08-13 — M1-T04 Performance Baseline
+
+### 指标合同与工具
+
+- 新增内容无关的性能指标schema，覆盖world、NPC、quest、action和D20的总延迟、队列等待、可空token/cache usage、重试与安全错误码，并限制字段、样本数、时间和计数上界。
+- 新增可重复CLI，要求显式指定新的JSON输出路径并拒绝覆盖；记录当前commit、运行环境、迭代次数及Fake/Real证据身份，不默认加入仓库或应用遥测。
+- Fake Provider没有usage数据时保持`null`，不伪造0；序列化证据扫描确认不包含Prompt、messages、玩家全文、request ID、凭据引用或秘密字段。
+- 新增`DEC-106`，固定内容无关指标、unknown传播、Fake/Real隔离与受控场景标记规则；未读取正式API Key或调用真实模型。
+
+### 基线证据
+
+- 正式Fake基线在macOS arm64、Node.js v26.7.0执行，每类10次、共50个样本；五类任务均产生P50/P95总延迟和队列等待汇总。
+- 首个quest样本通过标准`TIMEOUT`错误路径形成受控终态失败；首个action样本通过同类可重试错误后实际调用Fake Provider成功。报告分别记录一个失败与一次重试，不将其表述为自然故障率。
+- 独立使用每类3次再次运行，共15个样本，报告身份、五类汇总、受控失败和受控重试结构一致，证明工具可重复执行。
+- 新增`docs/V0.3_PERFORMANCE_BASELINE.md`，记录证据身份、方法、精确结果、复现命令、限制和M12比较规则。
+
+### 验证
+
+- 首次执行CLI时，runner位于Vitest默认排除的`scripts/`目录，命令明确失败且没有生成报告；将runner迁入`packages/ai-core/src`并保留CLI入口后重跑通过，未把空执行视为成功。
+- 定向runner执行通过：10次/任务为1项测试、50个样本；3次/任务重复运行为1项测试、15个样本。两份报告都由同一validator重算汇总并通过隐私扫描。
+- 指标单元测试覆盖schema、未知字段/隐私、失败一致性、上下界、nearest-rank汇总、unknown usage和报告身份/一致性。
+- 首次完整门禁在ESLint阶段发现测试中的非空断言及Node脚本直接使用`console`；改为显式输出路径校验和`process.stdout`后从头重跑，不跳过规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 90文件/528项通过，另有1项只在CLI环境运行的runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建209个模块。本任务没有以优化或删除校验改变基线结果。
+- 用户已有`.gitignore`修改保持未暂存；本任务不优化运行路径、不修改SQLite schema、不merge、不push。
+
+## 2026-08-13 — M2-T01 Design Tokens
+
+### Token架构与渐进迁移
+
+- 新增正式三层CSS token：Primitive集中color/type/spacing/radius/shadow/motion/layer原值，Semantic表达主题用途，Component只消费Semantic；单一文件在`theme.css`前加载。
+- 深色Ember为默认Semantic映射；NPC对话、任务板和冒险在自身根节点切换浅色Paper映射。旧`--ink`、`--muted`、`--panel`等变量暂时作为Semantic别名，避免全量重写。
+- 补齐此前已使用但未正式定义的display/body字体、muted文本与Ember强调别名；应用body、sidebar、navigation、titlebar、My核心卡片和三个Paper页背景/主面板完成迁移。
+- `theme.css`原始颜色从92处降至43处，减少49处（约53%）；其余旧页面留待后续逐页迁移，不引入CSS框架、主题状态库或运行时JavaScript。
+- 新增`DEC-107`与`docs/V0.3_DESIGN_TOKENS.md`，记录三层所有权、WCAG、motion、layer、迁移范围和后续规则。设计系统技能的三层架构用于约束实现，未采用其无关的slide流程。
+
+### 自动合同
+
+- 新增静态测试验证三层顺序、七类必需token、Semantic/Component无原始颜色、Component不直连Primitive、全部custom property均有定义，以及核心选择器不再写raw颜色。
+- 深色与Paper主题共8组文本/强调/焦点配色达到WCAG 2.2适用的7:1、4.5:1或3:1阈值；Paper主题仅作用于NPC对话、任务和冒险页面根节点。
+- reduced-motion合同在Semantic层把界面时长降为1ms，并验证导航和D20显式禁用动画；不会跳过规则、持久化或业务timeout。
+- 四分辨率静态smoke覆盖860×600、1180×760、1366×768和1920×1080，以及760px紧凑sidebar和已有页面堆叠断点。
+
+### 浏览器证据
+
+- `playwright-cli`技能要求的CLI未安装；未修改全局npm环境，改用已安装的应用内Browser控制本地Vite页面，并在结束时恢复视口、关闭测试页和停止服务器。
+- 四视口实际渲染均无document/body横向溢出；workspace宽度依次为612、932、1118和1672px，sidebar固定248px，navigation计算层级为10。
+- 深色canvas、正文、焦点和半透明卡片均解析到预期token；应用壳、导航、标题栏、My页卡片和错误状态可见，浏览器控制台0项warning/error。
+
+### 验证
+
+- 定向token、对比度和既有布局测试通过：5文件/22项。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 91文件/545项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建210个模块；CSS被正式构建且没有解析警告。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变游戏逻辑、SQLite、Provider或玩家数据，不merge、不push。
+
+## 2026-08-13 — M2-T02 UI Primitives
+
+### Primitive实现
+
+- 新增Button、Input、Textarea、Select、Card、Modal、Drawer、Tabs、Tooltip、Toast、Skeleton、Progress、EmptyState和ErrorState共14类无业务primitive，使用React、原生HTML与M2-T01 token实现。
+- Button统一variant、loading/disabled和可见状态名；三类Field强制label并关联description/error/`aria-invalid`；Progress和Skeleton拒绝越界输入。
+- Modal/Drawer使用原生dialog，覆盖初始焦点、Esc/backdrop/关闭按钮意图、受控open和关闭后焦点归还；Tabs实现方向键、Home/End、循环与跳过disabled的roving focus。
+- Tooltip合并触发器`aria-describedby`；Toast按普通/成功与错误区分polite/assertive live region；Empty与Error不以颜色作为唯一状态。
+- CSS只消费正式token，提供44px target、focus-visible/scroll margin、窄窗Overlay、正式layer、reduced-motion和forced-colors；未复制第三方资产。
+
+### 架构与迁移
+
+- 新增`DEC-108`和`docs/V0.3_UI_PRIMITIVES.md`，记录原生优先、无业务状态、无障碍与渐进迁移合同。
+- UI styling技能用于组件组合和状态原则，accessibility技能用于WCAG 2.2 target/focus/ARIA/live region；因现有栈已满足需求且任务禁止无必要迁移，未采用技能建议的shadcn/Tailwind安装。
+- `AppErrorBoundary`迁移到ErrorState作为页面接入证明；仍隐藏原始异常、保留main landmark和返回酒馆action，没有修改路由或错误分类。
+
+### 验证
+
+- 首次定向门禁在TypeScript阶段发现`exactOptionalPropertyTypes`下Field可选prop未允许显式undefined；统一公共Field合同后编译通过，未关闭严格模式。
+- Primitive定向行为与CSS测试通过：2文件/15项；连同AppErrorBoundary/Routes回归为3文件/23项。
+- 行为覆盖loading/disabled、Field label/error、Card inline snapshot、Modal/Drawer焦点和关闭、Tabs键盘、Tooltip、Toast、Skeleton、Progress及Empty/Error；CSS覆盖token、target、focus、Overlay、motion和forced-colors。
+- 首次完整门禁在ESLint阶段发现HTML inline snapshot的12处多余转义；改为标签、命名、子区块和文本组成的稳定结构snapshot后从头重跑，不禁用lint规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 93文件/560项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建212个模块。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变业务逻辑、SQLite、Provider或游戏事实，不merge、不push。
+
+## 2026-08-13 — M2-T03 Game Components
+
+### 共享展示合同
+
+- 核对原始目标发现明确列出十类组件，而Task摘要写成“九类”；按Spec和名称完成CharacterCard、NpcCard、TraitCard、QuestCard、ItemCard、ActionComposer、DialogueView、AIFieldAssist、GenerationPanel和StatusPanel全部十类。
+- 每类只接收只读view model、ReactNode或用户意图callback，不导入Repository、SQLite、Tauri、Provider、AI orchestrator或动态实体规则。
+- 五类Card统一语义、选择/禁用和非颜色选中提示；Dialogue统一消息与loading/empty/error；Generation/Status统一进度和状态投影。
+- ActionComposer与AIFieldAssist只建立presentation shell，未提前实现M2-T04的字段生命周期或M2-T05的streaming、重复提交、恢复和跨场景状态机。
+- 新增`DEC-109`和`docs/V0.3_GAME_COMPONENTS.md`，记录view model边界、十类权威清单、迁移与后续任务所有权。
+
+### 核心页面迁移
+
+- 任务板列表迁移到QuestCard；selected quest、accept、风险详情和导航继续由页面拥有。
+- 酒馆人物列表迁移到NpcCard；NPC选择、详情和对话导航继续由页面拥有。
+- NPC消息历史迁移到DialogueView；草稿、建议、发送、AI错误和关系状态继续由页面拥有。
+- 旧布局class作为显式适配保留，未机械替换其他页面或改变服务调用；760px窄窗与forced-colors增加统一合同。
+
+### 验证
+
+- 定向Game Components与三份迁移页面测试通过：5文件/12项。
+- 组件测试覆盖十类渲染/交互和空错加载态；CSS静态测试覆盖raw颜色、token完整性、非颜色选择标记、760px窄窗与forced-colors。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 95文件/568项通过，另有1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建214个模块；共享Game Components形成独立lazy chunk，三份迁移页面bundle均保持按路由拆分。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、Provider、业务规则或持久化，不merge、不push。
+
+## 2026-08-13 — M2-T04 AI Field Assist
+
+### 字段合同与安全边界
+
+- 建立21项自然语言字段权威清单，覆盖世界创建/预览/修订、角色创建以及NPC与冒险自由输入；页面以唯一`data-ai-field`登记，测试审计所有者、重复与未知marker。
+- AIFieldAssist补齐生成、完善、多个候选、扩写、缩写、采用、撤销、取消、重试和锁定展示；radio使用组件独立分组，空候选不能采用。
+- 新增纯状态机和React适配器：结果先进入候选，只有显式采用才通知页面；生成器只接收operation/value/AbortSignal，没有SQLite、Repository或save能力。
+- 活动请求期间拒绝编辑、二次生成和锁定；取消abort，迟到/失序响应按请求ID忽略。软锁可解，硬锁拒绝编辑、生成及解锁，保护游戏开始后的世界事实。
+- 候选限定1–5个，“多个候选”至少2个；拒绝空白、重复、危险控制符和超过8000字符输出。Provider原始异常不进入玩家状态。
+- 新增`DEC-110`与`docs/V0.3_AI_FIELD_ASSIST.md`。M2不伪造候选、不调用真实模型、不复用会持久化的现有世界整体生成；M3 Generator通过无持久化接口接入。
+
+### 验证
+
+- 首轮格式化命令错误使用不存在的`src/pages`路径，Prettier明确失败且未更改这些页面；改用真实`src`路径后成功，未将部分格式化视为完成。
+- 首次定向TypeScript发现Error结构断言和async rejection写法不满足严格类型；改为显式验证`FieldAssistStateError.code`及Promise rejection后通过，未放宽tsconfig。
+- 首次字段审计准确发现`world-name`使用直接字面marker而非World helper动态marker；审计改为同时验证所有清单源登记和所有字面marker均受清单管理，不删除该字段。
+- 专项测试4文件/23项通过，覆盖字段审计、state machine、cancel/race、locked field、不合规输出、适配器无直接发布及组件交互。
+- 首次完整门禁在ESLint阶段发现测试中的非空断言和两个无用转义；改为显式null保护和规范正则后从头重跑，不禁用规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 98文件/586项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建214个模块；没有新增Provider依赖或改变路由拆分。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、真实模型配置或已保存游戏事实，不merge、不push。
+
+## 2026-08-13 — M2-T05 Action Composer
+
+### 统一输入与候选合同
+
+- 新增Action Composer纯状态机，统一freeform/suggestion提交、3–5候选验证、streaming、取消、错误重试、禁用、草稿恢复与SQLite pending恢复语义；迟到事件按submission ID忽略。
+- 共享ActionComposer补齐`Ctrl/⌘ + Enter`、受控候选选择、aria-pressed、live stream/status、cancel和retry；自由Textarea始终存在，候选没有专用提交权限。
+- NPC和冒险移除各自重复候选/表单结构并迁移共享组件。NPC候选/自由文本均走`service.send`且以ref阻止双击；冒险三种模式均走`service.act`，其中OBSERVE作为当前调查集成。
+- NPC Reply schema、prompt与registry升级v4，新生成输出要求3–5个唯一建议话题；Fake Provider和fixtures同步为3项。旧存档快照加载不强制新下限，保证兼容。
+- 删除已无调用者的`.dialogue-topics`与`.suggested-actions`旧样式；共享组件只消费正式token，并为候选增加非颜色及forced-colors选择标记。
+- 新增`DEC-111`与`docs/V0.3_ACTION_COMPOSER.md`。实际Provider streaming/cancel分别属于M10-T03/M3-T02，本任务不伪造流或提前实现队列。
+
+### 验证
+
+- 首轮专项测试发现NPC schema版本矩阵仍期待v3，且冒险回归依赖“上方建议”既有文案；同步v4矩阵并保留用户文案后重跑通过，没有降低断言。
+- 定向8文件/92项通过，覆盖state machine、schema/prompt/Fake、共享组件、NPC Application与NPC/冒险页面集成；冒险既有自由输入失败保留、恢复和不可重复投骰回归继续通过。
+- 首次完整门禁在玩家文案阶段拒绝`Ctrl/Enter`英文键名；改为“控制键/命令键/回车”的完整中文说明后从头重跑。
+- 第二次完整门禁准确发现共享组件迁移后字段marker由字面属性变为受控prop，以及NPC prompt当前版本升到v4但缓存测试仍模拟v4；审计改为验证所有字面marker均在清单内（字段源登记仍逐项唯一），缓存变化测试改为v4→v5后从头重跑。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 99文件/596项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建214个模块；NPC页面chunk略降，ActionComposer保持共享lazy chunk。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、硬结果或既有消息/行动事实，不merge、不push。
+
+## 2026-08-13 — M3-T01 Generator Framework
+
+### 框架与首个迁移切片
+
+- 在ai-core新增九阶段泛型Generator/Runner，Context、Prompt、raw、parsed、validated、rules-checked、persisted和events类型分离；repair仅处理首次parse/validate失败并强制重新验证。
+- 新增内容无关审计entry与安全LifecycleError；每阶段STARTED/SUCCEEDED/SKIPPED/FAILED可观察，未知异常只投影稳定通用码。
+- 通过Transaction Port把persist与emitEvents置于同一事务；事件失败回滚，`ALREADY_COMMITTED`跳过事件，框架不导入SQLite/Persistence。
+- 首个迁移切片为Windows DesktopAIOrchestrator共享结构化生成：复用既有Model Settings、Prompt、cache、Provider、validate/repair和selection drift，不建立第二套Provider。
+- Desktop的persist阶段只返回已验证候选，事件为空，正式事实继续由现有Application/Gateway事务提交；未批量迁移其他生成器，未修改schema。
+- 新增`DEC-112`与`docs/V0.3_GENERATOR_FRAMEWORK.md`，固定阶段、一次repair、事务、幂等、审计与渐进迁移边界。
+
+### 验证
+
+- 首次实现补丁因`ai-core/index.ts`导出位置假设不匹配而整体拒绝；读取真实export布局后分两次添加文件与显式exports，没有产生半应用文件。
+- 首次Desktop迁移TypeScript发现validation subclass在base class声明前求值；将subclass移动到base之后通过，未关闭严格检查。
+- 框架与Desktop/AITurn定向3文件/24项通过，覆盖阶段顺序、失败短路、repair、规则拒绝、事务rollback、幂等事件和既有桌面能力。
+- 首次定向ESLint发现测试残留未使用的LifecycleError import；删除无用import后重新执行lint、TypeScript和定向测试通过，未忽略规则。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 100文件/603项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建215个模块；Generator形成共享依赖且桌面编排保持路由lazy chunk。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、Provider配置或已持久化游戏事实，不merge、不push。
+
+## 2026-08-14 — M3-T02 Generation Queue
+
+### 有界调度与策略
+
+- 新增P0/P1/P2 GenerationQueue，提供1–8全局并发、最大256 active intents、P0四次burst公平轮转、P1/P2轮转及P2保留前台槽策略。
+- 同intent返回相同handle/Promise；queued和running均可取消，attempt使用AbortSignal和单次settle，迟到结果不会改变终态。
+- timeout覆盖所有retry/fallback的整体deadline；retry限制0–3次，达到上限后只有稳定错误合同允许且调用方显式授权时才fallback一次。
+- hardResultKey在PRIMARY/RETRY/FALLBACK保持原值，Queue不创建、修改或持久化硬结果；成功结果仍需进入Generator rules/persist。
+- 指标只记录task/priority/status/route/attempts/queue wait/duration/error code，拒绝内容和身份字段；时长有界且每任务只记录一个终态。
+- 新增`DEC-113`与`docs/V0.3_GENERATION_QUEUE.md`；Queue只依赖execute callback，不建立第二套Provider，不直接写SQLite。
+
+### 验证
+
+- 首轮Queue专项8项中7项通过；并发测试预期错误地要求第二个P2占用专门保留的前台槽，同时fake timer在挂载rejection断言前推进造成handled-late警告。修正测试时序后8/8通过，未削弱P2容量限制。
+- 首次定向ESLint发现Queue entry变量只赋值一次；改为const entry和独立cancelTarget闭包后通过，未禁用prefer-const。
+- 新增硬结果技术retry及配置/容量边界专测后，Queue/Application Error/Generator定向3文件/28项通过，覆盖priority/fairness、concurrency、cancel race、timeout、dedupe、retry/fallback policy、hard result和metrics。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 101文件/613项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行97项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建216个模块；Queue保持共享无Provider依赖模块。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、模型凭据、硬结果或已持久化游戏事实，不merge、不push。
+
+## 2026-08-14 — M3-T03 Structured Entity Schemas
+
+### 版本化实体合同
+
+- 在ai-core新增九类实体闭集与registry，分别提供World Constitution、Career、Trait、Item、Location、Faction、NPC LOD、Quest Graph和Director Action严格version 1 input/output Zod Schema。
+- payload与registry双重携带schemaVersion；顶层及嵌套对象拒绝未知字段，字符串、列表、请求数量和输出资源均有硬上限，不把长篇文本作为唯一结构。
+- Career覆盖稀有度、role/skills/equipment/social/relationship/risk/requirement；Trait拆分kind、trigger及正负语义效果；Item分离叙事/语义/balance tag，不接受AI数值伤害字段。
+- Location/Faction包含稳定ID和关系引用；NPC LOD以0–3层结构承载逐步详情和preservedFields输入；Quest以node/edge表达闭集状态；Director只输出有界action proposal和cooldown key。
+- Schema刻意允许不存在的引用和LOD降级形状，证明parse不冒充业务验证；后续rulesCheck必须依据SQLite判断引用、revision、平衡、迁移、预算和冷却。
+- 新增`DEC-114`与`docs/V0.3_STRUCTURED_ENTITY_SCHEMAS.md`；不新增数据库、Provider、Prompt或事实写入口。
+
+### 验证
+
+- 首轮Prettier完成TS/JSON格式化；`cargo fmt --check`准确报告新Rust模块和module顺序不符合rustfmt，执行正式`cargo fmt --all`后通过，没有跳过格式门禁。
+- TypeScript实体专项14项通过，覆盖registry/fixture完整性、有效、缺失、未知版本、越界、资源上限、未知字段拒绝及结构/业务分层。
+- Rust跨语言专项3项通过，共读同一fixture并验证九类闭集、version、必需输出边界、资源上限和strict envelope。
+- 定向ESLint与全仓TypeScript strict typecheck通过。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 102文件/627项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建217个模块；实体Schema作为共享结构合同进入现有bundle，不新增运行时Provider或数据库依赖。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、已保存事实或模型配置，不merge、不push。
+
+## 2026-08-14 — M3-T04 AI Inspector
+
+### 会话诊断与权限边界
+
+- 新增session AI Inspector只读Gateway与有界投影，覆盖generation/task/status/error、provider/model、latency、cache、tokens、Context manifest、Prompt、raw、parsed、validation、repair和Generator lifecycle。
+- DesktopAIOrchestrator在每个primary/fallback实际attempt边界记录成功或失败；Inspector记录失败本身best-effort，不会替换原生成结果、稳定错误或fallback策略。
+- 玩家模式返回空且UI默认关闭；“我的”新增第八个AI检查器分区，只有显式开启才以ADVANCED模式读取，面板无编辑、retry、save或事实提交能力。
+- ADVANCED遮罩Prompt/raw/parsed scalar；DEVELOPER仅展示有界净化内容。SYSTEM Core Prompt始终隐藏；无system-role时只显示`[TASK_INPUT]`之后部分，防止合并的Core/stable truth泄露。
+- 递归遮罩API Key、Authorization/Bearer、Cookie、Password、Credential、secret/hidden/unrevealed和World Truth字段；Context继续只显示既有manifest metadata。
+- 会话记录、段长、消息、数组、对象字段、嵌套深度、validation issue和lifecycle都有硬上限；新增`DEC-115`与`docs/V0.3_AI_INSPECTOR.md`，不新增SQLite或导出面。
+
+### 验证
+
+- 首次严格TypeScript发现Provider cache token字段在协议中可为undefined，而Inspector合同只接受number/null；显式归一为null后通过，未放宽类型。
+- 专项4文件/24项通过，覆盖redaction、PLAYER/ADVANCED/DEVELOPER模式、空记录、成功、Provider失败、repair成功/失败、validation、metrics、内容/集合上限、UI显式启用和Context metadata回归。
+- 安全复核发现不支持system role时Core Prompt与用户输入合并；新增`[TASK_INPUT]`切分和回归测试，开发模式也不显示Core/stable prefix。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 103文件/635项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建218个模块；Inspector保持My与Desktop orchestrator现有lazy chunks，不新增Provider或持久化依赖。
+- 用户已有`.gitignore`修改保持未暂存；本任务不改变SQLite schema、GenerationRecord、已保存事实或模型凭据，不merge、不push。
+
+## 2026-08-14 — M4-T01 World Constitution
+
+### 结构化规则与锁定边界
+
+- 新增version 1 World Constitution合同，覆盖世界类型、时代、技术、魔法、族群、社会/政治/经济、战斗/死亡、职业/装备/NPC/Trait规则及禁忌；`GENERATE_WORLD`与`REFINE_WORLD`升级v2，在既有Generator/Provider响应内同批生成World与Constitution，不增加模型调用或提前生成后续实体。
+- 新增migration 9及`world_constitutions`独立表；TypeScript Repository与Rust Windows命令支持完整读写、revision递增、expected revision确认和SQLite重开。锁定trigger阻止已确认记录的任何UPDATE，绕过Repository也不能改写。
+- World与Constitution在同一事务提交；本地规则要求technology精确匹配、magic进入power rules、所有taboo进入forbidden elements。Schema有效但关系冲突的模型输出以稳定错误整批拒绝，Campaign、World和Constitution均不产生半提交。
+- 新增下游`assertConstitutionBinding`入口，要求LOCKED状态、campaign与revision完全一致；后续Career/Item/NPC/Trait业务规则仍由各自任务实现，不把结构parse误当成合法性裁决。
+- 世界确认UI增加醒目的只读Constitution区，显示revision/status及全部规则；AI refinement可在确认前同步修订并递增revision，确认后进入车卡且不可继续修订。
+- 新增`DEC-116`与`docs/V0.3_WORLD_CONSTITUTION.md`。portable archive仍保持v2，集中升级属于M10-T05；本任务不提前改变跨语言存档协议。
+
+### 验证
+
+- 新增三类Constitution（低魔、无魔调查、赛博朋克）save/reload测试，并覆盖revision、错误expected revision、Repository锁定拒绝、SQLite trigger、migration 9及数据库重开。
+- Domain/Application测试覆盖未锁定、campaign mismatch、revision mismatch、World technology/magic/taboo mismatch、原子拒绝及确认锁定；Windows UI/Service与Rust纵向切片覆盖展示、修订和确认。
+- 首次Rust reopen测试发现native migration最新版仍写死为8；改为集中`LATEST_SCHEMA_VERSION = 9`后通过。完整门禁随后发现archive本地数据库白名单也仍为8；同步本地识别为9但不改变portable v2格式，再从头执行完整门禁。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 105文件/646项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行100项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建218个模块；World Creation chunk包含确认UI，不新增Provider或完整世界生成链。
+- 用户已有`.gitignore`修改保持未暂存；本任务不merge、不push，也不提前执行M4-T02。
+
+## 2026-08-14 — M4-T02 World Seed
+
+### 持久Seed与独立程序随机流
+
+- 新增version 1 World Seed合同：每个Campaign持久128-bit小写hex Seed和`EMBER_STREAM_V1`算法标识；新Campaign在同一事务创建Seed，非法注入会回滚Campaign，migration 10为既有Campaign一次性回填。
+- 新增`world_seeds`与`world_random_streams`；Seed由SQLite trigger永久不可变，每个用途流独立保存next position。Repository以单条UPSERT原子预留1–4096次draw，重开后继续cursor且不会因其他流推进而漂移。
+- 新增可注入`DeterministicWorldRandom`，提供uint32/unit、pick、weightedPick和Fisher–Yates shuffle；严格验证Seed、流名、position、候选、权重和reservation边界，耗尽后拒绝继续抽样。
+- TypeScript与Rust共同实现`EMBER_STREAM_V1`随机访问算法，并以固定向量验证一致；Windows CampaignStore创建/读取Seed、预留map流，E2E在正式纵向切片证明落库。
+- `d20`、`dice`及其命名空间在Domain、Repository、SQLite和Rust拒绝；程序抽样器不实现`nextD20`。既有D20仍由独立受信`D20RandomSource`裁决并持久硬结果，设备模型温度设置也不与Seed混用。
+- 新增`DEC-117`与`docs/V0.3_WORLD_SEED.md`；不声称LLM完全确定，不提供Seed重置/查看UI，不提前实现地图、事件池或Director消费者。portable archive新表升级仍按M10-T05集中处理。
+
+### 验证
+
+- Domain/Repository/Application专项11项通过，覆盖shared vector、repeatability、pick/weight/shuffle、reservation耗尽、stream isolation、save/reopen、Seed/cursor、创建rollback、不可变trigger、SQLite硬随机命名拒绝及D20 independence。
+- migration/database startup 9项通过；从schema 6升级到10时既有Campaign获得合法Seed，完整新库包含两张Seed表且重复启动幂等。
+- 首次完整门禁在Rust Clippy唯一拒绝手写position闭区间判断；按建议改用`RangeInclusive::contains`，未添加allow或降低warnings，随后Clippy、Rust workspace与互操作全部通过。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 107文件/654项通过，另有1文件/1项CLI基线runner按设计跳过；Node 27项通过；Rust workspace执行102项、0失败，另有1项真实API测试默认忽略；TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建219个模块；Seed基础设施不增加玩家UI或模型调用。
+- 用户已有`.gitignore`修改保持未暂存；本任务不merge、不push，也不提前执行M4-T03。
+
+## 2026-08-14 — 引入《Ember Tavern 视觉风格手册 V1.0》并冻结渐进迁移策略
+
+### 规范持久化与任务影响分析
+
+- 将用户提供的视觉手册逐字持久化为`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`，并在`docs/V0.3_SPEC.md`建立全局引用；视觉方向冻结为“黑暗奇幻酒馆 × TRPG 冒险手册 × 现代桌面游戏 HUD”，AI采用命运/世界生成身份而非技术品牌主角。
+- 审计发现M2-T01～T05已完成Token、Primitives、Game Components、AIFieldAssist和ActionComposer基础，不能修改其历史状态或重做；但原任务只做渐进核心页面迁移，M5～M10新增Feature UI之后缺少统一Legacy迁移与一致性收敛门禁。
+- 在不改变里程碑顺序的前提下新增`M10-T07 Visual System Convergence`，由M10-T06依赖进入，并将M11-T01依赖改为M10-T07；M12-T01增加独立视觉复核标准。未另建第二套UI体系。
+- 新增`docs/V0.3_VISUAL_MIGRATION.md`：记录现有`theme.css`仍有41处非Token raw color、历史页面尚未逐页复核Typography/Color/Spacing/Radius/Border/Shadow/Motion等视觉债务，并冻结Token→Primitive→Game Component→Feature→Legacy→Audit迁移顺序。
+- 从现在起，M5～M10新增或自然触及的UI直接复用现有Token和共享组件并遵循手册；明显扩大当前业务任务的视觉调整留到M10-T07。M0～M4-T02页面不在当前M4-T03返工。
+- 视觉规范不改变Rules Engine、Provider、Generator/Queue、SQLite、Persistence、Save/Resume、World Seed/Constitution、D20或Quest/NPC/Adventure合同；冲突时功能正确性、数据合同和存档兼容性优先，无法兼容项必须记录Decision。
+
+### 当前任务连续性
+
+- 文档追加完成后继续`M4-T03 Rules Engine Expansion`现有属性、D20、装备、金钱、时间、Trait、Quest和事务盘点；未开始M4-T04，也未因视觉规范扩大或重构规则业务范围。
+- 用户已有`.gitignore`修改继续保持未暂存；本次只修改V0.3全局文档与尚未完成任务的标准/依赖，不修改已完成任务历史状态。
+
+## 2026-08-14 — M4-T03 Rules Engine Expansion
+
+### 本地裁决、事务与审计
+
+- 新增version 1角色规则状态与闭集命令合同，覆盖技能、HP、状态、装备、金钱、游戏时间、Trait修正、资源和Quest迁移；基础属性继续采用既有五属性合同并在两张表由SQLite trigger保持不可变。
+- authority只允许`LOCAL_RULE`、`PLAYER_ACTION`和`SYSTEM`。AI state patch validator显式拒绝所有规则命令和属性写入；未知命令/字段、非法所属关系和越界数值在写入前拒绝，不从Narrative反解析任何数值。
+- 新增migration 11、`character_rule_states`和append-only `rules_events`。TypeScript Repository以即时事务、expected revision、canonical command及idempotency key原子提交角色状态、可选Quest迁移和事件；碰撞、漂移或任一步失败完整回滚。
+- Windows原生桥接实现相同严格反序列化、裁决、幂等与事务语义，并提供受限前端gateway；未新增规则编辑页面或扩大视觉重构范围。
+- D20仍使用独立受信随机源；修正来自本地基础属性、状态、Trait和角色实际拥有且已装备的合法物品。World Seed、Provider和叙事输出均不能决定硬结果。
+- 新增`docs/V0.3_RULES_ENGINE.md`与`DEC-119`。本任务不实现完整DND/COC，不提前完成M5 Trait平衡或M4-T04 Knowledge Boundary。
+
+### 验证与限制
+
+- Domain专项覆盖组合、边界、非法authority/字段、property matrix、Trait/资源、D20/装备和物品效果；AI patch回归覆盖全部数值命令拒绝。
+- Persistence与migration测试覆盖schema 11升级/回填、save/reopen、审计append-only、ownership、事件碰撞rollback、Quest原子提交、幂等冲突、属性不可变及Campaign级联。
+- `pnpm check:shared`中的Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript及Vitest通过：110个文件/682项通过，另有1文件/1项CLI基线runner按设计跳过。Rust workspace 106项通过、0失败，另有1项真实API测试默认忽略；Clippy全workspace以`-D warnings`通过；TypeScript/Rust archive互操作通过；Windows production build通过（220个模块）。
+- Node独立测试28项通过；其中既有`node:sqlite backup()`一致性测试在当前Node 26环境耗时约46秒，但最终正常退出且未被修改、跳过或降低断言。
+- 本地数据库schema已为11并可关闭重开。portable`.emtavern`仍保持v2且暂不包含规则状态/事件，跨语言格式升级严格留给M10-T05；不得将本地恢复能力表述为portable archive已覆盖。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，也不进入M4-T04。
+
+## 2026-08-19 — M4-T04 Knowledge Boundary
+
+### 四层持久模型与本地授权
+
+- 新增schema 12及`world_truths`、`knowledge_claims`、`actor_knowledge`、`knowledge_memories`；Truth只承认本地规则、用户接受、领域事务和导入authority，Claim/Memory不能反向创建Truth。
+- NPC与Player Character使用独立Actor Knowledge行；数据库与Repository共同验证Campaign、Actor、Truth/Claim目标、provenance Event和Memory来源，跨Campaign、跨Actor、缺失来源及revision跳跃均拒绝。
+- LEARN、UPDATE、FORGET使用expected revision、operation ID和event ledger原子提交；重放返回原提交，同operation不同payload或ledger碰撞完整回滚，遗忘保留不可变审计历史。
+- Domain投影按Campaign、Actor type和Actor ID精确筛选，保留Truth/Claim种类与Known/Suspected/Believed状态；秘密Truth只有显式授权才可见，多NPC Adventure逐Actor投影。
+- TypeScript NPC Dialogue和Windows原生NPC/Adventure路径优先使用通用授权投影；存在新授权行时不再拼接旧事实。尚未迁移的Actor只使用既有隔离验证后的`npc_knowledge`兼容回退。
+- migration 12保守转换旧Truth/Rumor/False Belief和NPC认知，不暴露传闻veracity；新增`docs/V0.3_KNOWLEDGE_BOUNDARY.md`与`DEC-120`固定模型、授权和迁移边界。
+
+### 验证与限制
+
+- 合同、Domain、Context Builder、Persistence和Application专项覆盖secret isolation、Claim/Truth区分、NPC/Player独立、learn/update/forget、provenance、幂等/rollback、SQLite重开、Memory及Prompt leakage。
+- 原生Windows专项覆盖通用Actor投影替换旧事实列表，以及多NPC场景不交叉传播Knowledge；本地数据库最新版同步为schema 12。
+- 安全复核补上Knowledge更新时的provenance Event归属检查，以及Memory引用不存在Knowledge的fail-closed约束；专项23项Vitest和10项迁移/启动测试通过。
+- 首次完整门禁仅由`rustfmt --check`发现原生Memory长度条件需要标准换行；执行`cargo fmt --all`后从头重跑。最终`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 112个文件/689项通过，另有1文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 108项通过、0失败，另有1项真实API测试默认忽略；Clippy与TypeScript/Rust archive互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建220个模块；知识授权接线未新增平行Provider、前端状态机或UI重构。
+- portable`.emtavern`仍保持v2且暂不包含四张通用知识表；完整历史fixture、跨语言导入导出及round-trip升级严格留给M10-T05，不把本地重开验收冒充portable save/import完成。
+- 本任务未修改Rules Engine、Provider、D20、Quest/NPC/Adventure业务语义，也未进入M5-T01；用户已有`.gitignore`修改保持未暂存。
+
+## 2026-08-19 — M5-T01 Universal Character Schema
+
+### 通用合同、世界扩展与兼容迁移
+
+- 新增version 1 `UniversalCharacterProfile`，覆盖规格要求的身份、叙事、职业、属性、技能、熟练、能力、语言、财富、装备、声望、关系、Trait、状态和扩展字段；集合、文本、数字及嵌套资源均有硬上限。
+- 新增version 1 `WorldCharacterExtensionDefinition`，以namespace和TEXT/INTEGER/NUMBER/BOOLEAN/ENUM/TEXT_LIST字段描述世界差异；定义必须绑定同Campaign已锁定Constitution revision。
+- 修仙fixture验证灵根/境界/宗门，调查fixture验证理智/幸运/信用，Cyberpunk fixture验证义体/神经负荷/街头声望；三者都通过同一通用合同，不进入核心硬编码字段。
+- 未知namespace、schema version、字段、required缺失、枚举/数值/文本边界和过量资源明确拒绝；不静默丢弃未知扩展。
+- 新增migration 13、`universal_character_profiles`与`character_extension_definitions`。旧`player_characters`保留并保守回填通用档案；旧写入口同步兼容字段但不覆盖昵称、外貌等V0.3-only内容，可无损投影的Profile更新也在同一事务镜像旧行。
+- 基础属性、技能名、财富与状态继续以M4-T03 `character_rule_states`为authority；Profile写入必须匹配当前规则投影，规则状态更新trigger同步投影并推进Profile revision，不能借通用档案直接改钱或状态。
+- V0.2投影保留旧姓名、概念、偏好、内容边界、职业、属性、两项Trait、目标、背景、装备和时间戳；零/多Trait或无旧原型Career无法无损表示时明确拒绝。
+- 新增`docs/V0.3_UNIVERSAL_CHARACTER_SCHEMA.md`与`DEC-121`，固定合同、Constitution绑定、兼容与阶段边界。
+
+### 验证与限制
+
+- 合同与Repository定向11项通过，覆盖三世界fixture、schema version、资源上限、未知扩展、V0.2投影、revision/rollback、基础属性不可变、双向兼容同步、SQLite重开与round-trip。
+- migration/database startup定向10项通过，schema 10旧角色经11～13连续升级后完整回填；原生`ember-native-bridge` 63项通过，证明schema 13未破坏既有Windows纵向切片。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 114个文件/700项通过，另有1文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 108项通过、0失败，另有1项真实API测试默认忽略；Clippy、rustfmt与TypeScript/Rust archive互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建221个模块；通用角色合同进入共享bundle，但本任务未新增或迁移玩家UI。
+- portable`.emtavern`仍为v2且暂不导出完整通用档案/扩展定义；跨语言格式升级、历史fixture和portable round-trip严格留给M10-T05，不把本地重开冒充portable存档覆盖。
+- 本任务未实现M5-T02及后续UI、AI字段生成、Trait点数或Career Pool；用户已有`.gitignore`修改保持未暂存。
+
+## 2026-08-20 — M5-T02 Quick / Advanced Creation
+
+### 共享草稿、两种模式与正式事实门禁
+
+- 新增version 1 `CharacterCreationSession`与`UniversalCharacterDraft`，以`ACTIVE`、`READY_TO_CONFIRM`、`CANCELLED`、`CONFIRMED`状态统一Quick/Advanced、锁定字段、取消恢复、revision和确认语义；草稿和页面状态都不是正式角色事实。
+- schema 14新增`character_creation_sessions`及Campaign/Character/Constitution绑定、revision、状态迁移、已确认不可变和恢复保留trigger。Native普通保存使用服务端时间戳且不能伪造Quick generation provenance。
+- Quick通过统一`GENERATE_QUICK_CHARACTER`任务读取一句概念、故事偏好、内容边界、锁定Constitution和世界扩展定义；Provider只返回叙事字段、唯一属性优先级、两项当前阶段叙事特质和扩展值。属性4/3/2/1、Trait ID、财富/状态/装备等规则初值全部由本地建立。
+- Advanced呈现通用叙事字段、当前兼容职业/属性、内容边界和动态扩展字段；Rules/entity-owned初始字段只读。完整性校验要求叙事、目标、当前两项Trait、职业映射、属性总和及required扩展合法，不从文本反解析数值。
+- 模式切换、保存和Quick重生保持已锁字段；取消后SQLite保留草稿，重开可恢复。已通过校验的候选发生未保存页面编辑时禁用确认，不能误写旧持久版本。
+- 确认以单一SQLite事务写V0.2兼容角色、既有trigger建立的规则初态和V0.3-only通用档案字段，随后确认会话并推进Campaign到`GENERATING_TAVERN`；失败完整回滚，匹配revision的重复确认幂等。
+- 新Windows页面复用既有角色创建布局、Design Token和交互类，AI以“命运编织”表达；锁定控件和字段输入拆分独立可访问标签。未创建第二套Primitive/Game Component，也未提前迁移Legacy UI。
+- 新增`docs/V0.3_CHARACTER_CREATION.md`与`DEC-122`。本任务只保留当前两项叙事Trait和V0.2职业映射，不实现M5-T03字段AI、M5-T04点数、M5-T05平衡或M6实体生成。
+
+### 回归、自审与限制
+
+- 定向合同、AI schema/prompt、页面/服务、Repository和Native测试覆盖Quick、Advanced、mode switch、locked preservation、required扩展、invalid output、cancel/resume、save/reopen、revision/provenance伪造、确认rollback/幂等与未保存编辑门禁。
+- 完整门禁首次发现格式、玩家可见英语和新增required namespace校验对既有档案兼容读取的回归；分别修正格式/中文文案，并拆分“既有档案兼容校验”与“新角色确认完整校验”，未放宽新角色required要求。随后从头复验通过。
+- `pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 118个文件/717项通过，另有1文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 110项通过、0失败，另有1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建221个模块；新增角色创建页面独立lazy chunk成功产出。
+- 本地数据库最新版为schema 14并支持关闭重开。portable`.emtavern`仍为v2且尚不包含完整通用档案、扩展定义或创建会话；跨语言格式升级、历史fixture与portable round-trip严格留给M10-T05。
+- 已复核视觉手册附件与`docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`内容及SHA-256完全一致；规格、任务、决策、视觉债务和M10-T07收敛门禁均已持久化，无需重复建立UI重构体系。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，也不进入M5-T03。
+
+## 2026-08-20 — M5-T03 Character AI Everywhere
+
+### 全叙事字段命运辅助
+
+- 新增统一`EDIT_CHARACTER_DRAFT`任务、严格input/output schema、Prompt、Context Budget和Fake Provider。单字段支持生成/完善/3候选/扩写/缩写，整体支持补空、区域、整卡与未锁重生；非3候选、重复路径、缺少/额外目标和类型错误均拒绝。
+- 建立通用角色叙事字段白名单，覆盖身份、内心/关系、职业表达、两项当前叙事Trait、兼容背景、排除内容和TEXT/TEXT_LIST世界扩展。年龄、属性、派生值、财富、装备ID、声望、关系、状态、布尔规则和数值/枚举扩展均不可生成；本地patch后再对比全部Rules/entity-owned投影。
+- 所有字段复用M2`AIFieldAssist`和`useAIFieldAssist`，补上外部草稿同步；保留显式采用/撤销、取消、错误重试、同字段并发拒绝和迟到响应隔离。整卡类操作只产生预览，显式采用后可整批撤销。
+- 生成请求显式携带当前页面草稿、尚未保存的锁定集、锁定Constitution和世界扩展定义；同一锁定集用于目标过滤、本地patch和`CHECK_CONSISTENCY`语义校验，不仅依赖上次保存的session。
+- 世界扩展校验区分“草稿逐字段编辑”与“已提供Profile/确认完整性”：草稿可先填一个文本扩展，正式档案和确认仍拒绝required缺失，未放宽正式事实门禁。
+- UI继续复用现有Token、角色布局和Game Component，将玩家可见的“AI候选/生成/完善”收敛为“命运”身份；没有开启M10-T07 Legacy视觉迁移，也没有改动Rules Engine、SQLite或正式角色写入合同。
+- 新增`DEC-123`固定候选复用、白名单、锁定上下文与本地authority边界；`docs/TASKS.md`仅将M5-T03标记DONE，未修改已完成历史、依赖或M5-T04范围。
+
+### 回归、自审与限制
+
+- 专项测试覆盖静态及动态字段盘点、3候选、当前未保存锁定保留、Rules-owned不变、矛盾拒绝、一次schema repair、并发拒绝、迟到响应、候选/整批撤销和非叙事扩展排除。
+- 页面定向测试首次暴露批量请求会被每次重渲染的effect cleanup立即取消；改为只在页面卸载时中止。后续自审又发现未保存新锁未进入Prompt，改为页面显式传递并增加请求内容回归；两处均未以放宽断言规避。
+- 首次完整共享门禁仅发现一处新增测试格式偏差；用Prettier修正后从头重跑。最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 119个文件/729项通过，另1个文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 110项通过、0失败，另1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建225个模块，通用角色创建页独立lazy chunk成功产出。本任务不需要schema/SQLite迁移，portable`.emtavern`仍保持v2，未声称本任务扩大存档范围。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M5-T04。
+
+## 2026-08-20 — M5-T04 Trait Point System
+
+### 本地点数合同、确认门禁与规则 UI
+
+- 新增Buff、Debuff、Mixed、Narrative统一`TraitPointProfile`：Buff为-1至-5、Debuff为+1至+5、Mixed分别记录两边、Narrative严格为0；未知字段、错误符号、越界、空效果和类型矛盾全部拒绝。
+- 净点数不持久化。Domain按每项Trait生成可审计breakdown并计算角色总点数；空集合定义为0。Advanced准备、会话恢复与正式确认均由本地合同严格要求净0，非零草稿仍可保存但保持`ACTIVE`。
+- 角色创建页直接消费Domain重算结果，显示本地净点数并禁用非零/非法配置的准备与确认；支持移除到空集合，当前纵向切片最多两项。UI复用现有角色布局、Token和`AIFieldAssist`，未新建平行组件或提前迁移Legacy页面。
+- 正面/负面效果作为自然语言字段接入M5-T03白名单，但仅在当前类型需要时出现。Trait类型、Buff/Debuff点值始终位于AI权限外，patch应用后再次验证类型和点值未变；Prompt也明确禁止AI分配点数。
+- `CharacterTrait.pointProfile`采用可选兼容字段，旧数据缺失时只解释为Narrative 0；`PlayerCharacter.traits`由固定二元组演进为数组以满足空集合验收，旧两项JSON继续可读。Profile到兼容根的投影只保留id/name/description，不把点值伪装成旧字段。
+- TypeScript Repository和Rust Native镜像结构、范围与严格归零校验；点数嵌入既有Profile/会话JSON，无需新增SQLite schema migration。新增`docs/V0.3_TRAIT_POINT_SYSTEM.md`与`DEC-124`固定authority、兼容和阶段边界。
+
+### 验证、自审与限制
+
+- 定向TypeScript类型检查及9个相关测试文件43项通过，覆盖四类Trait、-5/+5边界、Mixed、非法符号/效果/额外字段、empty、strict zero、Domain breakdown、JSON序列化、会话状态、SQLite关闭重开、AI权限与页面门禁。
+- 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 121个文件/741项通过，另1个文件/1项CLI基线runner按设计跳过；Node 28项通过；Rust workspace 111项通过、0失败，另1项真实API测试按授权策略忽略；Clippy、rustfmt与TypeScript/Rust存档互操作通过。
+- `pnpm --dir windows-app build`通过，Vite production构建235个模块并产出独立通用角色创建chunk。Rust Native专项3项通过，覆盖Quick默认Narrative、非零拒绝及空集合保存/确认。
+- 本任务不把点数转换为M4-T03 `TraitRuleModifier`，不判断强度、频率、条件或协同，也不进入M5-T05。portable`.emtavern`仍为v2，完整通用档案迁移保持在M10-T05。
+- 已持久化的视觉手册、全局引用、视觉债务与M10-T07收敛门禁保持有效；本轮仅让自然修改到的角色Trait UI遵循既有体系，没有返工M0至M4页面。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M5-T05。
+
+## 2026-08-20 — M5-T05 Trait Balance & Synergy
+
+### 十维透明分档与协同套利门禁
+
+- 新增策略版本1`TraitEffectBalanceDeclaration`，显式覆盖频率、环境、战斗、社交、剧情、经济、永久性、可规避性、效果稀有度和条件十项0至3维度；至少一个游戏影响非零，条件与所需标签必须一致。
+- 十维总分公开映射为1至5点；`TraitBalanceReport`逐效果记录世界规则身份、策略版本、breakdown、总分、建议点、实际点与精确路径。机械Buff/Debuff必须精确匹配档位，Narrative和空集合无需机械声明。
+- 新增`TraitBalanceValidator`和`TraitSynergyValidator`。协同规则拒绝抵消计点弱点、自供并实际造成低档折扣的条件和正面触发闭环；只共享主题/机制标签或不改变档位的条件协作保持合法，避免黑盒相似度造成false positive。
+- 新增`TraitGenerationFeedback`组合accepted与稳定issues，角色页面直接消费该反馈并显示中文解释。AI自然语言辅助仍只能修改效果文本，类型、点值、十维声明和协同标签均位于AI白名单之外。
+- 角色页面为每个机械正负效果提供十维选择及机制/授予/所需/抵消标签，显示本地建议档位。净值、档位、声明或协同任一失败都禁用准备/确认，但仍允许保存和恢复编辑中草稿。
+- M5-T04缺少声明的机械Profile继续可读但在重新确认时明确要求补全；旧Narrative 0和空集合不受影响。TypeScript Repository和Rust Native镜像结构、范围、透明分档与组合门禁；数据嵌入现有JSON，SQLite schema保持14。
+- 新增`DEC-125`并扩充`docs/V0.3_TRAIT_POINT_SYSTEM.md`，固定策略、兼容、生成反馈和后续边界；视觉实现复用现有角色布局、Token和AIFieldAssist，没有创建平行组件体系或提前执行M10-T07。
+
+### 验证、自审与限制
+
+- 定向合同、Domain、会话、持久化、AI权限与页面测试42项通过；协同false-positive规则收窄后的核心回归子集21项再次通过。覆盖公平/不公平、条件、永久、环境、十维结构、三世界、稳定审计、序列化、旧数据补全、组合套利和false-positive baseline。
+- Rust Native角色创建专项4项通过，覆盖十维最低/环境/最高档、条件矛盾、平衡组合接受、协同套利拒绝、非零拒绝及空集合确认。最终`pnpm check:shared`完整通过：Vitest 123个文件通过、1个跳过，759项通过、1项跳过；Node 28项通过；Rust 112项通过、1项显式授权真实模型测试忽略；rustfmt、Clippy与TS↔Rust存档互操作门禁通过。`pnpm --dir windows-app build`生产构建通过，Vite转换237个模块。
+- 本任务不解析Trait效果文本、不自动创建M4-T03数值修正、不引入世界特定权重，也不进入M6-T01。portable`.emtavern`仍为v2，完整V0.3 Profile迁移继续属于M10-T05。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6。
+
+## 2026-08-20 — M6-T01 Dynamic Career Pool
+
+### Constitution 职业事实、生成与角色集成
+
+- 新增version 1 `CareerDefinition`/`CareerPool`合同和Domain validator，覆盖COMMON、UNCOMMON、RARE、SPECIAL、完整叙事/社会字段、显式V0.2原型映射、generation provenance及全角/空白/大小写统一规范化去重；职业不携带任何数值加成。
+- 初始池严格要求四种rarity各一项，运行时发现按请求rarity追加；候选必须逐项精确引用锁定Constitution的career rules、society、technology和economy。三世界fixture通过同一合同产生不同职业，不在核心schema硬编码世界类型。
+- 新增统一`GENERATE_CAREER_POOL` schema、Prompt、Context Budget、Fake输出和任务注册，复用既有Provider与Generator Runner；Windows服务进入既有Generation Queue P2通道，并在超时/取消后阻止迟到Native提交。
+- schema 15新增Campaign唯一的`career_pools`及身份、revision、锁定Constitution和保留trigger。TypeScript Repository与Rust Native均在写入和每次读取时核对canonical JSON、列及Constitution证据；generation record和池在Native immediate transaction原子提交，幂等重放不重复追加。
+- Universal Character Repository、Native创建流程、Quick schema/Prompt与Windows页面统一验证池内精确职业引用。角色创建页只展示动态职业及rarity、职责、社会位置、要求和风险；固定四职业与自由文本入口已移除，旧原型只作V0.2兼容投影。
+- 新增`docs/V0.3_DYNAMIC_CAREER_POOL.md`与`DEC-126`，并更新V0.3规格、角色创建、Generator Framework和任务引用。自然修改的UI复用既有Design Token与Game Component；没有提前进入Legacy UI迁移或建立平行设计体系。
+
+### 验证、自审与限制
+
+- 合同、Domain、AI schema/Prompt、Repository、角色服务和页面定向测试通过，覆盖Constitution compliance、四级rarity、requirements、三世界差异、运行时追加、Unicode规范化去重、P2生成集成、保存/重开、篡改拒绝、Quick精确选择及V0.2动态职业映射。
+- Native职业专项覆盖初始/运行时提交、幂等重放、关闭重开、角色引用、错误rarity、错误证据和规范化重复；角色创建专项继续通过，证明动态池没有改变Trait/角色状态机语义。
+- 完整门禁先后发现并修正新增文件格式/lint、启动迁移schema 15期望、Tauri命令类型导入及portable archive本地schema门禁遗漏；没有放宽断言或提前扩展archive格式。最终`pnpm check:shared`从头通过：Vitest 126个文件/784项通过，另1个文件/1项性能基线按设计跳过；Node 28项、Rust workspace 114项通过，另1项真实API测试按授权策略忽略；Prettier、玩家简体中文、ESLint、TypeScript、rustfmt、Clippy及TS↔Rust存档互操作全部通过。
+- `pnpm --dir windows-app build`通过，Vite生产构建转换239个模块并产出独立通用角色创建chunk。
+- portable`.emtavern`仍为v2；完整职业池导入导出和历史fixture迁移保留给M10-T05。本任务未实现M6-T02装备或后续NPC/地点/势力，也未修改Rules Engine、D20、Quest、Adventure、Provider或存档状态机。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6-T02。
+
+## 2026-08-20 — M6-T02 Semantic Equipment
+
+### 语义合同、本地机械与 Generator
+
+- 新增version 1 `SemanticEquipmentDefinition`，把名称、描述、类别、外观、历史、来源、剧情能力、语义效果和Quest/NPC/Fact绑定，与rarity、price、damage、defense、numeric effect及透明balance记录明确分层；严格结构、资源上限和Unicode规范化去重均fail closed。
+- Domain以Quest risk建立BASIC至LEGENDARY来源上限，并只按reward tier、装备类别和Quest主推荐属性派生机械。三世界fixture中的描述都故意包含`+99 damage`，最终数值仍完全由本地策略决定。
+- 新增统一`GENERATE_ITEMS`任务、schema、Prompt、Context Budget、Fake输出、缓存指标白名单和fixture。输入携带锁定Constitution三项精确证据、当前Quest/Adventure来源、已存在装备及允许绑定目标；Prompt禁止模型分配任何机械数字。
+
+### Windows 原子结算、持久化与兼容
+
+- Adventure snapshot新增只读装备生成上下文以及Quest risk/reward/recommended attributes；Windows成功结算在Summary和World Event后生成一件语义装备，并把三份generation audit交给固定Native命令。
+- Native重新验证响应、输入、Constitution revision、风险上限、类别、绑定、重复和机械预算；至少绑定当前Quest及发布者/关联NPC，Fact只接受同一结算的确定性ID。装备、归属、事件、生成记录、Quest、关系、酒馆变化、Fact、Clock和ending仍在一个immediate transaction中提交。
+- 完整语义对象嵌入既有`items.content_json`，顶层name/description与`reward_tier`/`effect_json`保持旧Item、Rules和UI兼容；没有新增migration或平行装备表。档案可读取完整语义对象，旧装备仍按原合同工作。
+- 既有`.emtavern` v2已携带items的JSON列，新增portable round-trip测试验证语义对象在导出、删除Campaign、导入后仍保留；未提前升级M10-T05负责的其他V0.3表。
+- 历史portable v2尚不含Constitution；为不破坏其中进行中的Adventure恢复，Native只在锁定行不存在时使用带固定Legacy标识、读取World Bible technology且明确economy未知的保守证据。新Campaign始终要求真实锁定Constitution，不写伪迁移数据。
+- 新增`docs/V0.3_SEMANTIC_EQUIPMENT.md`与`DEC-127`，并更新规格、Generator Framework和任务引用。自然修改的UI数据边界沿用视觉手册和现有组件，不提前执行M10-T07。
+
+### 验证、自审与限制
+
+- 合同、Domain、AI schema/Prompt、Windows服务、Native原子结算和portable archive专项通过，覆盖七类装备、四档rarity/price、四类trigger、Constitution证据、risk inflation、Unicode去重、叙事数字无authority、幂等、失败回滚和save/import。
+- 首轮完整门禁发现Adventure独立测试种子缺少新snapshot所需的Constitution，并进一步验证历史portable v2确实不携带该表；补齐当前测试的真实锁定数据，同时为历史归档加入显式Legacy兼容证据后从头重跑，没有删除测试或降低断言。
+- 最终`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 128个文件/811项通过，另1个文件/1项性能runner按设计跳过；Node 28项通过；Rust workspace 114项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TS↔Rust archive interop全部通过。
+- `pnpm --dir windows-app build`生产构建通过，Vite转换241个模块并生成独立settlement service chunk。
+- 本任务不修改Rules Engine/D20硬结果、Provider、Career Pool、Quest/NPC/Adventure状态语义、World Seed或SQLite真相架构，不进入M6-T03。用户已有`.gitignore`修改继续保持未暂存。
+
+## 2026-08-20 — M6-T03 NPC LOD
+
+### LOD合同、知识边界与按需Generator
+
+- 新增严格version 1 `NpcLodProfile`和LOD0–3字段解锁合同。LOD0只保存不可变identity anchor与人口角色；LOD1增加名字/外貌/当前行为，LOD2增加职业/人格/目标/授权知识与关系，LOD3才允许授权记忆、秘密、Quest、装备和经历。
+- Domain把唯一合法晋升固定为`OBSERVED`、`INTERACTED`、`RECURRING`，每次只增加一LOD和一revision；既有文本与ID必须是下一版本的子集，身份、人口角色和Constitution证据必须逐字一致，跳级、降级、改名、删事实和越权引用均fail closed。
+- 新增统一`GENERATE_NPC_LOD`任务、结构schema、Prompt、Context Budget、Fake Provider输出、缓存指标白名单和跨语言entity fixture。模型只选择Native提供的引用ID，不能创建世界事实、记忆、关系、Quest、Item或Event。
+- Windows新增`NpcLodService`和三个Tauri命令；同一Campaign/NPC的并发晋升在服务层合并，最终仍由Native expected revision仲裁。显式seed一次只创建一个背景身份，不扫描或预生成人口。
+
+### SQLite、Native与兼容
+
+- schema 16新增`npc_lod_profiles`和append-only`npc_lod_transitions`，保存canonical JSON、Constitution binding、generation provenance、before/after revision和idempotency key；SQLite trigger禁止身份改写、跳级、无provenance升级和在Campaign存续时删除身份。
+- Native从当前事务重新构造Generator输入与授权引用：LOD知识只来自该Actor的KNOWN Truth，秘密还必须是SECRET Truth，Memory必须属于该Actor，关系/Quest/语义Item/Event必须显式关联同一NPC。generation audit、profile更新和transition在一个`BEGIN IMMEDIATE`事务提交。
+- 既有完整`npcs`在迁移时保守回填为LOD3，后续旧Tavern流程新增完整NPC时由同一insert事务自动投影，不放宽旧表非空合同、不改变Dialogue/Quest/Adventure语义。低LOD身份纳入既有Knowledge、Memory和Actor Claim trigger，但跨Campaign与跨Actor仍拒绝。
+- 新增`docs/V0.3_NPC_LOD.md`与`DEC-128`，并更新V0.3规格、Generator Framework和任务引用。UI没有逐页返工，后续自然展示继续复用视觉Token与既有NPC Game Component，完整Legacy迁移仍由M10-T07处理。
+
+### 验证、自审与限制
+
+- 定向合同、Domain、AI schema/Prompt/Fake Provider、TypeScript Repository、Windows service、migration和Rust Native测试通过，覆盖each LOD、字段提前出现、跳级/错误trigger、identity continuity、知识泄露、幂等重放、并发revision、关闭重开及低LOD Actor trigger。
+- `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 132个文件/828项通过，另1个文件/1项性能runner按设计跳过；Node 28项通过；Rust workspace 116项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TS↔Rust archive interop全部通过。
+- `pnpm --dir windows-app build`生产构建通过，Vite转换243个模块。没有通过删除测试、降低校验或忽略错误完成门禁。
+- portable`.emtavern`仍为v2；新增LOD表的正式跨版本导入导出由M10-T05统一处理。本任务不进入M6-T04，不实现动态地点、势力、酒馆人口投影、多NPC场景或不可变NPC时间线。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
+
+## 2026-08-20 — M6-T04 Dynamic Locations
+
+### 稀疏地点图、渐进物化与本地旅行
+
+- 新增严格version 1 `DynamicLocationProfile`，支持十类地点、OUTLINE/DETAILED物化、Constitution证据、稳定层级、Faction引用和generation provenance。Domain拒绝缺失父节点、环、超过八层、稳定ID/规范化名称重复、未知连接、越权Faction及非相邻旅行。
+- 新增统一`GENERATE_LOCATIONS` schema、Prompt、Context Budget、Fake Provider输出和缓存指标白名单。每次只生成一个显式CHILDREN或CONNECTED扩展的一至八个地点；Prompt和校验共同禁止完整地图、坐标、NPC/Faction/Quest副作用与机械数值。
+- schema 17新增`dynamic_locations`、`location_connections`、`campaign_location_states`和append-only`location_travel_events`。Constitution锁定时只把既有WorldBible地点保守投影为OUTLINE；不调用模型、不编造额外事实。
+- TypeScript Repository和Rust Native均验证canonical profile、锁定Constitution、Faction authority、拓扑、generation provenance、旅行邻接及revision。Native从当前事务重新构造输入，把generation audit、地点与连接原子提交；幂等重放必须与原输入、上下文、generation ID和输出完全一致。
+- Windows新增`DynamicLocationService`与四个Tauri命令。同一Campaign、起点、模式和数量的并发扩展意图在服务内合并；移动是独立本地事务，不调用模型。CONNECTED专项证明玩家可以离开预设城市，关闭并重开SQLite后图、当前位置、revision和旅行历史保持一致。
+- 新增`docs/V0.3_DYNAMIC_LOCATIONS.md`与`DEC-129`，并更新V0.3规格、Generator Framework和任务引用。没有新增地图页面或逐页返工；未来地点展示继续复用视觉Token和既有组件，完整Legacy UI迁移仍由M10-T07执行。
+
+### 验证、自审与限制
+
+- 合同、Domain、migration、TypeScript Repository、Windows service和Rust Native定向测试覆盖hierarchy、lazy generation、CONNECTED离城、错误证据/父节点、非相邻/过期旅行、幂等、服务并发合并及save/reload。
+- 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 136个文件/843项通过，另1个文件/1项性能基线按设计跳过；Node 28项通过；Rust workspace 118项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。`pnpm --dir windows-app build`生产构建通过，Vite转换245个模块。
+- portable`.emtavern`仍为v2，schema 17新表的正式跨版本导入导出保留给M10-T05。本任务未实现格子地图、坐标、战棋、寻路、完整地图生成或M6-T05主动势力，也未修改Rules Engine、D20、Quest/NPC/Adventure、Provider、World Seed或存档状态机。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M6-T05。
+
+## 2026-08-20 — M6-T05 Active Factions
+
+### 八项合同、渐进激活与预算行动
+
+- 新增严格version 1 `ActiveFactionProfile`，完整保存Goal、Resource、Leadership、Enemy、Ally、Territory、Current Action和Player Relation，并绑定锁定Constitution证据、generation provenance和revision。WorldBible既有身份只投影为OUTLINE，不编造资源、领导或行动。
+- 新增统一`GENERATE_FACTIONS`任务、schema、Prompt、Context Budget、Fake Provider输出、缓存指标白名单和跨语言fixture。每次只激活一至十六个明确请求的既有Faction，必须延续name、goal、player relation、既有territory/relations与四项Constitution证据；Ally/Enemy必须双向一致。
+- Domain与Native共享最高六点的本地成本语义；调用者budget envelope只能收紧action、Quest和World Fact上限。PLAYER、WORLD_EVENT和未来DIRECTOR共用结构化proposal，但Native总会重新核对所需资源、目标、引用、关系对称、Quest合法迁移和成本。
+- 行动可原子增删resource/territory、双向改变relation、更新player relation、迁移一个Quest并创建一个Developing Fact。没有固定势力剧情、自动日程或全世界模拟；M8-T04/T05才负责World Director的每日调度、持久预算恢复与cooldown。
+
+### SQLite、Native、桌面与兼容
+
+- schema 18新增`active_factions`和append-only`faction_action_events`。初始Territory直接从同一WorldBible的Location所属关系投影，消除多个Constitution锁定触发器执行顺序造成的丢失风险；更新严格revision加一，Campaign存续时禁止删除身份和行动历史。
+- TypeScript Repository与Rust Native在`BEGIN IMMEDIATE`中提交generation audit、全部激活档案或行动的所有Faction/Quest/Fact/event变化；相同generation和operation只允许完全一致的幂等重放，竞争revision和budget decision冲突fail closed。
+- Windows新增`ActiveFactionService`及四个Tauri命令。相同Campaign与Faction集合的并发激活意图在服务层合并；本地Faction action不调用AI。关闭并重开SQLite后ACTIVE档案、双向关系、玩家关系和行动历史保持一致。
+- 新增`docs/V0.3_ACTIVE_FACTIONS.md`与`DEC-130`，并更新V0.3规格、Generator Framework和任务引用。本任务没有新增Faction页面或逐页返工；后续展示继续复用视觉Token与既有组件，完整Legacy视觉迁移仍由M10-T07处理。
+
+### 验证、自审与限制
+
+- 合同、Domain、AI schema/Prompt/Fake Provider、migration、TypeScript Repository、Windows service和Rust Native专项覆盖八项字段、ally/enemy、territory/resource、身份延续、预算/行动合法性、Quest后果、幂等、事务与save/reload。
+- 完整`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 140个文件/856项通过，另1个文件/1项性能基线按设计跳过；Node 28项通过；Rust workspace 119项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。`pnpm --dir windows-app build`生产构建通过，Vite转换247个模块。
+- portable`.emtavern`仍为v2，schema 18新表的正式跨版本导入导出保留给M10-T05。本任务未修改Rules Engine、D20硬结果、NPC/Quest/Adventure核心语义、Provider、World Seed或存档状态机，也未进入M7。
+- 用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push，不进入M7-T01。
+
+## 2026-08-24 — M7-T01 Dynamic Tavern Population
+
+### 本地 Context 投影、稳定身份与重要互动
+
+- 新增严格 Tavern Population 合同与纯 Domain projector，Context 固定覆盖 World、当前 Location、Clock、ACTIVE Faction、最近 Event 和 NPC History；来源替换、重复身份、错误 profile、过期 revision 和未晋升 focus 均 fail closed。
+- schema 19 新增 population state/member/cycle/focus 四表。数据库验证 Tavern/Campaign、NPC LOD、owner、Location、Clock、Faction 和 Event authority，禁止来源身份漂移、important/encounter 历史倒退及 Campaign 存续时删除。
+- TypeScript Repository 和 Rust Native 均从 SQLite 当前事实重建 Context 与机会，以 `BEGIN IMMEDIATE` 原子提交人口状态和 append-only 历史。既有初始化 owner/resident/visitor 保守复用；动态 Location/Clock/Faction/Event 来源只在首次出现时创建稳定 LOD0，不生成完整人口。
+- Rumor、AVAILABLE Quest、Faction current action、Clock 与最新 Event 只投影为机会，不执行任何 Quest/Faction/Clock 后果。相同 Context 与机会直接返回现有快照，不生成新身份、不增加 revision/encounter 或调用模型；owner-only 且无机会显式保存 empty state。
+- Windows 新增 `TavernPopulationService` 和三个 Tauri 命令。并发 refresh/focus 合并；聚焦 LOD0 时只复用既有 `NpcLodService` 晋升该身份到 LOD1，随后 Native 校验 canonical profile 与 population revision 并持久化 important/focus history。
+- 新增 `docs/V0.3_DYNAMIC_TAVERN_POPULATION.md` 与 `DEC-131`，并更新规格、Generator Framework 和任务引用。M7-T01 不新增人口 Generator，不重写既有 Tavern 页面；M7-T02 才消费快照建立多 NPC Scene 与 UI。
+
+### 验证、自审与限制
+
+- 定向合同、Domain、Repository、Windows service、Native 与 migration 测试已覆盖 context factors、同上下文不重生、Clock/Event 变化、来源身份延续/替换拒绝、单身份 LOD promotion、focus、empty state、幂等和关闭重开。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 144 个文件/866 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 115 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy 及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 249 个模块。没有通过删除测试、降低校验、写死结果或忽略错误完成门禁。
+- 当前视觉手册、视觉债务和 M10-T07 收敛门禁保持有效。本任务没有新增页面或 CSS，也没有建立平行 Primitive/Game Component；M7-T02 自然修改 UI 时继续复用 Token 与 `NpcCard`。
+- portable `.emtavern` 仍为 format v2；schema 19 新表的正式跨版本导入导出与历史 fixture 迁移严格留给 M10-T05。本任务未修改 Rules Engine、D20、Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心合同或存档状态机，也不进入 M7-T02。
+
+## 2026-08-24 — M7-T02 Multi-NPC Scene
+
+### 逐 Actor Context、本地仲裁与 Tavern UI
+
+- 新增 `PROPOSE_TAVERN_SCENE_ACTION` 严格 schema、Prompt、Context Budget、Fake Provider 输出和缓存指标白名单。每次请求只包含一个 Actor 的 LOD、目标、授权 Knowledge/Memory；其他参与者只有公开身份和状态，模型只提交结构化行动候选。
+- 合同与 Domain 建立 `SPEAK`、`INTERRUPT`、`SILENCE`、`EAVESDROP`、`LEAVE`、`INTERVENE` 闭集。仲裁按玩家点名、授权知识、有限 urgency 和行动语义选择至多一个发言者，同时保留非发言行动；Actor ID 只作平局键，不固定轮询。
+- schema 20 新增 Scene、Participant、append-only Turn 与 Actor Proposal。Rust Native 在 current transaction 重建每份 Actor 输入，验证 generation audit 和知识引用后，原子保存 generation provenance、提案、仲裁结果、离开状态与 scene revision；幂等重放和竞争 revision fail closed。
+- Windows `TavernSceneService` 对同 Scene 并发 send 合并，独立并发调用既有桌面 AI 编排；Tavern 页面消费 Population 快照，按需复用 LOD focus，并复用 `NpcCard`、`DialogueView` 与 `ActionComposer` 展示多人场景。新增 CSS 只使用既有 Design Token，没有建立第二套组件体系或提前执行 Legacy UI 迁移。
+- TypeScript Knowledge Repository 的 NPC authority 与 schema 16 一致扩展到 `npc_lod_profiles`，使低 LOD 稳定身份可参与逐 Actor 知识边界，不放宽跨 Campaign/Actor 校验。
+- 新增 [`V0.3_MULTI_NPC_SCENE.md`](V0.3_MULTI_NPC_SCENE.md) 与 `DEC-132`，并更新 V0.3 规格、Generator Framework 和任务引用。M7-T03 的正式回复锁定、技术 Retry 和事实冲突修复没有提前实现。
+
+### 验证、自审与限制
+
+- 定向测试覆盖非轮询 speaker selection、沉默/离开、知识泄漏、逐 Actor 输入和并发 send 合并。`pnpm check:shared` 从头通过：Prettier、release metadata、简体中文文案、ESLint、TypeScript；Vitest 146 个文件/873 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 120 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；archive interop 通过。
+- 全 workspace 严格 Clippy 与 rustfmt 通过；Windows 生产构建通过，Vite 转换 254 个模块。没有删除测试、降低校验、写死业务结果或忽略错误。
+- portable `.emtavern` 仍为 format v2；schema 20 的正式导入导出升级留给 M10-T05。本任务不修改 Rules Engine、D20、Provider 栈、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 业务语义或存档状态机，也不进入 M7-T03。
+- 视觉实现遵循已持久化手册与现有 Token/组件合同；既有页面的 Legacy 视觉债务仍由 M10-T07 统一迁移和审查。
+- 用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M7-T03 Immutable NPC Timeline
+
+### 先锁意图、技术 Attempt 与正式封存
+
+- 新增严格 `NpcTimelineOperation`/`Attempt` 合同及纯 Domain retry policy。Operation 锁定 Campaign/Scope、玩家意图、点名 NPC 和可选硬结果引用；技术 Attempt 使用新 request/generation ID 并保留首个 Attempt 的稳定 idempotency key。
+- schema 21 新增 `npc_timeline_operations` 和 append-only `npc_timeline_attempts`，限制每个 Scope 同时只有一个未解决 Operation。SQLite trigger 禁止修改锁定身份、非法状态转换、完成 Attempt 重写，以及删除/改写正式 NPC 回复和紧邻玩家输入；保护范围没有追溯扩大到旧的非 Timeline 消息。
+- Rust Native 独立计算 Retry 白名单，只有网络/Provider 暂时失败、结构/重复、`FACT_CONFLICT` 和 `APP_INTERRUPTED` 可重试；认证、配额、规则、持久化和未知失败终止。STARTED Attempt 在重开恢复时先记录 `APP_INTERRUPTED`，随后只允许同一意图、点名和硬结果进入新 Attempt。
+- 单 NPC 与多 NPC Native 提交均验证 Timeline Scope、generation/request/idempotency provenance 和 canonical Context，并在同一 immediate transaction 原子保存消息或 Scene Turn、全部 generation audit、业务后果与 COMMITTED Timeline。多 NPC 还为每 Actor 保存 pending request，保持 Actor 顺序和逐 Actor 稳定 key。
+- Windows 新增统一 `NpcTimelineService` 与三个 Tauri 命令。单 NPC/Scene 在 Provider 调用前持久化 Attempt；AI 错误 Retry 调用专用 `retry()`，不把旧失败重新当作新 send。Native 已提交但响应丢失时读取 durable COMMITTED 并重载 SQLite，不重复提交。
+- 页面重载会暴露 PENDING/FAILED_RETRYABLE 恢复入口；未解决单 NPC Operation 拒绝新输入。既有 UI 没有 Swipe 或成功回复刷新入口，自然修改继续复用 `ActionComposer`、`DialogueView`、`NpcCard` 和 Design Token，没有提前执行 M7-T04 或 M10-T07。
+- 新增 [`V0.3_IMMUTABLE_NPC_TIMELINE.md`](V0.3_IMMUTABLE_NPC_TIMELINE.md) 与 `DEC-133`，并更新 V0.3 规格、Generator Framework 和任务引用。
+
+### 验证、自审与限制
+
+- 定向测试覆盖锁定意图/硬结果、network retry、schema/fact policy、非技术失败终止、应用中断恢复、成功封存、消息 append-only、响应丢失、防重复提交和多 NPC 顺序；Native 还验证提交引用必须属于目标 NPC 对话或目标 Scene。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 148 个文件/890 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 123 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 257 个模块。没有删除测试、降低校验、写死业务结果或忽略错误。
+- portable `.emtavern` 仍为 format v2；schema 21 的正式导入导出升级严格留给 M10-T05。本任务没有修改 Rules Engine、D20、Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心合同或存档状态机，也不进入 M7-T04。
+- 视觉实现继续遵循已持久化手册和渐进迁移策略；没有逐页返工 Legacy UI。用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M7-T04 Dialogue Suggestions
+
+### 公开 Context、精确失效与 Action Composer
+
+- 新增统一 `GENERATE_DIALOGUE_SUGGESTIONS` version 1，严格输出 3–5 条唯一建议和合法可选点名对象。输入只含 World 摘要、玩家、参与者公开身份/状态、单 NPC 关系、公开对话/Scene 行动与开放 Quest；不向模型提供 Secret、私有 Knowledge/Memory 或隐藏事实。
+- schema 22 新增 immutable `dialogue_suggestion_cache`。Rust Native 从 SQLite 重建单 NPC 或多人 Scene 输入，并把 Campaign、Scope、NPC/关系/对话或 Scene revision、World Fact、Clock、Faction、Location、Population、Event 与 Quest 状态纳入 SHA-256 digest。缓存只允许精确 digest 命中，世界变化后旧建议不可取回。
+- Windows `DialogueSuggestionService` 先 prepare，命中缓存时不调用 Provider；未命中才走既有桌面 AI 编排。Native 在 immediate transaction 内再次重建 Context，过期 digest/输入返回 `FACT_CONFLICT`，并原子保存 request audit、generation record 与派生缓存。
+- 单 NPC 与多人 Tavern 页面均复用既有 `ActionComposer`。选择建议只填充可编辑草稿和可选点名 NPC，必须再次明确提交；编辑多人自由输入会清除建议携带的点名。建议加载、取消、错误和重试不禁用自由输入，页面取消后的晚到结果不会提交。
+- 建议缓存不复用可确认 `ai_candidates`，也不写 Message、Scene Turn、Game Event 或玩家行动。Campaign 删除可级联清理派生缓存；取消、结构错误、非法点名和过期提交均不产生部分写入。
+- 新增 [`V0.3_DIALOGUE_SUGGESTIONS.md`](V0.3_DIALOGUE_SUGGESTIONS.md) 与 `DEC-134`，并更新 V0.3 规格、Generator Framework 和任务引用。
+
+### 验证、自审与限制
+
+- 定向测试覆盖 count、公开 relevance input、单/多人 UI、永久自由输入、无自动发送、精确缓存、关系/世界变化失效、stale digest、非法点名、取消、错误 cause、无玩家行动持久化和 Campaign 删除。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 149 个文件/899 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 124 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 258 个模块。门禁后补充的中文动态错误文案与 Campaign cascade 专项测试亦通过 Prettier、ESLint、TypeScript 和对应 Rust 测试。
+- portable `.emtavern` 仍为 format v2；schema 22 派生缓存的正式归档策略留给 M10-T05。本任务没有修改 Rules Engine、D20、Immutable Timeline、Quest/NPC/Adventure 核心合同、Provider/Queue、World Seed/Constitution 或存档状态机，也没有进入 M7-T05。
+- 自然触及 UI 继续复用既有 Design Token、`ActionComposer` 与视觉手册；没有新增 CSS、平行组件体系或提前执行 M10-T07 Legacy 迁移。用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M7-T05 Prompt Manager
+
+### 不可覆盖 Core、版本化 User Guidance 与设备级恢复
+
+- Prompt package 新增严格 Prompt Manager schema：最多 24 个 preset、每个最多 8 个有序块、稳定 ID、递增 version、启用状态和 AI task 闭集。Stable Prompt profile 升级为 version 3，固定前五段 Core 后追加低权限 `USER_GUIDANCE`；默认模式也保留 inactive 段，用户内容以 JSON 字符串数据进入，不能改写此前 Core、Schema、Knowledge 或提交权限。
+- Native 复用 `app_settings.prompt_manager_v1`，不提升 Campaign schema。创建、更新、启用和导入都在单个 `BEGIN IMMEDIATE` 事务中比较 manager revision；更新还比较 preset version。Preset bundle 固定 `EMBER_PROMPT_PRESET` version 1，只含用户块，并复用存档秘密扫描器拒绝凭据。关闭重开 SQLite 后顺序、版本和活动状态保持一致。
+- 合法设置可把活动 preset 清空恢复默认；合法 JSON 但不符合 Prompt schema 的损坏设置只能由专用 Native 恢复在事务内再次确认非法后清除。无 revision 请求不能删除一个并发出现的有效设置，错误导入/秘密/过期修改均不替换最后有效快照。
+- Desktop AI Orchestrator 在每次执行开始时并行读取 Model Settings 和活动 preset，一次解析后冻结给 primary、fallback 和 structural repair。manager revision、preset ID/version 与有序块进入稳定 cache prefix，设置变化会改变 hash，动态玩家输入仍不改变稳定前缀。
+- “我的”页面新增提示词管理器：Core 只读说明、活动 preset/默认恢复、preset version、块增删/排序/启用、导入导出和损坏设置安全恢复。实现复用当前表单与 Design Token，没有 Core 编辑入口、第二套 UI 体系或 SillyTavern 界面复制。
+- 新增 [`V0.3_PROMPT_MANAGER.md`](V0.3_PROMPT_MANAGER.md) 与 `DEC-135`，并更新规格、Generator Framework、data model 和任务引用。Node skill 约束落实为 type-only imports、显式字段而非 parameter properties、错误 cause 保留、模型/Prompt 设置并行读取及隔离单测。
+
+### 验证、自审与限制
+
+- 定向测试覆盖 merge/order、task scope、Core immutability、repair、cache revision、primary/fallback冻结、version、reopen、import/export、secret scan、过期并发、默认恢复、损坏快照安全恢复和 UI 只读边界。
+- `pnpm check:shared` 从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 152 个文件/909 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 28 项通过；Rust workspace 128 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；rustfmt、全 workspace 严格 Clippy及 TypeScript↔Rust archive interop 全部通过。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 261 个模块。没有删除测试、降低校验、写死结果、忽略错误、修改 Campaign schema 或把 Core/秘密放进 bundle。
+- 本任务没有修改 Rules Engine、D20、AI Provider协议、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure 核心业务合同或存档状态机，也没有进入 M8-T01。视觉手册继续有效；完整 Legacy UI 迁移仍由 M10-T07 统一处理。
+- 用户已有 `.gitignore` 修改继续保持未暂存；本任务不 merge、不 push。
+
+## 2026-08-24 — M8-T01 Multi-Quest Pool
+
+### 多任务真相源、玩家介入与终态保护
+
+- Quest合同扩展到HIDDEN、DISCOVERED、AVAILABLE、兼容ACCEPTED、ACTIVE、BLOCKED、UPDATED、COMPLETED、FAILED、EXPIRED、ABANDONED，并增加有界转换来源。Domain冻结完整合法边；完成、失败、过期和放弃均为不可逆终态。
+- schema 23新增`quest_pool_states`生命周期真相源、append-only `quest_pool_transitions`和仅供内部快照事务使用的`quest_pool_restore_sessions`。迁移原样回填所有旧Quest；revision、operation、来源、原因与时间均持久化，旧`quests.status`不能覆盖已经分叉的新状态。
+- TypeScript Repository与Rust Native分别验证状态图、来源语义、乐观revision和幂等重放。Rules Engine、Faction、Adventure开始及结算改为在原业务事务内转换Quest Pool，不改变D20、奖励、NPC、Adventure或其他业务合同。
+- 内部自动快照现在保存并精确恢复Pool和转换账本；schema 23前的旧内部快照从其Quest状态建立revision 1迁移记录。恢复门禁只在立即事务内生效，普通业务路径仍不能删除历史。
+- Quest UI隐藏HIDDEN，展示状态原因/revision，允许多个任务同时ACTIVE。玩家“介入任务”从可见候选直接激活，不需要唯一主任务或传统接受门禁；兼容accept入口仍可服务旧Adventure流程，但不再限制其他任务。
+- 新增[`V0.3_MULTI_QUEST_POOL.md`](V0.3_MULTI_QUEST_POOL.md)与`DEC-136`，并更新V0.3规格、data model和任务引用。Node技能约束落实为type-only imports、显式字段、错误cause/rollback链、事务savepoint与隔离测试。
+
+### 验证、自审与限制
+
+- 专项测试覆盖全部状态和合法/非法转换、多Active、玩家直接介入、终态不可改写、幂等与竞争revision、schema 22→23回填、关闭重开、自动快照恢复、Rules/Faction/Adventure跨模块事务和隐藏任务UI。
+- `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 154个文件/915项通过，另1个文件/1项性能基线按设计跳过；Node 29项通过；Rust workspace 130项通过，另1项需明确API Key授权的真实Provider测试忽略；rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。
+- `pnpm --dir windows-app build`生产构建通过，Vite转换262个模块。没有删除测试、降低校验、写死结果、忽略错误或回滚已完成任务。
+- portable`.emtavern`仍为format v2；schema 23正式跨版本归档严格留给M10-T05。M8-T02 Quest Graph、M8-T03动态来源和World Director均未提前实现。
+- 新增UI复用既有Quest页面、组件和Design Token，没有新增CSS或平行组件体系；视觉手册与M10-T07 Legacy迁移门禁保持有效。用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
+
+## 2026-08-24 — M8-T02 Quest Graph
+
+### 本地依赖图、事务重评估与可审计投影
+
+- 新增Quest Graph合同与纯Domain求值器。来源闭集为Quest、World Fact、NPC、Faction和Location；同目标PREREQUISITE采用AND，CONSEQUENCE使用显式priority，相同priority冲突、语义重复、悬空引用、政策冲突和Quest→Quest循环全部fail closed。
+- 求值使用稳定拓扑顺序，并在一次事务内消费前序Quest的新状态，支持A→B→C链式传播和A→B/C分支。所有目标变化继续通过Quest Pool合法转换验证；COMPLETED、FAILED、EXPIRED、ABANDONED终态不可被图重开。
+- schema 24新增`quest_graphs`、当前边、append-only完整图修订和append-only求值事件。TypeScript Repository与Rust Native都验证Campaign引用、revision、幂等operation和当前SQLite实体状态；AI、Generator和UI不能宣告依赖满足或直接写Quest状态。
+- Quest Pool根转换在原事务内触发`QUEST_TRANSITION`重算，Faction行动完成其Profile/World Fact变化后触发`FACTION_CHANGE`重算。Native另提供受验证的World Fact、NPC、Location和手动重算入口，供对应本地事务及M8-T03来源适配器复用，不复制状态机。
+- 内部自动快照保存并精确恢复当前图、图修订与求值历史；schema 24前旧内部快照恢复为空图revision 1。portable`.emtavern`format v2保持不变，schema 24正式跨版本归档仍由M10-T05处理。
+- Quest Board快照新增最近20次求值和边的只读折叠调试投影，显示来源、谓词、目标、结果和变化数。页面复用现有Quest布局与Design Token，没有新增CSS、编辑权限或平行组件体系。
+- 新增[`V0.3_QUEST_GRAPH.md`](V0.3_QUEST_GRAPH.md)与`DEC-137`，并更新V0.3规格、data model和任务引用。此前持久化的视觉手册、视觉债务与M10-T07迁移门禁保持有效；本任务没有逐页返工Legacy UI。
+
+### 验证、自审与限制
+
+- 专项测试覆盖chain、branch、cycle、dangling reference、前置政策/priority冲突、NPC死亡、Faction、Location、World Fact后果、事务回滚、自动快照和关闭重开；Rust集成验证Quest根转换与依赖变化同事务提交并跨重启保持。
+- `pnpm check:shared`从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 156个文件/920项通过，另1个文件/1项性能基线按设计跳过；Node 29项通过；Rust workspace 132项通过，另1项需明确API Key授权的真实Provider测试忽略；TypeScript↔Rust archive interop通过。
+- `cargo fmt --check`与全workspace严格Clippy通过；`pnpm --dir windows-app build`生产构建通过，Vite转换264个模块。没有删除测试、降低校验、写死求值结果、忽略错误或让LLM取得规则权限。
+- 本任务不修改Rules Engine、D20硬结果、AI Provider、Generation Queue、World Seed/Constitution、Quest/NPC/Adventure内容合同或存档状态机，也没有进入M8-T03。用户已有`.gitignore`修改继续保持未暂存；本任务不merge、不push。
+
+## 2026-08-24 — M8-T03 完成 Dynamic Quest Sources
+
+### 开始状态与边界
+
+- 在分支 `task/M8-T03-dynamic-quest-sources`、起始提交 `f4e2074` 上继续；未回滚或重做 M0–M8-T02，用户已有 `.gitignore` 修改全程未暂存。
+- 本任务只实现 NPC/Faction/World Event/Discovery/Player Action/Consequence 六类 Quest source adapter。没有进入 M8-T04 World Director 或 M8-T05 Director Budget，也没有自动为每个玩家行为创建任务。
+
+### 实现
+
+- 新增 Dynamic Quest source/provenance、Constitution context、相关事实白名单、同步开放任务安全预算和本地初始状态合同；`PLAYER_ACTION` 显式来源直接进入 `ACTIVE`，Discovery 进入 `DISCOVERED`，隐藏 Faction/Consequence 保持 `HIDDEN`。
+- `GENERATE_QUEST` 输入 Schema 与 Prompt 升至 version 3，可接收本地 source、relevant facts、Constitution 和 generation budget；Core Prompt 明确模型无权决定来源、状态、可见性、provenance 或预算。旧初始化输入保持兼容。
+- schema 25 新增一次性 `quest_pool_creation_intents` 和 append-only `dynamic_quest_sources`。六类 occurrence、Campaign、NPC/Fact、Generation Record 均由唯一约束、外键和 trigger 校验；内部快照捕获并按依赖顺序恢复 provenance。
+- TypeScript Repository 与 Rust Native 均执行来源投影、SHA-256 规范上下文、同源去重、预算门禁、引用白名单和事务提交。Native 额外重验完整 generation input/context、8–12 回合、重复 Quest 结构及 generation audit，失败无部分写入。
+- Windows 新增显式 `dynamic_quest_prepare` / `dynamic_quest_commit` 命令和服务；相同在途来源合并，已有 provenance 直接加载而不再次调用模型。错误保留 cause，idempotency 与 durable occurrence 绑定。
+- NPC adapter 只读取玩家已见的正式提交回复，测试确认 Actor-private Knowledge 不进入输入。Quest Board 的 Quest、最近生成历史和 Windows Quest Graph 投影统一过滤隐藏 Quest；完整 SQLite 图仍供本地规则与内部审计使用。
+- 新增 [`V0.3_DYNAMIC_QUEST_SOURCES.md`](V0.3_DYNAMIC_QUEST_SOURCES.md)、`DEC-138`、V0.3 Spec/Data Model/Migration 索引，并将 M8-T03 标记 DONE。未新增 UI/CSS；视觉手册、Design Token、既有 Game Component 和 M10-T07 迁移边界保持不变。
+
+### 验证
+
+- 首轮共享门禁发现 `GENERATE_QUEST` Schema version 测试仍期望 2，以及 Clippy 建议 `sort_by_key`；均按新 version/惯用 Rust 修正后重验。
+- Prettier、release metadata、zh-CN 玩家语言、ESLint、TypeScript：通过。
+- Vitest：159 files passed、1 skipped；927 tests passed、1 skipped。覆盖六类来源、私有知识隔离、同源并发、重放、Constitution 输入、预算原子拒绝和服务错误 cause。
+- Node：29 tests passed。schema 25 新库、重复启动、旧库升级副本、备份失败与完整性约束均通过。
+- Rustfmt、Clippy `-D warnings`：通过。Rust workspace：133 passed、1 ignored；Native 动态玩家行动/隐藏后果创建、去重、安全图投影和关闭重开通过。
+- archive interoperability：TypeScript 13 + Rust 1 + TypeScript 13 均通过。
+- Desktop production build：通过，Vite 266 modules transformed。
+
+### 结束状态
+
+- `M8-T03` 完成；下一项严格为 `M8-T04 World Director`，本次未开始。
+- portable `.emtavern` format v2 保持不变；schema 25 正式跨版本归档仍留给 M10-T05。12 个开放任务上限仅为本 adapter 的 fail-closed 安全阀，不替代 M8-T05 的持久每日预算和 cooldown。
+- Rules Engine、D20、Provider、Generation Queue、SQLite 真相源、Save/Resume、World Seed/Constitution 与 Quest/NPC/Adventure 核心业务合同未被视觉规范或本任务重构；不 merge、不 push。
+
+## 2026-08-24 — M8-T04 完成 World Director
+
+### 开始状态与边界
+
+- 在分支 `task/M8-T04-world-director`、起始提交 `43652a9` 上继续；未回滚或重做 M0–M8-T03，用户已有 `.gitignore` 修改全程未暂存。
+- World Director 冻结为本地确定性调度器，不是 AI Agent 或第二事实源。本任务只实现节奏评估、实体行动提案、显式触发调度和可解释审计；没有进入 M8-T05 的持久每日预算、cooldown、day rollover 或 starvation。
+- 再次核对用户视觉手册附件与 `docs/EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md` 的 SHA-256 均为 `1ef31784546fb0bd5fc35022741d18522ac977781f933580dc1ffa5f8d854c7e`。既有 V0.3 Spec、视觉债务与 M10-T07 收敛任务已完整覆盖 Design Token 至 Visual Consistency Audit，无需建立第二套 UI 体系；本任务没有新增 UI/CSS。
+
+### 实现
+
+- 新增共享 Director action/pace/route/trigger/suppression、preparation 和 immutable run 合同，以及 TypeScript 纯 Domain 求值器。压力由 Active/Blocked Quest、临界 Clock、敌对 Active Faction 和近期失败确定；quiet、balanced、pressured、overloaded 四档使用稳定规则和最多八项有界提案。
+- 自然过期按 Quest 创建后数据库累计的 committed `WORLD_CLOCK_ADVANCED` 计数判断：DISCOVERED/AVAILABLE 为三次，BLOCKED 为五次，不会因最近二十条事件窗口被其他事件挤占。过载只保留收敛性的 `QUEST_EXPIRE`，新 pressure/foreshadow/Faction 内容均附明确抑制原因。
+- schema 26 新增 append-only `world_director_runs` 和有序 `world_director_proposals`。Campaign/trigger/事件类型、唯一重放、rank、route 与 JSON 均由约束/trigger 验证；内部快照捕获、按外键顺序恢复，并兼容 schema 26 前空集合。
+- TypeScript Repository 与 Rust Native 读取相同 SQLite 投影，计算 canonical SHA-256 context digest，在 immediate transaction 中重算并拒绝陈旧上下文，只追加审计而不写 World Fact、Quest、Clock、Faction、NPC、Adventure、Message 或 Game Event。精确 trigger replay 幂等，冲突身份 fail closed。
+- Tauri 新增 prepare/commit/history 命令；Windows 服务仅接受显式 MANUAL/WORLD_EVENT/PLAYER_ACTION/QUEST_TRANSITION/SETTLEMENT trigger，相同在途触发合并，历史只读且保留 signals、rationale、effects、route、cooldown key、suppression 和 source snapshot。服务没有 `AIProvider`、timer 或后台模型调用循环。
+- 新增 [`V0.3_WORLD_DIRECTOR.md`](V0.3_WORLD_DIRECTOR.md) 与 `DEC-139`，并更新 V0.3 Spec、Data Model、Migration 索引和任务引用。portable `.emtavern` format v2 保持不变；schema 26 正式跨版本归档仍留给 M10-T05。
+- Node skill 约束落实为 type-only imports、显式类字段而非 parameter properties、错误 cause/rollback 链、prepare/commit 隔离边界和独立服务测试。提交前自审进一步把 TypeScript locale/UTF-16 排序与截断改为和 Rust 一致的 Unicode code-point 顺序及字符上限。
+
+### 验证、自审与限制
+
+- 专项测试覆盖 quiet opportunity、foreshadow、pressure、自然 expiry、overload suppression、确定性顺序、触发合并、只读解释历史、失败 cause、陈旧 digest 原子拒绝、幂等重放、关闭重开、无事实副作用和内部快照恢复。
+- `pnpm check:shared` 在最终工作树从头完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 162 个文件/938 项通过，另 1 个文件/1 项性能基线按设计跳过；Node 29 项通过。
+- Rustfmt、全 workspace 严格 Clippy 与 archive interoperability 通过。Rust workspace 135 项通过，另 1 项需明确 API Key 授权的真实 Provider 测试忽略；其中 Native Bridge 90 项包含两项新增 Director 持久化/失败安全测试。
+- `pnpm --dir windows-app build` 生产构建通过，Vite 转换 268 个模块。没有删除测试、降低校验、写死结果、忽略错误或让 Director/LLM 获得事实写权限。
+- 单次最多八项只是 payload 安全上限，不冒充 M8-T05 的 durable budget/cooldown。M8-T04 完成后下一项严格为 M8-T05，本次未开始；不 merge、不 push。
+
+## 2026-08-24 — M8-T05 完成 Director Budget
+
+### 边界与实现
+
+- 在分支 `task/M8-T05-director-budget`、起始提交 `3d8af9c` 上继续；未回滚或重做 M0–M8-T04，用户已有 `.gitignore` 修改全程未暂存。本任务未进入 M9，也未新增 UI/CSS。
+- 冻结 Active Quest 4、每日事件 4、紧急事件 2、NPC 主动 2、后台变化 3 的本地上限。Rules Engine `game_time_minutes` 是唯一时钟，每 1440 分钟惰性恢复；墙钟、Prompt和模型均无预算权限。
+- Proposal 映射、cooldown、容量判断和 waiting-age 防饥饿排序由 TypeScript Domain 与 Rust Native实现。Quest更新/过期为免额度维护；Pressure同时占每日和紧急额度；Opportunity计入Active Quest预约。
+- schema 27新增状态、run admission、持久proposal队列、cooldown和append-only decision。批准先预约容量以阻断失败重试放大；延后保留原因和eligible game time；空run也精确幂等。内部快照保存全部预算表，SQLite关闭重开保持day/usage/queue/cooldown/revision。
+- Tauri新增admit/read命令，Windows服务在现有World Director提交后执行预算准入。玩家P0操作不进入预算通道；PLAYER_ACTION仅可能产生受预算的派生提案。
+- 新增[`V0.3_DIRECTOR_BUDGET.md`](V0.3_DIRECTOR_BUDGET.md)与`DEC-140`，更新V0.3 Spec、Data Model和任务引用。portable `.emtavern` format v2保持不变，schema 27正式跨版本归档仍留给M10-T05。
+- 视觉规范继续作为全局标准；本任务没有换色、逐页返工或创建第二套组件体系，M10-T07的Design Token→Primitive→Game Component→Feature→Legacy→Audit收敛顺序不变。
+
+### 验证
+
+- 专项测试覆盖类别与上限、cooldown、游戏日恢复、Active Quest预约、优先级aging、防饥饿、空run幂等、内部快照、SQLite重开、Windows编排和错误cause。
+- `pnpm check:shared` 在最终工作树从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 165 files / 947 tests通过，另1 file / 1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 125 tests通过，另1项需明确API Key授权的真实Provider测试忽略；其中Native Bridge 91 tests包含新增预算持久化/日恢复测试。Rustfmt、全workspace严格Clippy及TypeScript↔Rust archive interop全部通过。
+- Desktop production build通过，Vite转换270 modules。首轮门禁发现portable archive本地schema上限仍为26；提升到27后，archive专项、Windows E2E与完整门禁均从头复验通过。没有删除测试、降低校验或忽略错误。
+- M8-T05完成后下一项严格为M9-T01，本次未开始；用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M9-T01 完成 Unified Context Builder
+
+### 边界与实现
+
+- 在分支`task/M9-T01-unified-context-builder`、起始提交`84a987a`上继续；未回滚或重做M0–M8-T05，用户`.gitignore`修改保持未暂存。本任务未进入M9-T02，也未新增UI/CSS或SQLite迁移。
+- 新增统一十层Context合同：SYSTEM→CONSTITUTION→LORE→LOCATION→PLAYER→ACTOR_KNOWLEDGE→QUEST_STATE→MEMORY→RECENT→ACTION。每个字段形成带source/revision/stability/privacy/hash/token/relevance的immutable block；实体自身revision/schemaVersion优先成为审计revision。
+- 可选字段支持relevance与`not_relevant`/`block_budget`/`total_budget`可观察省略；required block超限fail closed且JSON不截断。最终投影继续执行既有task character budget。
+- 统一边界递归拒绝database/tables/allRows等全库envelope及credential-shaped字段。Actor Knowledge/Memory source在Inspector中遮罩；NPC授权profile内的叙事secret不被错误当作API凭据。
+- DesktopAIOrchestrator在Provider/Prompt执行前构建一次并冻结给primary/fallback/repair；Application AI Turn和primary task helper复用相同入口。14个Windows生成服务均继续通过DesktopAIEngine，不新增页面栈或Provider旁路。
+- 既有NPC/Adventure/World Event builder保留为领域adapter，继续执行Campaign、Actor Knowledge、Quest和Recent相关性过滤；M9-T03未来检索评分使用同一个optional/relevance接口，不复制体系。
+- 新增[`V0.3_UNIFIED_CONTEXT_BUILDER.md`](V0.3_UNIFIED_CONTEXT_BUILDER.md)与`DEC-141`，更新V0.3 Spec、Generator Framework、Data Model和任务引用。视觉规范和M10-T07迁移边界保持不变。
+
+### 验证
+
+- 专项测试覆盖十层顺序、字段相关性分类、irrelevant/budget omission、required保留、credential/full DB隔离、revision、每个AITask统一入口、Inspector脱敏、Application manifest及primary/fallback/repair冻结。
+- `pnpm check:shared`完整通过：Prettier、ESLint、TypeScript、release/i18n、Vitest 166 files/955 tests通过（另1 file/1 test为显式skip的performance baseline runner）、Node 29 tests、Rust workspace 125 tests通过（另1项需明确API Key授权的真实Provider测试ignored），archive interop通过。
+- 额外独立复验Rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换271 modules。不删除测试、不降低校验、不忽略错误。
+
+## 2026-08-24 — M9-T02 完成 Memory Layers
+
+### 边界与实现
+
+- 在分支`task/M9-T02-memory-layers`、起始提交`4c1c188`上继续；用户`.gitignore`修改保持未暂存。本任务未进入M9-T03，未实现检索/向量/Lore trigger，也未新增UI/CSS。
+- 固定Structured Fact、Recent、Summary、Long-term Memory、World Lore五层权威。Truth/Claim/Actor Knowledge与原Message/Event/Turn不重造；派生Summary/Lore/Memory无Truth authority，压缩不删除原史。
+- schema 28新增Historical Summary、World Lore和共享source snapshot。每个派生artifact保存Campaign/Actor、来源revision/hash/time、digest、generation record和连续revision；来源删除/更新可观察为stale，current-only列表不再投影。
+- 现有`knowledge_memories`继续是唯一通用Long-term Memory表。`EXTRACT_MEMORIES`除turn citation外必须有程序验证的Actor Knowledge/Event来源；同一SQLite事务幂等提交legacy NPC兼容视图、通用Memory与请求终态，任一投影冲突都会整体回滚。TypeScript与Native NPC上下文优先current通用Memory，否则兼容回退legacy隔离列表。
+- 内部snapshot首次纳入schema 12四张知识表和schema 28三张memory表，旧payload按空集合恢复。portable `.emtavern` v2按既定边界不升级，完整跨语言格式迁移仍留给M10-T05。
+- 新增[`V0.3_MEMORY_LAYERS.md`](V0.3_MEMORY_LAYERS.md)与`DEC-142`，更新V0.3 Spec、Unified Context、Data Model、migration说明和任务引用；视觉规范/M10-T07边界不变。
+
+### 验证
+
+- 专项覆盖promotion rules、Summary/source digest drift、source update/delete、Actor isolation、Long-term Memory freshness与幂等重放、双视图冲突整体回滚、旧史保留、generation provenance、本地reopen和internal snapshot round-trip；TypeScript对话生成记录证明current通用Memory优先于legacy视图，Native NPC测试证明Knowledge revision变化后stale Memory不再进入Prompt。
+- `pnpm check:shared`完整通过：Prettier、ESLint、TypeScript、release/i18n、Vitest 168 files/962 tests通过（另1 file/1 test为显式skip的performance baseline runner）、Node 29 tests、Rust workspace 136 tests通过（另1项需明确API Key授权的真实Provider测试ignored），archive interop通过。
+- 额外独立复验Rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换272 modules。不删除测试、不降低校验、不忽略错误。
+
+## 2026-08-24 — M9-T03 完成 Retrieval Interface & World Info
+
+### 边界与实现
+
+- 在分支`task/M9-T03-retrieval-world-info`、起始提交`d439adb`上继续；用户`.gitignore`修改保持未暂存。本任务未进入M10-T01，未增加UI/CSS、外部向量依赖、第二套Context栈或Lorebook复制实现。
+- 新增Campaign-scoped结构化query与版本化Lore rule：bounded keyword、闭集entity、Location、Quest、always-active、ANY/ALL、priority、entry/total token budget、enabled与CAS revision。SQLite schema 29和Repository双重拒绝畸形JSON、跨Campaign引用、身份修改和revision跳跃。
+- 纯Domain selector先排除stale/unconfigured/disabled，再产生ALWAYS/KEYWORD/ENTITY/LOCATION/QUEST具名证据；Latin关键词使用完整边界避免`port`误命中`portal`，CJK使用规范化substring。结果按priority→score→Lore ID稳定排序且不截断内容，完整manifest记录每条Lore的选择或省略原因。
+- `WorldInfoCandidateSource`隔离候选来源；当前SQLite adapter可离线工作，未来RAG只能替换该port并继续经过本地裁决。应用层有界LRU以规范query digest+完整corpus digest为key，Lore/source freshness/rule/query变化均自动miss，SQLite仍是唯一真相。
+- Application NPC对话按玩家文本、当前NPC、Tavern Location及相关非终态Quest检索，将选择结果注入既有Unified Context `LORE`层。`NPC_REPLY` Schema/Prompt升至v5并明确Lore不授予Actor Knowledge；回复、关系、Memory、不可重写时间线和提交事务语义不变。Windows既有native snapshot尚无Lore字段时显式使用空集合，避免把缺失上下文伪装成检索命中。
+- 内部snapshot纳入`world_lore_retrieval_rules`并兼容旧payload。portable`.emtavern`保持format v2，schema 29跨语言归档仍与其他V0.3表统一留给M10-T05。
+- 新增[`V0.3_WORLD_INFO_RETRIEVAL.md`](V0.3_WORLD_INFO_RETRIEVAL.md)与`DEC-143`，更新V0.3 Spec、Memory、Unified Context、Data Model、migration与任务引用。视觉规范和M10-T07迁移边界保持不变。
+
+### 验证
+
+- 专项测试覆盖keyword/entity/location/quest/always触发、ANY/ALL、false match、priority、score、entry/total budget、stale/disabled/unconfigured原因、rule/source/Lore/query缓存失效、跨Campaign拒绝、畸形更新、SQLite重开语义、internal snapshot及NPC生产请求的LORE注入。
+- 首轮完整门禁暴露Windows旧generation context缺少新必填字段及cache regression仍固定v4；补入显式空Lore兼容投影并推进缓存断言后，相关6项测试及完整门禁从头复验通过，没有降低Schema或跳过测试。
+- `pnpm check:shared`最终通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 172 files/970 tests通过，另1 file/1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换274 modules。
+- M9-T03完成后下一项严格为M10-T01；本次未开始。用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T01 完成 Lazy World Generation
+
+### 边界与实现
+
+- 在分支`task/M10-T01-lazy-world-generation`、起始提交`4f18e42`上继续；未回滚或重做M0～M9-T03，用户已有`.gitignore`修改保持未暂存。本任务没有进入M10-T02 Prefetch，也没有新增UI/CSS。
+- 冻结核心骨架为Campaign、锁定World Constitution、World Seed、World Bible及outline Location/Faction。Application和Native世界确认均在同一事务持久化计划，但不会生成Career Pool、Tavern、NPC、Quest、Item、详细Location或active Faction。
+- schema 30新增唯一materialization plan与append-only transition。三个全局P0按需计划覆盖初始职业池、酒馆和依赖酒馆的阵容；outline Location/Faction只登记P2 `BACKGROUND_ELIGIBLE`，不在本任务执行后台生成。
+- TypeScript合同、纯Domain计划器和Repository实现claim、同run dedupe、冲突run拒绝、dependency、complete、retryable failure、cancel、interrupted recovery、artifact reconciliation和CAS revision。SQLite trigger验证Campaign边界、合法转换并要求真实artifact，无法用占位内容完成。
+- Native职业池、酒馆、阵容、动态Location与主动Faction继续沿用既有Generator、验证与事务，在真实SQLite实体写入后原子reconcile计划；Location计划以outline origin为目标并引用一个新提交的相连/子级DETAILED artifact。旧存档没有bootstrap plan时保持原路径兼容。部分Roster失败不会破坏已提交Tavern。
+- internal snapshot纳入plan/history、旧payload空集合兼容，并使用现有restore session恢复非初始状态和append-only历史。portable`.emtavern`仍为format v2；schema 30正式跨语言升级严格留给M10-T05。
+- 新增[`V0.3_LAZY_WORLD_GENERATION.md`](V0.3_LAZY_WORLD_GENERATION.md)、`DEC-144`，更新V0.3 Spec、Data Model、migration与任务引用。视觉规范、视觉债务和M10-T07的Token→Primitive→Game Component→Feature→Legacy→Audit边界保持不变。
+
+### 验证
+
+- 专项测试覆盖cold start、no full-world generation、seed/claim dedupe、并发run拒绝、占位完成拒绝、dependency、partial failure、cancel/reopen、响应丢失reconcile、中断retry、snapshot round-trip与世界确认计划原子创建。
+- 首轮完整门禁的Windows纵向E2E暴露plan dependency使用`ON DELETE RESTRICT`会阻断整Campaign级联删除；改为同Campaign依赖级联后，迁移测试与该E2E专项通过，并从头重跑完整共享门禁。没有绕过外键或削弱删除验收。
+- 最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 175 files/978 tests通过，另1 file/1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换276 modules。
+- 不删除测试、不降低Schema/SQLite约束、不跳过错误，也不把M10-T02预取或M10-T05 portable迁移冒充完成。
+
+### 结束状态
+
+- `M10-T01`完成；下一项严格为`M10-T02 Prefetch`，本次未开始。
+- 用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T02 完成 Prefetch
+
+### 边界与实现
+
+- 在分支`task/M10-T02-prefetch`、起始提交`5a41eb0`上继续；未回滚或重做M0～M10-T01，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T03，也未新增UI/CSS。
+- 新增Director预取纯Domain预测：只接受同Campaign、已预算admit的run与`BACKGROUND_ELIGIBLE` Location/Faction计划；批准目标升为P1，其余P2受background剩余容量约束，每run最多四项并稳定排序，不复制source snapshot、rationale或private knowledge。
+- 新增Application planning/coordinator：只要存在未完成P0即取消并失效预取；新run supersede旧run；共享Generation Queue保证P0优先、P1高于P2并保留背景lane。队列饱和记录`PREFETCH_QUEUE_REJECTED`而不替换前台任务。
+- 生成候选只保存在当前process memory。精确Campaign/kind/target/context digest命中后才返回给原业务采用；未就绪、未预测、context变化、重启、取消和执行失败均形成明确终态。预取路径没有世界commit port，现有Location/Faction Domain/Native验证与原子事务仍是唯一事实写入路径。
+- schema 31新增`prefetch_candidates`与append-only `prefetch_events`。SQLite复核Director admission/context、approved P1 action及其真实actor/target绑定、P2容量、lazy plan资格、状态机、execution/process ownership、revision和四项上限；表中不保存Prompt、response、output、content或Knowledge。Repository提供命中率及queue/generation平均时间。
+- internal snapshot纳入候选/事件且兼容旧payload；重开必须使无内存body的候选失效。portable`.emtavern`仍为format v2，schema 31正式跨语言升级留给M10-T05。
+- 新增[`V0.3_PREFETCH.md`](V0.3_PREFETCH.md)与`DEC-145`，更新V0.3 Spec、Generator Framework、Data Model、migration与任务引用。视觉手册、视觉债务和M10-T07的Token→Primitive→Game Component→Feature→Legacy→Audit边界保持不变。
+
+### 验证
+
+- 专项测试覆盖Director批准/延后、P1/P2、恶意P1目标重绑定拒绝、稳定有界预测、P0门禁、前台优先、queue saturation、ready hit、not-ready/unpredicted miss、context invalidation、P0 cancel、process restart、预算拒绝batch rollback、候选无内容列、指标、整Campaign级联删除和internal snapshot round-trip。
+- 首轮全量Node门发现database startup测试仍固定schema 30；只推进期望到31后，startup/migration专项11项重新通过，没有降低迁移或备份门禁。
+- 最终`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 179 files / 995 tests通过，另1 file / 1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 136 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop全部通过。Windows纵向E2E包含删除/重开链并通过；Desktop production build通过，Vite转换278 modules。
+- 不删除测试、不降低SQLite/Schema校验、不忽略错误，也不把M10-T03 Streaming或M10-T05 portable迁移冒充完成。
+
+### 结束状态
+
+- `M10-T02`完成；下一项严格为`M10-T03 Streaming`，本次未开始。
+- 用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T03 完成 Streaming
+
+### 边界与实现
+
+- 在分支`task/M10-T03-streaming`、起始提交`980f187`上继续；未回滚或重做M0～M10-T02，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T04，也未扩大Rules、D20、Quest、NPC、Adventure或Persistence业务合同。
+- `AIProvider.generate`保持必需，新增capability-gated可选`generateStream`。旧配置和不支持流的Provider继续完整响应；DeepSeek、Qwen、OpenRouter与Ollama的新probe可记录streaming能力。Primary产生任何片段后不再切换fallback。
+- OpenAI-compatible Native发送`stream: true`，复用secure HTTP byte limit、overall timeout与CancellationToken。SSE decoder在byte层组装UTF-8/frame，要求合法JSON、稳定model、完整`[DONE]`；Tauri Channel按request ID发送连续sequence，最终仍返回一个完整Normalized response。
+- 有界Native stream registry覆盖active cancel和cancel-before-register竞态。TypeScript共享orchestrator再次验证sequence、总大小和`chunks.join('') === final.content`，取消、顺序错误或final mismatch均fail closed。
+- 新增顶层结构化字符串projector，处理跨chunk escape、Unicode escape与surrogate pair，拒绝嵌套同名字段冒充。NPC只显示`reply`，初始世界介绍只显示`summary`，不会向玩家展示原始JSON。
+- NPC复用durable timeline和原commit事务；取消/超时/畸形final只形成可重试失败，不插入半条Player/NPC消息。响应丢失后仍以SQLite COMMITTED为准。World只在完整Schema通过后调用原`world_generation_commit`。
+- NPC页面复用`ActionComposer` streaming/Cancel状态；World介绍复用同一stream output视觉样式与现有按钮。新增状态遵守[`EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md`](EMBER_TAVERN_VISUAL_STYLE_GUIDE_V1.md)，没有新增硬编码视觉值、平行组件体系或Legacy逐页返工。
+- 新增[`V0.3_STREAMING.md`](V0.3_STREAMING.md)与`DEC-146`，更新V0.3 Spec和任务引用；M10-T07的Token→Primitive→Game Component→Feature→Legacy→Audit顺序不变。
+
+### 验证
+
+- 专项测试覆盖SSE chunk order、byte-split Unicode、structured Unicode/surrogate、取消竞态、畸形/缺失final、final mismatch、NPC timeout retry、response-loss恢复、NPC/World no partial commit、非流式Provider兼容和NPC/World streaming UI。
+- 自审补强active/pre-dispatch取消区分与30秒tombstone TTL，避免完成后晚到cancel造成registry容量泄漏；并在流式草稿进入既有repair前显式清空临时投影，repair仍以完整响应验证且不拼接旧草稿。首轮完整门禁只发现`FinishReason::Default`可派生的严格Clippy问题，按编译器建议修正后从最终工作树完整重跑。
+- 最终`pnpm check:shared`通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 180 files / 1008 tests通过，另1 file / 1 test性能基线按设计跳过；Node 29 tests通过。
+- Rust workspace 141 tests通过，另1项需明确API Key授权的真实Provider测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换279 modules。
+
+### 结束状态
+
+- `M10-T03`实现与完整门禁完成；本地提交前不进入`M10-T04 Cache Optimization`。
+- 用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T04 完成 Cache Optimization
+
+### 边界与实现
+
+- 在分支`task/M10-T04-cache-optimization`、起始提交`d14b0db`上继续；未回滚或重做M0～M10-T03，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T05，未新增SQLite schema，也未修改Rules、D20、Queue、Quest/NPC/Adventure或存档业务合同。
+- Stable Prompt Profile推进到v4。Desktop primary/fallback/repair与Application默认turn formatter从同一次Unified Context assembly投影`stable/rules`，将Constitution/locked rules的规范内容、source revision和block version加入实际稳定前缀；随机ID、UUID、墙钟、request/cache/UI元数据、Actor Knowledge、Recent与Action均不进入。
+- 完整原任务输入仍保留在动态尾部，不以缓存命中牺牲正确上下文。相同稳定语义生成逐字节一致前缀；Prompt Manager、Profile、Constitution revision或规则内容变化会失效。
+- AI Inspector把Provider明确usage得到的`HIT/MISS/UNKNOWN`与进程内`PREFIX_FIRST_SEEN/PREFIX_REUSED`分字段展示。会话LRU只保留200个hash；DeepSeek设备指标继续原子保留最近200项且不保存Prompt、message、request ID、credential或玩家输入。
+- 指标白名单补齐Quick Character、Advanced Edit与Dialogue Suggestions。Rust专项测试暴露ratio经JSON往返后严格浮点相等可能误拒绝合法指标，修为只接受`f64::EPSILON`内序列化误差，整数hit/miss与计算语义保持严格。
+- 新增[`V0.3_CACHE_OPTIMIZATION.md`](V0.3_CACHE_OPTIMIZATION.md)与`DEC-147`，更新V0.3 Spec和任务引用。视觉手册继续全局有效；本任务只在既有AI Inspector指标区增加证据标签，复用现有组件/Token，没有Legacy逐页返工，M10-T07收敛顺序不变。
+
+### 性能与真实Provider证据
+
+- 使用M1-T04同一Fake Provider schema每任务10次重跑：World P50/P95 0.120/2.294 ms、NPC 0.204/1.845、Quest 0.061/0.601、Action 0.096/1.237、D20 0.032/0.241。两轮均保留受控Quest failure与Action retry；token/cache为unknown，未伪造0，单机微秒级差异不宣称性能改善或回归。
+- 真实DeepSeek测试继续是显式API Key opt-in的ignored test，覆盖相同stable system、不同dynamic input、同prefix hash、Provider hit token与SQLite重开。常规门禁未读取Key、未调用真实Provider，真实验证状态为NOT_RUN。
+
+### 验证
+
+- 专项测试覆盖stable byte equality、动态行动隔离、Constitution revision失效、UUID/时间/private knowledge隐私、桌面生产请求、Prompt Manager失效、session/Provider证据分离及TypeScript/Rust/session三处200项上限。
+- `pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 181 files / 1015 tests通过，另1 file / 1 test性能runner按设计跳过；Node 29 tests通过。Rust workspace 142 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；archive interop通过。
+- 额外独立复验rustfmt、全workspace/all-targets/all-features严格Clippy与Desktop production build均通过；Vite转换280 modules。自审确认primary/fallback/repair复用同一稳定assembly、无Prompt/credential持久化、无动态行动进入prefix、无Provider cache虚报。
+- M10-T04完成后下一项严格为M10-T05，本次未开始；用户`.gitignore`保持未暂存，不merge、不push。
+
+## 2026-08-24 — M10-T05 完成V0.3 Save Schema与隔离迁移
+
+### 范围与迁移
+
+- 在分支`task/M10-T05-save-schema-migration`、起始提交`2bb62ce`上严格执行M10-T05；未回滚或重做M0～M10-T04，未进入M10-T06。用户已有`.gitignore`修改始终保持未暂存。
+- 新增`0032_save_schema.sql`，在`campaigns`以`NOT NULL`/`CHECK`冻结`save_schema_version=3`和`world_schema_version=1`，并只把NPC LOD删除保护接入既有restore session边界；没有改变Rules、D20、Provider、Queue、Quest/NPC/Adventure业务语义。
+- Windows实际Rust启动不再对活动SQLite直接跑migration：先创建并验证完整备份，从备份建立隔离工作文件，执行历史migration，完成integrity、foreign key、schema history和Campaign领域重载后才rename切换；迁移或切换失败保持原文件，专项测试验证schema 31→32与失败原字节不变。TypeScript启动路径补齐foreign key与Campaign领域重载。
+
+### Portable archive与恢复UX
+
+- `.emtavern`五文件容器保持format 1，portable schema从2升到3。新增共享TS清单及Rust镜像，完整携带69张Campaign持久事实、状态和审计表，包括Constitution/Seed、Rules、Knowledge、Universal Character/Career、NPC LOD、动态地点/势力、酒馆人口/场景/时间线、Quest Pool/Graph、Director/Budget、Memory/Lore、Lazy Generation、Event Ledger和已终结AI Candidate。
+- 设备Provider/Model/设置/凭据、pending request、内部snapshot、restore session、Dialogue/Prefetch缓存继续排除；存在`PROPOSED`候选时仍拒绝导出。导入在单一IMMEDIATE事务内按触发器/外键顺序恢复，执行foreign key、69表精确重载和既有Repository领域重载；覆盖仍先做一致完整备份。
+- 历史TS/Rust v1、v2 fixtures未删除或覆盖，新增hash防漂移清单；另增TS/Rust v3 fixtures。v1/v2导入只增加save/world版本和允许的当前兼容投影，不改写源档。未来版本、损坏、资源炸弹和秘密均fail closed。
+- Save Home在检查阶段显示目标save/world版本；历史档明确提示隔离升级且原文件不改写，未来版本明确要求升级应用，本地数据保持原状。UI只自然修改既有导入提示，复用现有组件/CSS，没有借机进行M10-T07视觉重构。
+
+### 文档、决定与验证
+
+- 重写[`save-format.md`](save-format.md)为容器v1/portable schema 3权威规范，更新V0.3 Spec、Tasks、Data Model，并新增`DEC-148`。M10-T05标记DONE；后续严格为M10-T06。
+- `pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 181 files / 1018 tests通过，另1 file / 1 test性能runner按设计跳过；Node 29 tests通过。
+- Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。Desktop production build通过，Vite转换280 modules；`pnpm build:desktop`复验通过。
+- 未删除测试、降低SQLite/Schema/秘密校验或忽略错误；不merge、不push，不暂存用户`.gitignore`。
+
+## 2026-08-24 — M10-T06 完成 Performance Regression Gate
+
+### 范围与自动门
+
+- 在分支`task/M10-T06-performance-regression`、起始提交`43c89ca`上严格执行M10-T06；未回滚或重做M0～M10-T05，用户已有`.gitignore`修改保持未暂存。本任务未进入M10-T07，也未修改Rules Engine、Provider、Generator/Queue行为、SQLite schema、业务事务或存档格式。
+- 抽取M1-T04原Fake Provider测量函数供基线与回归复用；新增`performance:gate` CLI，拒绝覆盖已有输出，并生成内容无关JSON与Markdown。核心证据使用冷启动3批和同实例热运行3批、每任务每批10次，对run-level P95取中位数，不选择单次最快值。
+- 核心latency/queue固定门为`max(M1 P95 × 3, M1 P95 + 5 ms)`；真实GenerationQueue用concurrency=2、混合P0/P1/P2共40项压力测量，P95门为50 ms。失败测试证明任一越界会使报告FAIL，CLI也会非零退出；没有根据本次结果降低门槛。
+- 长存档在schema 32真实SQLite写入100→1000条durable message，以`page_count × page_size`计算≤4096 bytes/turn；Unified Context只投影固定recent/memory/Constitution/action，以≤2048 tokens且增长≤1.05×限制膨胀，不删除SQLite历史或传输全库。
+- Fake Provider未报告的token/cache usage继续为unknown/NOT_EVALUATED；真实证据阈值预先固定为input tokens每样本平均≤16384、Provider cache hit ratio≥0.50，且只接受Provider usage，不把本地prefix reuse冒充hit。
+
+### 证据、文档与验证
+
+- 本机门禁PASS：World cold/warm latency P95中位数0.153/0.104 ms，NPC 1.092/0.171，Quest 0.109/0.080，Action 0.082/0.073，D20 0.090/0.048；对应queue中位数均通过M1门。
+- GenerationQueue压力P95为2.000 ms；SQLite为1,556,480→2,043,904 bytes，即541.582 bytes/additional turn；Context为377→383 tokens、增长1.016×。真实Provider仍为NOT_RUN，未读取Key或调用网络模型。
+- 新增[`V0.3_PERFORMANCE_REGRESSION.md`](V0.3_PERFORMANCE_REGRESSION.md)与`DEC-149`，更新V0.3 Spec和任务状态。定向测试覆盖repeatability、warm/cold身份、long-save、跨批中位数、threshold failure、unknown usage、真实token/cache失败和report generation。
+- 首次Desktop build发现Node专用测量helper经`ai-core`根出口进入浏览器bundle；将helper改为测试/CLI私有导入后，M1旧基线runner再次成功生成3次/任务报告，M10 gate也在最终代码上再次PASS。没有用polyfill或跳过构建掩盖边界错误。
+- 最终`pnpm check:shared`从头通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 182 files / 1021 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、全workspace/all-targets/all-features严格Clippy、Windows纵向E2E及TypeScript↔Rust archive interop全部通过。
+- `pnpm build:desktop`最终通过，Vite转换281 modules。用户`.gitignore`仍保持未暂存；没有merge或push。
+- M10-T06完成后下一项严格为M10-T07 Visual System Convergence；本次未开始，不merge、不push。
+
+## 2026-08-24 — M10-T07 完成 Visual System Convergence
+
+### 范围与视觉架构
+
+- 在分支`task/M10-T07-visual-system-convergence`、起始提交`932c16b`上严格执行M10-T07；未回滚或重做M0～M10-T06，用户已有`.gitignore`修改保持未暂存。本任务没有进入M11，也没有修改Rules Engine、D20硬结果、Provider、Generator/Queue、SQLite、存档或Quest/NPC/Adventure业务合同。
+- 按`Design Tokens → UI Primitives → Game Components → Feature Pages → Legacy UI Migration → Visual Consistency Audit`完成收敛。三层Token切换为视觉手册的暖黑/深木/羊皮纸/余烬金方向，并冻结中文UI/叙事字体栈、4px spacing、6/10/14/16px radius、Border、Shadow与Motion。
+- `theme.css`、`ui/primitives.css`和`ui/game-components.css`的raw color/rgba从41处降为0，应用CSS不再直接读取Primitive`--et-*`。新增静态门同时拒绝raw typography、spacing、radius、border、shadow与animation timing/easing；媒体阈值、运行时几何和keyframe transform保持明确例外，不包装无意义Token。
+- 保留历史class作为兼容适配边界，但全部读取同一Semantic/Component Token；没有引入CSS框架或复制第二套组件。Tavern/NPC/Quest/Adventure/Character AI继续复用NpcCard、QuestCard、DialogueView、ActionComposer与AIFieldAssist；D20跳过操作迁入共享Button，不改变已保存结果、reveal回调或重新投掷语义。
+- 应用壳新增HashRouter安全的skip link，首个Tab可见且Enter后焦点落到`#app-main`而不改变路由。Paper error危险文本首次真实截图对比度不足后，新增Paper语义danger覆盖和自动对比度门，没有以降低阈值接受缺陷。
+
+### 视觉证据与文档
+
+- 真实Chromium覆盖860×600 Settings、1180×760 My、1366×768 Saves、1920×1080 Quest Paper/error；四个视口document宽度均等于viewport，可见后代横向越界为0。额外保存skip-link focus截图与SHA-256清单。
+- 真实reduced-motion浏览器结果为media query命中、D20/Spinner animation-name均`none`、navigation transition duration为`0s`；D20组件测试继续证明skip与reduced-motion只揭示同一硬结果。
+- 新增[`audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md`](audit/V0_3_VISUAL_SYSTEM_CONVERGENCE.md)与`DEC-150`；关闭[`V0.3_VISUAL_MIGRATION.md`](V0.3_VISUAL_MIGRATION.md)适用债务，更新Design Token规范、V0.3 Spec与任务状态。M12仍必须独立复算，不能直接继承本次PASS。
+
+### 验证与结束状态
+
+- 专项测试覆盖raw视觉值静态门、组件复用清单、Feature/状态矩阵、Paper/Ember contrast、skip-link焦点、D20 skip/reduced-motion、forced-colors、四视口布局合同与生产build。
+- `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 183 files / 1038 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；Windows纵向E2E与TypeScript↔Rust archive interop全部通过。
+- `pnpm build:desktop`最终通过，Vite转换281 modules；构建产物只用于本地验证，没有作为源码提交。
+- M10-T07完成后下一项严格为M11-T01；本次不进入M11，不merge、不push，用户`.gitignore`继续保持未暂存。
+
+## 2026-08-26 — M11-T01 完成 Three-World Test Harness
+
+### 范围与配置
+
+- 在分支`task/M11-T01-three-world-harness`、起始提交`2b67ffc`上严格执行M11-T01；未回滚或重做M0～M10-T07，用户已有`.gitignore`修改保持未暂存。本任务未执行Fantasy/Investigation/Cyberpunk长测，也未进入M11-T02。
+- 在既有`@ember-tavern/test-fixtures`包增加三套`SYNTHETIC_M11`配置。Fantasy、Investigation与Cyberpunk分别拥有不同的Constitution、3项Career、3项Equipment、2项Trait、3名NPC、3条Quest和3/4/5个世界扩展字段；调查世界不复制受版权保护规则文本。
+- 每世界提供32个有序行为，覆盖创建、酒馆、NPC/传闻、多Quest、自由输入、旅行/时间、D20、装备/交易、两次Save/Reopen和状态审阅。动作只声明输入与必采证据，不预填剧情结果。
+
+### 隔离与证据
+
+- 每个run保存来源commit、fixture/script SHA-256及组合scenario hash；三个世界使用独立目录和SQLite路径。相同输入replay保持hash但从空evidence开始；reset只删除目标世界已知SQLite/WAL/SHM与动作流，其他世界不受影响。
+- 新增`EMBER_PLAYTEST_EVIDENCE` v1状态机：`NOT_RUN/IN_PROGRESS/COMPLETE/BLOCKED`、Provider模式与显示身份、有序action outcome/latency/persistence/observations，以及P0～P3 finding ledger。Provider身份在首个动作后冻结，缺失必采证据或未完成32步不能声称COMPLETE。
+- fixture、manifest和evidence复用portable save秘密扫描；保留Campaign ID与`SYNTHETIC_M11`来源证明没有使用正式用户数据。新增[`V0.3_PLAYTEST_HARNESS.md`](V0.3_PLAYTEST_HARNESS.md)与`DEC-151`，更新Spec和Tasks。
+
+### 验证与结束状态
+
+- 定向7项测试覆盖fixture/业务合同、结构差异、目录与数据库隔离、reset/replay、动作顺序、证据完整性、Provider冻结、秘密扫描及hash篡改。
+- `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 184 files / 1045 tests通过，另2 files / 2 tests性能CLI runner按设计跳过；Node 29 tests通过。Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；Windows纵向E2E与TypeScript↔Rust archive interop全部通过。
+- `pnpm build:desktop`最终通过，Vite转换281 modules；本任务没有调用真实Provider，三世界长测状态仍诚实保持NOT_RUN。
+- M11-T01完成后下一项严格为M11-T02；本次不进入长测、不merge、不push，用户`.gitignore`继续保持未暂存。
+
+## 2026-08-27 — M11-T02 完成 Fantasy Long Playtest
+
+### 范围与生产纵切
+
+- 在分支`task/M11-T02-fantasy-long-playtest`、起始提交`8a85be5`上严格执行M11-T02；未回滚或重做M0～M11-T01，未进入M11-T03。用户已有`.gitignore`修改全程保持未暂存。
+- 以`9f640d6`建立Fantasy runner和保留数据库/archive路径的Windows production native vertical slice；随后自审发现Career Pool与多NPC scene未实际覆盖，废弃该提交绑定的初版证据，不把覆盖不完整的运行当作完成结果。
+- 在同一Campaign顺序执行32项行为，覆盖锁定Constitution、3项Career、角色/2项Trait、酒馆/4名NPC/3条传闻、知识与连续对话、两NPC scene、2项Quest、8回合Adventure、7次D20、7项Rules事件、装备/金钱/时间、地点/旅行、Director、正常重开、失败恢复和portable overwrite import。最终money为12、game time为765分钟、装备1件，所有动作持久化并记录必需observation。
+- Provider明确为Fake；真实Provider保持`NOT_RUN`，没有读取Credential或调用网络模型。总生产流墙钟2298.712 ms、32项摊销71.835 ms只作为harness观察，不冒充Provider billing latency或M10性能门。
+
+### 发现、修复与证据
+
+- 长测首次进入多NPC scene时暴露`M11-FAN-001`（P1）：`tavern_scene.rs`查询不存在的`npc_lod_profiles.population_role`列。根因为既有schema把该值存于`profile_json.$.populationRole`；在`e8f3a3c`修正查询，并以population projection、两名focus NPC、scene prepare/commit和最终scene/turn计数回归。
+- archive恢复改用生产`CampaignArchiveImportMode::Overwrite`，不以原始SQL删除Campaign绕过外键和领域重载。最终SQLite `integrity_check=ok`、foreign key violation=0、unfinished request=0、Save Schema 3、World Schema 1。
+- 最终run`m11-t02-fantasy-e8f3a3c`绑定完整来源提交；提交逐动作evidence、SQLite、`.emtavern`、summary、manifest、三张1366×768浏览器壳截图和SHA-256。浏览器壳三页无console error；Tauri/SQLite不可用、loading和无Campaign route guard是预期状态，不替代Native证据。
+- 新增[`audit/V0_3_FANTASY_LONG_PLAYTEST.md`](audit/V0_3_FANTASY_LONG_PLAYTEST.md)与`DEC-152`，更新Spec、Tasks和Harness。M11-T02开放finding为0；Investigation、Cyberpunk、free-input stress、真实模型和M12均未执行。
+
+### 最终门禁与结束状态
+
+- `pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 185 files / 1046 tests通过，另2 files / 3 tests按设计跳过；Node 29 tests通过。
+- Rust workspace 147 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。显式Windows纵向E2E再次通过。
+- `pnpm playtest:fantasy`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run此前已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
+- 本任务形成`9f640d6`、`e8f3a3c`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T03，本次未进入。
+
+## 2026-08-27 — M11-T03 完成 Investigation Long Playtest
+
+### 范围与生产纵切
+
+- 在分支`task/M11-T03-investigation-long-playtest`、起始提交`90bf26b`上严格执行M11-T03；未回滚或重做M0～M11-T02，未进入M11-T04。用户已有`.gitignore`修改全程保持未暂存。
+- 以`0779808`新增独立Investigation production native slice和环境门控runner，在同一Campaign顺序完成32项行为：锁定Constitution、3项Career、角色/2项Trait、`investigation-resilience`扩展、酒馆/4 NPC/三种真实性传闻、有限认知对话、两NPC scene、2 Quest、8回合Adventure、7次D20、8项Rules事件、装备/现金/时间、地点/旅行、Director、正常重开、失败恢复与portable overwrite import。
+- 最终镇定/机运/信用/线索负荷为62/48/35/0，cash为9、game time为660分钟、装备1件。扩展fixture只局部更新`extensions/revision/updatedAt`并继续经过既有触发器；没有修改基础属性、schema或业务合同。
+- 以difficulty 17、体魄1和`-5`雨寒状态保证首个检查失败，仍由本地D20硬结果逻辑实际投掷并先持久化；失败后其余回合、线索和结算继续，最终一项Quest完成、一项保持ACCEPTED。没有写死骰值或让一次失败锁死线索。
+
+### 认知、发现与证据
+
+- FALSE/PARTIAL/TRUE传闻各1条并保留source basis、置信度与NPC provenance；连续对话明确区分亲历、转述和未知。最终4条NPC knowledge、4条message和一项双NPC scene turn在重开/import后保留。
+- 最终run`m11-t03-investigation-0779808`绑定来源提交`077980887a4b705f6fda214af56f9355d7c15b15`，32/32`COMPLETE`、开放finding 0。夹具编写期被既有enum白名单、防重复、Quest和基础属性不可变校验拒绝的无效值均只修正夹具，没有降低产品门禁，故不冒充产品finding。
+- Provider明确为Fake；真实Provider保持`NOT_RUN`，未读取Credential或调用网络模型。生产流墙钟2578.118 ms、32项摊销80.566 ms只作为harness观察，不替代M10性能门。
+- SQLite 1,777,664 bytes、archive 190,889 bytes；`integrity_check=ok`、foreign key violation 0、unfinished request 0、Save Schema 3、World Schema 1。提交逐动作evidence、数据库、archive、summary、manifest、1440×1000浏览器壳截图与SHA-256。
+- 浏览器壳覆盖boot、Saves、My和Quest route guard且无console error；Vite下native不可用/loading/缺Campaign是预期安全状态，不替代Native证据。视觉保持既有冻结体系，没有借长测修改UI、CSS或业务组件。
+
+### 文档、门禁与结束状态
+
+- 新增[`audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md`](audit/V0_3_INVESTIGATION_LONG_PLAYTEST.md)和`DEC-153`，更新Spec、Tasks与Harness。M11-T03开放finding为0；Cyberpunk、free-input stress、真实模型、M11-T06与M12仍未执行。
+- 最终`pnpm check:shared`从最终工作树通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 186 files / 1047 tests通过，另2 files / 4 tests按设计skip；Node 29 tests通过。Rust workspace 148 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。
+- 显式Windows纵向E2E再次通过；`pnpm playtest:investigation`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run此前已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
+- 本任务形成`0779808`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T04，本次不进入。
+
+## 2026-08-27 — M11-T04 完成 Cyberpunk Long Playtest
+
+### 范围与生产纵切
+
+- 在分支`task/M11-T04-cyberpunk-long-playtest`、起始提交`c17e5c8`上严格执行M11-T04；未回滚或重做M0～M11-T03，未进入M11-T05。用户已有`.gitignore`修改全程保持未暂存。
+- 以`d42bae2`新增独立Cyberpunk production native slice和环境门控runner，在同一Campaign顺序完成32项行为：无超自然魔法Constitution、3项Career、角色/2项Trait、`cyberpunk-augmentation`扩展、余温中继站/4 NPC/三种真实性传闻、有限认知对话、两NPC scene、2 Quest、8回合Adventure、7次D20、8项Rules事件、装备/信用点/时间、动态地点、2个活跃势力/1次势力行动、Director、正常重开、失败恢复与portable overwrite import。
+- 最终神经负荷/街区声望/追踪热度为2/8/0，植入插槽1、网络权限“社区”，信用点15、game time 525分钟、装备1件。扩展fixture只局部更新`extensions/revision/updatedAt`并继续经过既有触发器；没有修改基础属性、schema或业务合同。
+- 动态势力使用既有生产生成/校验/提交链激活七码头互助网与栖桥公司；一次势力行动扩展到新生成的七码头离线节点、建立`FRIENDLY`关系并写入后果事实，重开和archive import后仍保留。
+
+### 平衡、发现与证据
+
+- 首个difficulty 17体魄检查叠加`-5`神经回响状态，保证自然20也失败，但仍由本地D20硬结果逻辑实际投掷并先持久化；最终7次D20含2次失败，后续回合、密钥交付、结算和第二项Quest继续完成或保持开放。
+- 经济/装备断言同时覆盖8项append-only Rules事件、显式unequip/equip替换、1件语义CLUE奖励和最高奖励价格0；没有用数值膨胀制造科幻差异。
+- 最终run`m11-t04-cyberpunk-d42bae2`绑定来源提交`d42bae2f4e8c111a293420afbd4412d83f501eb9`，32/32`COMPLETE`、开放finding 0。Provider明确为Fake；真实Provider保持`NOT_RUN`，未读取Credential或调用网络模型。
+- 生产流墙钟2938.837 ms、32项摊销91.839 ms只作为harness观察，不替代M10性能门。SQLite 1,806,336 bytes、archive 211,913 bytes；`integrity_check=ok`、foreign key violation 0、unfinished request 0、Save Schema 3、World Schema 1。
+- 浏览器壳在1440×1000覆盖Saves、My和Quest route guard，逐图人工查看且无console error；native不可用/loading/缺Campaign是预期安全状态，不替代Native证据。没有借长测修改UI、CSS或业务组件。
+
+### 文档、门禁与结束状态
+
+- 新增[`audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md`](audit/V0_3_CYBERPUNK_LONG_PLAYTEST.md)和`DEC-154`，更新Spec、Tasks与Harness。三世界固定长测均已独立完成；free-input stress、真实模型、M11-T06与M12仍未执行。
+- 最终`pnpm check:shared`从最终工作树完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 187 files / 1048 tests通过，另2 files / 5 tests按设计skip；Node 29 tests通过。Rust workspace 149 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、workspace/all-targets/all-features严格Clippy与TypeScript↔Rust archive interop均通过。
+- 显式Windows纵向E2E再次通过；`pnpm playtest:cyberpunk`普通入口通过合同测试，环境门控的证据生成测试按设计skip；最终绑定提交的集成run已32/32通过。`pnpm build:desktop`通过，Vite转换281 modules；证据`SHA256SUMS`全量复验通过。
+- 本任务形成`d42bae2`和最终证据/文档提交；不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T05，本次不进入。
+
+## 2026-08-27 — M11-T05 完成 Free-Input Stress Test
+
+### 范围与执行方式
+
+- 在分支`task/M11-T05-free-input-stress`、起始提交`c3c4a29`上严格执行M11-T05；未回滚或重做M0～M11-T04，未进入M11-T06。用户已有`.gitignore`修改全程保持未暂存。
+- 以`2432d18`新增八类精确自由输入合同、环境门控runner和Rust production native stress slice。运行器校验三份已提交Fantasy/Investigation/Cyberpunk长测数据库SHA-256后复制到不可覆盖的新run，不读取或修改正式用户存档。
+- 八类行为为拒绝Quest、欺骗发布者、购买酒馆、偷窃、离城、与路人长期交流、出售绑定Quest道具和投靠敌对势力；结果为4项`SUCCEEDED`、2项`FAILED`、2项`REJECTED`。全部精确输入与回复持久化，均不依赖推荐项且不含默认“无法解析”。
+- 对话使用既有validated `NpcDialogueCommit`；状态后果复用既有Quest transition、dynamic location travel和faction action事务。只以只读SQLite查询推导实际结果，没有为测试写死数据库结果、增加命令语言或绕开业务合同。
+
+### 一致性、证据与发现
+
+- Fantasy最终Quest abandoned 1、owner trust 2、money 12；Investigation旅行至海雾观测站、travel event 3、路人6条message且relationship为1/1/1；Cyberpunk保留绑定奖励和15信用点，同时企业关系为`ALLIED`、势力行动2、公开投敌后果事实1。
+- 三个Campaign在最终重开后均为`TAVERN`，`integrity_check=ok`、foreign key violation 0、unfinished request 0；各自产出SQLite与portable archive。正式run`m11-t05-free-input-2432d18`绑定来源提交，逐项evidence为8/8 `COMPLETE`、开放finding 0。
+- 首次完整门禁暴露新增Rust测试在无环境变量时错误强制执行，这是测试接线问题；修正为四个路径全部未配置时普通门禁安全返回、部分配置时fail closed、全部配置时执行真实压力流程。初次浏览器截图使用非Hash路径导致路由未切换，改用`/#/...`并逐图重采；两者均未降低产品校验，也不记为产品finding。
+- Provider明确为Fake；真实Provider保持`NOT_RUN`，未读取Credential或调用网络模型。生产事务墙钟2291.522 ms、八项摊销286.44 ms只作为harness观察，不替代M10性能门。
+- 浏览器壳在1440×1000覆盖Saves、My和Quest route guard，最终三图逐一检查且无console error；native不可用/loading/缺Campaign是预期安全状态，不替代Native证据。
+
+### 文档、门禁与结束状态
+
+- 新增[`audit/V0_3_FREE_INPUT_STRESS_TEST.md`](audit/V0_3_FREE_INPUT_STRESS_TEST.md)和`DEC-155`，更新Spec、Tasks与Harness。M11-T05开放finding为0；真实模型、M11-T06与M12仍未执行。
+- `pnpm check:shared`在测试基础提交后通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 188 files / 1049 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过。Rust workspace 150 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、严格Clippy与TypeScript↔Rust archive interop均通过。
+- 最终文档/证据工作树已复跑并通过完整共享门禁、显式Windows纵向E2E、普通`pnpm playtest:free-input`、desktop build与14项SHA-256复验；Vite生产构建转换281 modules。
+- 本任务不merge、不push，不暂存用户`.gitignore`。下一项严格为M11-T06，本次不进入。
+
+## 2026-08-27 — M11-T06 完成 Playability Report
+
+### 范围与统计复算
+
+- 在分支`task/M11-T05-free-input-stress`、起始提交`95e5e1e`上严格执行M11-T06；未回滚或重做M0～M11-T05，未进入M12。用户已有`.gitignore`修改全程保持未暂存。
+- 新增`playtest:report`复算门，直接读取M11-T02 Fantasy、M11-T03 Investigation、M11-T04 Cyberpunk和M11-T05自由输入的已提交evidence/summary，并逐文件复验四个来源目录`SHA256SUMS`。测试不从报告正文复制统计。
+- 复算得到三世界固定行为96项、自由输入8项，总计104项；固定流总墙钟7815.667 ms、按行为摊销81.413 ms，自由输入事务2291.522 ms、摊销286.44 ms。两种计时方法分别披露，不冒充Provider latency。
+- 唯一finding为Fantasy的`M11-FAN-001`（P1/FIXED）；当前开放P0/P1/P2/P3均为0。自由输入仍明确保留4次成功、2次失败、2次规则拒绝，不把合理失败删成“全成功”。
+
+### 报告、评分与边界
+
+- 新增[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)，逐世界记录行为数、Fake Provider/`ember-fake-v1`、延迟、Knowledge/Personality/Quest/World/Trait/Equipment/Director/Context、发现/修复/剩余和评分。
+- 五项显式维度各2分，Fantasy/Investigation/Cyberpunk为8.6/8.8/8.9；三个世界均为32项行为，等行为权重综合8.8/10，置信度MEDIUM。评分只覆盖确定性生产harness，不包含真实模型文风或网络质量。
+- 四个M11 run全部为Fake。V0.3真实Provider、真实token/计费cache、网络latency明确为`NOT_EVALUATED`；V0.2 DeepSeek结果只作历史背景，未计入104项行为、评分或findings。
+- 机器摘要run`m11-t06-report-95e5e1e`绑定M11-T06起始提交，记录全部来源、统计、逐世界metrics、评分和Provider边界；manifest与SHA-256防止静默漂移。新增`DEC-156`并更新Tasks、Spec与Harness。
+
+### 门禁与结束状态
+
+- `pnpm playtest:report`通过3项测试：四源证据/hash/统计/评分复算、提交摘要逐字段一致、Markdown章节与链接合同。
+- 最终工作树`pnpm check:shared`完整通过：Prettier、release metadata、简体中文玩家文案、ESLint、TypeScript；Vitest 189 files / 1052 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过。Rust workspace 150 tests通过，另1项需显式API Key授权的真实DeepSeek测试ignored；rustfmt、严格Clippy与TypeScript↔Rust archive interop均通过。
+- 三世界普通入口、自由输入入口、`pnpm playtest:report`、显式Windows纵向E2E、desktop build与M11-T06 evidence hash全部通过；Vite生产构建转换281 modules。普通长测入口按设计只运行合同测试并跳过需要新run目录的证据生成，权威已提交run由report门重新哈希和复算。
+- M11-T06完成后M11全部任务结束；本任务不merge、不push，不暂存用户`.gitignore`。下一项严格为M12-T01，本次不进入。
+
+## 2026-08-27 — M12-T01 完成 First Full Audit
+
+### 审计范围与独立证据
+
+- 在分支`task/M11-T05-free-input-stress`、起始提交`d41e99b`上执行M12-T01；没有采信历史DONE标签，没有修改生产业务代码，也没有边审边修复。用户已有`.gitignore`修改全程保持未暂存。
+- 新增[`audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md`](audit/V0_3_FIRST_FULL_AUDIT_FINDINGS.md)，逐项复核Architecture、Code、Security、Credential、Provider、AI、Rules、SQLite、Save/Migration、Performance/Cache、UI/UX/A11y、Regression和Playability。
+- 冻结6项开放finding：P2四项（无Campaign本地导航、Vite开发服务器公告、CI Action可移动tag、V0.3仍标识0.2.0）与P3两项（Vitest/传递开发工具公告、Linux GTK3条件依赖维护/unsound告警）；开放P0/P1均为0。独立安全复核确认CI风险存在可执行artifact投毒路径，但只读token、无secret/write/OIDC/自动发布使其不构成P0/P1。
+- 当前与git历史秘密扫描只命中故意的假秘密测试夹具；CSP、最小Tauri capability、OS Keyring、opaque CredentialRef、HTTPS公开地址/loopback HTTP、解析地址固定、禁redirect、超时和响应上限继续通过。`cargo-audit 0.22.2`用当日RustSec库审计499项依赖，报告0个vulnerability、16个unmaintained和1个Linux GTK3路径unsound informational warning。
+- 仅使用官方当前文档复核Provider：DeepSeek、Qwen与OpenRouter endpoint/model/API仍有效；Qwen 3.7 Max已列为旧版但仍可调用，不误报为下架。没有读取Credential或调用真实计费Provider。
+
+### UI、性能与外部边界
+
+- 真实Chromium重新覆盖12个核心页面族、unknown/route guard、错误/loading/selected代表状态与860×600、1180×760、1366×768、1920×1080四个既定视口；横向溢出0、console error 0。保存页面证据、finding点击前后图与SHA-256。
+- 重新验证Design Token唯一来源、Primitive/Game Component复用、Feature/Legacy收敛、raw visual value、WCAG对比度、2px焦点、forced-colors和reduced-motion静态/测试合同；没有第二套组件体系。视觉评级B+，扣分来自无Campaign导航语义，不来自样式体系分裂。
+- 性能门绑定审计基线提交并通过：SQLite增长541.582 bytes/turn，Unified Context在100→1000回合为377→383 tokens、增长1.016，GenerationQueue压力P95为5ms。Fake Provider不报告真实token/cache，保持NOT_EVALUATED。
+- 当前macOS主机不能证明V0.3 NSIS/Credential Manager/WebView2/安装启动卸载；真实Provider叙事、网络、token和计费cache也未获授权。两项明确记为BLOCKED_EXTERNAL/NOT_EVALUATED，旧V0.2或Fake证据不冒充通过。
+
+### 门禁与结束状态
+
+- `pnpm check`完整通过：Prettier、release metadata同步、zh-CN、ESLint、TypeScript；Vitest 189 files / 1052 tests通过，另2 files / 6 tests按设计skip；Node 29 tests通过；Rust workspace 150 tests通过，另1项真实DeepSeek测试ignored；rustfmt、严格Clippy和archive interop通过。
+- `pnpm test:windows-e2e`、`pnpm build:desktop`（281 modules）、`pnpm performance:gate`和`pnpm playtest:report`均通过。M12-T01只冻结finding和证据，不修复、不进入M12-T03；下一项严格为M12-T02。
+
+## 2026-08-28 — M12-T02 完成 First Audit Findings 修复
+
+### 逐项处理
+
+- 从findings冻结提交`c5b7e74`开始，仅处理M12-T01登记的6项问题；实现提交`d1b5a30`。用户已有`.gitignore`修改保持未暂存，没有修改Rules/D20、Provider业务合同、Generator/Queue、SQLite schema、存档格式或Quest/NPC/Adventure状态机。
+- 修复无Campaign导航：设备级“我的”保持`/my`，酒馆/任务/冒险/角色/档案入口统一回存档选择；设置包屑不再以“我的”标签进入Saves。新增两个点击级回归，导航定向2 files / 23 tests通过。
+- Vite升级到7.3.6、plugin-react到5.2.0、Vitest到4.1.11，刷新传递图并用workspace override固定`brace-expansion` 5.0.9。npm官方registry audit从8条降为0；仍保持非交互`vitest run`。
+- 14个CI `uses:`全部固定到5个当前上游完整commit SHA并保留版本旁注；三处checkout设置`persist-credentials: false`，三处Rust setup显式`toolchain: stable`。新增workflow门锁定SHA数量/格式和安全配置，6/6通过。
+- 所有npm workspace、Cargo workspace/lock、Tauri、release-info、生成版本、CHANGELOG和README统一到未发布的0.3.0候选；release sync移除会漏刷Cargo.lock workspace版本的`--no-deps`，连续sync/check与frozen install通过。
+- RustSec依旧为0 vulnerability、16 unmaintained/1 unsound informational warning。三目标`cargo tree`证明glib/GTK3只在Linux图，macOS arm64与Windows x64均不可达；V0.3不发布Linux，故P3记为`DEFERRED_ACCEPTED`，任何未来Linux发布前必须重审，不把告警伪装成消失。
+
+### 门禁与边界
+
+- 完整`pnpm check`通过：Vitest 189 files / 1054 tests，另2 files / 6 tests按设计skip；Node 30/30；Rust 150/150，另1项真实DeepSeek测试按授权边界ignored；Prettier、release 0.3.0同步、zh-CN、ESLint、TypeScript、rustfmt、严格Clippy和archive interop均通过。
+- `pnpm test:windows-e2e` 1/1、`pnpm build:desktop` 281 modules、性能门和`playtest:report`均通过。性能门绑定实现提交`d1b5a30`；Fake数据为SQLite 541.582 bytes/turn、Context 377→383 tokens、增长1.016、Queue P95 2ms；真实token/cache保持NOT_EVALUATED。
+- M12-T02结束时开放P0/P1/P2/P3均为0，另有1项仅Linux条件依赖的显式延期风险。未读取真实Credential、未调用计费Provider，不push、不merge、不签名、不发布。下一项严格为M12-T03 Release Gates。
+
+## 2026-08-28 — M12-T03 完成 Release Gates
+
+### 门禁实现与来源绑定
+
+- 在分支`task/M11-T05-free-input-stress`上严格执行M12-T03；未回滚或重做M0～M12-T02，也未提前进入M12-T04。用户已有`.gitignore`修改保持未暂存。
+- 首先修复发布门禁仍硬编码0.2.0的问题：Windows与macOS生命周期脚本改为读取并校验`release-info.json`的0.3.0，测试锁定不得重新引入旧版本字面量；实现提交为`a77eb03`。全部构建、测试、性能与发布元数据证据绑定完整来源提交`a77eb03530ab2f90e635a18b513994b1b4dca1af`。
+- 新增[`audit/V0_3_RELEASE_GATES.md`](audit/V0_3_RELEASE_GATES.md)和结构化manifest。证据目录包含20个受`SHA256SUMS`覆盖的文件；逐项SHA-256复验全部通过。没有签名、notarize、发布、push或merge。
+
+### 适用平台结果与外部阻塞
+
+- Frozen install与完整`pnpm check`通过：Vitest 189 files / 1054 tests通过，另2 files / 6 tests按显式环境合同skip；Node 30/30；Rust 150/150，另1项需显式Credential授权的真实DeepSeek测试ignored；Prettier、0.3.0 release sync、zh-CN、ESLint、TypeScript、rustfmt、严格Clippy和archive interop全绿。
+- Desktop production build与显式Windows生产纵向切片通过：Vite 7.3.6转换281 modules，Windows E2E 1/1。当前macOS不能构建和执行Windows NSIS、Credential Manager、WebView2、安装/启动/卸载生命周期，因此该项明确为`BLOCKED_EXTERNAL`，没有复用V0.2证据冒充V0.3。
+- 当前主机构建`Ember Tavern.app`成功；Info.plist的产品名、identifier、可执行文件与版本0.3.0通过检查，三个bundle文件记录SHA-256，二进制确认链接系统WebKit。Keychain、真实启动、数据库创建与清理门只允许临时macOS CI；本机运行被脚本在触碰用户路径前拒绝，`cleanup.authorized=false`，故生命周期明确为`BLOCKED_EXTERNAL`而非VERIFIED。
+
+### 安全、性能与真实性边界
+
+- `pnpm audit`为0 advisories；RustSec为0 vulnerability，并继续诚实披露16个unmaintained与1个仅Linux GTK3/glib图可达的unsound warning，维持M12-T02的`DEFERRED_ACCEPTED`裁决。
+- 对当前tracked tree及全部reachable Git revisions执行秘密模式扫描，只保存文件名和计数、不回显疑似值；10个唯一命中文件全部为测试文件或Rust`cfg(test)`模块内的故意假夹具，未解释命中为0。保存/导出秘密扫描2 files / 17 tests通过。未读取OS Credential Store或用户未跟踪文件。
+- 性能门通过：SQLite增长541.582 bytes/turn、Unified Context 377→383 tokens、增长1.016、GenerationQueue压力P95 3ms。证据明确为Fake Provider；真实Provider token预算和计费cache hit仍为`NOT_EVALUATED`，未读取Credential、未调用网络模型。
+- M12-T03所有当前主机适用门禁均通过，Windows生命周期与macOS生命周期两个外部环境项显式阻塞，真实Provider两项保持未评价。下一项严格为M12-T04 Reports & Final Verdict。
+
+## 2026-08-28 — M12-T04 完成 Reports & Final Verdict
+
+### 最终报告与复算
+
+- 从M12-T03证据提交`d5c5fe0`进入最后一项任务；未重做M0～M12-T03，也未自动开始第二轮审计。新增[`V0.3_FIRST_AUDIT_REPORT.md`](V0.3_FIRST_AUDIT_REPORT.md)，并将[`V0.3_PLAYABILITY_REPORT.md`](V0.3_PLAYABILITY_REPORT.md)更新为含M12最终附录的版本；同步README、Spec、Tasks、Decisions与本日志。
+- 最终开放finding为P0=0/P1=0/P2=0/P3=0。M12第一轮六项finding为4个P2全部FIXED、2个P3中1个FIXED/1个Linux-only`DEFERRED_ACCEPTED`；M11历史`M11-FAN-001` P1已修复并回归，不计为开放项。
+- 可玩性证据复算仍为三世界固定96项+自由输入8项=104项；Fantasy/Investigation/Cyberpunk评分8.6/8.8/8.9，综合8.8/10、MEDIUM confidence。自由输入保持4 success/2 failed/2 rules-rejected，没有删除合理失败。
+
+### Final Verdict 与边界
+
+- 最终判断为`READY FOR SECOND AUDIT`：P0/P1清零，核心架构、Rules/D20、SQLite/Save/Migration、Credential边界、三世界可玩性和所有当前主机适用门禁均有可信证据。
+- 同时明确`NOT READY FOR PUBLIC RELEASE`：Windows NSIS/Credential Manager/WebView2/install-launch-uninstall和临时macOS Keychain/launch/database/cleanup生命周期仍为`BLOCKED_EXTERNAL`；真实Provider长测、token、network latency和计费cache仍为`NOT_EVALUATED`；产物未签名、notarize或发布。
+- 新增`DEC-157`把第二轮审计准入与公开发布批准分离，防止平台阻塞、Fake性能或V0.2历史证据被误写为V0.3发布验证。没有修改任何产品代码、schema、状态机或视觉合同。
+- 最终文档完成态再次扫描当前tree和全部reachable revisions，只记录文件名：10个既有假夹具文件外，新增命中仅为已提交`secret-review.json`自身的模式类别标签，未解释命中仍为0；未读取或回显任何真实Credential。
+
+### Git 与结束状态
+
+- V0.3起始基线为`0af183391a5d83406874db326ed02b175ba24e6e`，第一项提交为`01030e1`，最终审计产品源码为`a77eb03`，M12-T03证据提交为`d5c5fe0`。截至M12-T03共新增67 commits（46 feat / 9 test / 4 fix / 8 docs），无merge commit；最终M12-T04文档commit在交接中作为ending HEAD报告。
+- 用户已有`.gitignore`修改始终保持未暂存，因此工作树会如实报告为not clean；所有agent-owned M12-T04修改独立提交。不push、不merge、不签名、不发布，也不自动开始第二轮审计。
+
+## 2026-08-28 — V0.3 第二轮独立完整审计完成
+
+### 独立复核与 Findings
+
+- 从最终产品HEAD `bc5fb56`建立`audit/v0.3-second-full-audit`，不采信第一轮DONE/PASS标签，重新检查Git范围、Architecture、Security/Credential、Provider/AI、Rules/D20、SQLite/Save/Migration、Performance、UI/UX/A11y、Regression和Playability。用户`.gitignore`修改全程保持未暂存。
+- 在修复前提交`f763f08`冻结2项发现：`V03-SA-001`（P2）为macOS CI哈希父目录会吸收陈旧同级`.app`；`V03-SA-002`（P3）为缺失稳定的`docs/ARCHITECTURE.md`入口。P0/P1均为0。
+- 修复提交`0c56b56`把macOS evidence root锁定到唯一候选`.app`并增加6/6 workflow回归；新增只描述当前已实现边界的架构索引。第二轮P2 1/1 FIXED、P3 1/1 FIXED，开放P0/P1/P2/P3均为0。
+
+### 新 Evidence 与完整门禁
+
+- 修复后`pnpm check`通过：Vitest 189 files / 1054 tests，另2 files / 6 tests按显式环境合同skip；Node 30/30；Rust 150/150，另1项真实DeepSeek测试按授权边界ignored；Prettier、release sync、zh-CN、ESLint、TypeScript、rustfmt、strict Clippy和archive interop全绿。
+- Frozen install、Windows生产纵向E2E 1/1、desktop build 281 modules、macOS `.app` build/Info.plist/system WebKit/精确3文件hash、npm 0 advisories、RustSec 0 vulnerabilities和秘密扫描均通过。Linux-only 16 unmaintained + 1 unsound informational warning继续按第一轮裁决`DEFERRED_ACCEPTED`。
+- 重新生成Fantasy/Investigation/Cyberpunk各32项与自由输入8项，共104项Fake生产harness行为；六份隔离SQLite均`integrity_check=ok`、外键违规0、未完成请求0。确定性性能门SQLite 541.582 bytes/turn、Context 377→383、增长1.016、Queue P95 2ms，真实token/cache仍`NOT_EVALUATED`。
+- Chromium覆盖13个路由和860×600、1366×768、1920×1080矩阵；16张截图逐张查看，横向溢出0、console error 0、首个Tab正确聚焦skip link。浏览器无Tauri bridge时的原生错误态按设计降级，不冒充原生生命周期。
+
+### Final Verdict 与边界
+
+- 新增[`V0.3_SECOND_AUDIT_REPORT.md`](V0.3_SECOND_AUDIT_REPORT.md)、第二轮findings/fixes账本、修复前与修复后独立evidence、manifest和逐文件SHA-256。
+- 最终判断为`SECOND AUDIT PASS — READY FOR RELEASE CANDIDATE VALIDATION`，同时明确`NOT READY FOR PUBLIC RELEASE`。Windows NSIS/Credential Manager/WebView2/install-launch-uninstall和macOS临时环境Keychain/launch/database/cleanup仍为`BLOCKED_EXTERNAL`；真实Provider、token、网络latency和计费cache仍为`NOT_EVALUATED`；未签名、notarize、发布、push或merge。
+
+## 2026-08-29 — V0.3 RC 实测问题修复完成
+
+### 两项阻塞修复
+
+- 从第二轮审计完成提交`00fc1ad`建立`fix/v0.3-rc-playtest-issues`，完整读取用户提供的`12.docx`文本与三张截图，先冻结`RC-PLAYTEST-001/002`，再提交代码与测试`760b5a24c7c806e8f30eb49c4251f8c1ae6cc62b`。用户已有`.gitignore`修改保持未暂存且diff哈希不变。
+- 世界生成根因为世界构筑绕过GenerationQueue，且最大8,000 token任务被单一约60秒传输时限覆盖。修复后使用DNS 10秒、连接15秒、Provider 120秒、世界操作270秒的分层有界预算；Queue按Campaign/Task意图去重并分离排队/执行时间，AbortSignal贯穿UI到原生HTTP，失败/取消/无效输出不进入SQLite commit。
+- 新建存档根因为成功后只刷新列表而不导航，且React disabled前存在同tick双击窗口。修复后同步ref防重入，并按`campaign_create`返回的权威状态直接进入世界构筑。截图中的八个创建中存档未被证明为无效幽灵草稿，因此没有删除、隐藏或改写用户数据。
+
+### 回归、Chromium 与 SQLite
+
+- 新增回归覆盖旧60秒边界后的合法响应、永久挂起、TIMEOUT后重试、同意图并发、AUTH分类、取消、Queue等待计时、直接导航、同步双击与现有归档流程。定向55项通过；世界页面取消测试确认退出loading且不发布world。
+- 真实Chromium在860×600、1366×768、1920×1080复测：同步双击产生一次`campaign_create`，直接进入`#/world?campaignId=...`并显示权威第01步；TIMEOUT、重试busy/disabled和取消态均可见，commit调用为0；横向溢出0、console error 0、键盘焦点outline可见。
+- 显式保留Windows E2E主SQLite、三个自动完整备份和portable archive。四库均`integrity_check=ok`、外键违规0、重复idempotency/request/world 0、孤儿world 0；活动主库未完成请求0。一个恢复前不可变备份按测试设计保留`SENDING`请求和`RECOVERY_REQUIRED → TAVERN`恢复点，活动主库已恢复为`TAVERN`。
+
+### 完整门禁与结束状态
+
+- Frozen install、`pnpm check`、`pnpm test:windows-e2e`、`pnpm build:desktop`和macOS `.app`构建全部通过。完整门为Vitest 189 files / 1063 tests、Node 30/30、Rust 150 tests，另1项需真实Credential的DeepSeek测试ignored；Vite构建281 modules。npm/RustSec vulnerability均为0。
+- 新增[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)、`DEC-158`与独立证据目录。两项结论均为`FIXED`；真实Provider、Windows安装生命周期、签名/notarization/发布仍不在授权和本机证明范围，因此不宣称`PUBLIC RELEASE READY`。未push、merge、签名或发布，也未进入V0.4。
+
+## 2026-08-29 — V0.3 RC 实测追加 INVALID_OUTPUT 修复与真实链路复核
+
+### 问题三调查与修复
+
+- 在同一 `fix/v0.3-rc-playtest-issues` 分支追加 `RC-PLAYTEST-003`，冻结用户新截图，不覆盖第二轮审计证据。完整追踪 Provider、finish reason、规范化/parse、一次 repair、TypeScript Schema/业务规则、Rust commit 与 SQLite transaction。
+- 原失败 raw response 按既有安全合同未持久化，因此不猜测截图对应的具体字段。确认的代码缺口为：裸 `JSON.parse` 误拒可确定围栏/唯一对象；`LENGTH` 未先分类为截断；repair Provider 失败遮蔽初始验证路径；世界构筑误用“已锁定硬结果”文案。Prompt Schema 与 `AI_TASK_SCHEMAS` 同源，未发现版本漂移；DeepSeek 当前请求为 `JSON_OBJECT`，本地完整验证仍不可省略。
+- 实现提交 `1c5f164` 增加严格规范化与 `AMBIGUOUS_JSON` fail closed、finish reason 分类、INITIAL/REPAIR 脱敏诊断、repair 后完整复验，以及 JSON/Schema/截断/业务规则的阶段化 UI。没有放宽 Schema、删除业务规则、写入任意文本或把 Fake 结果冒充真实 Provider。
+
+### 回归、真实 Provider 与 SQLite
+
+- 新增合法 JSON 单次通过、围栏、唯一对象+短说明、多个对象拒绝、截断、缺字段、错类型/枚举、业务规则、repair 成功/失败/超时、无部分 commit、显式重试只提交一次和错误分类回归。Chromium 四种失败层级均可区分，860×600、1366×768、1920×1080 横向溢出 0、console error 0，硬结果误导文案已移除。
+- 通过 OS Credential Store opaque reference 在独立数据根运行真实 DeepSeek/`deepseek-v4-flash` 三个不同世界组合；没有读取或打印原始 Key，也没有污染用户存档。三次均在完整响应前 `TIMEOUT`，finish reason、parse、Schema、business 和 commit 均 `NOT_REACHED`，故真实验证为 `BLOCKED_EXTERNAL`，不是 PASS。
+- 隔离库 `integrity_check=ok`、外键违规 0、3 个创建中 Campaign、world 0、generation record 0、unfinished 0、重复 Campaign/request/world 0；用户主库前后状态和计数一致。显式同 Campaign 重试没有新增 Campaign/world/unfinished。
+
+### 门禁与状态
+
+- `pnpm check` 通过：Vitest 189 files / 1085 tests，另 2 files / 6 tests 按合同 skip；Node 30/30；Rust workspace、格式、release metadata、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy和archive interop全绿。
+- `pnpm test:windows-e2e` 1/1、`pnpm build:desktop` 281 modules、标准 macOS `.app` 构建均通过；用户 `.gitignore` 保持未暂存。不 push、merge、签名、notarize 或发布。
+- 问题二完全关闭；问题一与问题三的代码缺口已闭合，但真实 Provider 三次超时导致总体为 `BLOCKED_EXTERNAL`。因此本轮不输出 `FIXED — READY FOR RC REVALIDATION`，也不宣称 `PUBLIC RELEASE READY`。
+
+## 2026-08-30 — V0.3 RC A–D 差分诊断与三问题最终闭合
+
+### 差分根因与最小修复
+
+- 在同一 `fix/v0.3-rc-playtest-issues` 分支从 `1934053` 继续，不改用户 `.gitignore`、不覆盖第二轮审计证据。通过 OS Credential Store opaque reference 执行 A–D：`/models` 167ms 成功；最小 JSON thinking disabled/default 分别 800ms/1155ms；完整生产世界 D 12.691s、`STOP`、1550/1047 tokens。
+- TIMEOUT 的追加根因为 DeepSeek V4 Flash 默认高强度 thinking，而世界流只消费 content；8000 输出 token 也缺少样本依据。仅对 DeepSeek `GENERATE_WORLD/REFINE_WORLD` 显式发送 `thinking.disabled`，世界预算校准为 4096，其他任务/Provider 不变。
+- D 首次完整响应复现出独立的 INVALID_OUTPUT 根因：TypeScript 结构验证通过，但 Desktop 未执行 application/Rust 已有的 Constitution 三条跨字段业务规则。Prompt 现明确三条恒等关系，Desktop `RULES_CHECK` 复用 `assertWorldConstitutionCompliance`，以 `WORLD_BUSINESS_RULE_INVALID` 和脱敏路径 fail closed；没有把业务错误改名为 Schema，也没有扩大 repair 范围。
+
+### 三次真实世界验收与 SQLite
+
+- 三个不同选项组合均通过真实 DeepSeek、生产 Prompt/JSON_OBJECT/streaming、4096 token 和隔离 SQLite。前两次首次通过并提交；第三次首次在 `locations[5].factionNames[1]` 被 Schema 拒绝，唯一一次 repair 使用独立 deadline，随后完整重跑 JSON、Schema、business、Rust validation 与 transaction。
+- 初始三次时延/token 为 14.209s/1584→1328、10.047s/1588→915、45.514s/1589→3492；repair 为 20.120s/5192→3487。所有调用 `STOP` 且 Provider request ID 存在；cache hit/miss 未由响应提供，明确为 unavailable。
+- 验收库 `integrity_check=ok`、外键违规 0、Campaign/world/constitution/generation record 均为 3、unfinished 0、部分 world 0、重复 idempotency/save/world 0。用户数据库未打开或修改。
+
+### 门禁与结论
+
+- `pnpm check` PASS：Vitest 189 files / 1087 tests，另 2 files / 6 tests 合同 skip；Node 30/30；Rust native 101、platform 5、provider 19、HTTP 11、secrets 3、Tauri 13 全绿，1 个环境变量式真实测试 ignored。Windows E2E 1/1、desktop 281 modules 和移除临时诊断入口后的标准 macOS `.app` 构建均 PASS。
+- 新增追加证据目录 `audit/evidence/v0.3-rc-playtest-real-provider-1934053/`，更新 RC 修复报告与 `DEC-160`。三个问题均完全关闭，状态更新为 `FIXED — READY FOR RC REVALIDATION`；只批准 RC 复验，不构成公开发布批准。未 push、merge、签名、notarize 或发布。
+## 2026-08-30 — V0.3 RC 职业池 TIMEOUT 追加闭环
+
+- 在同一 `fix/v0.3-rc-playtest-issues` 分支与 `914165e` 之后固化真人实测职业池 TIMEOUT 截图，不覆盖二轮审计证据。差分确认职业池 12s Queue 总时限、未传递 AbortSignal、DeepSeek provider-default thinking 与 Queue 外 commit 共同导致问题；不将它写成普通网络中断。
+- 严格结构任务统一 DeepSeek non-thinking；职业池改为 4096 token、60s 无进度时限、150s operation，Provider 取消和 commit 纳入同一 intent Queue。传输层对持续分块重置 idle deadline，并保留 300s 安全总上限。TIMEOUT UI 不再误述为“网络恢复”。
+- 三组真实 DeepSeek 职业链路使用 OS Credential Store opaque reference 和隔离 SQLite。两个不同世界直接通过；既有 Campaign 显式重试先将 2048 token 截断响应 fail closed，4096 预算下 33.616s/3071 tokens 完整通过并单次提交。三库均 integrity ok、外键违规 0、unfinished 0、每 Campaign 1 个职业池/4 个职业/1 条 generation record，用户存档未打开或修改。
+- 完整门禁通过：Vitest 189 files/1091 tests，Node 30/30，Rust native 101、platform 5、provider 19、HTTP 12、secrets 3、Tauri 13；Windows E2E 1/1、desktop build 281 modules 和标准 `Ember Tavern.app` 打包通过。临时诊断入口已移除，未 push、merge、签名、notarize 或发布。
+
+## 2026-08-31 — V0.3.0 最终 Git 与 Release 发布
+
+### 发布范围与元数据
+
+- 完整复核 `docs/TASKS.md`：V0.3 的 60 项实现任务全部为 `DONE`，没有 `PARTIAL`、`NOT DONE` 或 `UNVERIFIABLE`，也没有把 V0.4 规划内容带入发布。补齐既有 DONE 项的真实完成日期，不改写任务结论。
+- 将 `CHANGELOG.md`、`release-info.json`、生成的桌面端发布信息和 README 同步为稳定版 `0.3.0`，正式发布日期为 2026-08-31；新增 `docs/RELEASE_NOTES_0.3.md`。发布准备提交为 `221ef0f806bf08bfb9ce6deba49ef31cac7cb745`，PR 为 `#3`。
+- 首轮 PR 生命周期批次 `33319736944` 发现 Windows PowerShell 在解析 `"$expectedVersion:"` 时失败；修复为显式 `${expectedVersion}` 边界并增加静态回归断言。修复提交 `e0d78874c316fe3f50c2c6109a37f8812f56fa31` 的复验批次 `33321429337` 四个 job 全部通过。
+
+### 最终门禁与发布产物
+
+- 本地 `pnpm check` 通过：Vitest 189 files / 1091 tests，另 2 files / 6 tests 按显式环境合同 skip；Node 33/33；Rust 153 tests 通过，另 1 项真实 Credential 测试 ignored；格式、release sync、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy和 archive interop 全绿。
+- Windows E2E 1/1、desktop build 281 modules、三世界加自由输入 104 项可玩性证据、确定性性能门 24 PASS / 2 个真实 Provider 指标 `NOT_EVALUATED` 均通过。Windows CI 完成 NSIS、Credential Manager、WebView2、静默安装、启动与卸载；macOS CI 完成 `.app`、Keychain、WKWebView、启动、PlatformPaths 与哈希门禁。
+- 正式 Release 只发布 Windows x64 NSIS 安装包、与 CI 一致的 macOS 应用包压缩档和 SHA-256 清单；不上传测试 SQLite、用户存档、Credential、日志或审计临时数据库。当前产物未做代码签名和 Apple notarization，该限制在 Release Notes 中明确披露。
+
+### Git 与发布边界
+
+- 发布分支先正常合并当时的 `origin/main`，保留完整历史，再通过 PR #3 以普通 merge 进入 `main`；最终 `v0.3.0` 为指向发布后 `main` HEAD 的 annotated tag。GitHub Release 固定入口为 `https://github.com/qwerxxc7635-crypto/AI-tavern/releases/tag/v0.3.0`。
+- 用户已有 `.gitignore` 修改始终保持未暂存，未进入任何发布提交。发布过程未读取、打印或上传真实 API Key，未修改用户数据库，也未开始 V0.4。

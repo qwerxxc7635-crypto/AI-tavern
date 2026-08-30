@@ -88,6 +88,200 @@ export class FakeAIProvider implements AIProvider {
 
 function fakeOutput(request: NormalizedAIRequest): unknown {
   const base = FAKE_TASK_OUTPUTS[request.task];
+  if (request.task === 'EDIT_CHARACTER_DRAFT') {
+    const input = taskInput(request);
+    if (input === undefined) return base;
+    const targetPaths = Array.isArray(input?.['targetPaths']) ? input['targetPaths'] : [];
+    const fieldKinds = isRecord(input?.['fieldKinds']) ? input['fieldKinds'] : {};
+    const fieldPath = typeof input?.['fieldPath'] === 'string' ? input['fieldPath'] : 'identity';
+    if (input?.['fieldOperation'] === 'OPTIONS') {
+      return {
+        kind: 'FIELD_CANDIDATES',
+        fieldPath,
+        candidates: [
+          `命运候选一：${fieldPath}`,
+          `命运候选二：${fieldPath}`,
+          `命运候选三：${fieldPath}`,
+        ],
+      };
+    }
+    return {
+      kind: 'DRAFT_PATCH',
+      updates: targetPaths.flatMap((path) =>
+        typeof path !== 'string'
+          ? []
+          : [
+              {
+                path,
+                value:
+                  fieldKinds[path] === 'TEXT_LIST'
+                    ? [`由命运补全的${path}`]
+                    : `由命运补全的${path}`,
+              },
+            ],
+      ),
+    };
+  }
+  if (request.task === 'GENERATE_ITEMS') {
+    const input = taskInput(request);
+    if (input === undefined) return base;
+    const targets = Array.isArray(input['bindingTargets']) ? input['bindingTargets'] : [];
+    const evidence = isRecord(input['constitutionEvidence'])
+      ? input['constitutionEvidence']
+      : undefined;
+    return {
+      schemaVersion: 1,
+      items: [
+        {
+          id: 'item-stormglass-compass',
+          name: 'Stormglass Compass',
+          description: 'A weathered compass whose clouded face clears near old beacon roads.',
+          category: 'TOOL',
+          appearance: 'Dark brass surrounds a pane of blue-gray stormglass.',
+          history: 'A route warden carried it before the harbor beacons went dark.',
+          origin: 'The old lantern guild workshops.',
+          narrativeAbilities: ['Reveals faded route marks when held beneath beacon light'],
+          semanticEffects: ['Recognized by surviving lantern wardens'],
+          balanceTags: ['QUEST_REWARD', 'NON_COMBAT'],
+          bindings: targets.flatMap((target) => {
+            if (!isRecord(target)) return [];
+            const kind = target['kind'];
+            const targetId = target['targetId'];
+            const allowedTriggers = target['allowedTriggers'];
+            const summary = target['summary'];
+            if (
+              typeof kind !== 'string' ||
+              typeof targetId !== 'string' ||
+              !Array.isArray(allowedTriggers) ||
+              typeof allowedTriggers[0] !== 'string' ||
+              typeof summary !== 'string'
+            ) {
+              return [];
+            }
+            return [{ kind, targetId, trigger: allowedTriggers[0], summary }];
+          }),
+          constitutionEvidence: evidence,
+        },
+      ],
+    };
+  }
+  if (request.task === 'GENERATE_NPC_LOD') {
+    const input = taskInput(request);
+    const current = isRecord(input?.['currentProfile']) ? input['currentProfile'] : undefined;
+    if (current === undefined) return base;
+    const targetLod = input?.['targetLod'];
+    const evidence = isRecord(input?.['constitutionEvidence'])
+      ? input['constitutionEvidence']
+      : current['constitutionEvidence'];
+    const references = isRecord(input?.['allowedReferences']) ? input['allowedReferences'] : {};
+    const firstReference = (key: string): readonly string[] => {
+      const values = references[key];
+      return Array.isArray(values) && typeof values[0] === 'string' ? [values[0]] : [];
+    };
+    return {
+      schemaVersion: 1,
+      npc: {
+        ...current,
+        lod: targetLod,
+        name: targetLod === 1 ? 'Nera Fen' : current['name'],
+        appearance:
+          targetLod === 1 ? 'A rain-dark cloak and a coil of pale rope.' : current['appearance'],
+        currentBehavior:
+          targetLod === 1
+            ? 'Studies the tide marks beside the tavern door.'
+            : current['currentBehavior'],
+        career: targetLod === 2 ? 'Tide runner' : current['career'],
+        personality: targetLod === 2 ? 'Watchful and quietly helpful.' : current['personality'],
+        goals: targetLod === 2 ? ['Learn who altered the harbor marks'] : current['goals'],
+        knowledgeFactIds:
+          targetLod === 2 ? firstReference('knowledgeFactIds') : current['knowledgeFactIds'],
+        relationshipNpcIds:
+          targetLod === 2 ? firstReference('relationshipNpcIds') : current['relationshipNpcIds'],
+        memoryIds: targetLod === 3 ? firstReference('memoryIds') : current['memoryIds'],
+        secretFactIds: targetLod === 3 ? firstReference('secretFactIds') : current['secretFactIds'],
+        questIds: targetLod === 3 ? firstReference('questIds') : current['questIds'],
+        itemIds: targetLod === 3 ? firstReference('itemIds') : current['itemIds'],
+        experienceEventIds:
+          targetLod === 3 ? firstReference('experienceEventIds') : current['experienceEventIds'],
+        constitutionEvidence: evidence,
+      },
+    };
+  }
+  if (request.task === 'GENERATE_LOCATIONS') {
+    const input = taskInput(request);
+    const origin = isRecord(input?.['originLocation']) ? input['originLocation'] : undefined;
+    const evidence = isRecord(input?.['constitutionEvidence'])
+      ? input['constitutionEvidence']
+      : undefined;
+    if (origin === undefined || evidence === undefined) return base;
+    const count = typeof input?.['requestedCount'] === 'number' ? input['requestedCount'] : 1;
+    const mode = input?.['expansionMode'];
+    const allowedFactions = Array.isArray(input?.['allowedFactionIds'])
+      ? input['allowedFactionIds']
+      : [];
+    return {
+      schemaVersion: 1,
+      locations: Array.from({ length: count }, (_, index) => {
+        const id = `location-fake-${index + 1}`;
+        return {
+          id,
+          name: `Ember Reach ${index + 1}`,
+          kind: mode === 'CHILDREN' ? 'DISTRICT' : 'VILLAGE',
+          parentLocationId:
+            mode === 'CHILDREN' ? origin['id'] : (origin['parentLocationId'] ?? null),
+          description: 'A newly reached place grounded in the surrounding world.',
+          atmosphere: 'Wind-worn, inhabited, and watchful of the road.',
+          features: ['A marked shelter beside the old route'],
+          factionIds: typeof allowedFactions[0] === 'string' ? [allowedFactions[0]] : [],
+          connections: mode === 'CONNECTED' ? [origin['id']] : [],
+          currentSituation: 'Travelers are adapting to a recent change in the route.',
+          constitutionEvidence: evidence,
+        };
+      }),
+    };
+  }
+  if (request.task === 'GENERATE_FACTIONS') {
+    const input = taskInput(request);
+    const existing = Array.isArray(input?.['existingFactions']) ? input['existingFactions'] : [];
+    const requested = Array.isArray(input?.['requestedFactionIds'])
+      ? new Set(input['requestedFactionIds'])
+      : new Set<unknown>();
+    const evidence = input?.['constitutionEvidence'];
+    const factions = existing.filter((value) => isRecord(value) && requested.has(value['id']));
+    if (!isRecord(evidence) || factions.length === 0) return base;
+    return {
+      schemaVersion: 1,
+      factions: factions.map((value) => ({
+        id: value['id'],
+        name: value['name'],
+        goal: value['goal'],
+        resources: ['Harbor patrols', 'Beacon stores'],
+        leadership: [`${String(value['name'])} council`],
+        enemyFactionIds: value['enemyFactionIds'],
+        allyFactionIds: value['allyFactionIds'],
+        territoryLocationIds: value['territoryLocationIds'],
+        currentAction: 'Secure the roads affected by the latest world event.',
+        playerRelation: value['playerRelation'],
+        constitutionEvidence: evidence,
+      })),
+    };
+  }
+  if (request.task === 'GENERATE_DIALOGUE_SUGGESTIONS') {
+    const input = taskInput(request);
+    const participants = Array.isArray(input?.['participants']) ? input['participants'] : [];
+    const first = participants.find(isRecord);
+    const addressedNpcId = typeof first?.['id'] === 'string' ? first['id'] : null;
+    return {
+      suggestions: [
+        { text: '询问最近改变酒馆气氛的事情', addressedNpcId },
+        { text: '谈谈眼前任务可能遗漏的线索', addressedNpcId },
+        {
+          text: '观察众人听到当前话题后的反应',
+          addressedNpcId: input?.['scopeKind'] === 'NPC_DIALOGUE' ? addressedNpcId : null,
+        },
+      ],
+    };
+  }
   if (request.task === 'SUMMARIZE_ADVENTURE') {
     const input = taskInput(request);
     const npc = Array.isArray(input?.['relatedNpcs']) ? input['relatedNpcs'][0] : undefined;
@@ -118,6 +312,13 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
   if (request.task === 'GENERATE_QUEST') {
     const input = taskInput(request);
     const recentStructures = input?.['recentQuestStructures'];
+    const relevantFacts = input?.['relevantFacts'];
+    const relatedFactIds = Array.isArray(relevantFacts)
+      ? relevantFacts
+          .slice(0, 1)
+          .map((fact) => (isRecord(fact) && typeof fact['id'] === 'string' ? fact['id'] : null))
+          .filter((id): id is string => id !== null)
+      : [];
     if (Array.isArray(recentStructures) && recentStructures.length > 0) {
       return {
         content: {
@@ -131,8 +332,11 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
         expectedTurns: { min: 9, max: 12 },
         rewardTier: 'RARE',
         relatedNpcIds: [],
-        relatedFactIds: [],
+        relatedFactIds,
       };
+    }
+    if (input?.['dynamicSource'] !== undefined) {
+      return { ...FAKE_TASK_OUTPUTS.GENERATE_QUEST, relatedFactIds };
     }
   }
   if (request.task === 'NPC_REPLY') {
@@ -154,7 +358,11 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
         return {
           reply: `Ilyra weighs "${inlinePlayerMessage}" and marks another safe step toward the sealed passage before the tide changes.`,
           mood: 'Focused',
-          suggestedTopics: [`Tide mark ${answerNumber}`, `Passage sign ${answerNumber}`],
+          suggestedTopics: [
+            `Tide mark ${answerNumber}`,
+            `Passage sign ${answerNumber}`,
+            `Safe step ${answerNumber}`,
+          ],
           memoryCandidate: `The player asked about "${inlinePlayerMessage}" while investigating the sealed route beneath the tavern.`,
           relationshipProposal: trust === 5 ? {} : { trust: 1 },
         };
@@ -162,11 +370,34 @@ function fakeOutput(request: NormalizedAIRequest): unknown {
       return {
         reply: 'The lower stones have cooled, so the old tunnel can be approached carefully.',
         mood: 'Focused',
-        suggestedTopics: ['The tide marks', 'The sealed passage'],
+        suggestedTopics: ['The tide marks', 'The sealed passage', 'The cooled stones'],
         memoryCandidate: 'The player returned to ask what lies beyond the cellar threshold.',
         relationshipProposal: { trust: 1 },
       };
     }
+  }
+  if (request.task === 'PROPOSE_TAVERN_SCENE_ACTION') {
+    const input = taskInput(request);
+    const actor = isRecord(input?.['actor']) ? input['actor'] : undefined;
+    const actorId = typeof actor?.['id'] === 'string' ? actor['id'] : 'npc-owner';
+    const allowed = Array.isArray(input?.['allowedActions']) ? input['allowedActions'] : [];
+    const action = allowed.includes('SPEAK')
+      ? 'SPEAK'
+      : allowed.includes('INTERVENE')
+        ? 'INTERVENE'
+        : 'SILENCE';
+    return {
+      actorId,
+      action,
+      targetNpcId: null,
+      utterance:
+        action === 'SILENCE'
+          ? null
+          : `${typeof actor?.['name'] === 'string' ? actor['name'] : 'A patron'} answers from their own place by the hearth.`,
+      citedKnowledgeIds: [],
+      urgency: 1,
+      rationale: 'The visible player intent invites this actor to respond from their own context.',
+    };
   }
   if (request.task !== 'GENERATE_ADVENTURE_TURN') return base;
   const adventureBase = FAKE_TASK_OUTPUTS.GENERATE_ADVENTURE_TURN;

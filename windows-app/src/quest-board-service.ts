@@ -8,11 +8,21 @@ import {
   type AIProvider,
 } from '@ember-tavern/ai-core';
 import {
+  QUEST_STATUSES,
+  QUEST_GRAPH_EDGE_KINDS,
+  QUEST_GRAPH_PREDICATES,
+  QUEST_GRAPH_SOURCE_KINDS,
+  QUEST_GRAPH_TRIGGER_KINDS,
+  QUEST_TRANSITION_SOURCES,
   aiRequestId,
   campaignId,
   generationRecordId,
   idempotencyKey,
   isoTimestamp,
+  questId as parseQuestId,
+  type QuestStatus,
+  type QuestGraphSnapshot,
+  type QuestTransitionSource,
 } from '@ember-tavern/contracts';
 import {
   desktopAIEngine,
@@ -62,7 +72,10 @@ export interface QuestView {
     readonly objective: string;
     readonly failureCost: string;
   };
-  readonly status: 'AVAILABLE' | 'ACCEPTED' | 'ACTIVE' | 'COMPLETED' | 'FAILED' | 'ABANDONED';
+  readonly status: QuestStatus;
+  readonly revision: number;
+  readonly statusSource: QuestTransitionSource;
+  readonly statusReason: string;
   readonly risk: 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
   readonly recommendedAttributes: readonly ('physique' | 'agility' | 'knowledge' | 'charisma')[];
   readonly expectedTurnsMin: number;
@@ -77,6 +90,7 @@ export interface QuestBoardSnapshot {
   readonly campaignState: string;
   readonly source: QuestGenerationSource;
   readonly quests: readonly QuestView[];
+  readonly graph?: QuestGraphSnapshot;
 }
 
 interface GenerationAudit {
@@ -97,10 +111,21 @@ interface QuestGenerationCommit {
   readonly generation: GenerationAudit;
 }
 
+interface QuestPoolTransitionCommand {
+  readonly campaignId: string;
+  readonly questId: string;
+  readonly expectedRevision: number;
+  readonly toStatus: QuestStatus;
+  readonly source: QuestTransitionSource;
+  readonly reason: string;
+  readonly operationId: string;
+}
+
 export interface QuestBoardGateway {
   load(campaignId: string): Promise<QuestBoardSnapshot>;
   commit(command: QuestGenerationCommit): Promise<QuestBoardSnapshot>;
   accept(campaignId: string, questId: string): Promise<QuestBoardSnapshot>;
+  transition(command: QuestPoolTransitionCommand): Promise<QuestBoardSnapshot>;
 }
 
 interface RequestIdentity {
@@ -111,16 +136,28 @@ interface RequestIdentity {
 
 export const tauriQuestBoardGateway: QuestBoardGateway = {
   async load(id) {
-    return parseSnapshot(await invoke<unknown>('quest_board_get', { campaignId: id }), id);
+    return parseQuestBoardSnapshot(
+      await invoke<unknown>('quest_board_get', { campaignId: id }),
+      id,
+    );
   },
   async commit(command) {
-    return parseSnapshot(
+    return parseQuestBoardSnapshot(
       await invoke<unknown>('quest_generation_commit', { command }),
       command.campaignId,
     );
   },
   async accept(id, questId) {
-    return parseSnapshot(await invoke<unknown>('quest_accept', { campaignId: id, questId }), id);
+    return parseQuestBoardSnapshot(
+      await invoke<unknown>('quest_accept', { campaignId: id, questId }),
+      id,
+    );
+  },
+  async transition(command) {
+    return parseQuestBoardSnapshot(
+      await invoke<unknown>('quest_pool_transition', { command }),
+      command.campaignId,
+    );
   },
 };
 
@@ -160,6 +197,56 @@ export class WindowsQuestBoardService {
     campaignId(id);
     requireText(questId);
     return this.gateway.accept(id, questId);
+  }
+
+  public intervene(
+    id: string,
+    quest: string,
+    expectedRevision: number,
+  ): Promise<QuestBoardSnapshot> {
+    return this.transition(
+      id,
+      quest,
+      expectedRevision,
+      'ACTIVE',
+      'PLAYER_INTERVENTION',
+      '玩家行动已实际介入该任务。',
+    );
+  }
+
+  public abandon(id: string, quest: string, expectedRevision: number): Promise<QuestBoardSnapshot> {
+    return this.transition(
+      id,
+      quest,
+      expectedRevision,
+      'ABANDONED',
+      'PLAYER',
+      '玩家明确放弃该任务。',
+    );
+  }
+
+  private transition(
+    id: string,
+    quest: string,
+    expectedRevision: number,
+    toStatus: QuestStatus,
+    source: QuestTransitionSource,
+    reason: string,
+  ): Promise<QuestBoardSnapshot> {
+    campaignId(id);
+    parseQuestId(quest);
+    if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) {
+      throw new TypeError('Quest revision is invalid');
+    }
+    return this.gateway.transition({
+      campaignId: id,
+      questId: quest,
+      expectedRevision,
+      toStatus,
+      source,
+      reason,
+      operationId: `quest-${source.toLowerCase()}-${crypto.randomUUID()}`,
+    });
   }
 
   private async initializeOnce(id: string): Promise<QuestBoardSnapshot> {
@@ -233,9 +320,12 @@ export const windowsQuestBoardService = new WindowsQuestBoardService(
 );
 
 export class QuestBoardServiceError extends Error {
-  public constructor(public readonly code: string) {
-    super('Quest board operation failed');
+  public readonly code: string;
+
+  public constructor(code: string, cause?: unknown) {
+    super('Quest board operation failed', { cause });
     this.name = 'QuestBoardServiceError';
+    this.code = code;
   }
 }
 
@@ -248,7 +338,10 @@ function defaultIdentity(): RequestIdentity {
   };
 }
 
-function parseSnapshot(value: unknown, expectedCampaignId: string): QuestBoardSnapshot {
+export function parseQuestBoardSnapshot(
+  value: unknown,
+  expectedCampaignId: string,
+): QuestBoardSnapshot {
   const record = requireRecord(value);
   const source = parseSource(record['source']);
   const quests = Object.freeze(requireArray(record['quests']).map(parseQuest));
@@ -267,11 +360,84 @@ function parseSnapshot(value: unknown, expectedCampaignId: string): QuestBoardSn
   if (JSON.stringify(source.recentQuestStructures) !== JSON.stringify(expectedStructures)) {
     throw new TypeError('Quest repetition history is inconsistent');
   }
+  const graph =
+    record['graph'] === undefined ? undefined : parseGraph(record['graph'], storedCampaignId);
   return Object.freeze({
     campaignId: storedCampaignId,
     campaignState: requireText(record['campaignState']),
     source,
     quests,
+    ...(graph === undefined ? {} : { graph }),
+  });
+}
+
+function parseGraph(value: unknown, expectedCampaignId: string): QuestGraphSnapshot {
+  const record = requireRecord(value);
+  const storedCampaignId = campaignId(requireText(record['campaignId']));
+  if (storedCampaignId !== expectedCampaignId) {
+    throw new TypeError('Quest graph belongs to another campaign');
+  }
+  return Object.freeze({
+    campaignId: storedCampaignId,
+    revision: positiveInteger(record['revision']),
+    updatedAt: isoTimestamp(requireText(record['updatedAt'])),
+    edges: Object.freeze(
+      requireArray(record['edges']).map((item) => {
+        const edge = requireRecord(item);
+        const edgeCampaignId = campaignId(requireText(edge['campaignId']));
+        if (edgeCampaignId !== storedCampaignId) {
+          throw new TypeError('Quest graph edge belongs to another campaign');
+        }
+        return Object.freeze({
+          id: requireText(edge['id']),
+          campaignId: edgeCampaignId,
+          kind: enumValue(QUEST_GRAPH_EDGE_KINDS, edge['kind']),
+          sourceKind: enumValue(QUEST_GRAPH_SOURCE_KINDS, edge['sourceKind']),
+          sourceId: requireText(edge['sourceId']),
+          predicate: enumValue(QUEST_GRAPH_PREDICATES, edge['predicate']),
+          expectedValue: requireText(edge['expectedValue']),
+          targetQuestId: parseQuestId(requireText(edge['targetQuestId'])),
+          satisfiedStatus: enumValue(QUEST_STATUSES, edge['satisfiedStatus']),
+          unsatisfiedStatus:
+            edge['unsatisfiedStatus'] === null
+              ? null
+              : enumValue(QUEST_STATUSES, edge['unsatisfiedStatus']),
+          priority: nonNegativeInteger(edge['priority']),
+          createdAt: isoTimestamp(requireText(edge['createdAt'])),
+        });
+      }),
+    ),
+    evaluations: Object.freeze(
+      requireArray(record['evaluations']).map((item) => {
+        const evaluation = requireRecord(item);
+        const evaluationCampaignId = campaignId(requireText(evaluation['campaignId']));
+        if (evaluationCampaignId !== storedCampaignId) {
+          throw new TypeError('Quest graph evaluation belongs to another campaign');
+        }
+        return Object.freeze({
+          operationId: requireText(evaluation['operationId']),
+          campaignId: evaluationCampaignId,
+          graphRevision: positiveInteger(evaluation['graphRevision']),
+          triggerKind: enumValue(QUEST_GRAPH_TRIGGER_KINDS, evaluation['triggerKind']),
+          triggerId: requireText(evaluation['triggerId']),
+          evaluatedEdgeIds: Object.freeze(
+            requireArray(evaluation['evaluatedEdgeIds']).map(requireText),
+          ),
+          changes: Object.freeze(
+            requireArray(evaluation['changes']).map((item) => {
+              const change = requireRecord(item);
+              return Object.freeze({
+                questId: parseQuestId(requireText(change['questId'])),
+                fromStatus: enumValue(QUEST_STATUSES, change['fromStatus']),
+                toStatus: enumValue(QUEST_STATUSES, change['toStatus']),
+                edgeIds: Object.freeze(requireArray(change['edgeIds']).map(requireText)),
+              });
+            }),
+          ),
+          occurredAt: isoTimestamp(requireText(evaluation['occurredAt'])),
+        });
+      }),
+    ),
   });
 }
 
@@ -314,10 +480,7 @@ function parseNpc(value: unknown): QuestNpcBrief {
 function parseQuest(value: unknown): QuestView {
   const record = requireRecord(value);
   const content = requireRecord(record['content']);
-  const status = enumValue(
-    ['AVAILABLE', 'ACCEPTED', 'ACTIVE', 'COMPLETED', 'FAILED', 'ABANDONED'] as const,
-    record['status'],
-  );
+  const status = enumValue(QUEST_STATUSES, record['status']);
   const risk = enumValue(['LOW', 'MODERATE', 'HIGH', 'EXTREME'] as const, record['risk']);
   const rewardTier = enumValue(
     ['BASIC', 'NOTABLE', 'RARE', 'LEGENDARY'] as const,
@@ -339,6 +502,9 @@ function parseQuest(value: unknown): QuestView {
       failureCost: requireText(content['failureCost']),
     }),
     status,
+    revision: positiveInteger(record['revision']),
+    statusSource: enumValue(QUEST_TRANSITION_SOURCES, record['statusSource']),
+    statusReason: requireText(record['statusReason']),
     risk,
     recommendedAttributes: Object.freeze(
       requireArray(record['recommendedAttributes']).map((attribute) =>
@@ -374,6 +540,13 @@ function requireText(value: unknown): string {
 
 function positiveInteger(value: unknown): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new TypeError('Quest number is invalid');
+  }
+  return value;
+}
+
+function nonNegativeInteger(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 0) {
     throw new TypeError('Quest number is invalid');
   }
   return value;

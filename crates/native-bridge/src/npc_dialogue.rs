@@ -58,6 +58,10 @@ pub struct NpcDialogueCommit {
     pub npc_id: String,
     pub player_message: String,
     pub generation: TavernGenerationAudit,
+    #[serde(default)]
+    pub timeline_submission_id: Option<String>,
+    #[serde(default)]
+    pub timeline_attempt_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -139,7 +143,11 @@ impl CampaignStore {
         if command.generation.input != expected_input
             || command.generation.context != json!({ "npcId": command.npc_id })
         {
-            return Err(CampaignStoreError::InvalidData);
+            return Err(if command.timeline_submission_id.is_some() {
+                CampaignStoreError::FactConflict
+            } else {
+                CampaignStoreError::InvalidData
+            });
         }
 
         let prior_conversation_id =
@@ -178,6 +186,8 @@ impl CampaignStore {
         };
         let at = current_timestamp()?;
         let conversation_id = prior_conversation_id.unwrap_or_else(|| Uuid::new_v4().to_string());
+        let player_message_id = Uuid::new_v4().to_string();
+        let npc_message_id = Uuid::new_v4().to_string();
         transaction.execute(
             "INSERT OR IGNORE INTO conversations (
                id, campaign_id, kind, npc_id, adventure_id, created_at, updated_at
@@ -197,7 +207,7 @@ impl CampaignStore {
                content, generation_record_id, created_at
              ) VALUES (?1, ?2, ?3, 'PLAYER', NULL, ?4, NULL, ?5)",
             params![
-                Uuid::new_v4().to_string(),
+                player_message_id,
                 conversation_id,
                 next_sequence,
                 command.player_message,
@@ -210,7 +220,7 @@ impl CampaignStore {
                content, generation_record_id, created_at
              ) VALUES (?1, ?2, ?3, 'NPC', ?4, ?5, ?6, ?7)",
             params![
-                Uuid::new_v4().to_string(),
+                npc_message_id,
                 conversation_id,
                 next_sequence + 1,
                 command.npc_id,
@@ -223,6 +233,21 @@ impl CampaignStore {
             "UPDATE conversations SET updated_at = ?1 WHERE id = ?2",
             params![at, conversation_id],
         )?;
+        match (
+            command.timeline_submission_id.as_deref(),
+            command.timeline_attempt_id.as_deref(),
+        ) {
+            (Some(submission_id), Some(attempt_id)) => crate::commit_npc_timeline(
+                &transaction,
+                submission_id,
+                attempt_id,
+                &npc_message_id,
+                std::slice::from_ref(&command.generation.generation_record_id),
+                &at,
+            )?,
+            (None, None) => {}
+            _ => return Err(CampaignStoreError::InvalidData),
+        }
         transaction.execute(
             "UPDATE npcs SET current_mood = ?1, updated_at = ?2
              WHERE id = ?3 AND campaign_id = ?4 AND current_status = 'ACTIVE'",
@@ -303,6 +328,126 @@ fn load_generation_context(
         return Err(CampaignStoreError::InvalidState);
     }
     let relationship = load_relationship(connection, npc_id)?;
+    let authorized_knowledge = load_actor_knowledge_entries(connection, campaign_id, npc_id)?;
+    let knowledge = if authorized_knowledge.is_empty() {
+        load_legacy_npc_knowledge_entries(connection, campaign_id, npc_id)?
+    } else {
+        authorized_knowledge
+    };
+    let recent_messages = match conversation_id(connection, campaign_id, npc_id)? {
+        Some(id) => load_messages(connection, &id)?
+            .into_iter()
+            .rev()
+            .take(12)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .map(|message| json!({ "role": message.role, "content": message.content }))
+            .collect(),
+        None => Vec::new(),
+    };
+    let memories_value: Value =
+        serde_json::from_str(&npc.memories_json).map_err(|_| CampaignStoreError::InvalidData)?;
+    let memories = memories_value
+        .as_array()
+        .ok_or(CampaignStoreError::InvalidData)?;
+    let mut validated_memories = Vec::with_capacity(memories.len());
+    for memory in memories {
+        let record = memory.as_object().ok_or(CampaignStoreError::InvalidData)?;
+        if record.get("npcId").and_then(Value::as_str) != Some(npc_id) {
+            return Err(CampaignStoreError::InvalidData);
+        }
+        let summary = record
+            .get("summary")
+            .and_then(Value::as_str)
+            .ok_or(CampaignStoreError::InvalidData)?;
+        validate_text(summary, 4_000)?;
+        validated_memories.push(summary.to_owned());
+    }
+    let authorized_memories = load_actor_memories(connection, campaign_id, npc_id)?;
+    let memory_source = if authorized_memories.is_empty() {
+        validated_memories
+    } else {
+        authorized_memories
+    };
+    let long_term_memories = memory_source
+        .into_iter()
+        .rev()
+        .take(8)
+        .collect::<Vec<_>>()
+        .into_iter()
+        .rev()
+        .collect::<Vec<_>>();
+    Ok(json!({
+        "worldSummary": world_summary,
+        "currentRegion": current_region,
+        "npc": {
+            "id": npc.view.id,
+            "name": npc.view.name,
+            "identity": npc.view.identity,
+            "personality": npc.view.personality,
+            "goal": npc.goal,
+            "currentMood": npc.view.current_mood,
+            "appearance": npc.view.appearance,
+            "secret": npc.secret,
+            "speechStyle": npc.speech_style,
+            "currentStatus": npc.current_status,
+        },
+        "relationship": relationship,
+        "knowledge": knowledge,
+        "recentMessages": recent_messages,
+        "longTermMemories": long_term_memories,
+    }))
+}
+
+fn load_actor_memories(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Vec<String>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT memory.summary FROM knowledge_memories memory
+         WHERE memory.campaign_id = ?1 AND memory.actor_type = 'NPC' AND memory.actor_id = ?2
+         AND EXISTS (
+           SELECT 1 FROM memory_artifact_sources source
+           WHERE source.artifact_kind='LONG_TERM' AND source.artifact_id=memory.id
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM memory_artifact_sources source
+           WHERE source.artifact_kind='LONG_TERM' AND source.artifact_id=memory.id AND (
+             (source.source_kind='KNOWLEDGE' AND NOT EXISTS (
+               SELECT 1 FROM actor_knowledge knowledge
+               WHERE knowledge.id=source.source_id AND knowledge.campaign_id=memory.campaign_id
+                 AND knowledge.actor_type=memory.actor_type AND knowledge.actor_id=memory.actor_id
+                 AND knowledge.revision=source.source_revision
+             )) OR
+             (source.source_kind='GAME_EVENT' AND NOT EXISTS (
+               SELECT 1 FROM game_events event
+               WHERE event.id=source.source_id AND event.campaign_id=memory.campaign_id
+                 AND event.schema_version=source.source_revision
+             )) OR source.source_kind NOT IN ('KNOWLEDGE','GAME_EVENT')
+           )
+         )
+         ORDER BY created_at, id LIMIT 129",
+    )?;
+    let memories = statement
+        .query_map(params![campaign_id, npc_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    if memories.len() > 128
+        || memories
+            .iter()
+            .any(|summary| validate_text(summary, 4_000).is_err())
+    {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    Ok(memories)
+}
+
+fn load_legacy_npc_knowledge_entries(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Vec<Value>, CampaignStoreError> {
     let (known, suspected, false_beliefs, excluded, provenance): (
         String,
         String,
@@ -371,64 +516,7 @@ fn load_generation_context(
         "BELIEVED",
         &mut used,
     )?);
-    let recent_messages = match conversation_id(connection, campaign_id, npc_id)? {
-        Some(id) => load_messages(connection, &id)?
-            .into_iter()
-            .rev()
-            .take(12)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .rev()
-            .map(|message| json!({ "role": message.role, "content": message.content }))
-            .collect(),
-        None => Vec::new(),
-    };
-    let memories_value: Value =
-        serde_json::from_str(&npc.memories_json).map_err(|_| CampaignStoreError::InvalidData)?;
-    let memories = memories_value
-        .as_array()
-        .ok_or(CampaignStoreError::InvalidData)?;
-    let mut validated_memories = Vec::with_capacity(memories.len());
-    for memory in memories {
-        let record = memory.as_object().ok_or(CampaignStoreError::InvalidData)?;
-        if record.get("npcId").and_then(Value::as_str) != Some(npc_id) {
-            return Err(CampaignStoreError::InvalidData);
-        }
-        let summary = record
-            .get("summary")
-            .and_then(Value::as_str)
-            .ok_or(CampaignStoreError::InvalidData)?;
-        validate_text(summary, 4_000)?;
-        validated_memories.push(summary.to_owned());
-    }
-    let long_term_memories = validated_memories
-        .into_iter()
-        .rev()
-        .take(8)
-        .collect::<Vec<_>>()
-        .into_iter()
-        .rev()
-        .collect::<Vec<_>>();
-    Ok(json!({
-        "worldSummary": world_summary,
-        "currentRegion": current_region,
-        "npc": {
-            "id": npc.view.id,
-            "name": npc.view.name,
-            "identity": npc.view.identity,
-            "personality": npc.view.personality,
-            "goal": npc.goal,
-            "currentMood": npc.view.current_mood,
-            "appearance": npc.view.appearance,
-            "secret": npc.secret,
-            "speechStyle": npc.speech_style,
-            "currentStatus": npc.current_status,
-        },
-        "relationship": relationship,
-        "knowledge": knowledge,
-        "recentMessages": recent_messages,
-        "longTermMemories": long_term_memories,
-    }))
+    Ok(knowledge)
 }
 
 #[derive(Deserialize)]
@@ -745,6 +833,68 @@ fn knowledge_entries(
     Ok(entries)
 }
 
+fn load_actor_knowledge_entries(
+    connection: &Connection,
+    campaign_id: &str,
+    npc_id: &str,
+) -> Result<Vec<Value>, CampaignStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT knowledge.target_kind, knowledge.knowledge_state,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.subject ELSE claims.subject END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.predicate ELSE claims.predicate END,
+                CASE WHEN knowledge.target_kind = 'TRUTH' THEN truths.object_json ELSE claims.object_json END
+         FROM actor_knowledge AS knowledge
+         LEFT JOIN world_truths AS truths
+           ON knowledge.target_kind = 'TRUTH' AND truths.id = knowledge.truth_id
+              AND truths.campaign_id = knowledge.campaign_id
+         LEFT JOIN knowledge_claims AS claims
+           ON knowledge.target_kind = 'CLAIM' AND claims.id = knowledge.claim_id
+              AND claims.campaign_id = knowledge.campaign_id
+         WHERE knowledge.campaign_id = ?1 AND knowledge.actor_type = 'NPC'
+           AND knowledge.actor_id = ?2
+         ORDER BY knowledge.id LIMIT 101",
+    )?;
+    let rows = statement
+        .query_map(params![campaign_id, npc_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Option<String>>(2)?,
+                row.get::<_, Option<String>>(3)?,
+                row.get::<_, Option<String>>(4)?,
+            ))
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    if rows.len() > 100 {
+        return Err(CampaignStoreError::InvalidData);
+    }
+    rows.into_iter()
+        .map(|(target_kind, state, subject, predicate, object_json)| {
+            if !matches!(target_kind.as_str(), "TRUTH" | "CLAIM")
+                || !matches!(state.as_str(), "KNOWN" | "SUSPECTED" | "BELIEVED")
+            {
+                return Err(CampaignStoreError::InvalidData);
+            }
+            let subject = subject.ok_or(CampaignStoreError::InvalidData)?;
+            let predicate = predicate.ok_or(CampaignStoreError::InvalidData)?;
+            validate_text(&subject, 256)?;
+            validate_text(&predicate, 128)?;
+            let object_json = object_json.ok_or(CampaignStoreError::InvalidData)?;
+            let object: Value =
+                serde_json::from_str(&object_json).map_err(|_| CampaignStoreError::InvalidData)?;
+            let object =
+                serde_json::to_string(&object).map_err(|_| CampaignStoreError::InvalidData)?;
+            let statement = format!("{subject} {predicate} {object}");
+            validate_text(&statement, 4_000)?;
+            Ok(json!({
+                "targetKind": target_kind,
+                "state": state,
+                "statement": statement,
+            }))
+        })
+        .collect()
+}
+
 fn id_list(value: &str) -> Result<Vec<String>, CampaignStoreError> {
     serde_json::from_str(value).map_err(|_| CampaignStoreError::InvalidData)
 }
@@ -906,6 +1056,7 @@ fn replayed(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::NpcTimelineBegin;
 
     #[test]
     fn consecutive_dialogue_survives_reopen_with_order_and_relationship() {
@@ -943,6 +1094,90 @@ mod tests {
         );
         assert_eq!(second.relationship.trust, 2);
         assert_eq!(second.npc.current_mood, "Wary");
+    }
+
+    #[test]
+    fn timeline_commit_is_atomic_append_only_and_not_regenerable() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_dialogue(&store);
+        seed_timeline_profile(&store);
+        let snapshot = store
+            .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
+            .expect("snapshot");
+        let mut dialogue = command(&snapshot, 1, "Show me the cellar.");
+        let timeline = NpcTimelineBegin {
+            id: "timeline-dialogue-id".to_owned(),
+            operation_id: "timeline-dialogue-operation".to_owned(),
+            campaign_id: "campaign-dialogue".to_owned(),
+            scope_kind: "NPC_DIALOGUE".to_owned(),
+            scope_id: "npc-owner".to_owned(),
+            player_intent: dialogue.player_message.clone(),
+            addressed_npc_id: Some("npc-owner".to_owned()),
+            hard_result_key: None,
+            attempt_id: "timeline-dialogue-attempt-1".to_owned(),
+            request_ids: vec![dialogue.generation.request_id.clone()],
+            generation_record_ids: vec![dialogue.generation.generation_record_id.clone()],
+            idempotency_keys: vec![dialogue.generation.idempotency_key.clone()],
+        };
+        store
+            .begin_npc_timeline_attempt(timeline)
+            .expect("lock intent before generation commit");
+        dialogue.timeline_submission_id = Some("timeline-dialogue-id".to_owned());
+        dialogue.timeline_attempt_id = Some("timeline-dialogue-attempt-1".to_owned());
+        let saved = store
+            .commit_npc_dialogue(dialogue)
+            .expect("atomic timeline commit");
+        assert_eq!(saved.messages.len(), 2);
+        let committed = store
+            .latest_npc_timeline("campaign-dialogue", "NPC_DIALOGUE", "npc-owner")
+            .expect("load timeline")
+            .expect("timeline exists");
+        assert_eq!(committed.status, "COMMITTED");
+        assert_eq!(committed.attempts[0].status, "COMMITTED");
+        assert_eq!(
+            committed.committed_ref_id.as_deref(),
+            Some(saved.messages[1].id.as_str())
+        );
+
+        let connection = store.connect().expect("connect");
+        assert!(
+            connection
+                .execute(
+                    "UPDATE messages SET content='rewritten' WHERE id=?1",
+                    [&saved.messages[1].id]
+                )
+                .is_err()
+        );
+        assert!(
+            connection
+                .execute("DELETE FROM messages WHERE id=?1", [&saved.messages[0].id])
+                .is_err()
+        );
+        drop(connection);
+
+        let replay = store
+            .begin_npc_timeline_attempt(NpcTimelineBegin {
+                id: committed.id.clone(),
+                operation_id: committed.operation_id.clone(),
+                campaign_id: committed.campaign_id.clone(),
+                scope_kind: committed.scope_kind.clone(),
+                scope_id: committed.scope_id.clone(),
+                player_intent: committed.player_intent.clone(),
+                addressed_npc_id: committed.addressed_npc_id.clone(),
+                hard_result_key: committed.hard_result_key.clone(),
+                attempt_id: "timeline-dialogue-attempt-2".to_owned(),
+                request_ids: vec!["dialogue-request-replay".to_owned()],
+                generation_record_ids: vec!["dialogue-generation-replay".to_owned()],
+                idempotency_keys: vec!["dialogue-key-1".to_owned()],
+            })
+            .expect("committed replay returns the sealed operation");
+        assert_eq!(replay.status, "COMMITTED");
+        assert_eq!(replay.attempts.len(), 1);
+        store
+            .delete_campaign("campaign-dialogue")
+            .expect("campaign cascade can remove sealed timeline data");
     }
 
     #[test]
@@ -1006,6 +1241,91 @@ mod tests {
             .expect("unchanged snapshot");
         assert_eq!(after.messages.len(), 2);
         assert_eq!(after.relationship.trust, 1);
+    }
+
+    #[test]
+    fn generic_actor_projection_replaces_legacy_fact_lists_without_secret_leakage() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let store =
+            CampaignStore::open(directory.path().join("ember-tavern.sqlite")).expect("open");
+        seed_dialogue(&store);
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                "INSERT INTO world_truths (
+                   id, campaign_id, subject, predicate, object_json, authority, visibility,
+                   source_event_id, revision, created_at, updated_at
+                 ) VALUES (
+                   'truth-authorized', 'campaign-dialogue', 'sealed_route', 'opens_at',
+                   '\"moonrise\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 ), (
+                   'truth-ungranted', 'campaign-dialogue', 'royal_archive', 'contains',
+                   '\"the hidden succession\"', 'LOCAL_RULE', 'SECRET', NULL, 1,
+                   '2026-08-14T12:00:00.000Z', '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO actor_knowledge (
+                   id, campaign_id, actor_type, actor_id, target_kind, truth_id, claim_id,
+                   knowledge_state, visibility, provenance_kind, provenance_source_id,
+                   provenance_event_id, learned_at, confidence, revision, updated_at
+                 ) VALUES (
+                   'knowledge-authorized', 'campaign-dialogue', 'NPC', 'npc-owner',
+                   'TRUTH', 'truth-authorized', NULL, 'KNOWN', 'ACTOR_PRIVATE',
+                   'LOCAL_RULE', 'test-rule', NULL, '2026-08-14T12:00:00.000Z', 1.0, 1,
+                   '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO knowledge_memories (
+                   id,campaign_id,actor_type,actor_id,summary,source_knowledge_ids_json,
+                   source_event_ids_json,revision,created_at
+                 ) VALUES (
+                   'memory-authorized','campaign-dialogue','NPC','npc-owner',
+                   'The sealed route opens at moonrise.','[\"knowledge-authorized\"]','[]',1,
+                   '2026-08-14T12:00:00.000Z'
+                 );
+                 INSERT INTO memory_artifact_sources (
+                   campaign_id,artifact_kind,artifact_id,ordinal,source_kind,source_id,
+                   source_revision,source_hash,source_occurred_at
+                 ) VALUES (
+                   'campaign-dialogue','LONG_TERM','memory-authorized',0,'KNOWLEDGE',
+                   'knowledge-authorized',1,
+                   'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+                   '2026-08-14T12:00:00.000Z'
+                 );",
+            )
+            .expect("seed actor projection");
+        drop(connection);
+
+        let snapshot = store
+            .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
+            .expect("project actor knowledge");
+        assert_eq!(
+            snapshot.generation_context["knowledge"],
+            json!([{
+                "targetKind": "TRUTH",
+                "state": "KNOWN",
+                "statement": "sealed_route opens_at \"moonrise\""
+            }])
+        );
+        assert_eq!(
+            snapshot.generation_context["longTermMemories"],
+            json!(["The sealed route opens at moonrise."])
+        );
+        let serialized = snapshot.generation_context.to_string();
+        assert!(!serialized.contains("hidden succession"));
+        assert!(!serialized.contains("cellar door is warm"));
+
+        let connection = store.connect().expect("connect for source update");
+        connection
+            .execute(
+                "UPDATE actor_knowledge SET revision=2,updated_at=?1 WHERE id='knowledge-authorized'",
+                ["2026-08-14T12:10:00.000Z"],
+            )
+            .expect("advance source revision");
+        drop(connection);
+        let stale = store
+            .npc_dialogue_snapshot("campaign-dialogue", "npc-owner")
+            .expect("exclude stale memory");
+        assert_eq!(stale.generation_context["longTermMemories"], json!([]));
     }
 
     #[test]
@@ -1121,6 +1441,32 @@ mod tests {
             .expect("seed dialogue");
     }
 
+    fn seed_timeline_profile(store: &CampaignStore) {
+        let connection = store.connect().expect("connect");
+        connection
+            .execute_batch(
+                r#"INSERT INTO world_constitutions(
+                   campaign_id,schema_version,revision,status,world_type,era,technology,magic,
+                   peoples_json,society,politics,economy,combat_scale,death_rules,career_rules,
+                   equipment_rules,npc_rules,trait_rules,taboos_json,created_at,updated_at,locked_at
+                 ) VALUES(
+                   'campaign-dialogue',1,1,'LOCKED','Fantasy','Late medieval','Steel','Rare',
+                   '[]','Guilds','Council','Coin','Personal','Final','Open','Grounded','Persistent',
+                   'Balanced','[]','2026-07-31T05:00:00.000Z','2026-07-31T05:00:00.000Z',
+                   '2026-07-31T05:00:00.000Z'
+                 );
+                 INSERT INTO npc_lod_profiles(
+                   id,campaign_id,schema_version,constitution_revision,lod,revision,profile_json,
+                   generation_record_id,created_at,updated_at
+                 ) VALUES(
+                   'npc-owner','campaign-dialogue',1,1,3,1,
+                   '{"kind":"NPC_LOD_PROFILE","schemaVersion":1,"id":"npc-owner","campaignId":"campaign-dialogue","constitutionRevision":1,"lod":3,"revision":1,"generationRecordId":null,"createdAt":"2026-07-31T05:00:00.000Z","updatedAt":"2026-07-31T05:00:00.000Z"}',
+                   NULL,'2026-07-31T05:00:00.000Z','2026-07-31T05:00:00.000Z'
+                 );"#,
+            )
+            .expect("seed timeline profile");
+    }
+
     fn command(
         snapshot: &NpcDialogueSnapshot,
         index: usize,
@@ -1158,6 +1504,8 @@ mod tests {
                 raw_response_text: output.to_string(),
                 validated_output: output,
             },
+            timeline_submission_id: None,
+            timeline_attempt_id: None,
         }
     }
 }

@@ -1,6 +1,6 @@
 {
   "name": "@ember-tavern/windows-app",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,6 +12,7 @@
   "dependencies": {
     "@ember-tavern/ai-core": "workspace:*",
     "@ember-tavern/contracts": "workspace:*",
+    "@ember-tavern/domain": "workspace:*",
     "@ember-tavern/prompts": "workspace:*",
     "@tauri-apps/api": "^2.10.1",
     "@tauri-apps/plugin-dialog": "2.7.2",
@@ -25,8 +26,8 @@
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitejs/plugin-react": "^5.1.1",
+    "@vitejs/plugin-react": "^5.2.0",
     "jsdom": "^30.0.1",
-    "vite": "^7.2.4"
+    "vite": "^7.3.6"
   }
 }

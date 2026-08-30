@@ -17,6 +17,7 @@ import {
   type CharacterAIPhase,
 } from './character-ai-state-machine.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignRoute } from './navigation.js';
 
 type CharacterCreationActions = Pick<
   WindowsCharacterCreationService,
@@ -313,7 +314,7 @@ export function CharacterCreationPage({
             <button
               className="primary-action character-next"
               type="button"
-              onClick={() => navigate(`/tavern?campaignId=${encodeURIComponent(campaignId)}`)}
+              onClick={() => navigate(campaignRoute(APP_PATHS.tavern, campaignId))}
             >
               进入酒馆生成流程
             </button>
@@ -487,6 +488,7 @@ export function CharacterCreationPage({
           <label>
             <span>姓名</span>
             <input
+              data-ai-field="character-name"
               required
               value={draft.name}
               onChange={(event) => updateDraft({ ...draft, name: event.target.value })}
@@ -495,6 +497,7 @@ export function CharacterCreationPage({
           <label>
             <span>性别（可选）</span>
             <input
+              data-ai-field="character-gender"
               value={draft.gender ?? ''}
               onChange={(event) =>
                 updateDraft({ ...draft, gender: emptyToNull(event.target.value) })
@@ -518,6 +521,7 @@ export function CharacterCreationPage({
           <label className="character-form__wide">
             <span>角色概念</span>
             <textarea
+              data-ai-field="character-concept"
               required
               rows={3}
               value={draft.concept}
@@ -547,6 +551,7 @@ export function CharacterCreationPage({
           <label>
             <span>职业显示名</span>
             <input
+              data-ai-field="character-class-name"
               required
               value={draft.classDisplayName}
               onChange={(event) => updateDraft({ ...draft, classDisplayName: event.target.value })}
@@ -555,6 +560,7 @@ export function CharacterCreationPage({
           <label className="character-form__wide">
             <span>个人目标</span>
             <textarea
+              data-ai-field="character-personal-goal"
               required
               rows={2}
               value={draft.personalGoal}
@@ -564,6 +570,7 @@ export function CharacterCreationPage({
           <label className="character-form__wide">
             <span>故事偏好（每行一项）</span>
             <textarea
+              data-ai-field="character-story-preferences"
               rows={2}
               value={draft.storyPreferences.join('\n')}
               onChange={(event) =>
@@ -651,6 +658,7 @@ export function CharacterCreationPage({
           <label className="character-boundaries__wide">
             <span>排除内容（每行一项）</span>
             <textarea
+              data-ai-field="character-excluded-content"
               rows={2}
               value={draft.contentBoundaries.excludedContent.join('\n')}
               onChange={(event) =>
@@ -685,7 +693,7 @@ export function CharacterCreationPage({
 function CharacterTopline({ step }: { readonly step: string }) {
   return (
     <header className="character-studio__topline">
-      <Link to="/saves">← 存档首页</Link>
+      <Link to={APP_PATHS.saves}>← 存档首页</Link>
       <p>{step} · 本地离线</p>
     </header>
   );
@@ -723,7 +731,7 @@ function CharacterMessage({ title }: { readonly title: string }) {
     <main className="character-studio character-studio--message" role="alert">
       <p className="eyebrow">{playerText.coreUi.characterStageUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>

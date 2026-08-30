@@ -24,7 +24,13 @@ describe('tauri save transfer gateway', () => {
     mocks.open.mockResolvedValue('D:\\Saves\\journey.emtavern');
     mocks.save.mockResolvedValue('D:\\Exports\\journey.emtavern');
     mocks.invoke
-      .mockResolvedValueOnce({ campaignId: 'campaign-transfer', campaignExists: false })
+      .mockResolvedValueOnce({
+        campaignId: 'campaign-transfer',
+        campaignExists: false,
+        saveSchemaVersion: 3,
+        worldSchemaVersion: 1,
+        migrationRequired: false,
+      })
       .mockResolvedValueOnce({
         id: 'campaign-transfer',
         state: 'TAVERN',
@@ -42,6 +48,9 @@ describe('tauri save transfer gateway', () => {
     await expect(tauriSaveTransferGateway.inspect('D:\\Saves\\journey.emtavern')).resolves.toEqual({
       campaignId: 'campaign-transfer',
       campaignExists: false,
+      saveSchemaVersion: 3,
+      worldSchemaVersion: 1,
+      migrationRequired: false,
     });
     await expect(
       tauriSaveTransferGateway.importArchive('D:\\Saves\\journey.emtavern', 'CREATE'),

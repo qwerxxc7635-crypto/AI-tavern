@@ -6,8 +6,8 @@ import type {
   Clue,
   GameEvent,
   Message,
+  NpcId,
   NpcKnowledge,
-  NpcMemory,
   NpcProfile,
   NpcRelationship,
   PlayerCharacter,
@@ -15,6 +15,7 @@ import type {
   SceneFrame,
   WorldBible,
   WorldFact,
+  WorldInfoRetrievalSelection,
 } from '@ember-tavern/contracts';
 import type { WorldClock } from '@ember-tavern/domain';
 import type { z } from 'zod';
@@ -71,14 +72,32 @@ const ADVENTURE_CONTEXT_BUDGET = Object.freeze({
   historicalSummaryMaxCharacters: 4_000,
 }) satisfies ContextBudget;
 
+const CHARACTER_EDIT_CONTEXT_BUDGET = Object.freeze({
+  maxCharacters: 48_000,
+  recentMessageLimit: 0,
+  longTermMemoryLimit: 0,
+  recentTurnLimit: 0,
+  recentEventLimit: 0,
+  historicalSummaryMaxCharacters: 0,
+}) satisfies ContextBudget;
+
 export const TASK_CONTEXT_BUDGETS: Readonly<Record<AITask, ContextBudget>> = Object.freeze({
   GENERATE_WORLD: COMPACT_CONTEXT_BUDGET,
   REFINE_WORLD: COMPACT_CONTEXT_BUDGET,
   GENERATE_CHARACTER_TRAITS: COMPACT_CONTEXT_BUDGET,
   COMPLETE_CHARACTER_BACKGROUND: COMPACT_CONTEXT_BUDGET,
+  GENERATE_QUICK_CHARACTER: COMPACT_CONTEXT_BUDGET,
+  EDIT_CHARACTER_DRAFT: CHARACTER_EDIT_CONTEXT_BUDGET,
+  GENERATE_CAREER_POOL: COMPACT_CONTEXT_BUDGET,
+  GENERATE_ITEMS: COMPACT_CONTEXT_BUDGET,
+  GENERATE_NPC_LOD: COMPACT_CONTEXT_BUDGET,
+  GENERATE_LOCATIONS: COMPACT_CONTEXT_BUDGET,
+  GENERATE_FACTIONS: COMPACT_CONTEXT_BUDGET,
   GENERATE_TAVERN: COMPACT_CONTEXT_BUDGET,
   GENERATE_NPCS: COMPACT_CONTEXT_BUDGET,
   NPC_REPLY: DIALOGUE_CONTEXT_BUDGET,
+  GENERATE_DIALOGUE_SUGGESTIONS: DIALOGUE_CONTEXT_BUDGET,
+  PROPOSE_TAVERN_SCENE_ACTION: DIALOGUE_CONTEXT_BUDGET,
   GENERATE_QUEST: COMPACT_CONTEXT_BUDGET,
   GENERATE_ADVENTURE_PLAN: ADVENTURE_CONTEXT_BUDGET,
   GENERATE_ADVENTURE_TURN: ADVENTURE_CONTEXT_BUDGET,
@@ -124,8 +143,14 @@ export interface NpcDialogueContextSource {
   readonly relationship: NpcRelationship;
   readonly facts: readonly WorldFact[];
   readonly messages: readonly Message[];
-  readonly memories: readonly NpcMemory[];
+  readonly memories: readonly { readonly npcId: NpcId; readonly summary: string }[];
   readonly playerMessage: string;
+  readonly relevantLore?: readonly WorldInfoRetrievalSelection[];
+  readonly authorizedKnowledge?: readonly {
+    readonly targetKind: 'TRUTH' | 'CLAIM';
+    readonly state: 'KNOWN' | 'SUSPECTED' | 'BELIEVED';
+    readonly statement: string;
+  }[];
 }
 
 export interface AdventureContextSource {
@@ -206,11 +231,14 @@ export function buildNpcDialogueContext(
         } as const,
       ];
     });
-  const actorKnowledge = [
-    ...knowledgeEntries(source.knowledge.knownFactIds, 'KNOWN'),
-    ...knowledgeEntries(source.knowledge.suspectedFactIds, 'SUSPECTED'),
-    ...knowledgeEntries(source.knowledge.falseBeliefFactIds, 'BELIEVED'),
-  ];
+  const actorKnowledge =
+    source.authorizedKnowledge === undefined
+      ? [
+          ...knowledgeEntries(source.knowledge.knownFactIds, 'KNOWN'),
+          ...knowledgeEntries(source.knowledge.suspectedFactIds, 'SUSPECTED'),
+          ...knowledgeEntries(source.knowledge.falseBeliefFactIds, 'BELIEVED'),
+        ]
+      : source.authorizedKnowledge.map((entry) => ({ ...entry }));
   let recentMessages = takeNewest(
     source.messages
       .filter(
@@ -229,10 +257,20 @@ export function buildNpcDialogueContext(
     Math.min(budget.longTermMemoryLimit, 29),
     budget.historicalSummaryMaxCharacters,
   );
+  let relevantLore = (source.relevantLore ?? []).slice(0, 12).map((entry) => ({
+    loreEntryId: entry.loreEntryId,
+    title: entry.title,
+    text: entry.text,
+    revision: entry.revision,
+    score: entry.score,
+    priority: entry.priority,
+    matches: entry.matches.map((match) => ({ ...match })),
+  }));
 
   const build = () => ({
     worldSummary: source.world.summary,
     currentRegion: source.world.currentRegion,
+    relevantLore,
     npc: {
       id: source.npc.id,
       name: source.npc.name,
@@ -263,7 +301,9 @@ export function buildNpcDialogueContext(
     const oldestMemorySize =
       longTermMemories.length === 0 ? -1 : serializedLength(longTermMemories[0]);
     if (oldestMessageSize < 0 && oldestMemorySize < 0) {
-      throw new ContextBuildError('NPC context core fields exceed the character budget');
+      if (relevantLore.length > 0) relevantLore = relevantLore.slice(0, -1);
+      else throw new ContextBuildError('NPC context core fields exceed the character budget');
+      continue;
     }
     if (oldestMessageSize >= oldestMemorySize) recentMessages = recentMessages.slice(1);
     else longTermMemories = longTermMemories.slice(1);

@@ -54,6 +54,8 @@ describe('central prompt catalog', () => {
     expect(PROMPT_HISTORY.slice(0, AI_TASKS.length).map(({ task }) => task)).toEqual(AI_TASKS);
     for (const task of AI_TASKS) {
       const expectedVersion = [
+        'GENERATE_WORLD',
+        'REFINE_WORLD',
         'GENERATE_CHARACTER_TRAITS',
         'COMPLETE_CHARACTER_BACKGROUND',
         'GENERATE_QUEST',
@@ -70,11 +72,13 @@ describe('central prompt catalog', () => {
             ? 4
             : task === 'RESOLVE_DICE_RESULT'
               ? 3
-              : task === 'GENERATE_NPCS'
-                ? 4
-                : task === 'NPC_REPLY'
-                  ? 3
-                  : expectedVersion,
+              : task === 'GENERATE_QUEST'
+                ? 3
+                : task === 'GENERATE_NPCS'
+                  ? 4
+                  : task === 'NPC_REPLY'
+                    ? 5
+                    : expectedVersion,
       });
       expect(TASK_PROMPTS[task].instruction.length).toBeGreaterThan(20);
     }
@@ -85,16 +89,30 @@ describe('central prompt catalog', () => {
       expect.objectContaining({ task: 'GENERATE_NPCS', version: 4 }),
     );
     expect(PROMPT_HISTORY).toContainEqual(
-      expect.objectContaining({ task: 'GENERATE_QUEST', version: 2 }),
+      expect.objectContaining({ task: 'GENERATE_QUEST', version: 3 }),
+    );
+    expect(PROMPT_HISTORY).toContainEqual(
+      expect.objectContaining({ task: 'NPC_REPLY', version: 5 }),
     );
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toMatch(/3-5 distinct suggestions/);
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('knownFacts');
     expect(TASK_PROMPTS.GENERATE_ADVENTURE_TURN.instruction).toContain('npcKnowledge');
+    expect(TASK_PROMPTS.NPC_REPLY.instruction).toMatch(/3-5 distinct suggested topics/);
+    expect(TASK_PROMPTS.NPC_REPLY.instruction).toContain('relevantLore');
     expect(TASK_PROMPTS.RESOLVE_DICE_RESULT.instruction).toMatch(
       /raw, modifier, total, DC, and result/,
     );
     expect(TASK_PROMPTS.GENERATE_NPCS.instruction).toContain('existingNpcArchetypes');
     expect(TASK_PROMPTS.GENERATE_QUEST.instruction).toContain('recentQuestStructures');
+    expect(TASK_PROMPTS.GENERATE_WORLD.instruction).toContain(
+      'technologyLevel must exactly equal constitution.technology',
+    );
+    expect(TASK_PROMPTS.GENERATE_WORLD.instruction).toContain(
+      'powerRules must include constitution.magic verbatim',
+    );
+    expect(TASK_PROMPTS.GENERATE_WORLD.instruction).toContain(
+      'constitution.taboos entry must also appear verbatim in forbiddenElements',
+    );
   });
 
   it('centralizes authority, privacy, validation, and JSON rules', () => {
@@ -109,15 +127,18 @@ describe('provider-neutral prompt formatting', () => {
   it('validates input and emits system/user messages with JSON Schema when supported', () => {
     const formatted = formatTaskPrompt('GENERATE_WORLD', worldInput, capabilities);
 
-    expect(formatted.promptVersion).toBe(1);
+    expect(formatted.promptVersion).toBe(2);
     expect(formatted.messages.map(({ role }) => role)).toEqual(['SYSTEM', 'USER']);
     expect(formatted.messages[0]?.content).toContain('WORLD_DESIGNER');
     expect(formatted.messages[0]?.content).toContain('[SYSTEM_CONTRACT]');
     expect(formatted.messages[0]?.content).toContain('[STABLE_WORLD_TRUTHS]');
+    expect(formatted.messages[0]?.content).toMatch(/exactly one JSON value/i);
+    expect(formatted.messages[0]?.content).toContain('[OUTPUT_SCHEMA]');
+    expect(formatted.messages[0]?.content).toContain('generate_world_v2');
     expect(formatted.messages[1]?.content).toContain(canonicalJson(worldInput));
     expect(formatted.responseFormat).toMatchObject({
       kind: 'JSON_SCHEMA',
-      name: 'generate_world_v1',
+      name: 'generate_world_v2',
       schema: { type: 'object' },
     });
   });
@@ -171,13 +192,13 @@ describe('provider-neutral prompt formatting', () => {
 });
 
 describe('stable prompt profile', () => {
-  it('fixes the five required prefix sections and versions the profile', () => {
+  it('fixes the six required prefix sections and versions the profile', () => {
     const formatted = formatTaskPrompt('GENERATE_WORLD', worldInput, capabilities);
     expect(formatted.stableProfile).toMatchObject({
       id: STABLE_PROMPT_PROFILE_ID,
       version: STABLE_PROMPT_PROFILE_VERSION,
       task: 'GENERATE_WORLD',
-      promptVersion: 1,
+      promptVersion: 2,
     });
     expect(formatted.stableProfile.sections.map(({ kind }) => kind)).toEqual(
       STABLE_PROMPT_SECTION_KINDS,
@@ -186,7 +207,7 @@ describe('stable prompt profile', () => {
     expect(formatted.stableProfile.sections[3]?.content).toMatchObject({
       task: 'GENERATE_WORLD',
       logicalRole: 'WORLD_DESIGNER',
-      stableProfileVersion: 2,
+      stableProfileVersion: STABLE_PROMPT_PROFILE_VERSION,
     });
   });
 

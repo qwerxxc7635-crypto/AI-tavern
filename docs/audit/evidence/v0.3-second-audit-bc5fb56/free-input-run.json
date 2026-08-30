@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "env",
+    "EMBER_FREE_INPUT_STRESS_RUN_DIRECTORY=/Users/mac/Desktop/item/4D/docs/audit/evidence/v0.3-second-audit-bc5fb56/playability/free-input",
+    "EMBER_FREE_INPUT_STRESS_SOURCE_COMMIT=bc5fb56f5f5058b48511d5d5b8d8888dc68ed0fd",
+    "pnpm",
+    "playtest:free-input"
+  ],
+  "startedAt": "2026-08-28T02:55:40.963Z",
+  "endedAt": "2026-08-28T02:55:45.506Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\n RUN  v4.1.11 /Users/mac/Desktop/item/4D\n\n\n Test Files  1 passed (1)\n      Tests  2 passed (2)\n   Start at  10:55:42\n   Duration  3.41s (transform 581ms, setup 0ms, import 704ms, tests 2.60s, environment 0ms)\n\n",
+  "stderr": "$ vitest run packages/test-fixtures/src/free-input-stress-runner.test.ts\n"
+}

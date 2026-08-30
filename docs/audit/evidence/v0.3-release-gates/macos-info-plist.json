@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "command": [
+    "plutil",
+    "-p",
+    "target/release/bundle/macos/Ember Tavern.app/Contents/Info.plist"
+  ],
+  "startedAt": "2026-08-28T02:10:16.112Z",
+  "endedAt": "2026-08-28T02:10:16.127Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "{\n  \"CFBundleDevelopmentRegion\" => \"English\"\n  \"CFBundleDisplayName\" => \"Ember Tavern\"\n  \"CFBundleExecutable\" => \"ember-tavern-windows\"\n  \"CFBundleIconFile\" => \"icon.icns\"\n  \"CFBundleIdentifier\" => \"com.embertavern.windows\"\n  \"CFBundleInfoDictionaryVersion\" => \"6.0\"\n  \"CFBundleName\" => \"Ember Tavern\"\n  \"CFBundlePackageType\" => \"APPL\"\n  \"CFBundleShortVersionString\" => \"0.3.0\"\n  \"CFBundleVersion\" => \"0.3.0\"\n  \"CSResourcesFileMapped\" => 1\n  \"LSApplicationCategoryType\" => \"public.app-category.role-playing-games\"\n  \"LSMinimumSystemVersion\" => \"10.13\"\n  \"LSRequiresCarbon\" => 1\n  \"NSHighResolutionCapable\" => 1\n}\n",
+  "stderr": ""
+}

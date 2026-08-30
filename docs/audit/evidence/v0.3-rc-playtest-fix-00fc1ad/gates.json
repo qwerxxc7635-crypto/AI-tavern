@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "sourceCommit": "1c5f164951ca4671393784beb16dcabfb43ba427",
+  "branch": "fix/v0.3-rc-playtest-issues",
+  "gates": [
+    { "command": "pnpm install --frozen-lockfile", "status": "PASS" },
+    {
+      "command": "pnpm check",
+      "status": "PASS",
+      "vitest": { "filesPassed": 189, "filesSkipped": 2, "testsPassed": 1085, "testsSkipped": 6 },
+      "nodeTestsPassed": 30,
+      "rustTestsPassed": 150,
+      "rustTestsIgnored": 1
+    },
+    { "command": "pnpm test:windows-e2e", "status": "PASS", "testsPassed": 1 },
+    { "command": "pnpm build:desktop", "status": "PASS", "viteModules": 281 },
+    {
+      "command": "pnpm --dir windows-app tauri build --bundles app",
+      "status": "PASS",
+      "artifact": "target/release/bundle/macos/Ember Tavern.app",
+      "bundleVersion": "0.3.0",
+      "bundleIdentifier": "com.embertavern.windows",
+      "systemWebKitLinked": true,
+      "signature": "AD_HOC_NOT_PUBLIC_RELEASE"
+    },
+    { "command": "pnpm audit --registry=https://registry.npmjs.org --json", "status": "PASS", "advisories": 0 },
+    { "command": ".local/tools/cargo-audit/bin/cargo-audit audit --json", "status": "PASS", "vulnerabilities": 0 }
+  ]
+}

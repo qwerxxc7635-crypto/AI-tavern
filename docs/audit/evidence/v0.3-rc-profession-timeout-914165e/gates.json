@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "pnpmCheck": {
+    "status": "PASS",
+    "vitestFilesPassed": 189,
+    "vitestFilesSkipped": 2,
+    "vitestTestsPassed": 1091,
+    "vitestTestsSkipped": 6,
+    "nodeTestsPassed": 30,
+    "rust": {
+      "nativeBridge": 101,
+      "platformServices": 5,
+      "provider": 19,
+      "secureHttp": 12,
+      "secureSecrets": 3,
+      "tauri": 13,
+      "ignoredAuthorizedEnvironmentTest": 1
+    },
+    "archiveInterop": "PASS"
+  },
+  "windowsE2E": "PASS 1/1",
+  "desktopBuild": "PASS 281 modules",
+  "macosAppBuild": {
+    "status": "PASS",
+    "path": "target/release/bundle/macos/Ember Tavern.app"
+  },
+  "gitDiffCheck": "PASS",
+  "userGitignoreExcluded": true
+}

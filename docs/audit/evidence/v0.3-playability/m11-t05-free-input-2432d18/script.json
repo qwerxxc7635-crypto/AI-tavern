@@ -1,0 +1,66 @@
+[
+  {
+    "sequence": 1,
+    "id": "fantasy-refuse-quest",
+    "world": "fantasy",
+    "category": "REFUSE_QUEST",
+    "input": "我拒绝继续钟塔誓约，请把这项委托从我的承诺中撤下。",
+    "expectedOutcome": "SUCCEEDED"
+  },
+  {
+    "sequence": 2,
+    "id": "investigation-deceive-publisher",
+    "world": "investigation",
+    "category": "DECEIVE_PUBLISHER",
+    "input": "我谎称亲眼看见罗兹在凌晨两点搬走发报机，要求你立即公开指控。",
+    "expectedOutcome": "FAILED"
+  },
+  {
+    "sequence": 3,
+    "id": "fantasy-buy-tavern",
+    "world": "fantasy",
+    "category": "BUY_TAVERN",
+    "input": "我出十二枚银币买下断梁酒馆，现在就把产权交给我。",
+    "expectedOutcome": "REJECTED"
+  },
+  {
+    "sequence": 4,
+    "id": "fantasy-steal",
+    "world": "fantasy",
+    "category": "STEAL",
+    "input": "趁玛菈转身时，我伸手偷走柜台下的钱匣。",
+    "expectedOutcome": "FAILED"
+  },
+  {
+    "sequence": 5,
+    "id": "investigation-leave-town",
+    "world": "investigation",
+    "category": "LEAVE_TOWN",
+    "input": "我暂时离开雾港，沿公路前往海雾观测站，不等待推荐路线。",
+    "expectedOutcome": "SUCCEEDED"
+  },
+  {
+    "sequence": 6,
+    "id": "investigation-long-talk",
+    "world": "investigation",
+    "category": "LONG_TERM_PASSERBY",
+    "input": "我连续三天与早班邮差交谈，只核对他亲历的邮路与目击顺序。",
+    "expectedOutcome": "SUCCEEDED"
+  },
+  {
+    "sequence": 7,
+    "id": "cyberpunk-sell-quest-item",
+    "world": "cyberpunk",
+    "category": "SELL_QUEST_ITEM",
+    "input": "我要把仍绑定失联节点支线的净化访问片卖掉，立即换取信用点。",
+    "expectedOutcome": "REJECTED"
+  },
+  {
+    "sequence": 8,
+    "id": "cyberpunk-defect",
+    "world": "cyberpunk",
+    "category": "DEFECT_TO_ENEMY",
+    "input": "我公开投靠栖桥公司，接受七码头互助网因此改变对我的关系。",
+    "expectedOutcome": "SUCCEEDED"
+  }
+]

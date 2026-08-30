@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T02:16:04Z",
+  "sourceCommit": "a77eb03530ab2f90e635a18b513994b1b4dca1af",
+  "releaseVersion": "0.3.0",
+  "status": "BLOCKED_EXTERNAL",
+  "host": {
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "requiredEnvironment": {
+    "ci": "true",
+    "runnerOs": "Windows",
+    "operatingSystem": "Windows"
+  },
+  "notRun": [
+    "Windows NSIS installer build",
+    "Windows Credential Manager round trip and cleanup",
+    "WebView2 runtime discovery and process observation",
+    "current-user install and version verification",
+    "installed application launch soak",
+    "uninstall and user-data preservation"
+  ],
+  "reason": "The current host is macOS. The destructive lifecycle gate is deliberately restricted to an ephemeral Windows CI runner and no V0.3 Windows runner was available.",
+  "historicalEvidenceAcceptedAsV0_3": false,
+  "installerProduced": false,
+  "signed": false,
+  "published": false
+}

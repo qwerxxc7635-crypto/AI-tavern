@@ -1,0 +1,381 @@
+[
+  {
+    "sequence": 1,
+    "id": "cyberpunk-01",
+    "kind": "START_CAMPAIGN",
+    "input": "以“霓虹堤岸的断网夜”为世界种子创建赛博都市战役。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 2,
+    "id": "cyberpunk-02",
+    "kind": "CREATE_CHARACTER",
+    "input": "创建一名网格快递员，填写神经负荷、街区声望和追踪热度。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 3,
+    "id": "cyberpunk-03",
+    "kind": "ENTER_TAVERN",
+    "input": "进入余温中继站，记录在线住客、委托墙和区域断电倒计时。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 4,
+    "id": "cyberpunk-04",
+    "kind": "TALK_NPC",
+    "input": "询问修补师岚为什么拒绝接入市政备用网。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 5,
+    "id": "cyberpunk-05",
+    "kind": "INSPECT_RUMOR",
+    "input": "核对“栖桥公司正在回收免费义体”背后的传播链。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 6,
+    "id": "cyberpunk-06",
+    "kind": "ACCEPT_QUEST",
+    "input": "接受《送达离线密钥》，但不立即选择公司路线。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "QUEST_STATE"
+    ]
+  },
+  {
+    "sequence": 7,
+    "id": "cyberpunk-07",
+    "kind": "FREE_INPUT",
+    "input": "提议把密钥拆分给三个街区节点共同保管。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 8,
+    "id": "cyberpunk-08",
+    "kind": "D20_ACTION",
+    "input": "用知识检定识别密钥壳体上的追踪固件。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 9,
+    "id": "cyberpunk-09",
+    "kind": "EQUIP_ITEM",
+    "input": "装备低温信号隔离套，确认负荷和插槽限制。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 10,
+    "id": "cyberpunk-10",
+    "kind": "TRAVEL",
+    "input": "穿过断电磁轨前往七码头，记录区域连接与时间。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 11,
+    "id": "cyberpunk-11",
+    "kind": "TALK_NPC",
+    "input": "向街医询问密钥原主人，但不暴露当前携带者。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 12,
+    "id": "cyberpunk-12",
+    "kind": "FREE_INPUT",
+    "input": "尝试用未来街区声望换取一次匿名义体扫描。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 13,
+    "id": "cyberpunk-13",
+    "kind": "D20_ACTION",
+    "input": "用敏捷检定避开巡检无人机，接受失败带来的热度。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 14,
+    "id": "cyberpunk-14",
+    "kind": "INSPECT_RUMOR",
+    "input": "比较公司公告、街医记录与修补师说法的权限差异。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 15,
+    "id": "cyberpunk-15",
+    "kind": "ADVANCE_TIME",
+    "input": "等待备用电网切换，观察派系和委托状态推进。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 16,
+    "id": "cyberpunk-16",
+    "kind": "ACCEPT_QUEST",
+    "input": "发现并激活《失联节点的最后心跳》支线。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "QUEST_STATE"
+    ]
+  },
+  {
+    "sequence": 17,
+    "id": "cyberpunk-17",
+    "kind": "TRADE",
+    "input": "出售一块普通废旧电池，确认价格不受高科技描述膨胀。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 18,
+    "id": "cyberpunk-18",
+    "kind": "EQUIP_ITEM",
+    "input": "切换到折叠电弧扳手，检查同插槽工具不会叠加。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 19,
+    "id": "cyberpunk-19",
+    "kind": "FREE_INPUT",
+    "input": "把公司追踪证据公开给街区频道，但隐去街医身份。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 20,
+    "id": "cyberpunk-20",
+    "kind": "TALK_NPC",
+    "input": "追问岚对备用网后门的已知事实与个人猜测。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 21,
+    "id": "cyberpunk-21",
+    "kind": "D20_ACTION",
+    "input": "用魅力检定争取中继站管理员延迟日志上传。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 22,
+    "id": "cyberpunk-22",
+    "kind": "TRAVEL",
+    "input": "返回余温中继站，验证路线耗时和动态派系变化。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 23,
+    "id": "cyberpunk-23",
+    "kind": "SAVE_REOPEN",
+    "input": "保存并重启，复核义体负荷、声望、热度、装备和任务。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "REOPEN_STATE"
+    ]
+  },
+  {
+    "sequence": 24,
+    "id": "cyberpunk-24",
+    "kind": "REVIEW_STATE",
+    "input": "审阅角色扩展、NPC 认知、派系、经济与 D20 历史。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  },
+  {
+    "sequence": 25,
+    "id": "cyberpunk-25",
+    "kind": "FREE_INPUT",
+    "input": "拒绝把密钥卖给最高出价者，提出开源审计后再决定。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 26,
+    "id": "cyberpunk-26",
+    "kind": "D20_ACTION",
+    "input": "用体魄检定拖开断电闸门，保留失败造成的资源消耗。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "D20_HARD_RESULT"
+    ]
+  },
+  {
+    "sequence": 27,
+    "id": "cyberpunk-27",
+    "kind": "ADVANCE_TIME",
+    "input": "让城市时钟跨过公司换班点，观察预算和冷却。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "WORLD_STATE"
+    ]
+  },
+  {
+    "sequence": 28,
+    "id": "cyberpunk-28",
+    "kind": "TALK_NPC",
+    "input": "询问新上线的外卖骑手是否见过公司回收队。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "KNOWLEDGE_BOUNDARY"
+    ]
+  },
+  {
+    "sequence": 29,
+    "id": "cyberpunk-29",
+    "kind": "TRADE",
+    "input": "购买标准散热凝胶，核对库存、信用点与消耗用途。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "ECONOMY_EQUIPMENT"
+    ]
+  },
+  {
+    "sequence": 30,
+    "id": "cyberpunk-30",
+    "kind": "FREE_INPUT",
+    "input": "把隔离套借给街医进行离线拆检并约定归还条件。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "CONSEQUENCE"
+    ]
+  },
+  {
+    "sequence": 31,
+    "id": "cyberpunk-31",
+    "kind": "SAVE_REOPEN",
+    "input": "再次保存重启，确认借出装备、声望和派系后果未回滚。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST",
+      "REOPEN_STATE"
+    ]
+  },
+  {
+    "sequence": 32,
+    "id": "cyberpunk-32",
+    "kind": "REVIEW_STATE",
+    "input": "记录世界、Quest、Trait、Equipment、Director、Context 与缓存观察。",
+    "requiredEvidence": [
+      "OUTPUT",
+      "LATENCY",
+      "STATE_DIGEST"
+    ]
+  }
+]

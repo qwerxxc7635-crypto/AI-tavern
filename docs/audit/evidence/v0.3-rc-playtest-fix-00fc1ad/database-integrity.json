@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "query": "sqlite/integrity.sql",
+  "databases": [
+    {
+      "path": "sqlite/windows-e2e.sqlite3",
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0,
+      "unfinishedPendingRequests": 0,
+      "unfinishedGenerationRecords": 0,
+      "duplicateIdempotencyKeys": 0,
+      "duplicateGenerationRequestIds": 0,
+      "duplicateWorldsPerCampaign": 0,
+      "orphanWorlds": 0,
+      "campaignState": "TAVERN"
+    },
+    {
+      "path": "sqlite/windows-e2e.sqlite3.backups/windows-e2e.sqlite3.full-000000000000000000001787977968796421000-9d1234d6-9467-4565-ba5a-284ed098760c.sqlite",
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0,
+      "unfinishedPendingRequests": 1,
+      "unfinishedGenerationRecords": 0,
+      "duplicateIdempotencyKeys": 0,
+      "duplicateGenerationRequestIds": 0,
+      "duplicateWorldsPerCampaign": 0,
+      "orphanWorlds": 0,
+      "campaignState": "RECOVERY_REQUIRED",
+      "resumeState": "TAVERN",
+      "expectedSnapshot": "Immutable pre-recovery backup intentionally retains e2e-interrupted-request in SENDING state."
+    },
+    {
+      "path": "sqlite/windows-e2e.sqlite3.backups/windows-e2e.sqlite3.full-000000000000000000001787977969185069000-1e424319-6749-4201-8269-6f75a4953d3e.sqlite",
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0,
+      "unfinishedPendingRequests": 0,
+      "unfinishedGenerationRecords": 0,
+      "duplicateIdempotencyKeys": 0,
+      "duplicateGenerationRequestIds": 0,
+      "duplicateWorldsPerCampaign": 0,
+      "orphanWorlds": 0,
+      "campaignState": "TAVERN"
+    },
+    {
+      "path": "sqlite/windows-e2e.sqlite3.backups/windows-e2e.sqlite3.full-000000000000000000001787977969293495000-ec4e1935-a257-47be-a810-86464bbb1e5c.sqlite",
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0,
+      "unfinishedPendingRequests": 0,
+      "unfinishedGenerationRecords": 0,
+      "duplicateIdempotencyKeys": 0,
+      "duplicateGenerationRequestIds": 0,
+      "duplicateWorldsPerCampaign": 0,
+      "orphanWorlds": 0,
+      "campaignState": "TAVERN"
+    }
+  ],
+  "activeDatabaseHealthy": true,
+  "invalidOutputValidation": {
+    "status": "BLOCKED_EXTERNAL",
+    "isolatedRealProviderDatabase": {
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0,
+      "campaigns": 3,
+      "campaignStates": { "CREATING_WORLD": 3 },
+      "worldBibles": 0,
+      "generationRecords": 0,
+      "unfinishedRequests": 0,
+      "duplicateCampaignIds": 0,
+      "duplicateRequestIds": 0,
+      "duplicateWorldsPerCampaign": 0
+    },
+    "userDatabaseUnchanged": true,
+    "secretMaterialCopiedToEvidence": false
+  }
+}

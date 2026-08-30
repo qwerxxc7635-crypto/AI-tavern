@@ -10,9 +10,18 @@ const AI_TASKS: &[&str] = &[
     "REFINE_WORLD",
     "GENERATE_CHARACTER_TRAITS",
     "COMPLETE_CHARACTER_BACKGROUND",
+    "GENERATE_QUICK_CHARACTER",
+    "EDIT_CHARACTER_DRAFT",
+    "GENERATE_CAREER_POOL",
+    "GENERATE_ITEMS",
+    "GENERATE_NPC_LOD",
+    "GENERATE_LOCATIONS",
+    "GENERATE_FACTIONS",
     "GENERATE_TAVERN",
     "GENERATE_NPCS",
     "NPC_REPLY",
+    "GENERATE_DIALOGUE_SUGGESTIONS",
+    "PROPOSE_TAVERN_SCENE_ACTION",
     "GENERATE_QUEST",
     "GENERATE_ADVENTURE_PLAN",
     "GENERATE_ADVENTURE_TURN",
@@ -131,7 +140,8 @@ fn validate_metric(metric: &DeepSeekCacheMetric) -> Result<(), CampaignStoreErro
         metric.prompt_cache_hit_tokens as f64 / total as f64
     };
     if !AI_TASKS.contains(&metric.task_type.as_str())
-        || metric.hit_ratio != ratio
+        || !metric.hit_ratio.is_finite()
+        || (metric.hit_ratio - ratio).abs() > f64::EPSILON
         || metric.prefix_hash.len() != 64
         || !metric
             .prefix_hash
@@ -184,5 +194,26 @@ mod tests {
                 .record_deepseek_cache_metric("UNKNOWN", 1, 0, "bad", "not-a-time")
                 .is_err()
         );
+    }
+
+    #[test]
+    fn retains_only_the_latest_two_hundred_provider_observations() {
+        let directory = tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("bounded-cache.sqlite")).unwrap();
+        for index in 0_u64..205 {
+            store
+                .record_deepseek_cache_metric(
+                    "GENERATE_DIALOGUE_SUGGESTIONS",
+                    index,
+                    1,
+                    &format!("{index:064x}"),
+                    &format!("2026-08-12T00:{:02}:{:02}Z", index / 60, index % 60),
+                )
+                .unwrap();
+        }
+        let metrics = store.deepseek_cache_metrics().unwrap();
+        assert_eq!(metrics.len(), MAX_METRICS);
+        assert_eq!(metrics.first().unwrap().prompt_cache_hit_tokens, 5);
+        assert_eq!(metrics.last().unwrap().prompt_cache_hit_tokens, 204);
     }
 }

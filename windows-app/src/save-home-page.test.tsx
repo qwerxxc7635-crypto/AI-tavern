@@ -6,7 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import type { CampaignGateway, CampaignSummary } from './campaign-gateway.js';
 import { SaveHomePage } from './save-home-page.js';
-import type { CampaignArchiveImportMode, SaveTransferGateway } from './save-transfer-gateway.js';
+import type {
+  CampaignArchiveImportMode,
+  CampaignArchiveInspection,
+  SaveTransferGateway,
+} from './save-transfer-gateway.js';
 
 const EXISTING_CAMPAIGN: CampaignSummary = {
   id: 'campaign-existing',
@@ -38,19 +42,41 @@ describe('save home page', () => {
     expect(gateway.listCalls).toBe(1);
   });
 
-  it('creates and archives campaigns through the gateway before refreshing the list', async () => {
+  it('creates one campaign and immediately enters the authoritative world route', async () => {
     const gateway = new FakeCampaignGateway([]);
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
     renderSaveHome(gateway);
 
     expect(await screen.findByText('炉边还没有你的故事。')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: '新建存档' }));
-    expect(await screen.findByRole('heading', { name: '存档 campaign' })).toBeTruthy();
+    expect(await screen.findByText('继续构筑 campaign-created')).toBeTruthy();
     expect(gateway.createCalls).toBe(1);
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: '归档' }));
+  it('suppresses rapid duplicate new-campaign clicks while initialization is pending', async () => {
+    const gateway = new FakeCampaignGateway([]);
+    const barrier = deferred<undefined>();
+    gateway.createBarrier = barrier.promise;
+    renderSaveHome(gateway);
+
+    const button = await screen.findByRole('button', { name: '新建存档' });
+    fireEvent.click(button);
+    fireEvent.click(button);
+    expect(gateway.createCalls).toBe(1);
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+
+    barrier.resolve(undefined);
+    expect(await screen.findByText('继续构筑 campaign-created')).toBeTruthy();
+    expect(gateway.createCalls).toBe(1);
+  });
+
+  it('archives existing campaigns through the gateway before refreshing the list', async () => {
+    const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderSaveHome(gateway);
+
+    fireEvent.click(await screen.findByRole('button', { name: '归档' }));
     expect(await screen.findByText('炉边还没有你的故事。')).toBeTruthy();
-    expect(gateway.archiveCalls).toEqual(['campaign-created']);
+    expect(gateway.archiveCalls).toEqual([EXISTING_CAMPAIGN.id]);
   });
 
   it('permanently deletes an exported campaign only after explicit confirmation', async () => {
@@ -152,11 +178,45 @@ describe('save home page', () => {
     expect(gateway.listCalls).toBe(2);
   });
 
+  it('explains historical archive migration and preserves the source file', async () => {
+    const gateway = new FakeCampaignGateway([]);
+    const transfers = new FakeSaveTransferGateway();
+    transfers.importPath = 'D:\\Saves\\v02.emtavern';
+    transfers.inspection = { ...transfers.inspection, migrationRequired: true };
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    renderSaveHome(gateway, transfers);
+
+    fireEvent.click(await screen.findByRole('button', { name: '导入存档' }));
+
+    await waitFor(() =>
+      expect(confirm).toHaveBeenCalledWith(expect.stringContaining('原文件不会被改写')),
+    );
+    expect((await screen.findByRole('status')).textContent).toContain('原文件保持不变');
+    expect(transfers.importCalls).toEqual([['D:\\Saves\\v02.emtavern', 'CREATE']]);
+  });
+
+  it('reports a future archive version without implying local mutation', async () => {
+    const gateway = new FakeCampaignGateway([]);
+    const transfers = new FakeSaveTransferGateway();
+    transfers.importPath = 'D:\\Saves\\future.emtavern';
+    transfers.importFailure = JSON.stringify({ code: 'SAVE_ARCHIVE_FUTURE' });
+    renderSaveHome(gateway, transfers);
+
+    fireEvent.click(await screen.findByRole('button', { name: '导入存档' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('请升级 Ember Tavern');
+    expect(screen.getByRole('alert').textContent).toContain('本地存档保持原状');
+  });
+
   it('confirms overwrite for a conflicting archive and accepts a single dropped file', async () => {
     const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
     const transfers = new FakeSaveTransferGateway();
     transfers.importPath = 'D:\\Saves\\existing.emtavern';
-    transfers.inspection = { campaignId: EXISTING_CAMPAIGN.id, campaignExists: true };
+    transfers.inspection = {
+      ...transfers.inspection,
+      campaignId: EXISTING_CAMPAIGN.id,
+      campaignExists: true,
+    };
     vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
     renderSaveHome(gateway, transfers);
     await waitFor(() => expect(transfers.dropHandler).not.toBeNull());
@@ -202,11 +262,18 @@ function renderSaveHome(
 class FakeSaveTransferGateway implements SaveTransferGateway {
   public importPath: string | null = null;
   public exportPath: string | null = null;
-  public inspection = { campaignId: 'campaign-imported', campaignExists: false };
+  public inspection: CampaignArchiveInspection = {
+    campaignId: 'campaign-imported',
+    campaignExists: false,
+    saveSchemaVersion: 3,
+    worldSchemaVersion: 1,
+    migrationRequired: false,
+  };
   public readonly suggestedNames: string[] = [];
   public readonly importCalls: Array<[string, CampaignArchiveImportMode]> = [];
   public readonly exportCalls: Array<[string, string]> = [];
   public dropHandler: ((paths: readonly string[]) => void) | null = null;
+  public importFailure: unknown = null;
 
   public async chooseImportPath(): Promise<string | null> {
     return this.importPath;
@@ -217,10 +284,7 @@ class FakeSaveTransferGateway implements SaveTransferGateway {
     return this.exportPath;
   }
 
-  public async inspect(): Promise<{
-    readonly campaignId: string;
-    readonly campaignExists: boolean;
-  }> {
+  public async inspect(): Promise<CampaignArchiveInspection> {
     return this.inspection;
   }
 
@@ -228,6 +292,7 @@ class FakeSaveTransferGateway implements SaveTransferGateway {
     path: string,
     mode: CampaignArchiveImportMode,
   ): Promise<CampaignSummary> {
+    if (this.importFailure !== null) throw this.importFailure;
     this.importCalls.push([path, mode]);
     return {
       id: 'imported-campaign',
@@ -291,6 +356,7 @@ class FakeCampaignGateway implements CampaignGateway {
   public readonly continueCalls: string[] = [];
   public readonly archiveCalls: string[] = [];
   public readonly deleteCalls: string[] = [];
+  public createBarrier: Promise<void> | null = null;
 
   public constructor(private campaigns: readonly CampaignSummary[]) {}
 
@@ -301,6 +367,7 @@ class FakeCampaignGateway implements CampaignGateway {
 
   public async create(): Promise<CampaignSummary> {
     this.createCalls += 1;
+    await this.createBarrier;
     const created: CampaignSummary = {
       id: 'campaign-created',
       state: 'CREATING_WORLD',
@@ -327,4 +394,12 @@ class FakeCampaignGateway implements CampaignGateway {
     this.deleteCalls.push(id);
     this.campaigns = this.campaigns.filter((campaign) => campaign.id !== id);
   }
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
 }

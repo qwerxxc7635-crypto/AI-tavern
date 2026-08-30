@@ -10,10 +10,11 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDirectory = join(root, 'packages', 'persistence', 'test-fixtures');
 const manifest = JSON.parse(readFileSync(join(fixtureDirectory, 'archive-fixtures.json'), 'utf8'));
 const work = mkdtempSync(join(tmpdir(), 'ember-archive-interop-'));
-const typescriptOutput = join(work, 'typescript-export-v1.emtavern');
-const rustOutput = join(work, 'rust-export-v1.emtavern');
+const typescriptOutput = join(work, 'typescript-export-v3.emtavern');
+const rustOutput = join(work, 'rust-export-v3.emtavern');
 
 try {
+  verifyHistoricalFixtures();
   runPnpm(['exec', 'vitest', 'run', 'packages/persistence/src/save-export.test.ts'], {
     EMBER_TS_ARCHIVE_OUTPUT: typescriptOutput,
   });
@@ -40,6 +41,18 @@ try {
   });
 } finally {
   rmSync(work, { recursive: true, force: true });
+}
+
+function verifyHistoricalFixtures() {
+  assert.ok(Array.isArray(manifest.historicalFixtures), 'Missing historical fixture metadata');
+  for (const fixture of manifest.historicalFixtures) {
+    assert.equal(typeof fixture?.path, 'string', 'Historical fixture path is invalid');
+    assert.equal(
+      sha256(readFileSync(join(root, fixture.path))),
+      fixture.sha256,
+      `Historical fixture changed: ${fixture.path}`,
+    );
+  }
 }
 
 function verifyRegeneratedFixture(key, generatedPath) {

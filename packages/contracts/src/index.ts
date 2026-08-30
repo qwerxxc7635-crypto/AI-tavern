@@ -1,4 +1,26 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
+export {
+  NPC_TIMELINE_ATTEMPT_STATUSES,
+  NPC_TIMELINE_SCOPE_KINDS,
+  NPC_TIMELINE_STATUSES,
+} from './npc-timeline.js';
+export type {
+  NpcTimelineAttempt,
+  NpcTimelineAttemptStatus,
+  NpcTimelineOperation,
+  NpcTimelineScopeKind,
+  NpcTimelineStatus,
+} from './npc-timeline.js';
+export { TAVERN_SCENE_ACTIONS, TAVERN_SCENE_PARTICIPANT_STATUSES } from './tavern-scene.js';
+export type {
+  TavernSceneAction,
+  TavernSceneActorProposal,
+  TavernSceneParticipant,
+  TavernSceneParticipantStatus,
+  TavernSceneResolvedAction,
+  TavernSceneSnapshot,
+  TavernSceneTurn,
+} from './tavern-scene.js';
 export { SNAPSHOT_KINDS } from './snapshot.js';
 export type { SaveSnapshot, SnapshotKind } from './snapshot.js';
 export type {
@@ -14,6 +36,70 @@ export type {
   GameEventType,
   ModelSelectionRef,
 } from './game-event.js';
+export { RULE_COMMAND_AUTHORITIES, RULE_STATUS_KINDS } from './rules.js';
+export type {
+  CharacterRuleState,
+  RuleCommandAuthority,
+  RuleResource,
+  RuleSkill,
+  RuleStatus,
+  RuleStatusKind,
+  RulesCommand,
+  RulesCommandKind,
+  RulesEvent,
+  TraitModifierTarget,
+  TraitRuleModifier,
+} from './rules.js';
+export {
+  CHARACTER_TRAIT_TYPES,
+  NARRATIVE_TRAIT_POINT_PROFILE,
+  TraitPointError,
+  assertBalancedCharacterTraitPoints,
+  assertCharacterTraitBalanceAndSynergy,
+  buildTraitGenerationFeedback,
+  characterTraitPointNet,
+  createTraitPointProfile,
+  evaluateCharacterTraitBalance,
+  evaluateCharacterTraitSynergy,
+  traitPointNet,
+} from './trait-points.js';
+export type { CharacterTraitType, TraitPointProfile } from './trait-points.js';
+export {
+  DEFAULT_TRAIT_EFFECT_BALANCE_DECLARATION,
+  TRAIT_AVOIDABILITY_LEVELS,
+  TRAIT_BALANCE_DIMENSIONS,
+  TRAIT_BALANCE_POLICY_VERSION,
+  TRAIT_CONDITION_SCOPES,
+  TRAIT_EFFECT_RARITIES,
+  TRAIT_ENVIRONMENT_SCOPES,
+  TRAIT_FREQUENCIES,
+  TRAIT_IMPACT_LEVELS,
+  TRAIT_PERMANENCE_LEVELS,
+  TraitBalanceError,
+  createTraitEffectBalanceDeclaration,
+  createTraitWorldRuleKey,
+  recommendedTraitPoints,
+  traitBalanceScore,
+  traitDimensionBreakdown,
+} from './trait-balance.js';
+export type {
+  TraitAvoidability,
+  TraitBalanceDimension,
+  TraitBalanceReport,
+  TraitBalanceSide,
+  TraitConditionScope,
+  TraitDimensionBreakdown,
+  TraitEffectBalanceDeclaration,
+  TraitEffectBalanceEvaluation,
+  TraitEffectRarity,
+  TraitEnvironmentScope,
+  TraitFrequency,
+  TraitGenerationFeedback,
+  TraitImpactLevel,
+  TraitPermanence,
+  TraitSynergyReport,
+  TraitValidationIssue,
+} from './trait-balance.js';
 export { AI_REQUEST_STATUSES } from './pending-ai-request.js';
 export type {
   AiRequestError,
@@ -88,7 +174,7 @@ export type {
   PlayerAction,
   SceneFrame,
 } from './adventure.js';
-export { QUEST_STATUSES } from './quest.js';
+export { QUEST_STATUSES, QUEST_TRANSITION_SOURCES } from './quest.js';
 export type {
   Item,
   ItemContent,
@@ -97,11 +183,32 @@ export type {
   QuestContent,
   QuestRisk,
   QuestStatus,
+  QuestPoolState,
+  QuestTransition,
+  QuestTransitionSource,
   RewardTier,
   Rumor,
   RumorContent,
   RumorTruthStatus,
 } from './quest.js';
+export {
+  QUEST_GRAPH_EDGE_KINDS,
+  QUEST_GRAPH_PREDICATES,
+  QUEST_GRAPH_SOURCE_KINDS,
+  QUEST_GRAPH_TRIGGER_KINDS,
+  QuestGraphContractError,
+} from './quest-graph.js';
+export type {
+  QuestGraphEdge,
+  QuestGraphEdgeKind,
+  QuestGraphEntityState,
+  QuestGraphEvaluation,
+  QuestGraphPredicate,
+  QuestGraphSnapshot,
+  QuestGraphSourceKind,
+  QuestGraphStatusChange,
+  QuestGraphTriggerKind,
+} from './quest-graph.js';
 export {
   NPC_KNOWLEDGE_SOURCES,
   NPC_KNOWLEDGE_STATES,
@@ -110,6 +217,48 @@ export {
   createNpcKnowledge,
   createNpcRelationship,
 } from './tavern.js';
+export {
+  MEMORY_LAYER_KINDS,
+  MEMORY_SOURCE_KINDS,
+  SUMMARY_SCOPE_KINDS,
+  MemoryLayerContractError,
+  createHistoricalSummary,
+  createWorldLoreEntry,
+} from './memory-layer.js';
+export type {
+  HistoricalSummary,
+  MemoryLayerKind,
+  MemorySourceKind,
+  MemorySourceSelector,
+  MemorySourceSnapshot,
+  SummaryScopeKind,
+  WorldLoreEntry,
+} from './memory-layer.js';
+export {
+  createWorldInfoRetrievalQuery,
+  createWorldLoreRetrievalRule,
+  LORE_MATCH_MODES,
+  RETRIEVAL_ENTITY_KINDS,
+  WORLD_INFO_RETRIEVAL_REASONS,
+  WORLD_INFO_TRIGGER_KINDS,
+  WorldInfoRetrievalContractError,
+} from './world-info-retrieval.js';
+export type {
+  LoreMatchMode,
+  RetrievalEntityKind,
+  RetrievalEntityRef,
+  WorldInfoCandidateSource,
+  WorldInfoRetrievalCandidate,
+  WorldInfoRetrievalCorpus,
+  WorldInfoRetrievalManifestEntry,
+  WorldInfoRetrievalQuery,
+  WorldInfoRetrievalReason,
+  WorldInfoRetrievalResult,
+  WorldInfoRetrievalSelection,
+  WorldInfoTriggerKind,
+  WorldInfoTriggerMatch,
+  WorldLoreRetrievalRule,
+} from './world-info-retrieval.js';
 export type {
   NpcKnowledge,
   NpcKnowledgeInput,
@@ -133,6 +282,184 @@ export {
   AttributeAllocationError,
   createPlayerAttributes,
 } from './character.js';
+export {
+  CAREER_RARITIES,
+  CAREER_SOURCES,
+  CareerContractError,
+  appendCareerPool,
+  careerEvidenceFor,
+  createCareerDefinition,
+  createCareerPool,
+  normalizeCareerName,
+  parseCareerPool,
+} from './career.js';
+export {
+  EQUIPMENT_BINDING_KINDS,
+  EQUIPMENT_CATEGORIES,
+  EQUIPMENT_TRIGGERS,
+  SemanticEquipmentContractError,
+  createSemanticEquipment,
+  normalizeEquipmentName,
+  parseSemanticEquipment,
+  projectSemanticEquipmentItem,
+  semanticEquipmentStorageContent,
+  type EquipmentBalanceRecord,
+  type EquipmentBinding,
+  type EquipmentBindingKind,
+  type EquipmentCategory,
+  type EquipmentConstitutionEvidence,
+  type EquipmentMechanics,
+  type EquipmentTrigger,
+  type SemanticEquipmentCandidate,
+  type SemanticEquipmentContent,
+  type SemanticEquipmentDefinition,
+} from './semantic-equipment.js';
+export {
+  NPC_LOD_LEVELS,
+  NPC_LOD_UPGRADE_TRIGGERS,
+  NpcLodContractError,
+  createNpcLodProfile,
+  parseNpcLodProfile,
+} from './npc-lod.js';
+export {
+  DYNAMIC_LOCATION_KINDS,
+  LOCATION_EXPANSION_MODES,
+  LOCATION_MATERIALIZATION_LEVELS,
+  LOCATION_TRAVEL_MODES,
+  DynamicLocationContractError,
+  createDynamicLocationProfile,
+  locationConstitutionEvidence,
+  parseDynamicLocationProfile,
+  type CampaignLocationState,
+  type DynamicLocationCandidate,
+  type DynamicLocationKind,
+  type DynamicLocationProfile,
+  type LocationConnection,
+  type LocationConstitutionEvidence,
+  type LocationExpansionMode,
+  type LocationMaterializationLevel,
+  type LocationTravelEvent,
+  type LocationTravelMode,
+} from './dynamic-location.js';
+export {
+  FACTION_ACTION_KINDS,
+  FACTION_ACTION_SOURCES,
+  FACTION_MATERIALIZATION_LEVELS,
+  PLAYER_FACTION_RELATIONS,
+  ActiveFactionContractError,
+  createActiveFactionProfile,
+  factionActionProposal,
+  parseActiveFactionProfile,
+} from './active-faction.js';
+export {
+  TAVERN_OPPORTUNITY_KINDS,
+  TAVERN_POPULATION_PRESENCES,
+  TAVERN_POPULATION_SOURCE_KINDS,
+  TAVERN_POPULATION_TRIGGERS,
+  TavernPopulationContractError,
+  createTavernOpportunity,
+  createTavernPopulationContext,
+  createTavernPopulationCycle,
+  createTavernPopulationFocusEvent,
+  createTavernPopulationMember,
+  createTavernPopulationSnapshot,
+  createTavernPopulationState,
+} from './tavern-population.js';
+export type {
+  TavernOpportunity,
+  TavernOpportunityKind,
+  TavernPopulationClockFactor,
+  TavernPopulationContext,
+  TavernPopulationCycle,
+  TavernPopulationFactionFactor,
+  TavernPopulationFocusEvent,
+  TavernPopulationMember,
+  TavernPopulationPresence,
+  TavernPopulationSnapshot,
+  TavernPopulationSourceKind,
+  TavernPopulationState,
+  TavernPopulationTrigger,
+} from './tavern-population.js';
+export type {
+  ActiveFactionCandidate,
+  ActiveFactionProfile,
+  FactionActionBudget,
+  FactionActionConsequence,
+  FactionActionEvent,
+  FactionActionKind,
+  FactionActionProposal,
+  FactionActionSource,
+  FactionConstitutionEvidence,
+  FactionMaterializationLevel,
+  PlayerFactionRelation,
+} from './active-faction.js';
+export type {
+  NpcLodCandidate,
+  NpcLodConstitutionEvidence,
+  NpcLodLevel,
+  NpcLodProfile,
+  NpcLodTransition,
+  NpcLodUpgradeTrigger,
+} from './npc-lod.js';
+export type {
+  CareerCandidate,
+  CareerConstitutionEvidence,
+  CareerDefinition,
+  CareerPool,
+  CareerRarity,
+  CareerSource,
+} from './career.js';
+export {
+  CHARACTER_EXTENSION_FIELD_TYPES,
+  UNIVERSAL_CHARACTER_SCHEMA_VERSION,
+  WORLD_CHARACTER_EXTENSION_SCHEMA_VERSION,
+  UniversalCharacterError,
+  createUniversalCharacterProfile,
+  createWorldCharacterExtensionDefinition,
+  projectUniversalCharacterToV02,
+  validateCharacterExtensionDraftValues,
+  validateCharacterExtensionValues,
+  validateCompleteCharacterExtensionValues,
+} from './universal-character.js';
+export type {
+  CharacterExtensionFieldDefinition,
+  CharacterExtensionFieldType,
+  CharacterExtensionValueSet,
+  CharacterRelationshipSummary,
+  CharacterReputation,
+  NamedCharacterValue,
+  UniversalCharacterCareer,
+  UniversalCharacterProfile,
+  WorldCharacterExtensionDefinition,
+} from './universal-character.js';
+export {
+  CHARACTER_CREATION_MODES,
+  CHARACTER_CREATION_SESSION_SCHEMA_VERSION,
+  CHARACTER_CREATION_STATUSES,
+  CharacterCreationSessionError,
+  cancelCharacterCreationSession,
+  createCharacterCreationSession,
+  createUniversalCharacterDraft,
+  markCharacterCreationConfirmed,
+  materializeUniversalCharacterProfile,
+  parseCharacterCreationSession,
+  parseUniversalCharacterDraft,
+  prepareAdvancedCharacterDraft,
+  restoreCharacterCreationSession,
+  resumeCharacterCreationSession,
+  saveCharacterCreationDraft,
+  stageQuickCharacterDraft,
+  switchCharacterCreationMode,
+  validateCharacterLockedFields,
+  UNIVERSAL_CHARACTER_DRAFT_KEYS,
+} from './character-creation-session.js';
+export type {
+  CharacterCreationMode,
+  CharacterCreationSession,
+  CharacterCreationStatus,
+  CreateCharacterCreationSessionInput,
+  UniversalCharacterDraft,
+} from './character-creation-session.js';
 export type {
   CharacterAttributeName,
   CharacterBackground,
@@ -144,7 +471,12 @@ export type {
   PlayerAttributesInput,
   PlayerCharacter,
 } from './character.js';
-export { RUMOR_SOURCE_BASES, WORLD_BIBLE_LOCKABLE_FIELDS, isLockedWorldFact } from './world.js';
+export {
+  RUMOR_SOURCE_BASES,
+  WORLD_BIBLE_LOCKABLE_FIELDS,
+  WORLD_CONSTITUTION_STATUSES,
+  isLockedWorldFact,
+} from './world.js';
 export type {
   DevelopingFact,
   Faction,
@@ -159,8 +491,18 @@ export type {
   TemporaryNarrativeFact,
   WorldBible,
   WorldBibleLockableField,
+  WorldConstitution,
+  WorldConstitutionContent,
+  WorldConstitutionStatus,
   WorldFact,
 } from './world.js';
+export { WORLD_SEED_ALGORITHMS } from './world-seed.js';
+export type {
+  WorldRandomCursor,
+  WorldRandomReservation,
+  WorldSeed,
+  WorldSeedAlgorithm,
+} from './world-seed.js';
 export {
   CAMPAIGN_ACTIVE_STATES,
   CAMPAIGN_EXCEPTION_STATES,
@@ -193,10 +535,12 @@ export {
   conversationId,
   factionId,
   eventLedgerId,
+  rulesEventId,
   gameEventId,
   generationRecordId,
   idempotencyKey,
   characterTraitId,
+  careerId,
   isoTimestamp,
   locationId,
   messageId,
@@ -220,6 +564,8 @@ export {
   claimId,
   knowledgeId,
   memoryId,
+  historicalSummaryId,
+  worldLoreEntryId,
 } from './foundation.js';
 export type {
   ActionOptionId,
@@ -234,10 +580,12 @@ export type {
   ConversationId,
   FactionId,
   EventLedgerId,
+  RulesEventId,
   GameEventId,
   GenerationRecordId,
   IdempotencyKey,
   CharacterTraitId,
+  CareerId,
   IsoTimestamp,
   LocationId,
   MessageId,
@@ -260,4 +608,90 @@ export type {
   ClaimId,
   KnowledgeId,
   MemoryId,
+  HistoricalSummaryId,
+  WorldLoreEntryId,
 } from './foundation.js';
+export {
+  DYNAMIC_QUEST_ENTITY_KINDS,
+  DYNAMIC_QUEST_SOURCE_KINDS,
+  DYNAMIC_QUEST_VISIBILITIES,
+  DynamicQuestSourceContractError,
+  type DynamicQuestBudget,
+  type DynamicQuestConstitutionContext,
+  type DynamicQuestEntityKind,
+  type DynamicQuestPreparation,
+  type DynamicQuestProvenance,
+  type DynamicQuestRelevantFact,
+  type DynamicQuestSourceContext,
+  type DynamicQuestSourceKind,
+  type DynamicQuestVisibility,
+} from './dynamic-quest-source.js';
+export {
+  WORLD_DIRECTOR_ACTION_KINDS,
+  WORLD_DIRECTOR_PACES,
+  WORLD_DIRECTOR_ROUTES,
+  WORLD_DIRECTOR_SUPPRESSION_REASONS,
+  WORLD_DIRECTOR_TRIGGER_KINDS,
+  WORLD_DIRECTOR_URGENCIES,
+  WorldDirectorContractError,
+  type WorldDirectorActionKind,
+  type WorldDirectorPace,
+  type WorldDirectorPreparation,
+  type WorldDirectorProposal,
+  type WorldDirectorRoute,
+  type WorldDirectorRun,
+  type WorldDirectorSignals,
+  type WorldDirectorSuppression,
+  type WorldDirectorSuppressionReason,
+  type WorldDirectorTrigger,
+  type WorldDirectorTriggerKind,
+  type WorldDirectorUrgency,
+} from './world-director.js';
+export {
+  DIRECTOR_BUDGET_CATEGORIES,
+  DIRECTOR_BUDGET_REASONS,
+  DIRECTOR_BUDGET_STATUSES,
+  DirectorBudgetContractError,
+  type DirectorBudgetCategory,
+  type DirectorBudgetEntry,
+  type DirectorBudgetReason,
+  type DirectorBudgetSnapshot,
+  type DirectorBudgetStatus,
+  type DirectorBudgetUsage,
+} from './director-budget.js';
+export {
+  LAZY_WORLD_EXECUTION_MODES,
+  LAZY_WORLD_GENERATION_KINDS,
+  LAZY_WORLD_GENERATION_PRIORITIES,
+  LAZY_WORLD_GENERATION_STATES,
+  LAZY_WORLD_TRANSITION_REASONS,
+  LazyWorldGenerationContractError,
+  createLazyWorldGenerationPlanSeed,
+  lazyWorldIntentKey,
+  type CoreWorldGenerationPlanInput,
+  type LazyWorldExecutionMode,
+  type LazyWorldGenerationKind,
+  type LazyWorldGenerationPlan,
+  type LazyWorldGenerationPlanSeed,
+  type LazyWorldGenerationPriority,
+  type LazyWorldGenerationState,
+  type LazyWorldGenerationTransition,
+  type LazyWorldTransitionReason,
+} from './lazy-world-generation.js';
+export {
+  PREFETCH_EVENT_KINDS,
+  PREFETCH_EVENT_REASONS,
+  PREFETCH_PREDICTION_REASONS,
+  PREFETCH_PRIORITIES,
+  PREFETCH_STATES,
+  PrefetchContractError,
+  type PrefetchCandidate,
+  type PrefetchCandidateSeed,
+  type PrefetchEvent,
+  type PrefetchEventKind,
+  type PrefetchEventReason,
+  type PrefetchMetrics,
+  type PrefetchPredictionReason,
+  type PrefetchPriority,
+  type PrefetchState,
+} from './prefetch.js';

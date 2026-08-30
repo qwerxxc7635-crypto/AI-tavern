@@ -15,7 +15,10 @@ describe('NPC dialogue page', () => {
     render(
       <MemoryRouter initialEntries={['/npc?campaignId=campaign-tavern&npcId=npc-owner']}>
         <Routes>
-          <Route path="/npc" element={<NpcDialoguePage service={service} />} />
+          <Route
+            path="/npc"
+            element={<NpcDialoguePage service={service} suggestionService={suggestionService} />}
+          />
         </Routes>
       </MemoryRouter>,
     );
@@ -24,7 +27,7 @@ describe('NPC dialogue page', () => {
     expect(screen.getByText('Earlier question')).toBeTruthy();
     expect(screen.getByLabelText('信任 1')).toBeTruthy();
 
-    fireEvent.click(screen.getByRole('button', { name: 'The old tunnel' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'The old tunnel' }));
     expect((screen.getByLabelText('你想说什么？') as HTMLTextAreaElement).value).toBe(
       'The old tunnel',
     );
@@ -37,7 +40,123 @@ describe('NPC dialogue page', () => {
     expect(await screen.findByText('Stay close.')).toBeTruthy();
     expect(screen.getByLabelText('信任 2')).toBeTruthy();
   });
+
+  it('submits a suggestion through the same path and suppresses duplicate clicks', async () => {
+    const service = new FakeDialogueService();
+    render(
+      <MemoryRouter initialEntries={['/npc?campaignId=campaign-tavern&npcId=npc-owner']}>
+        <Routes>
+          <Route
+            path="/npc"
+            element={<NpcDialoguePage service={service} suggestionService={suggestionService} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    await screen.findByRole('heading', { name: 'Ilyra Venn' });
+    fireEvent.click(await screen.findByRole('button', { name: 'The cellar door' }));
+    const submit = screen.getByRole('button', { name: '发送' });
+    fireEvent.click(submit);
+    fireEvent.click(submit);
+    await waitFor(() => expect(service.sent).toEqual(['The cellar door']));
+  });
+
+  it('keeps free input usable when optional suggestions fail', async () => {
+    const service = new FakeDialogueService();
+    render(
+      <MemoryRouter initialEntries={['/npc?campaignId=campaign-tavern&npcId=npc-owner']}>
+        <Routes>
+          <Route
+            path="/npc"
+            element={
+              <NpcDialoguePage
+                service={service}
+                suggestionService={{
+                  async load() {
+                    throw new Error('offline');
+                  },
+                }}
+              />
+            }
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const input = (await screen.findByLabelText('你想说什么？')) as HTMLTextAreaElement;
+    fireEvent.change(input, { target: { value: 'I speak without a suggestion.' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+    await waitFor(() => expect(service.sent).toEqual(['I speak without a suggestion.']));
+  });
+
+  it('shows streamed NPC prose, exposes cancel and never inserts preview as history', async () => {
+    let aborted = false;
+    const service = {
+      async load() {
+        return initialSnapshot();
+      },
+      async send(
+        _campaignId: string,
+        _npcId: string,
+        _message: string,
+        stream?: { readonly signal: AbortSignal; readonly onChunk: (content: string) => void },
+      ): Promise<NpcDialogueSnapshot> {
+        stream?.onChunk('The flame flickers.');
+        return new Promise((_resolve, reject) => {
+          stream?.signal.addEventListener(
+            'abort',
+            () => {
+              aborted = true;
+              reject({ code: 'CANCELLED' });
+            },
+            { once: true },
+          );
+        });
+      },
+      async retry() {
+        return initialSnapshot();
+      },
+    };
+    render(
+      <MemoryRouter initialEntries={['/npc?campaignId=campaign-tavern&npcId=npc-owner']}>
+        <Routes>
+          <Route
+            path="/npc"
+            element={<NpcDialoguePage service={service} suggestionService={suggestionService} />}
+          />
+        </Routes>
+      </MemoryRouter>,
+    );
+    const input = await screen.findByLabelText('你想说什么？');
+    fireEvent.change(input, { target: { value: 'Read the flame.' } });
+    fireEvent.click(screen.getByRole('button', { name: '发送' }));
+
+    expect(await screen.findByText('The flame flickers.')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '取消' }));
+    await waitFor(() => expect(aborted).toBe(true));
+    await waitFor(() => expect(screen.queryByText('The flame flickers.')).toBeNull());
+    expect(screen.getByText('Earlier answer')).toBeTruthy();
+    expect((screen.getByLabelText('你想说什么？') as HTMLTextAreaElement).value).toBe(
+      'Read the flame.',
+    );
+  });
 });
+
+const suggestionService = {
+  async load() {
+    return {
+      cacheId: 'cache-1',
+      campaignId: 'campaign-tavern',
+      scopeKind: 'NPC_DIALOGUE' as const,
+      scopeId: 'npc-owner',
+      contextDigest: 'a'.repeat(64),
+      suggestions: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'].map(
+        (text, index) => ({ id: `topic-${index + 1}`, text, addressedNpcId: 'npc-owner' }),
+      ),
+      source: 'CACHE' as const,
+      createdAt: '2026-08-24T00:00:00Z',
+    };
+  },
+};
 
 class FakeDialogueService {
   public readonly sent: string[] = [];
@@ -60,6 +179,10 @@ class FakeDialogueService {
     };
     return this.snapshot;
   }
+
+  public async retry() {
+    return this.snapshot;
+  }
 }
 
 function initialSnapshot(): NpcDialogueSnapshot {
@@ -79,8 +202,9 @@ function initialSnapshot(): NpcDialogueSnapshot {
       dialogueMessage('player-1', 1, 'PLAYER', 'Earlier question'),
       dialogueMessage('npc-1', 2, 'NPC', 'Earlier answer'),
     ],
-    suggestedTopics: ['The old tunnel', 'The lighthouse keeper'],
+    suggestedTopics: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'],
     generationContext: {},
+    timeline: null,
   };
 }
 

@@ -48,6 +48,135 @@ const migrations = [
     name: 'rumor_claim_sources',
     source: new URL('../../../database/migrations/0008_rumor_claim_sources.sql', import.meta.url),
   },
+  {
+    version: 9,
+    name: 'world_constitutions',
+    source: new URL('../../../database/migrations/0009_world_constitutions.sql', import.meta.url),
+  },
+  {
+    version: 10,
+    name: 'world_seed',
+    source: new URL('../../../database/migrations/0010_world_seed.sql', import.meta.url),
+  },
+  {
+    version: 11,
+    name: 'rules_engine',
+    source: new URL('../../../database/migrations/0011_rules_engine.sql', import.meta.url),
+  },
+  {
+    version: 12,
+    name: 'knowledge_boundary',
+    source: new URL('../../../database/migrations/0012_knowledge_boundary.sql', import.meta.url),
+  },
+  {
+    version: 13,
+    name: 'universal_character',
+    source: new URL('../../../database/migrations/0013_universal_character.sql', import.meta.url),
+  },
+  {
+    version: 14,
+    name: 'character_creation_sessions',
+    source: new URL(
+      '../../../database/migrations/0014_character_creation_sessions.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 15,
+    name: 'career_pools',
+    source: new URL('../../../database/migrations/0015_career_pools.sql', import.meta.url),
+  },
+  {
+    version: 16,
+    name: 'npc_lod',
+    source: new URL('../../../database/migrations/0016_npc_lod.sql', import.meta.url),
+  },
+  {
+    version: 17,
+    name: 'dynamic_locations',
+    source: new URL('../../../database/migrations/0017_dynamic_locations.sql', import.meta.url),
+  },
+  {
+    version: 18,
+    name: 'active_factions',
+    source: new URL('../../../database/migrations/0018_active_factions.sql', import.meta.url),
+  },
+  {
+    version: 19,
+    name: 'tavern_population',
+    source: new URL('../../../database/migrations/0019_tavern_population.sql', import.meta.url),
+  },
+  {
+    version: 20,
+    name: 'multi_npc_scene',
+    source: new URL('../../../database/migrations/0020_multi_npc_scene.sql', import.meta.url),
+  },
+  {
+    version: 21,
+    name: 'immutable_npc_timeline',
+    source: new URL(
+      '../../../database/migrations/0021_immutable_npc_timeline.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 22,
+    name: 'dialogue_suggestion_cache',
+    source: new URL(
+      '../../../database/migrations/0022_dialogue_suggestion_cache.sql',
+      import.meta.url,
+    ),
+  },
+  {
+    version: 23,
+    name: 'multi_quest_pool',
+    source: new URL('../../../database/migrations/0023_multi_quest_pool.sql', import.meta.url),
+  },
+  {
+    version: 24,
+    name: 'quest_graph',
+    source: new URL('../../../database/migrations/0024_quest_graph.sql', import.meta.url),
+  },
+  {
+    version: 25,
+    name: 'dynamic_quest_sources',
+    source: new URL('../../../database/migrations/0025_dynamic_quest_sources.sql', import.meta.url),
+  },
+  {
+    version: 26,
+    name: 'world_director',
+    source: new URL('../../../database/migrations/0026_world_director.sql', import.meta.url),
+  },
+  {
+    version: 27,
+    name: 'director_budget',
+    source: new URL('../../../database/migrations/0027_director_budget.sql', import.meta.url),
+  },
+  {
+    version: 28,
+    name: 'memory_layers',
+    source: new URL('../../../database/migrations/0028_memory_layers.sql', import.meta.url),
+  },
+  {
+    version: 29,
+    name: 'world_info_retrieval',
+    source: new URL('../../../database/migrations/0029_world_info_retrieval.sql', import.meta.url),
+  },
+  {
+    version: 30,
+    name: 'lazy_world_generation',
+    source: new URL('../../../database/migrations/0030_lazy_world_generation.sql', import.meta.url),
+  },
+  {
+    version: 31,
+    name: 'prefetch',
+    source: new URL('../../../database/migrations/0031_prefetch.sql', import.meta.url),
+  },
+  {
+    version: 32,
+    name: 'save_schema',
+    source: new URL('../../../database/migrations/0032_save_schema.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

@@ -2,6 +2,7 @@ import {
   CLASS_ARCHETYPES,
   campaignId,
   characterTraitId,
+  createTraitPointProfile,
   createPlayerAttributes,
   isoTimestamp,
   itemId,
@@ -186,21 +187,26 @@ function parseContentBoundaries(value: unknown): ContentBoundaries {
   });
 }
 
-function parseTraits(value: unknown): readonly [CharacterTrait, CharacterTrait] {
+function parseTraits(value: unknown): readonly CharacterTrait[] {
   const values = requireArray(value, 'traits');
-  if (values.length !== 2) {
-    throw new PersistenceDataError('traits must contain exactly two entries');
+  if (values.length > 32) throw new PersistenceDataError('traits exceed the limit');
+  const traits = values.map(parseTrait);
+  if (new Set(traits.map(({ id }) => id)).size !== traits.length) {
+    throw new PersistenceDataError('trait ids must be unique');
   }
-  return Object.freeze([parseTrait(values[0], 0), parseTrait(values[1], 1)]);
+  return Object.freeze(traits);
 }
 
 function parseTrait(value: unknown, index: number): CharacterTrait {
   const row = requireRecord(value, `traits[${index}]`);
-  return Object.freeze({
+  const trait = {
     id: characterTraitId(requireString(row['id'], `traits[${index}].id`)),
     name: requireString(row['name'], `traits[${index}].name`),
     description: requireString(row['description'], `traits[${index}].description`),
-  });
+  };
+  return Object.hasOwn(row, 'pointProfile')
+    ? Object.freeze({ ...trait, pointProfile: createTraitPointProfile(row['pointProfile']) })
+    : Object.freeze(trait);
 }
 
 function parseBackground(value: unknown): CharacterBackground {

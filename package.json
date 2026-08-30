@@ -1,6 +1,6 @@
 {
   "name": "ember-tavern",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "packageManager": "pnpm@11.9.0",
   "scripts": {
@@ -15,6 +15,13 @@
     "test": "vitest run --passWithNoTests && node --test packages/persistence/src/*.test.mjs scripts/*.test.mjs",
     "test:windows-e2e": "cargo test -p ember-native-bridge windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save",
     "archive:interop": "node scripts/archive-interop.mjs",
+    "performance:baseline": "node scripts/performance-baseline.mjs",
+    "performance:gate": "node scripts/performance-regression.mjs",
+    "playtest:fantasy": "vitest run packages/test-fixtures/src/fantasy-long-playtest-runner.test.ts",
+    "playtest:investigation": "vitest run packages/test-fixtures/src/investigation-long-playtest-runner.test.ts",
+    "playtest:cyberpunk": "vitest run packages/test-fixtures/src/cyberpunk-long-playtest-runner.test.ts",
+    "playtest:free-input": "vitest run packages/test-fixtures/src/free-input-stress-runner.test.ts",
+    "playtest:report": "vitest run packages/test-fixtures/src/playability-report.test.ts",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "rust:fmt": "cargo fmt --all -- --check",
     "rust:clippy": "cargo clippy --workspace --all-targets --all-features -- -D warnings",
@@ -29,6 +36,6 @@
     "prettier": "3.9.6",
     "typescript": "5.9.3",
     "typescript-eslint": "8.65.0",
-    "vitest": "4.0.18"
+    "vitest": "4.1.11"
   }
 }

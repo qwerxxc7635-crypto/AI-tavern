@@ -1,20 +1,38 @@
 {
   "schemaVersion": 1,
   "command": "pnpm archive:interop",
+  "historicalFixtures": [
+    {
+      "path": "packages/persistence/test-fixtures/typescript-export-v1.emtavern",
+      "sha256": "613d643c13398134c27ddcd0b4fa27bbf2bcc4f9fe920b607a3152eb52973c47"
+    },
+    {
+      "path": "packages/persistence/test-fixtures/rust-export-v1.emtavern",
+      "sha256": "d1bd48a278a220f7741d56727b406070bc43218566b9aaa461f517e68a5ab467"
+    },
+    {
+      "path": "packages/persistence/test-fixtures/typescript-export-v2.emtavern",
+      "sha256": "1c9d5159cef2aaacb76089eed000a403a0cc99ad1d878bbbd2b33cf40bd48bf8"
+    },
+    {
+      "path": "packages/persistence/test-fixtures/rust-export-v2.emtavern",
+      "sha256": "ee1b76ea20ed01c3cc83f0fb7936fca214b98dcad5643c5431ef7d1c375432f0"
+    }
+  ],
   "fixtures": {
     "typescript": {
-      "path": "packages/persistence/test-fixtures/typescript-export-v2.emtavern",
+      "path": "packages/persistence/test-fixtures/typescript-export-v3.emtavern",
       "producer": "packages/persistence/src/save-export.ts",
       "sourceTest": "packages/persistence/src/save-export.test.ts",
       "createdAt": "2026-08-01T13:00:00.000Z",
-      "sha256": "1c9d5159cef2aaacb76089eed000a403a0cc99ad1d878bbbd2b33cf40bd48bf8"
+      "sha256": "b2c3f9c6f066b137851ffd1683e6ecdc92a8ff1f32389c530b3e37f57c1d36a1"
     },
     "rust": {
-      "path": "packages/persistence/test-fixtures/rust-export-v2.emtavern",
+      "path": "packages/persistence/test-fixtures/rust-export-v3.emtavern",
       "producer": "crates/native-bridge/src/save_archive.rs",
       "sourceTest": "current_archive_interop_gate_imports_typescript_and_emits_rust",
       "createdAt": "2026-08-02T00:59:25.584Z",
-      "sha256": "ee1b76ea20ed01c3cc83f0fb7936fca214b98dcad5643c5431ef7d1c375432f0"
+      "sha256": "29d2bd59a68d2e2fdc8424898a8c02adfa8929ae5b1ed3e4f07c75a6c187f8c5"
     }
   }
 }

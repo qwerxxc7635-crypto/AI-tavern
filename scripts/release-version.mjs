@@ -36,15 +36,17 @@ const cargoMemberNames = [
   'ember-tavern-windows',
 ];
 
-export function expectedReleaseInfo(version, highlights = []) {
+export function expectedReleaseInfo(version, highlights = [], releaseDate = null) {
   requireVersion(version);
+  requireReleaseDate(releaseDate);
+  const released = releaseDate !== null;
   return {
     schemaVersion: 1,
     version,
-    channel: 'development',
-    status: 'unreleased',
+    channel: released ? 'stable' : 'development',
+    status: released ? 'released' : 'unreleased',
     changelogPath: 'CHANGELOG.md',
-    changelogHeading: `[${version}] - 未发布`,
+    changelogHeading: `[${version}] - ${releaseDate ?? '未发布'}`,
     highlights,
   };
 }
@@ -70,15 +72,20 @@ export function releaseStateErrors(state) {
     if (actual !== version)
       errors.push(`Cargo.lock ${name} version ${actual} differs from ${version}`);
   }
-  const expected = expectedReleaseInfo(version, currentReleaseHighlights(state.changelog, version));
+  const releaseDate = currentReleaseDate(state.changelog, version);
+  const expected = expectedReleaseInfo(
+    version,
+    currentReleaseHighlights(state.changelog, version),
+    releaseDate,
+  );
   if (JSON.stringify(state.releaseInfo) !== JSON.stringify(expected)) {
     errors.push('release-info.json is not synchronized');
   }
   if (state.generatedReleaseInfo !== renderGeneratedReleaseInfo(expected)) {
     errors.push('generated release info is not synchronized');
   }
-  if (!state.changelog.includes(`## [${version}] - 未发布`)) {
-    errors.push(`CHANGELOG.md has no current ${version} 未发布 heading`);
+  if (currentReleaseMarkerHeading(state.changelog, version) === null) {
+    errors.push(`CHANGELOG.md has no current ${version} release heading`);
   }
   return errors;
 }
@@ -116,24 +123,20 @@ export async function syncReleaseVersion() {
   }
 
   const changelog = await readText('CHANGELOG.md');
-  const synchronizedChangelog = changelog.replace(
-    /(<!-- current-release:start -->\s*\n)## \[[^\]]+\] - 未发布/u,
-    `$1## [${version}] - 未发布`,
-  );
-  if (synchronizedChangelog === changelog && !changelog.includes(`## [${version}] - 未发布`)) {
-    throw new Error('CHANGELOG.md current release marker is missing');
-  }
+  const synchronizedChangelog = synchronizeCurrentReleaseHeading(changelog, version);
+  const releaseDate = currentReleaseDate(synchronizedChangelog, version);
   await writeText('CHANGELOG.md', synchronizedChangelog);
   const releaseInfo = expectedReleaseInfo(
     version,
     currentReleaseHighlights(synchronizedChangelog, version),
+    releaseDate,
   );
   await writeJson('release-info.json', releaseInfo);
   await writeText(
     'windows-app/src/generated-release-info.ts',
     renderGeneratedReleaseInfo(releaseInfo),
   );
-  execFileSync('cargo', ['metadata', '--no-deps', '--format-version', '1'], {
+  execFileSync('cargo', ['metadata', '--format-version', '1'], {
     cwd: root,
     stdio: 'ignore',
   });
@@ -174,13 +177,57 @@ async function readReleaseState() {
 
 export function currentReleaseHighlights(changelog, version) {
   requireVersion(version);
-  const heading = `## [${version}] - 未发布`;
+  const heading = currentReleaseHeading(changelog, version)?.heading;
+  if (heading === undefined) return [];
   const start = changelog.indexOf(heading);
-  if (start < 0) return [];
   const afterHeading = changelog.slice(start + heading.length);
   const nextRelease = afterHeading.search(/^## /mu);
   const section = nextRelease < 0 ? afterHeading : afterHeading.slice(0, nextRelease);
   return [...section.matchAll(/^- (.+)$/gmu)].map((match) => match[1]);
+}
+
+export function currentReleaseDate(changelog, version) {
+  requireVersion(version);
+  const heading = currentReleaseHeading(changelog, version);
+  if (heading === null || heading.label === '未发布') return null;
+  requireReleaseDate(heading.label);
+  return heading.label;
+}
+
+export function synchronizeCurrentReleaseHeading(changelog, version) {
+  requireVersion(version);
+  const existingHeading = currentReleaseMarkerHeading(changelog);
+  if (existingHeading === null) {
+    throw new Error('CHANGELOG.md current release marker is missing');
+  }
+  const releaseLabel = existingHeading.version === version ? existingHeading.label : '未发布';
+  return changelog.replace(
+    /(<!-- current-release:start -->\s*\n)## \[[^\]]+\] - [^\n]+/u,
+    `$1## [${version}] - ${releaseLabel}`,
+  );
+}
+
+function currentReleaseHeading(changelog, expectedVersion = null) {
+  const escapedVersion =
+    expectedVersion === null ? '[^\\]]+' : expectedVersion.replaceAll('.', '\\.');
+  const headingMatch = changelog.match(
+    new RegExp(`^(## \\[(${escapedVersion})\\] - ([^\\n]+))`, 'mu'),
+  );
+  if (headingMatch === null) return null;
+  const [, heading, version, label] = headingMatch;
+  if (heading === undefined || version === undefined || label === undefined) return null;
+  return { heading, version, label };
+}
+
+function currentReleaseMarkerHeading(changelog, expectedVersion = null) {
+  const marker = changelog.match(
+    /<!-- current-release:start -->\s*\n(## \[([^\]]+)\] - ([^\n]+))/u,
+  );
+  if (marker === null) return null;
+  const [, heading, version, label] = marker;
+  if (heading === undefined || version === undefined || label === undefined) return null;
+  if (expectedVersion !== null && version !== expectedVersion) return null;
+  return { heading, version, label };
 }
 
 export function renderGeneratedReleaseInfo(info) {
@@ -196,6 +243,17 @@ function cargoLockVersion(lock, name) {
 function requireVersion(value) {
   if (typeof value !== 'string' || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(value)) {
     throw new Error('Root package version must be a semantic version');
+  }
+}
+
+function requireReleaseDate(value) {
+  if (value === null) return;
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    throw new Error('Release date must be null or an ISO calendar date');
+  }
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  if (Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0, 10) !== value) {
+    throw new Error('Release date must be null or an ISO calendar date');
   }
 }
 

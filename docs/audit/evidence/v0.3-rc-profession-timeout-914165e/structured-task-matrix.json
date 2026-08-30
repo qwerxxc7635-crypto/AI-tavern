@@ -1,0 +1,83 @@
+{
+  "schemaVersion": 1,
+  "sharedProviderPath": {
+    "router": "DesktopAIOrchestrator",
+    "queue": "GenerationQueue only where explicitly listed",
+    "provider": "selected saved profile",
+    "openAiCompatibleEndpoint": "/chat/completions",
+    "deepSeekResponseFormat": "JSON_OBJECT",
+    "promptAndSchemaAuthority": "formatTaskPrompt + AI_TASK_SCHEMAS",
+    "repair": "at most one non-stream Provider call, same task and fresh HTTP inactivity deadline, then full parse/schema/business validation",
+    "remoteMinimumProviderIdleTimeoutMs": 60000,
+    "transportOverallSafetyCapMs": 300000
+  },
+  "groups": [
+    {
+      "group": "world",
+      "tasks": ["GENERATE_WORLD", "REFINE_WORLD"],
+      "queue": "P0 concurrency=1 intent-deduplicated",
+      "thinking": "DeepSeek disabled",
+      "maxOutputTokens": 4096,
+      "providerIdleTimeoutMs": 120000,
+      "operationTimeoutMs": 270000,
+      "stream": true,
+      "cancellation": "UI -> Queue -> Provider -> HTTP",
+      "commit": "inside deduplicated Queue"
+    },
+    {
+      "group": "profession",
+      "tasks": ["GENERATE_CAREER_POOL"],
+      "queue": "P2 concurrency=2 intent-deduplicated",
+      "thinking": "DeepSeek disabled",
+      "maxOutputTokens": 4096,
+      "providerIdleTimeoutMs": 60000,
+      "operationTimeoutMs": 150000,
+      "stream": false,
+      "cancellation": "Queue -> Provider -> HTTP",
+      "commit": "inside deduplicated Queue"
+    },
+    {
+      "group": "traits-and-background",
+      "tasks": ["GENERATE_CHARACTER_TRAITS", "COMPLETE_CHARACTER_BACKGROUND"],
+      "queue": "none",
+      "thinking": "DeepSeek disabled",
+      "maxOutputTokens": 4000,
+      "requestedTimeoutMs": 5000,
+      "effectiveRemoteIdleTimeoutMs": 60000,
+      "stream": false,
+      "commit": "validated gateway transaction"
+    },
+    {
+      "group": "universal-character",
+      "tasks": ["GENERATE_QUICK_CHARACTER", "EDIT_CHARACTER_DRAFT", "CHECK_CONSISTENCY"],
+      "queue": "none except profession",
+      "thinking": "DeepSeek disabled",
+      "maxOutputTokensByTask": {"GENERATE_QUICK_CHARACTER": 8000, "EDIT_CHARACTER_DRAFT": 8000, "CHECK_CONSISTENCY": 2000},
+      "requestedTimeoutMs": 8000,
+      "effectiveRemoteIdleTimeoutMs": 60000,
+      "stream": false,
+      "commit": "draft/preview validation before transaction"
+    },
+    {
+      "group": "tavern-and-npc",
+      "tasks": ["GENERATE_TAVERN", "GENERATE_NPCS", "GENERATE_NPC_LOD", "NPC_REPLY"],
+      "queue": "service-specific, no shared GenerationQueue",
+      "thinking": "provider default for narrative tasks",
+      "maxOutputTokensRange": [2000, 6000],
+      "effectiveRemoteIdleTimeoutMs": 60000,
+      "stream": "NPC_REPLY supports streaming",
+      "commit": "task business validation then transaction"
+    },
+    {
+      "group": "quest-and-adventure",
+      "tasks": ["GENERATE_QUEST", "GENERATE_ADVENTURE_PLAN", "GENERATE_ADVENTURE_TURN", "RESOLVE_DICE_RESULT", "GENERATE_WORLD_EVENT", "SUMMARIZE_ADVENTURE"],
+      "queue": "service-specific, no shared GenerationQueue",
+      "thinking": "provider default for narrative/reasoning tasks",
+      "maxOutputTokensRange": [4000, 8000],
+      "effectiveRemoteIdleTimeoutMs": 60000,
+      "stream": false,
+      "commit": "rules and D20 boundaries then transaction"
+    }
+  ],
+  "sameMechanismAuditConclusion": "Strict world/career/trait/character/repair tasks now share the DeepSeek non-thinking policy. Other structured calls already receive the 60 second remote minimum and retain provider-default reasoning only where narrative/reasoning is part of the task contract."
+}

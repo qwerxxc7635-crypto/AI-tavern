@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 import {
@@ -8,22 +8,46 @@ import {
 } from './npc-dialogue-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignParentRoute, campaignRoute } from './navigation.js';
+import { ActionComposer, DialogueView } from './ui/game-components.js';
+import {
+  dialogueSuggestionService,
+  type DialogueSuggestionSet,
+  type WindowsDialogueSuggestionService,
+} from './dialogue-suggestion-service.js';
 
-type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send'>;
+type DialogueActions = Pick<WindowsNpcDialogueService, 'load' | 'send' | 'retry'>;
 
 export function NpcDialoguePage({
   service = windowsNpcDialogueService,
+  suggestionService = dialogueSuggestionService,
 }: {
   readonly service?: DialogueActions;
+  readonly suggestionService?: Pick<WindowsDialogueSuggestionService, 'load'>;
 }) {
   const [search] = useSearchParams();
   const campaignId = search.get('campaignId');
   const npcId = search.get('npcId');
   const [snapshot, setSnapshot] = useState<NpcDialogueSnapshot | null>(null);
   const [draft, setDraft] = useState('');
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [streaming, setStreaming] = useState(false);
+  const [streamedText, setStreamedText] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
   const [aiError, setAiError] = useState<unknown | null>(null);
+  const [suggestions, setSuggestions] = useState<DialogueSuggestionSet | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | undefined>();
+  const [suggestionRevision, setSuggestionRevision] = useState(0);
+  const sendInFlight = useRef(false);
+  const streamController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      streamController.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (campaignId === null || npcId === null) return;
@@ -41,18 +65,99 @@ export function NpcDialoguePage({
     };
   }, [campaignId, npcId, service]);
 
+  useEffect(() => {
+    if (campaignId === null || npcId === null || snapshot === null) return;
+    const controller = new AbortController();
+    setSuggestions(null);
+    setSuggestionError(undefined);
+    void suggestionService
+      .load(campaignId, 'NPC_DIALOGUE', npcId, controller.signal)
+      .then(setSuggestions)
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) {
+          setSuggestionError(error instanceof Error ? error.message : '对话建议暂时无法生成。');
+        }
+      });
+    return () => controller.abort();
+  }, [campaignId, npcId, snapshot, suggestionRevision, suggestionService]);
+
   async function send() {
-    if (campaignId === null || npcId === null || busy || draft.trim().length === 0) return;
+    if (
+      campaignId === null ||
+      npcId === null ||
+      busy ||
+      sendInFlight.current ||
+      draft.trim().length === 0
+    )
+      return;
     const message = draft.trim();
+    sendInFlight.current = true;
     setBusy(true);
+    setStreaming(false);
+    setStreamedText('');
     setAiError(null);
+    const controller = new AbortController();
+    streamController.current = controller;
     try {
-      setSnapshot(await service.send(campaignId, npcId, message));
+      setSnapshot(
+        await service.send(campaignId, npcId, message, {
+          signal: controller.signal,
+          onChunk(content) {
+            setStreaming(true);
+            setStreamedText((current) => `${current}${content}`);
+          },
+          onReset() {
+            setStreaming(false);
+            setStreamedText('');
+          },
+        }),
+      );
       setDraft('');
+      setSelectedTopicId(null);
     } catch (error) {
       setAiError(error);
     } finally {
+      streamController.current = null;
+      sendInFlight.current = false;
       setBusy(false);
+      setStreaming(false);
+      setStreamedText('');
+    }
+  }
+
+  async function retry() {
+    if (campaignId === null || npcId === null || busy || sendInFlight.current) return;
+    sendInFlight.current = true;
+    setBusy(true);
+    setStreaming(false);
+    setStreamedText('');
+    setAiError(null);
+    const controller = new AbortController();
+    streamController.current = controller;
+    try {
+      setSnapshot(
+        await service.retry(campaignId, npcId, {
+          signal: controller.signal,
+          onChunk(content) {
+            setStreaming(true);
+            setStreamedText((current) => `${current}${content}`);
+          },
+          onReset() {
+            setStreaming(false);
+            setStreamedText('');
+          },
+        }),
+      );
+      setDraft('');
+      setSelectedTopicId(null);
+    } catch (error) {
+      setAiError(error);
+    } finally {
+      streamController.current = null;
+      sendInFlight.current = false;
+      setBusy(false);
+      setStreaming(false);
+      setStreamedText('');
     }
   }
 
@@ -84,63 +189,63 @@ export function NpcDialoguePage({
             {snapshot.npc.identity} · {snapshot.npc.currentMood}
           </p>
         </div>
-        <Link className="text-link" to={`/tavern?campaignId=${encodeURIComponent(campaignId)}`}>
+        <Link className="text-link" to={campaignRoute(APP_PATHS.tavern, campaignId)}>
           返回酒馆
         </Link>
       </header>
 
       <div className="dialogue-layout">
         <section className="dialogue-panel" aria-label="对话历史">
-          <div className="dialogue-history" aria-live="polite">
-            {snapshot.messages.length === 0 ? (
-              <p className="dialogue-empty">炉火正旺。你可以先开口。</p>
-            ) : (
-              snapshot.messages.map((message) => (
-                <article
-                  className={`dialogue-bubble dialogue-bubble--${message.role.toLowerCase()}`}
-                  key={message.id}
-                >
-                  <small>{message.role === 'PLAYER' ? '你' : snapshot.npc.name}</small>
-                  <p>{message.content}</p>
-                </article>
-              ))
-            )}
-          </div>
+          <DialogueView
+            className="dialogue-history"
+            label="对话历史"
+            emptyText="炉火正旺。你可以先开口。"
+            messages={snapshot.messages.map((message) => ({
+              id: message.id,
+              content: message.content,
+              side: message.role,
+              speaker: message.role === 'PLAYER' ? '你' : snapshot.npc.name,
+            }))}
+          />
 
-          {snapshot.suggestedTopics.length === 0 ? null : (
-            <div className="dialogue-topics" aria-label="建议话题">
-              <span>建议话题</span>
-              {snapshot.suggestedTopics.map((topic) => (
-                <button type="button" key={topic} onClick={() => setDraft(topic)} disabled={busy}>
-                  {topic}
-                </button>
-              ))}
-            </div>
-          )}
-
-          <form
+          <ActionComposer
             className="dialogue-composer"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void send();
+            fieldId="npc-dialogue-free-input"
+            label="你想说什么？"
+            description="可以选择建议话题，也可以永久使用自由输入。按住控制键或命令键，再按回车发送。"
+            value={draft}
+            suggestions={(suggestions?.suggestions ?? []).map((suggestion) => ({
+              id: suggestion.id,
+              label: suggestion.text,
+            }))}
+            selectedSuggestionId={selectedTopicId}
+            disabled={busy}
+            submitting={busy && !streaming}
+            streaming={streaming}
+            streamedText={streamedText}
+            {...(suggestions === null && suggestionError === undefined
+              ? { status: '正在整理对话建议…' }
+              : {})}
+            {...(suggestionError === undefined ? {} : { error: suggestionError })}
+            submitLabel="发送"
+            onChange={(value) => {
+              setDraft(value);
+              setSelectedTopicId(null);
             }}
-          >
-            <label htmlFor="dialogue-message">你想说什么？</label>
-            <textarea
-              id="dialogue-message"
-              maxLength={4_000}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              disabled={busy}
+            onSuggestion={(suggestion) => {
+              setDraft(suggestion.label);
+              setSelectedTopicId(suggestion.id);
+            }}
+            onRetry={() => setSuggestionRevision((current) => current + 1)}
+            onCancel={() => streamController.current?.abort()}
+            onSubmit={() => void send()}
+          />
+          {snapshot.timeline === null && aiError === null ? null : (
+            <AIErrorNotice
+              error={aiError ?? restoredTimelineError(snapshot)}
+              onRetry={() => void retry()}
             />
-            <div>
-              <span>{draft.length} / 4000</span>
-              <button className="primary-action" type="submit" disabled={busy || !draft.trim()}>
-                {busy ? '等待回应…' : '发送'}
-              </button>
-            </div>
-          </form>
-          {aiError === null ? null : <AIErrorNotice error={aiError} onRetry={() => void send()} />}
+          )}
         </section>
 
         <aside className="dialogue-sidebar">
@@ -164,6 +269,13 @@ export function NpcDialoguePage({
   );
 }
 
+function restoredTimelineError(snapshot: NpcDialogueSnapshot): { readonly code: string } {
+  const timeline = snapshot.timeline;
+  if (timeline === null || timeline.status === 'PENDING') return { code: 'APP_INTERRUPTED' };
+  const latest = timeline.attempts.at(-1);
+  return { code: latest?.errorCode ?? 'APP_INTERRUPTED' };
+}
+
 function Relationship({ label, value }: { readonly label: string; readonly value: number }) {
   return (
     <div className="relationship-row">
@@ -177,12 +289,13 @@ function Relationship({ label, value }: { readonly label: string; readonly value
 }
 
 function DialogueMessage({ title }: { readonly title: string }) {
+  const [search] = useSearchParams();
   return (
     <main className="dialogue-room">
       <p className="eyebrow">{playerText.coreUi.conversationUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/tavern">
-        返回酒馆
+      <Link className="text-link" to={campaignParentRoute(search, APP_PATHS.tavern)}>
+        {search.has('campaignId') ? '返回酒馆' : '返回存档首页'}
       </Link>
     </main>
   );

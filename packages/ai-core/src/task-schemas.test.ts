@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { AI_TASKS, AI_TASK_SCHEMAS, type AITask } from './index.js';
+import { AI_TASKS, AI_TASK_SCHEMAS, FAKE_TASK_OUTPUTS, type AITask } from './index.js';
 
 const boundaries = {
   allowHorror: true,
@@ -17,8 +17,27 @@ const world = {
   technologyLevel: 'Late medieval',
   powerRules: ['Magic always leaves a warm trace.'],
 };
+const constitution = {
+  schemaVersion: 1,
+  worldType: 'Low fantasy coast',
+  era: 'Late medieval',
+  technology: 'Late medieval',
+  magic: 'Magic always leaves a warm trace.',
+  peoples: ['Coastal humans'],
+  society: 'Guilds connect isolated settlements',
+  politics: 'Harbor councils share authority with guilds',
+  economy: 'Fishing and coastal trade',
+  combatScale: 'Personal and small-group conflict',
+  deathRules: 'Death is permanent',
+  careerRules: 'Careers arise from local institutions',
+  equipmentRules: 'Equipment follows available craft and materials',
+  npcRules: 'NPC motives follow knowledge and obligations',
+  traitRules: 'Benefits require balancing drawbacks',
+  taboos: [],
+};
 const worldDraft = {
   ...world,
+  constitution,
   factions: [
     {
       name: 'Lantern Guild',
@@ -140,6 +159,209 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
       ],
     },
   },
+  GENERATE_QUICK_CHARACTER: {
+    input: {
+      concept: 'A world-walking scholar.',
+      storyPreferences: ['Exploration'],
+      contentBoundaries: boundaries,
+      constitution,
+      extensionDefinitions: [],
+      careerPool: [
+        {
+          id: 'career-lantern-warden',
+          name: 'Lantern Warden',
+          rarity: 'COMMON',
+          role: 'Maintains beacon roads.',
+          requirements: ['Guild apprenticeship'],
+          legacyArchetype: 'WARRIOR',
+        },
+      ],
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_QUICK_CHARACTER,
+  },
+  EDIT_CHARACTER_DRAFT: {
+    input: {
+      scope: 'FIELD',
+      fieldOperation: 'GENERATE',
+      section: null,
+      fieldPath: 'identity',
+      targetPaths: ['identity'],
+      fieldKinds: { identity: 'TEXT' },
+      draft: { kind: 'UNIVERSAL_CHARACTER_DRAFT', identity: '' },
+      lockedFields: [],
+      constitution,
+      extensionDefinitions: [],
+    },
+    output: FAKE_TASK_OUTPUTS.EDIT_CHARACTER_DRAFT,
+  },
+  GENERATE_CAREER_POOL: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-careers',
+        constitutionRevision: 1,
+        contextSummary: JSON.stringify(constitution),
+      },
+      generationMode: 'INITIAL',
+      requestedCount: 1,
+      requestedRarities: ['COMMON'],
+      existingCareerIds: [],
+      existingCareerNames: [],
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_CAREER_POOL,
+  },
+  GENERATE_ITEMS: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-items',
+        constitutionRevision: 1,
+        contextSummary: JSON.stringify(constitution),
+      },
+      purpose: 'A grounded reward from the beacon quest',
+      requestedCount: 1,
+      requestedRarity: 'NOTABLE',
+      source: {
+        kind: 'QUEST_REWARD',
+        questId: 'quest-beacon',
+        adventureId: 'adventure-beacon',
+      },
+      bindingTargets: [
+        {
+          kind: 'QUEST',
+          targetId: 'quest-beacon',
+          allowedTriggers: ['QUEST_CONTEXT'],
+          summary: 'Recovered during the beacon quest',
+        },
+        {
+          kind: 'NPC',
+          targetId: 'npc-owner',
+          allowedTriggers: ['NPC_RECOGNITION'],
+          summary: 'The tavern owner recognizes its provenance',
+        },
+      ],
+      constitutionEvidence: {
+        equipmentRules: constitution.equipmentRules,
+        technology: constitution.technology,
+        economy: constitution.economy,
+      },
+      existingItemIds: [],
+      existingItemNames: [],
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_ITEMS,
+  },
+  GENERATE_NPC_LOD: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-npc-lod',
+        constitutionRevision: 1,
+        contextSummary: 'A background harbor passerby is noticed near the tavern.',
+      },
+      currentProfile: {
+        npcId: 'npc-background-1',
+        lod: 0,
+        identityAnchor: 'anchor-background-1',
+        populationRole: 'Harbor passerby',
+        name: null,
+        appearance: null,
+        currentBehavior: null,
+        career: null,
+        personality: null,
+        goals: [],
+        knowledgeFactIds: [],
+        relationshipNpcIds: [],
+        memoryIds: [],
+        secretFactIds: [],
+        questIds: [],
+        itemIds: [],
+        experienceEventIds: [],
+        constitutionEvidence: {
+          npcRules: constitution.npcRules,
+          society: constitution.society,
+          technology: constitution.technology,
+        },
+      },
+      targetLod: 1,
+      trigger: 'OBSERVED',
+      allowedReferences: {
+        knowledgeFactIds: [],
+        relationshipNpcIds: [],
+        memoryIds: [],
+        secretFactIds: [],
+        questIds: [],
+        itemIds: [],
+        experienceEventIds: [],
+      },
+      constitutionEvidence: {
+        npcRules: constitution.npcRules,
+        society: constitution.society,
+        technology: constitution.technology,
+      },
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_NPC_LOD,
+  },
+  GENERATE_LOCATIONS: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-locations',
+        constitutionRevision: 1,
+        contextSummary: 'The road immediately beyond Ash Harbor.',
+      },
+      expansionMode: 'CONNECTED',
+      originLocation: {
+        id: 'location-ash-harbor',
+        name: 'Ash Harbor',
+        kind: 'CITY',
+        parentLocationId: null,
+        description: 'A sheltered port beneath black cliffs.',
+      },
+      requestedCount: 1,
+      existingLocationIds: ['location-ash-harbor'],
+      existingLocationNames: ['Ash Harbor'],
+      allowedFactionIds: [],
+      constitutionEvidence: {
+        technology: constitution.technology,
+        magic: constitution.magic,
+        society: constitution.society,
+        politics: constitution.politics,
+      },
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_LOCATIONS,
+  },
+  GENERATE_FACTIONS: {
+    input: {
+      schemaVersion: 1,
+      context: {
+        worldId: 'campaign-factions',
+        constitutionRevision: 1,
+        contextSummary: 'Activate the established Lantern Guild.',
+      },
+      requestedFactionIds: ['faction-lantern'],
+      existingFactions: [
+        {
+          id: 'faction-lantern',
+          name: 'Lantern Guild',
+          description: 'Navigators who maintain the coast beacons.',
+          goal: 'Restore the Ash Harbor lighthouse.',
+          enemyFactionIds: [],
+          allyFactionIds: [],
+          territoryLocationIds: ['location-ash-harbor'],
+          playerRelation: 'UNKNOWN',
+        },
+      ],
+      allowedFactionIds: ['faction-lantern'],
+      allowedLocationIds: ['location-ash-harbor'],
+      constitutionEvidence: {
+        technology: constitution.technology,
+        society: constitution.society,
+        politics: constitution.politics,
+        economy: constitution.economy,
+      },
+    },
+    output: FAKE_TASK_OUTPUTS.GENERATE_FACTIONS,
+  },
   GENERATE_TAVERN: {
     input: { world, playerConcept: 'Curious scout', desiredPosition: null },
     output: {
@@ -217,6 +439,7 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     input: {
       worldSummary: world.summary,
       currentRegion: world.currentRegion,
+      relevantLore: [],
       npc: {
         ...npc,
         appearance: 'Tall, with a red wool coat.',
@@ -240,9 +463,64 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     output: {
       reply: 'I will show you, but stay close.',
       mood: 'Wary',
-      suggestedTopics: ['The old tunnel'],
+      suggestedTopics: ['The old tunnel', 'The lighthouse keeper', 'The cellar door'],
       memoryCandidate: 'Mira asked to see the cellar door.',
       relationshipProposal: { trust: 1 },
+    },
+  },
+  GENERATE_DIALOGUE_SUGGESTIONS: {
+    input: {
+      scopeKind: 'NPC_DIALOGUE',
+      scopeId: 'npc-1',
+      world: { summary: world.summary, currentRegion: world.currentRegion },
+      player: { name: 'Mira', concept: 'Curious scout', personalGoal: 'Find the old road.' },
+      participants: [{ id: 'npc-1', name: 'Ilyra', identity: 'Innkeeper', status: 'ACTIVE' }],
+      relationship: { trust: 1, closeness: 0, awe: 0, obligation: 0 },
+      recentMessages: [
+        { role: 'PLAYER', speakerNpcId: null, content: 'What is below the cellar?' },
+        { role: 'NPC', speakerNpcId: 'npc-1', content: 'An old sealed passage.' },
+      ],
+      openQuests: [{ id: 'quest-1', title: 'The Lantern Below', status: 'AVAILABLE' }],
+    },
+    output: {
+      suggestions: [
+        { text: 'Who sealed the passage?', addressedNpcId: 'npc-1' },
+        { text: 'Ask about the lantern quest.', addressedNpcId: 'npc-1' },
+        { text: 'Offer to inspect the cellar.', addressedNpcId: 'npc-1' },
+      ],
+    },
+  },
+  PROPOSE_TAVERN_SCENE_ACTION: {
+    input: {
+      sceneId: 'scene-1',
+      sceneRevision: 1,
+      actor: {
+        id: 'npc-1',
+        name: 'Ilyra',
+        populationRole: 'Tavern owner',
+        currentBehavior: 'Keeps watch over the common room.',
+        personality: 'Measured and direct.',
+        goals: ['Keep the tavern safe.'],
+      },
+      visibleParticipants: [
+        { id: 'npc-1', name: 'Ilyra', populationRole: 'Tavern owner', status: 'ACTIVE' },
+        { id: 'npc-2', name: 'Tomas', populationRole: 'Visitor', status: 'LISTENING' },
+      ],
+      authorizedKnowledge: [{ id: 'knowledge-1', content: 'The cellar has an old door.' }],
+      memories: [{ id: 'memory-1', summary: 'A traveler asked about the cellar.' }],
+      recentPublicTurns: [],
+      playerIntent: 'I ask who knows the cellar.',
+      addressedNpcId: 'npc-1',
+      allowedActions: ['SPEAK', 'INTERRUPT', 'SILENCE', 'EAVESDROP', 'LEAVE'],
+    },
+    output: {
+      actorId: 'npc-1',
+      action: 'SPEAK',
+      targetNpcId: null,
+      utterance: 'I know the cellar door.',
+      citedKnowledgeIds: ['knowledge-1'],
+      urgency: 1,
+      rationale: 'The question is directly relevant to known information.',
     },
   },
   GENERATE_QUEST: {
@@ -461,17 +739,20 @@ describe('versioned AI task schemas', () => {
         : task === 'GENERATE_NPCS'
           ? 4
           : task === 'NPC_REPLY'
-            ? 3
-            : [
-                  'GENERATE_CHARACTER_TRAITS',
-                  'COMPLETE_CHARACTER_BACKGROUND',
-                  'GENERATE_QUEST',
-                  'GENERATE_WORLD_EVENT',
-                  'SUMMARIZE_ADVENTURE',
-                  'RESOLVE_DICE_RESULT',
-                ].includes(task)
-              ? 2
-              : 1;
+            ? 5
+            : task === 'GENERATE_QUEST'
+              ? 3
+              : [
+                    'GENERATE_WORLD',
+                    'REFINE_WORLD',
+                    'GENERATE_CHARACTER_TRAITS',
+                    'COMPLETE_CHARACTER_BACKGROUND',
+                    'GENERATE_WORLD_EVENT',
+                    'SUMMARIZE_ADVENTURE',
+                    'RESOLVE_DICE_RESULT',
+                  ].includes(task)
+                ? 2
+                : 1;
     expect(definition.schemaVersion).toBe(expectedVersion);
     expect(definition.input.safeParse(fixtures[task].input).success).toBe(true);
     expect(definition.output.safeParse(fixtures[task].output).success).toBe(true);
@@ -518,6 +799,25 @@ describe('versioned AI task schemas', () => {
         ],
       }).success,
     ).toBe(false);
+  });
+
+  it('requires three to five unique optional topics for NPC replies', () => {
+    const output = fixtures.NPC_REPLY.output as Record<string, unknown>;
+    for (const suggestedTopics of [
+      ['one', 'two'],
+      ['one', 'two', 'three', 'four', 'five', 'six'],
+      ['one', 'two', 'ONE'],
+    ]) {
+      expect(
+        AI_TASK_SCHEMAS.NPC_REPLY.output.safeParse({ ...output, suggestedTopics }).success,
+      ).toBe(false);
+    }
+    expect(
+      AI_TASK_SCHEMAS.NPC_REPLY.output.safeParse({
+        ...output,
+        suggestedTopics: ['one', 'two', 'three'],
+      }).success,
+    ).toBe(true);
   });
 
   it('forbids suggestions after an adventure reaches its ending', () => {

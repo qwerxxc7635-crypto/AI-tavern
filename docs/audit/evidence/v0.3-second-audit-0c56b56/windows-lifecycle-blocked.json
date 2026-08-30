@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "recordedAt": "2026-08-28T09:28:57Z",
+  "sourceCommit": "0c56b56f174e07ffcfe01a7d4b52ff741273c88c",
+  "status": "BLOCKED_EXTERNAL",
+  "host": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "pwshAvailable": false
+  },
+  "scope": "Windows NSIS, Credential Manager, WebView2, install, launch, version, uninstall, and user-data preservation lifecycle",
+  "reason": "The audit host is macOS arm64 and no ephemeral Windows runner or PowerShell executable is available.",
+  "oldEvidenceReused": false,
+  "installerBuilt": false,
+  "lifecycleExecuted": false
+}

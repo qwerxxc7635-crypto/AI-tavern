@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 
 import {
@@ -10,6 +10,7 @@ import {
 } from './world-creation-service.js';
 import { AIErrorNotice } from './ai-error-notice.js';
 import { playerText } from './localization/index.js';
+import { APP_PATHS, campaignRoute } from './navigation.js';
 
 type WorldCreationActions = Pick<
   WindowsWorldCreationService,
@@ -48,6 +49,15 @@ export function WorldCreationPage({
     (() => Promise<WorldCreationSnapshot>) | null
   >(null);
   const [revision, setRevision] = useState('');
+  const [streamedIntroduction, setStreamedIntroduction] = useState('');
+  const streamController = useRef<AbortController | null>(null);
+
+  useEffect(
+    () => () => {
+      streamController.current?.abort();
+    },
+    [],
+  );
 
   useEffect(() => {
     if (campaignId === null) return;
@@ -85,12 +95,39 @@ export function WorldCreationPage({
     }
   }
 
+  function generateWorld(options: Parameters<WindowsWorldCreationService['generate']>[1]) {
+    if (campaignId === null) return;
+    const currentCampaignId = campaignId;
+    const action = async () => {
+      const controller = new AbortController();
+      streamController.current = controller;
+      setStreamedIntroduction('');
+      try {
+        return await service.generate(currentCampaignId, options, {
+          signal: controller.signal,
+          onChunk(content) {
+            setStreamedIntroduction((current) => `${current}${content}`);
+          },
+          onReset() {
+            setStreamedIntroduction('');
+          },
+        });
+      } catch (error) {
+        setStreamedIntroduction('');
+        throw error;
+      } finally {
+        if (streamController.current === controller) streamController.current = null;
+      }
+    };
+    void perform('generate', action);
+  }
+
   if (campaignId === null) {
     return (
       <main className="world-studio world-studio--message">
         <p className="eyebrow">{playerText.coreUi.missingChronicle}</p>
         <h1>先选择一个存档。</h1>
-        <Link className="text-link" to="/saves">
+        <Link className="text-link" to={APP_PATHS.saves}>
           返回存档首页
         </Link>
       </main>
@@ -115,20 +152,26 @@ export function WorldCreationPage({
       <WorldOptions
         busy={busy !== null}
         error={aiError}
+        streamedIntroduction={streamedIntroduction}
+        onCancel={() => streamController.current?.abort()}
         onRetry={retryOperation === null ? undefined : () => void perform('retry', retryOperation)}
-        onGenerate={(options) =>
-          void perform('generate', () => service.generate(campaignId, options))
-        }
+        onGenerate={generateWorld}
       />
     );
   }
 
-  if (snapshot?.campaignState === 'REVIEWING_WORLD' && snapshot.world !== null && editor !== null) {
+  if (
+    snapshot?.campaignState === 'REVIEWING_WORLD' &&
+    snapshot.world !== null &&
+    snapshot.constitution !== null &&
+    editor !== null
+  ) {
     const current = snapshot.world;
+    const constitution = snapshot.constitution;
     return (
       <main className="world-studio">
         <header className="world-studio__topline">
-          <Link to="/saves">← 存档首页</Link>
+          <Link to={APP_PATHS.saves}>← 存档首页</Link>
           <p>当前默认模型 · 生成结果预览</p>
         </header>
         <section className="world-hero">
@@ -136,6 +179,7 @@ export function WorldCreationPage({
             <p className="eyebrow">{playerText.coreUi.worldBibleReview}</p>
             <input
               aria-label="世界名称"
+              data-ai-field="world-name"
               className="world-title-input"
               value={editor.name}
               disabled={isLocked('name', current.lockedFields)}
@@ -150,13 +194,63 @@ export function WorldCreationPage({
             onClick={() =>
               void perform('confirm', async () => {
                 const confirmed = await service.confirm(campaignId);
-                navigate(`/character/create?campaignId=${encodeURIComponent(campaignId)}`);
+                navigate(campaignRoute(APP_PATHS.characterCreation, campaignId));
                 return confirmed;
               })
             }
           >
             {busy === 'confirm' ? '正在确认…' : '确认世界'}
           </button>
+        </section>
+
+        <section className="world-constitution" aria-label="世界宪法确认">
+          <div className="world-constitution__heading">
+            <div>
+              <p className="eyebrow">世界宪法 · 修订 {constitution.revision}</p>
+              <h2>
+                {constitution.worldType} · {constitution.era}
+              </h2>
+            </div>
+            <strong>{constitution.status === 'DRAFT' ? '确认后永久锁定' : '已锁定'}</strong>
+          </div>
+          <dl>
+            <div>
+              <dt>技术</dt>
+              <dd>{constitution.technology}</dd>
+            </div>
+            <div>
+              <dt>魔法与力量</dt>
+              <dd>{constitution.magic}</dd>
+            </div>
+            <div>
+              <dt>族群</dt>
+              <dd>{constitution.peoples.join('、') || '未设定特殊族群'}</dd>
+            </div>
+            <div>
+              <dt>社会 / 政治 / 经济</dt>
+              <dd>
+                {constitution.society}；{constitution.politics}；{constitution.economy}
+              </dd>
+            </div>
+            <div>
+              <dt>战斗与死亡</dt>
+              <dd>
+                {constitution.combatScale}；{constitution.deathRules}
+              </dd>
+            </div>
+            <div>
+              <dt>生成规则</dt>
+              <dd>
+                职业：{constitution.careerRules}；装备：{constitution.equipmentRules}；NPC：
+                {constitution.npcRules}；特质：{constitution.traitRules}
+              </dd>
+            </div>
+            <div>
+              <dt>世界禁忌</dt>
+              <dd>{constitution.taboos.join('、') || '无额外禁忌'}</dd>
+            </div>
+          </dl>
+          <p>确认世界会同时锁定本修订；后续生成必须携带并匹配修订号。</p>
         </section>
 
         {aiError === null ? null : (
@@ -171,48 +265,56 @@ export function WorldCreationPage({
         <div className="world-layout">
           <section className="world-editor" aria-label="世界圣经编辑">
             <WorldTextField
+              fieldId="world-current-region"
               label="当前地区"
               value={editor.currentRegion}
               locked={isLocked('currentRegion', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, currentRegion: value })}
             />
             <WorldTextArea
+              fieldId="world-summary"
               label="世界简介"
               value={editor.summary}
               locked={isLocked('summary', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, summary: value })}
             />
             <WorldTextArea
+              fieldId="world-core-conflict"
               label="核心冲突"
               value={editor.coreConflict}
               locked={isLocked('coreConflict', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, coreConflict: value })}
             />
             <WorldTextField
+              fieldId="world-technology-level"
               label="技术水平"
               value={editor.technologyLevel}
               locked={isLocked('technologyLevel', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, technologyLevel: value })}
             />
             <WorldTextArea
+              fieldId="world-power-rules"
               label="力量规则（每行一条）"
               value={editor.powerRules.join('\n')}
               locked={isLocked('powerRules', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, powerRules: lines(value) })}
             />
             <WorldTextArea
+              fieldId="world-narrative-style"
               label="叙事风格"
               value={editor.narrativeStyle}
               locked={isLocked('narrativeStyle', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, narrativeStyle: value })}
             />
             <WorldTextArea
+              fieldId="world-forbidden-elements"
               label="禁止设定（每行一条）"
               value={editor.forbiddenElements.join('\n')}
               locked={isLocked('forbiddenElements', current.lockedFields)}
               onChange={(value) => setEditor({ ...editor, forbiddenElements: lines(value) })}
             />
             <WorldTextArea
+              fieldId="world-tavern-reason"
               label="酒馆存在的原因"
               value={editor.tavernReason}
               locked={isLocked('tavernReason', current.lockedFields)}
@@ -263,6 +365,7 @@ export function WorldCreationPage({
               <h2>局部修改</h2>
               <textarea
                 aria-label="修改要求"
+                data-ai-field="world-revision"
                 rows={5}
                 maxLength={4_000}
                 placeholder="例如：让主要势力的目标更明确，但保留力量规则。"
@@ -326,7 +429,7 @@ export function WorldCreationPage({
     <main className="world-studio world-studio--message" role="alert">
       <p className="eyebrow">{playerText.coreUi.worldStageUnavailable}</p>
       <h1>这个存档不在世界构筑阶段。</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>
@@ -338,7 +441,7 @@ function WorldMessage({ title }: { readonly title: string }) {
     <main className="world-studio world-studio--message" role="alert">
       <p className="eyebrow">{playerText.coreUi.worldStageUnavailable}</p>
       <h1>{title}</h1>
-      <Link className="text-link" to="/saves">
+      <Link className="text-link" to={APP_PATHS.saves}>
         返回存档首页
       </Link>
     </main>
@@ -350,9 +453,18 @@ interface WorldOptionsProps {
   readonly error: unknown | null;
   readonly onRetry?: (() => void) | undefined;
   readonly onGenerate: (options: Parameters<WindowsWorldCreationService['generate']>[1]) => void;
+  readonly streamedIntroduction: string;
+  readonly onCancel: () => void;
 }
 
-function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
+function WorldOptions({
+  busy,
+  error,
+  streamedIntroduction,
+  onCancel,
+  onGenerate,
+  onRetry,
+}: WorldOptionsProps) {
   const [worldType, setWorldType] = useState('奇幻');
   const [tone, setTone] = useState('冒险');
   const [magic, setMagic] = useState('中');
@@ -368,7 +480,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
   return (
     <main className="world-studio world-studio--options">
       <header className="world-studio__topline">
-        <Link to="/saves">← 存档首页</Link>
+        <Link to={APP_PATHS.saves}>← 存档首页</Link>
         <p>{playerText.coreUi.worldCreationStep}</p>
       </header>
       <section className="world-options__intro">
@@ -378,6 +490,12 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
       </section>
 
       {error === null ? null : <AIErrorNotice error={error} onRetry={onRetry} />}
+
+      {streamedIntroduction.length === 0 ? null : (
+        <output className="game-action-composer__stream" aria-live="polite">
+          {streamedIntroduction}
+        </output>
+      )}
 
       <form
         className="world-options"
@@ -441,6 +559,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
             自定义世界构想 <small>可选</small>
           </span>
           <textarea
+            data-ai-field="world-options-concept"
             rows={6}
             maxLength={4_000}
             placeholder="例如：这是一个漂浮在云海上的群岛世界……"
@@ -462,6 +581,7 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
           <label className="boundary-options__excluded">
             <span>不希望出现的内容（每行一项）</span>
             <textarea
+              data-ai-field="world-options-excluded-content"
               rows={3}
               value={excluded}
               onChange={(event) => setExcluded(event.target.value)}
@@ -472,6 +592,11 @@ function WorldOptions({ busy, error, onGenerate, onRetry }: WorldOptionsProps) {
         <button className="primary-action world-options__submit" type="submit" disabled={busy}>
           {busy ? '正在生成世界…' : '使用默认模型生成'}
         </button>
+        {busy ? (
+          <button className="quiet-action" type="button" onClick={onCancel}>
+            取消生成
+          </button>
+        ) : null}
       </form>
     </main>
   );
@@ -522,11 +647,13 @@ function BooleanOption({
 }
 
 function WorldTextField({
+  fieldId,
   label,
   value,
   locked,
   onChange,
 }: {
+  readonly fieldId: string;
   readonly label: string;
   readonly value: string;
   readonly locked: boolean;
@@ -535,17 +662,24 @@ function WorldTextField({
   return (
     <label>
       <span>{label}</span>
-      <input value={value} disabled={locked} onChange={(event) => onChange(event.target.value)} />
+      <input
+        data-ai-field={fieldId}
+        value={value}
+        disabled={locked}
+        onChange={(event) => onChange(event.target.value)}
+      />
     </label>
   );
 }
 
 function WorldTextArea({
+  fieldId,
   label,
   value,
   locked,
   onChange,
 }: {
+  readonly fieldId: string;
   readonly label: string;
   readonly value: string;
   readonly locked: boolean;
@@ -555,6 +689,7 @@ function WorldTextArea({
     <label>
       <span>{label}</span>
       <textarea
+        data-ai-field={fieldId}
         rows={4}
         value={value}
         disabled={locked}
@@ -596,6 +731,11 @@ function lines(value: string): string[] {
 
 function draftOf(world: WorldBibleView): WorldDraft {
   return {
+    constitution: {
+      ...world.constitution,
+      peoples: [...world.constitution.peoples],
+      taboos: [...world.constitution.taboos],
+    },
     name: world.name,
     currentRegion: world.currentRegion,
     summary: world.summary,

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-28T02:10:16.146Z",
+  "sourceCommit": "a77eb03530ab2f90e635a18b513994b1b4dca1af",
+  "releaseVersion": "0.3.0",
+  "platform": "darwin",
+  "architecture": "arm64",
+  "root": "target/release/bundle/macos/Ember Tavern.app",
+  "files": [
+    {
+      "path": "target/release/bundle/macos/Ember Tavern.app/Contents/Info.plist",
+      "bytes": 1084,
+      "sha256": "656d04295f98aaa52d3a126d6a0e202c5cc0403ba3a37bca492285270b498a1d"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern.app/Contents/MacOS/ember-tavern-windows",
+      "bytes": 25984288,
+      "sha256": "a1036c9e20d00fd08ba7fea24eed2282b89fcbd128f086aeadc6a99c1fbac8dd"
+    },
+    {
+      "path": "target/release/bundle/macos/Ember Tavern.app/Contents/Resources/icon.icns",
+      "bytes": 63344,
+      "sha256": "a3352d50b1dccc806fd0d3ef66ee270f14dff2cf85232fcf1cda8f7a128a53da"
+    }
+  ]
+}

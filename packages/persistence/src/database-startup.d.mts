@@ -5,6 +5,8 @@ export type DatabaseStartupFailureCode =
   | 'DATABASE_CLOSE_FAILED'
   | 'DATABASE_CREATE_FAILED'
   | 'DATABASE_SWITCH_FAILED'
+  | 'DOMAIN_RELOAD_FAILED'
+  | 'FOREIGN_KEY_CHECK_FAILED'
   | 'INTEGRITY_CHECK_FAILED'
   | 'MIGRATION_FAILED'
   | 'MIGRATION_INCOMPLETE'
@@ -18,6 +20,7 @@ export type DatabaseStartupResult =
       fromVersion: number;
       toVersion: number;
       backupPath: string | null;
+      cleanupPath?: string | null;
     }>
   | Readonly<{
       status: 'FAILED';

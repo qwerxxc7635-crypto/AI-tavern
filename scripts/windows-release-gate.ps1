@@ -11,6 +11,12 @@ Set-StrictMode -Version Latest
 
 $productName = 'Ember Tavern'
 $appIdentifier = 'com.embertavern.windows'
+$releaseInfoPath = Join-Path (Split-Path -Parent $PSScriptRoot) 'release-info.json'
+$expectedVersion = (Get-Content -LiteralPath $releaseInfoPath -Raw -Encoding utf8 | ConvertFrom-Json).version
+if ($expectedVersion -notmatch '^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$') {
+  throw 'release-info.json does not contain a valid release version.'
+}
+$expectedVersionPattern = '^' + [regex]::Escape($expectedVersion) + '(?:\.|$)'
 $startedAt = [DateTime]::UtcNow.ToString('o')
 $evidence = [ordered]@{
   schemaVersion = 1
@@ -150,8 +156,8 @@ try {
   if ($null -eq $application) {
     throw 'Installed Ember Tavern application executable was not found.'
   }
-  if ($application.VersionInfo.ProductVersion -notmatch '^0\.2\.0') {
-    throw "Installed product version is not 0.2.0: $($application.VersionInfo.ProductVersion)"
+  if ($application.VersionInfo.ProductVersion -notmatch $expectedVersionPattern) {
+    throw "Installed product version is not ${expectedVersion}: $($application.VersionInfo.ProductVersion)"
   }
   $evidence.install = [ordered]@{
     exitCode = $installProcess.ExitCode

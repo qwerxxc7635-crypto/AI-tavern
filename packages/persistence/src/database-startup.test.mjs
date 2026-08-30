@@ -31,7 +31,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
 
     assert.equal(result.status, 'MIGRATED');
     assert.equal(result.fromVersion, 0);
-    assert.equal(result.toVersion, 8);
+    assert.equal(result.toVersion, 32);
     assert.notEqual(result.backupPath, null);
     await access(result.backupPath);
 
@@ -54,6 +54,30 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
         { version: 6, name: 'scene_frames' },
         { version: 7, name: 'knowledge_provenance' },
         { version: 8, name: 'rumor_claim_sources' },
+        { version: 9, name: 'world_constitutions' },
+        { version: 10, name: 'world_seed' },
+        { version: 11, name: 'rules_engine' },
+        { version: 12, name: 'knowledge_boundary' },
+        { version: 13, name: 'universal_character' },
+        { version: 14, name: 'character_creation_sessions' },
+        { version: 15, name: 'career_pools' },
+        { version: 16, name: 'npc_lod' },
+        { version: 17, name: 'dynamic_locations' },
+        { version: 18, name: 'active_factions' },
+        { version: 19, name: 'tavern_population' },
+        { version: 20, name: 'multi_npc_scene' },
+        { version: 21, name: 'immutable_npc_timeline' },
+        { version: 22, name: 'dialogue_suggestion_cache' },
+        { version: 23, name: 'multi_quest_pool' },
+        { version: 24, name: 'quest_graph' },
+        { version: 25, name: 'dynamic_quest_sources' },
+        { version: 26, name: 'world_director' },
+        { version: 27, name: 'director_budget' },
+        { version: 28, name: 'memory_layers' },
+        { version: 29, name: 'world_info_retrieval' },
+        { version: 30, name: 'lazy_world_generation' },
+        { version: 31, name: 'prefetch' },
+        { version: 32, name: 'save_schema' },
       ],
     );
     assert.equal(migrated.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');

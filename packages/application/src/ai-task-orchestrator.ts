@@ -1,12 +1,14 @@
 import {
-  assembleTaskContext,
-  contextBudgetForTask,
+  buildUnifiedTaskContext,
+  classifyApplicationError,
   createContextBlock,
   providerConfigFromResolved,
   resolveModelConfig,
   standardizeAIError,
   verifyResolvedModelConfig,
   type AIProvider,
+  type ApplicationErrorKind,
+  type ErrorAction,
   type AITask,
   type ContextAssembly,
   type ModelCapabilities,
@@ -76,6 +78,10 @@ export interface AITaskResult {
 }
 
 export class AITaskExecutionError extends Error {
+  public readonly kind: ApplicationErrorKind;
+  public readonly fallbackEligible: boolean;
+  public readonly actions: readonly ErrorAction[];
+
   public constructor(
     public readonly operationId: AiOperationId,
     public readonly requestId: AiRequestId,
@@ -86,6 +92,10 @@ export class AITaskExecutionError extends Error {
   ) {
     super(`AI task failed: ${category}/${code}`, options);
     this.name = 'AITaskExecutionError';
+    const contract = classifyApplicationError({ code });
+    this.kind = contract.kind;
+    this.fallbackEligible = contract.fallbackEligible;
+    this.actions = contract.actions;
   }
 }
 
@@ -143,13 +153,10 @@ export async function executePrimaryAITask(
   modelProfileId: ModelProfileId | null,
   capabilities: ModelCapabilities,
 ): Promise<NormalizedAIResponse> {
-  const prepared = await assembleTaskContext(
-    request.task,
-    request.requestId,
-    1,
-    context,
-    contextBudgetForTask(request.task).maxCharacters,
-  );
+  const prepared = await buildUnifiedTaskContext(request.task, context, {
+    sourceId: campaignId,
+    sourceRevision: 1,
+  });
   const resolvedModelConfig = await resolveModelConfig({
     connectionProfile: providerConfig,
     modelProfileId,

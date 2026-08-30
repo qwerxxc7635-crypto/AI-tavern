@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "task": "M12-T01",
+  "recordedAt": "2026-08-27T15:00:00Z",
+  "sourceCommit": "d41e99b35e7efb9d47f2a500b236ff3251d68b07",
+  "evidenceKind": "FIRST_FULL_AUDIT",
+  "providerEvidence": "FAKE_ONLY",
+  "realProvider": "NOT_EVALUATED",
+  "windowsReleaseLifecycle": "BLOCKED_EXTERNAL",
+  "findings": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 4,
+    "P3": 2
+  },
+  "gates": {
+    "sharedCheck": "PASS",
+    "vitestFilesPassed": 189,
+    "vitestTestsPassed": 1052,
+    "vitestFilesSkipped": 2,
+    "vitestTestsSkipped": 6,
+    "nodeTestsPassed": 29,
+    "rustTestsPassed": 150,
+    "rustTestsIgnored": 1,
+    "windowsVerticalSlice": "PASS",
+    "desktopBuild": "PASS_281_MODULES",
+    "performanceRegression": "PASS",
+    "playabilityReport": "PASS"
+  },
+  "dependencyAudit": {
+    "pnpmAdvisories": 8,
+    "cargoVulnerabilities": 0,
+    "cargoUnmaintainedWarnings": 16,
+    "cargoUnsoundWarnings": 1
+  },
+  "visualAudit": {
+    "browserConsoleErrors": 0,
+    "viewports": ["860x600", "1180x760", "1366x768", "1920x1080"],
+    "horizontalOverflow": 0,
+    "grade": "B+"
+  }
+}

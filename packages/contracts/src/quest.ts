@@ -36,14 +36,58 @@ export interface Rumor {
 }
 
 export const QUEST_STATUSES = [
+  'HIDDEN',
+  'DISCOVERED',
   'AVAILABLE',
   'ACCEPTED',
   'ACTIVE',
+  'BLOCKED',
+  'UPDATED',
   'COMPLETED',
   'FAILED',
+  'EXPIRED',
   'ABANDONED',
 ] as const;
 export type QuestStatus = (typeof QUEST_STATUSES)[number];
+
+export const QUEST_TRANSITION_SOURCES = [
+  'INITIALIZATION',
+  'MIGRATION',
+  'GENERATION',
+  'PLAYER_INTERVENTION',
+  'PLAYER',
+  'LOCAL_RULE',
+  'SYSTEM',
+  'ADVENTURE',
+  'FACTION',
+  'LEGACY',
+] as const;
+export type QuestTransitionSource = (typeof QUEST_TRANSITION_SOURCES)[number];
+
+export interface QuestPoolState {
+  readonly questId: QuestId;
+  readonly campaignId: CampaignId;
+  readonly status: QuestStatus;
+  readonly revision: number;
+  readonly lastSource: QuestTransitionSource;
+  readonly lastReason: string;
+  readonly lastOperationId: string;
+  readonly createdAt: IsoTimestamp;
+  readonly updatedAt: IsoTimestamp;
+}
+
+export interface QuestTransition {
+  readonly operationId: string;
+  readonly questId: QuestId;
+  readonly campaignId: CampaignId;
+  readonly fromStatus: QuestStatus | null;
+  readonly toStatus: QuestStatus;
+  readonly source: QuestTransitionSource;
+  readonly reason: string;
+  readonly beforeRevision: number;
+  readonly afterRevision: number;
+  readonly occurredAt: IsoTimestamp;
+}
 
 export type QuestRisk = 'LOW' | 'MODERATE' | 'HIGH' | 'EXTREME';
 export type RewardTier = 'BASIC' | 'NOTABLE' | 'RARE' | 'LEGENDARY';
