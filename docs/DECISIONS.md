@@ -3421,3 +3421,26 @@ Fake Provider性能和可玩性只证明确定性生产编排、规则、事务�
 - fallback 仍由 Desktop orchestrator 的既有政策决定，Queue 不额外重试或叠加 fallback。
 - 不修改 Provider 业务合同、SQLite schema、Save 格式、Rules/D20 或世界状态机。
 - 真实 Provider SLA、token 与计费 cache 仍需独立授权验证；本决定不构成公开发布批准。
+
+## DEC-159：模型 JSON 只做确定性规范化，finish reason 与完整验证层级必须可区分
+
+- 日期：2026-08-29
+- 状态：已采纳
+- 依据：V0.3 RC 实测 `RC-PLAYTEST-003`、[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)
+
+### 背景
+
+世界生成 Provider 可能返回裸 JSON、单层 Markdown JSON 围栏、短说明包围的唯一对象，或因 token 上限返回截断内容。把所有情况直接交给裸 `JSON.parse` 会误拒可确定规范化的响应；反过来，从多个对象猜一个、放宽必填字段或跳过业务规则会破坏 AI 不可信边界。旧错误链还不能稳定区分 JSON、Schema、业务规则、截断和 repair 自身失败，世界构筑 UI 又误用了冒险阶段的“已锁定硬结果”文案。
+
+### 决定与理由
+
+Provider 响应先检查 finish reason：`LENGTH` 明确为 `RESPONSE_TRUNCATED`，内容过滤和未知未完成原因独立分类。内容只允许三种输入：完整 JSON、完整单层 JSON 围栏、最多一个由短说明文字包围的唯一顶层 JSON 对象；多个候选一律 `AMBIGUOUS_JSON`。规范化之后始终执行同一权威 TypeScript Schema 与业务规则；repair 最多沿用既有一次机会，使用独立 Provider 请求预算，并从头复验。仍失败则不进入 SQLite。
+
+Prompt 输出 Schema 继续直接来自 `AI_TASK_SCHEMAS`；Rust commit 继续复核本地 ID、envelope/validated output/world 一致性、业务规则和原子事务。错误链保留 INITIAL/REPAIR、脱敏验证 code 和字段路径，但不记录 API Key、Authorization 或原始敏感响应。普通 UI 显示适合世界构筑阶段的失败层级，不显示内部 Schema 内容，也不声称存在已锁定硬结果。
+
+### 影响与边界
+
+- 不把必填字段改 optional/nullable，不静默删除关键字段，不把任意文本写入 SQLite。
+- `JSON_OBJECT` Provider 能力不等于严格 `JSON_SCHEMA` 保证；本地完整校验不可省略。
+- 失败 raw response 按现有安全合同不持久化，因此历史截图的具体字段可能无法追溯；新的 session inspector 只保留脱敏定位信息。
+- 真实 Provider 若在完整响应前超时，JSON/Schema/business/commit 验收必须标为 `BLOCKED_EXTERNAL`，Fake 或浏览器 mock 不得替代。

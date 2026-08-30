@@ -25,6 +25,17 @@
 - Required investigation boundary: new-save click handler, duplicate-click protection, Campaign ID allocation, SQLite creation order, Hash Router navigation, refresh/back/resume semantics, and save-list eligibility.
 - Safety invariant: do not delete or mutate user data unless a record is proven to be an empty invalid draft; remediation tests must use isolated SQLite.
 
+## RC-PLAYTEST-003 — Real Provider output reports `INVALID_OUTPUT`
+
+- Severity: P1 / release-candidate blocker
+- Status at freeze: OPEN
+- User-visible evidence: `source/image4-invalid-output.png`
+- Observed UI: the authoritative world-construction page reports “模型输出没有通过验证”, error code `INVALID_OUTPUT`, and incorrectly reuses locked-hard-result copy from a later adventure stage.
+- Required investigation boundary: Provider raw response → fence/prose normalization → JSON parse → repair → TypeScript/Rust schema → business validation → SQLite transaction.
+- Safety invariant: deterministic normalization only; multiple objects, truncation, missing/type/enum/ID errors and business-rule violations remain fail closed. Fake Provider evidence cannot satisfy real Provider validation.
+
 ## Evidence interpretation boundary
 
 The screenshots prove the displayed failure and the presence of multiple creation-stage records. They do not by themselves prove whether every record is an invalid ghost draft or which internal timeout layer fired. Root-cause conclusions remain OPEN until reproduced against source and isolated tests.
+
+The fourth screenshot proves the `INVALID_OUTPUT` presentation, but the safety contract does not persist failed raw output. It therefore cannot prove the original response bytes or exact validation field. Remediation evidence must preserve that uncertainty and record any later real-provider block separately.

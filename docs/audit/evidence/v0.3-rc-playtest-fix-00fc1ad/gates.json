@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "sourceCommit": "760b5a24c7c806e8f30eb49c4251f8c1ae6cc62b",
+  "sourceCommit": "1c5f164951ca4671393784beb16dcabfb43ba427",
   "branch": "fix/v0.3-rc-playtest-issues",
   "gates": [
     { "command": "pnpm install --frozen-lockfile", "status": "PASS" },
     {
       "command": "pnpm check",
       "status": "PASS",
-      "vitest": { "filesPassed": 189, "filesSkipped": 2, "testsPassed": 1063, "testsSkipped": 6 },
+      "vitest": { "filesPassed": 189, "filesSkipped": 2, "testsPassed": 1085, "testsSkipped": 6 },
       "nodeTestsPassed": 30,
       "rustTestsPassed": 150,
       "rustTestsIgnored": 1

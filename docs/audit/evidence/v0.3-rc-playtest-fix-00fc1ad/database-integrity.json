@@ -53,5 +53,22 @@
       "campaignState": "TAVERN"
     }
   ],
-  "activeDatabaseHealthy": true
+  "activeDatabaseHealthy": true,
+  "invalidOutputValidation": {
+    "status": "BLOCKED_EXTERNAL",
+    "isolatedRealProviderDatabase": {
+      "integrityCheck": "ok",
+      "foreignKeyViolations": 0,
+      "campaigns": 3,
+      "campaignStates": { "CREATING_WORLD": 3 },
+      "worldBibles": 0,
+      "generationRecords": 0,
+      "unfinishedRequests": 0,
+      "duplicateCampaignIds": 0,
+      "duplicateRequestIds": 0,
+      "duplicateWorldsPerCampaign": 0
+    },
+    "userDatabaseUnchanged": true,
+    "secretMaterialCopiedToEvidence": false
+  }
 }

@@ -4986,3 +4986,23 @@
 
 - Frozen install、`pnpm check`、`pnpm test:windows-e2e`、`pnpm build:desktop`和macOS `.app`构建全部通过。完整门为Vitest 189 files / 1063 tests、Node 30/30、Rust 150 tests，另1项需真实Credential的DeepSeek测试ignored；Vite构建281 modules。npm/RustSec vulnerability均为0。
 - 新增[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)、`DEC-158`与独立证据目录。两项结论均为`FIXED`；真实Provider、Windows安装生命周期、签名/notarization/发布仍不在授权和本机证明范围，因此不宣称`PUBLIC RELEASE READY`。未push、merge、签名或发布，也未进入V0.4。
+
+## 2026-08-29 — V0.3 RC 实测追加 INVALID_OUTPUT 修复与真实链路复核
+
+### 问题三调查与修复
+
+- 在同一 `fix/v0.3-rc-playtest-issues` 分支追加 `RC-PLAYTEST-003`，冻结用户新截图，不覆盖第二轮审计证据。完整追踪 Provider、finish reason、规范化/parse、一次 repair、TypeScript Schema/业务规则、Rust commit 与 SQLite transaction。
+- 原失败 raw response 按既有安全合同未持久化，因此不猜测截图对应的具体字段。确认的代码缺口为：裸 `JSON.parse` 误拒可确定围栏/唯一对象；`LENGTH` 未先分类为截断；repair Provider 失败遮蔽初始验证路径；世界构筑误用“已锁定硬结果”文案。Prompt Schema 与 `AI_TASK_SCHEMAS` 同源，未发现版本漂移；DeepSeek 当前请求为 `JSON_OBJECT`，本地完整验证仍不可省略。
+- 实现提交 `1c5f164` 增加严格规范化与 `AMBIGUOUS_JSON` fail closed、finish reason 分类、INITIAL/REPAIR 脱敏诊断、repair 后完整复验，以及 JSON/Schema/截断/业务规则的阶段化 UI。没有放宽 Schema、删除业务规则、写入任意文本或把 Fake 结果冒充真实 Provider。
+
+### 回归、真实 Provider 与 SQLite
+
+- 新增合法 JSON 单次通过、围栏、唯一对象+短说明、多个对象拒绝、截断、缺字段、错类型/枚举、业务规则、repair 成功/失败/超时、无部分 commit、显式重试只提交一次和错误分类回归。Chromium 四种失败层级均可区分，860×600、1366×768、1920×1080 横向溢出 0、console error 0，硬结果误导文案已移除。
+- 通过 OS Credential Store opaque reference 在独立数据根运行真实 DeepSeek/`deepseek-v4-flash` 三个不同世界组合；没有读取或打印原始 Key，也没有污染用户存档。三次均在完整响应前 `TIMEOUT`，finish reason、parse、Schema、business 和 commit 均 `NOT_REACHED`，故真实验证为 `BLOCKED_EXTERNAL`，不是 PASS。
+- 隔离库 `integrity_check=ok`、外键违规 0、3 个创建中 Campaign、world 0、generation record 0、unfinished 0、重复 Campaign/request/world 0；用户主库前后状态和计数一致。显式同 Campaign 重试没有新增 Campaign/world/unfinished。
+
+### 门禁与状态
+
+- `pnpm check` 通过：Vitest 189 files / 1085 tests，另 2 files / 6 tests 按合同 skip；Node 30/30；Rust workspace、格式、release metadata、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy和archive interop全绿。
+- `pnpm test:windows-e2e` 1/1、`pnpm build:desktop` 281 modules、标准 macOS `.app` 构建均通过；用户 `.gitignore` 保持未暂存。不 push、merge、签名、notarize 或发布。
+- 问题二完全关闭；问题一与问题三的代码缺口已闭合，但真实 Provider 三次超时导致总体为 `BLOCKED_EXTERNAL`。因此本轮不输出 `FIXED — READY FOR RC REVALIDATION`，也不宣称 `PUBLIC RELEASE READY`。
