@@ -233,6 +233,14 @@ pub struct OpenAiCompatibleConfig {
     endpoint: ApprovedEndpoint,
     credential_ref: Option<CredentialRef>,
     additional_headers: Vec<RequestHeader>,
+    thinking: ThinkingPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+enum ThinkingPolicy {
+    #[default]
+    ProviderDefault,
+    Disabled,
 }
 
 impl OpenAiCompatibleConfig {
@@ -244,7 +252,15 @@ impl OpenAiCompatibleConfig {
             endpoint: ApprovedEndpoint::parse(base_url).map_err(map_transport_error)?,
             credential_ref,
             additional_headers: Vec::new(),
+            thinking: ThinkingPolicy::ProviderDefault,
         })
+    }
+
+    /// Explicitly disables provider-side reasoning for latency-sensitive structured tasks.
+    /// Providers that do not support this extension should keep the default policy instead.
+    pub fn with_thinking_disabled(mut self) -> Self {
+        self.thinking = ThinkingPolicy::Disabled;
+        self
     }
 }
 
@@ -351,6 +367,7 @@ impl OpenAiCompatibleProvider {
             temperature: request.temperature,
             max_tokens: request.max_output_tokens,
             stream: None,
+            thinking: api_thinking(config.thinking),
         })
         .map_err(|_| ProviderError::InvalidRequest)?;
         let transport_request = self.request(
@@ -420,6 +437,7 @@ impl OpenAiCompatibleProvider {
             temperature: request.temperature,
             max_tokens: request.max_output_tokens,
             stream: Some(true),
+            thinking: api_thinking(config.thinking),
         })
         .map_err(|_| ProviderError::InvalidRequest)?;
         let mut transport_request = self.request(
@@ -745,6 +763,8 @@ struct ChatRequest<'a> {
     max_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     stream: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    thinking: Option<ApiThinking>,
 }
 
 #[derive(Serialize)]
@@ -757,6 +777,19 @@ struct ApiMessage<'a> {
 struct ApiResponseFormat {
     #[serde(rename = "type")]
     kind: &'static str,
+}
+
+#[derive(Serialize)]
+struct ApiThinking {
+    #[serde(rename = "type")]
+    kind: &'static str,
+}
+
+fn api_thinking(policy: ThinkingPolicy) -> Option<ApiThinking> {
+    match policy {
+        ThinkingPolicy::ProviderDefault => None,
+        ThinkingPolicy::Disabled => Some(ApiThinking { kind: "disabled" }),
+    }
 }
 
 #[derive(Deserialize)]

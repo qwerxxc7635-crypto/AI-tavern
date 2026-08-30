@@ -131,9 +131,11 @@ describe('WindowsWorldCreationService', () => {
     const gateway = new FakeWorldGateway();
     const delayed = deferred<undefined>();
     let requestedTimeout = 0;
+    let requestedOutputTokens = 0;
     const engine: DesktopAIEngine = {
       async execute(_task, _input, options) {
         requestedTimeout = options.timeoutMs;
+        requestedOutputTokens = options.maxOutputTokens;
         await delayed.promise;
         return execution(options.requestId, worldDraft());
       },
@@ -144,6 +146,7 @@ describe('WindowsWorldCreationService', () => {
     await vi.advanceTimersByTimeAsync(60_001);
     expect(gateway.commits).toHaveLength(0);
     expect(requestedTimeout).toBe(120_000);
+    expect(requestedOutputTokens).toBe(4_096);
     delayed.resolve(undefined);
     await expect(generated).resolves.toMatchObject({ campaignState: 'REVIEWING_WORLD' });
     expect(gateway.commits).toHaveLength(1);

@@ -222,7 +222,7 @@ export class WindowsWorldCreationService {
         const generated = await this.ai.execute(task, input, {
           requestId: identity.requestId,
           temperature,
-          maxOutputTokens: 8_000,
+          maxOutputTokens: 4_096,
           timeoutMs: WORLD_PROVIDER_TIMEOUT_MS,
           signal,
           ...(stream === undefined

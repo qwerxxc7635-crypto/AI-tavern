@@ -2,6 +2,7 @@ import { Channel, invoke } from '@tauri-apps/api/core';
 
 import {
   FakeAIProvider,
+  GenerateWorldOutputSchema,
   GeneratorRunner,
   NOOP_GENERATOR_TRANSACTION,
   buildUnifiedTaskContext,
@@ -18,8 +19,10 @@ import {
   type NormalizedAIRequest,
   type NormalizedAIResponse,
   type ProviderConfig,
+  RefineWorldOutputSchema,
 } from '@ember-tavern/ai-core';
 import { aiRequestId, isoTimestamp } from '@ember-tavern/contracts';
+import { assertWorldConstitutionCompliance } from '@ember-tavern/domain';
 import {
   formatOutputRepairPrompt,
   formatTaskPrompt,
@@ -452,6 +455,19 @@ class DesktopStructuredGenerator implements Generator<
         native.selectedPresetKey !== selection.profile.presetKey)
     ) {
       throw new DesktopAIOrchestrationError('MODEL_SELECTION_DRIFT');
+    }
+    try {
+      const world =
+        validated.prepared.task === 'GENERATE_WORLD'
+          ? GenerateWorldOutputSchema.parse(validated.validatedOutput)
+          : validated.prepared.task === 'REFINE_WORLD'
+            ? RefineWorldOutputSchema.parse(validated.validatedOutput).world
+            : null;
+      if (world !== null) {
+        assertWorldConstitutionCompliance(world.constitution, world);
+      }
+    } catch (error) {
+      throw new DesktopAIOrchestrationError('WORLD_BUSINESS_RULE_INVALID', error);
     }
     return validated;
   }

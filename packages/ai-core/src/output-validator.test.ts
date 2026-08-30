@@ -104,6 +104,23 @@ describe('AI output structure validation', () => {
     });
   });
 
+  it('keeps constitution drift structurally valid for the separate business-rule layer', () => {
+    const valid = FAKE_TASK_OUTPUTS.GENERATE_WORLD;
+    const invalid = {
+      ...valid,
+      technologyLevel: '不一致的技术水平',
+      powerRules: [
+        ...valid.powerRules.filter((rule) => rule !== valid.constitution.magic),
+        '另一条仍然有效但不等于宪法魔法声明的规则。',
+      ],
+      forbiddenElements: [],
+      constitution: { ...valid.constitution, taboos: ['禁止改写历史'] },
+    };
+    const result = validateAIOutput('GENERATE_WORLD', JSON.stringify(invalid));
+
+    expect(result).toMatchObject({ ok: true });
+  });
+
   it('rejects NPC rosters that the native residency and rumor rules cannot commit', () => {
     const output = FAKE_TASK_OUTPUTS.GENERATE_NPCS;
     const invalid = {

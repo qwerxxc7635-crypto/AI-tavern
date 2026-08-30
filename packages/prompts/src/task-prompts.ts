@@ -29,13 +29,13 @@ export const TASK_PROMPTS = Object.freeze({
   GENERATE_WORLD: define(
     'GENERATE_WORLD',
     'WORLD_DESIGNER',
-    'Create a coherent original world from the player concept, preferences, and boundaries. First define the complete structured World Constitution; make every world field obey it. Faction and location names must each be unique. Every parentName must be null or exactly match another generated location name, never itself. Every factionNames entry must exactly match a generated faction name. Do not pre-generate careers, equipment, NPCs, or quests.',
+    'Create a coherent original world from the player concept, preferences, and boundaries. First define the complete structured World Constitution; make every world field obey it. technologyLevel must exactly equal constitution.technology. powerRules must include constitution.magic verbatim. Every constitution.taboos entry must also appear verbatim in forbiddenElements. Faction and location names must each be unique. Every parentName must be null or exactly match another generated location name, never itself. Every factionNames entry must exactly match a generated faction name. Do not pre-generate careers, equipment, NPCs, or quests.',
     2,
   ),
   REFINE_WORLD: define(
     'REFINE_WORLD',
     'WORLD_DESIGNER',
-    'Revise only what the instructions require. Keep the structured World Constitution and all world fields mutually consistent, preserve every locked field exactly, and summarize the actual changes.',
+    'Revise only what the instructions require. Keep the structured World Constitution and all world fields mutually consistent: technologyLevel must exactly equal constitution.technology, powerRules must include constitution.magic verbatim, and every constitution.taboos entry must appear verbatim in forbiddenElements. Preserve every locked field exactly, and summarize the actual changes.',
     2,
   ),
   GENERATE_CHARACTER_TRAITS: define(

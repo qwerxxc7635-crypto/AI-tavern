@@ -156,7 +156,9 @@ async fn provider_streams_sse_deltas_and_returns_one_normalized_final_response()
         "data: [DONE]\n\n"
     );
     let (base_url, captured) = server(vec![(200, response)]).await;
-    let config = OpenAiCompatibleConfig::new(&base_url, None).unwrap();
+    let config = OpenAiCompatibleConfig::new(&base_url, None)
+        .unwrap()
+        .with_thinking_disabled();
     let mut deltas = Vec::new();
 
     let result = OpenAiCompatibleProvider::new()
@@ -179,6 +181,8 @@ async fn provider_streams_sse_deltas_and_returns_one_normalized_final_response()
     let requests = captured.lock().await;
     let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
     assert_eq!(body["stream"], true);
+    assert_eq!(body["thinking"]["type"], "disabled");
+    assert_eq!(body["response_format"]["type"], "json_object");
     assert!(String::from_utf8_lossy(&requests[0].head).contains("text/event-stream"));
 }
 
@@ -300,6 +304,38 @@ async fn run_enabled_provider_contract(case: EnabledProviderContract) {
     assert_eq!(json_body["response_format"]["type"], "json_object");
     assert_eq!(json_body["messages"][0]["role"], "system");
     assert_eq!(json_body["messages"][1]["role"], "user");
+    assert!(json_body.get("thinking").is_none());
+}
+
+#[tokio::test]
+async fn minimum_json_contract_serializes_explicit_json_mode_and_disabled_thinking() {
+    let completion = r#"{"id":"minimum-json","model":"ember-model","choices":[{"message":{"content":"{\"status\":\"ok\"}"},"finish_reason":"stop"}]}"#;
+    let (base_url, captured) = server(vec![(200, completion)]).await;
+    let config = OpenAiCompatibleConfig::new(&base_url, None)
+        .unwrap()
+        .with_thinking_disabled();
+    let mut request = normalized(ResponseFormat::JsonObject);
+    request.messages[0].content = "Return JSON only.".to_owned();
+    request.messages[1].content = "Output JSON exactly: {\"status\":\"ok\"}.".to_owned();
+    request.max_output_tokens = 256;
+
+    OpenAiCompatibleProvider::new()
+        .unwrap()
+        .generate(&config, &request, CancellationToken::new())
+        .await
+        .unwrap();
+
+    let requests = captured.lock().await;
+    let body: Value = serde_json::from_slice(&requests[0].body).unwrap();
+    assert_eq!(body["response_format"]["type"], "json_object");
+    assert_eq!(body["thinking"]["type"], "disabled");
+    assert_eq!(body["max_tokens"], 256);
+    assert!(
+        body["messages"][0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("JSON")
+    );
 }
 
 macro_rules! enabled_provider_contract_test {

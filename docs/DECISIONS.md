@@ -3444,3 +3444,26 @@ Prompt 输出 Schema 继续直接来自 `AI_TASK_SCHEMAS`；Rust commit 继续�
 - `JSON_OBJECT` Provider 能力不等于严格 `JSON_SCHEMA` 保证；本地完整校验不可省略。
 - 失败 raw response 按现有安全合同不持久化，因此历史截图的具体字段可能无法追溯；新的 session inspector 只保留脱敏定位信息。
 - 真实 Provider 若在完整响应前超时，JSON/Schema/business/commit 验收必须标为 `BLOCKED_EXTERNAL`，Fake 或浏览器 mock 不得替代。
+
+## DEC-160：DeepSeek 世界任务显式禁用 thinking，结构 Schema 与业务规则保持分层同权
+
+- 日期：2026-08-30
+- 状态：已采纳
+- 依据：V0.3 RC A–D 差分诊断、[`audit/V0_3_RC_PLAYTEST_FIX_REPORT.md`](audit/V0_3_RC_PLAYTEST_FIX_REPORT.md)
+
+### 背景
+
+`/models` 与最小 JSON 都能快速完成，但完整世界请求在默认 thinking 下可能把大量时间和 token 用于当前客户端不消费的 `reasoning_content`，最终撞上 120 秒完整流 deadline。追加生产 D 同时证明 Desktop 结构验证与 Rust commit 之间存在 Constitution 跨字段业务规则漂移。把所有问题归因于网络、无限增加 timeout、放宽 Schema 或把业务矛盾伪装成结构错误都会掩盖真实边界。
+
+### 决定与理由
+
+仅当 preset 为 DeepSeek 且 task 为 `GENERATE_WORLD` 或 `REFINE_WORLD` 时，在 OpenAI-compatible 请求中显式序列化 `thinking:{type:"disabled"}`。Provider 默认策略仍是 omission，因此其他任务、Qwen、OpenRouter、Ollama 与 custom endpoint 不接收未经证明的扩展。世界输出上限按成功样本与三次真实验收校准为 4096，同时保留 120 秒 Provider 与 270 秒 operation 上限。
+
+世界 JSON Schema 继续负责语法、字段、类型、枚举、长度和引用完整性；Constitution 的 `technologyLevel`、`powerRules`、`forbiddenElements` 三条恒等关系继续属于业务规则。Desktop `RULES_CHECK`、application use case 和 Rust transaction boundary 使用同一规则语义，业务冲突映射为 `WORLD_BUSINESS_RULE_INVALID`，不触发结构 repair；JSON/Schema 错误仍最多 repair 一次并从头复验。
+
+### 影响与边界
+
+- 不消费或展示 reasoning 内容，不把 thinking policy 推广到未经验证的任务或 Provider。
+- 不降低任何必填、枚举、引用或 Rust commit 约束；业务错误与 Schema 错误在 UI 和证据中保持可区分。
+- 4096 不是无限保证；`finishReason=LENGTH` 仍明确进入截断/结构修复或 fail-closed 流程。
+- 三次真实世界生成只使用隔离存档与 OS Credential Store opaque reference；该验证不授予公开发布、签名或部署权限。

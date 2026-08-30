@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 1,
+  "status": "PASS",
+  "provider": "DeepSeek",
+  "model": "deepseek-v4-flash",
+  "responseMode": "JSON_OBJECT",
+  "thinking": "disabled",
+  "stream": true,
+  "maxOutputTokens": 4096,
+  "isolatedData": true,
+  "userSaveModified": false,
+  "runs": [
+    { "run": 1, "combination": "fantasy-night-tide-port", "completeResponse": true, "finishReason": "STOP", "firstContentMs": 1732, "latencyMs": 14209, "inputTokens": 1584, "outputTokens": 1328, "jsonParse": "PASS", "schemaValidation": "PASS", "businessValidation": "PASS", "transactionCommit": "PASS", "repairCalls": 0, "duplicateSave": false },
+    { "run": 2, "combination": "storm-steam-islands", "completeResponse": true, "finishReason": "STOP", "firstContentMs": 1892, "latencyMs": 10047, "inputTokens": 1588, "outputTokens": 915, "jsonParse": "PASS", "schemaValidation": "PASS", "businessValidation": "PASS", "transactionCommit": "PASS", "repairCalls": 0, "duplicateSave": false },
+    { "run": 3, "combination": "low-magic-frozen-trade-route", "completeResponse": true, "finishReason": "STOP", "firstContentMs": 1373, "latencyMs": 45514, "inputTokens": 1589, "outputTokens": 3492, "jsonParse": "PASS", "schemaValidation": { "initial": "FAIL_CLOSED", "path": "locations[5].factionNames[1]", "repair": "PASS" }, "repair": { "calls": 1, "independentDeadline": true, "completeResponse": true, "finishReason": "STOP", "firstContentMs": 1096, "latencyMs": 20120, "inputTokens": 5192, "outputTokens": 3487 }, "businessValidation": "PASS_AFTER_FULL_REVALIDATION", "transactionCommit": "PASS", "duplicateSave": false }
+  ],
+  "cacheMetrics": "UNAVAILABLE_IN_RECORDED_RESPONSE",
+  "providerRequestIdPresentForEveryCall": true,
+  "secretMaterialRecorded": false
+}

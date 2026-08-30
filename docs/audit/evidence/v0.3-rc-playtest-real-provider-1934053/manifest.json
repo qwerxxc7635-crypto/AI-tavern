@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "baseline": "1934053",
+  "branch": "fix/v0.3-rc-playtest-issues",
+  "status": "FIXED — READY FOR RC REVALIDATION",
+  "issues": [
+    { "id": "RC-PLAYTEST-001", "severity": "P1", "status": "FIXED" },
+    { "id": "RC-PLAYTEST-002", "severity": "P1", "status": "FIXED" },
+    { "id": "RC-PLAYTEST-003", "severity": "P1", "status": "FIXED" }
+  ],
+  "files": ["differential-diagnosis.json", "real-provider-validation.json", "sqlite-integrity.json", "gates.json"],
+  "containsRawProviderOutput": false,
+  "containsCredentials": false,
+  "containsUserStoryContent": false
+}

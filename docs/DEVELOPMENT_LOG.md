@@ -5006,3 +5006,22 @@
 - `pnpm check` 通过：Vitest 189 files / 1085 tests，另 2 files / 6 tests 按合同 skip；Node 30/30；Rust workspace、格式、release metadata、zh-CN、ESLint、TypeScript、rustfmt、严格 Clippy和archive interop全绿。
 - `pnpm test:windows-e2e` 1/1、`pnpm build:desktop` 281 modules、标准 macOS `.app` 构建均通过；用户 `.gitignore` 保持未暂存。不 push、merge、签名、notarize 或发布。
 - 问题二完全关闭；问题一与问题三的代码缺口已闭合，但真实 Provider 三次超时导致总体为 `BLOCKED_EXTERNAL`。因此本轮不输出 `FIXED — READY FOR RC REVALIDATION`，也不宣称 `PUBLIC RELEASE READY`。
+
+## 2026-08-30 — V0.3 RC A–D 差分诊断与三问题最终闭合
+
+### 差分根因与最小修复
+
+- 在同一 `fix/v0.3-rc-playtest-issues` 分支从 `1934053` 继续，不改用户 `.gitignore`、不覆盖第二轮审计证据。通过 OS Credential Store opaque reference 执行 A–D：`/models` 167ms 成功；最小 JSON thinking disabled/default 分别 800ms/1155ms；完整生产世界 D 12.691s、`STOP`、1550/1047 tokens。
+- TIMEOUT 的追加根因为 DeepSeek V4 Flash 默认高强度 thinking，而世界流只消费 content；8000 输出 token 也缺少样本依据。仅对 DeepSeek `GENERATE_WORLD/REFINE_WORLD` 显式发送 `thinking.disabled`，世界预算校准为 4096，其他任务/Provider 不变。
+- D 首次完整响应复现出独立的 INVALID_OUTPUT 根因：TypeScript 结构验证通过，但 Desktop 未执行 application/Rust 已有的 Constitution 三条跨字段业务规则。Prompt 现明确三条恒等关系，Desktop `RULES_CHECK` 复用 `assertWorldConstitutionCompliance`，以 `WORLD_BUSINESS_RULE_INVALID` 和脱敏路径 fail closed；没有把业务错误改名为 Schema，也没有扩大 repair 范围。
+
+### 三次真实世界验收与 SQLite
+
+- 三个不同选项组合均通过真实 DeepSeek、生产 Prompt/JSON_OBJECT/streaming、4096 token 和隔离 SQLite。前两次首次通过并提交；第三次首次在 `locations[5].factionNames[1]` 被 Schema 拒绝，唯一一次 repair 使用独立 deadline，随后完整重跑 JSON、Schema、business、Rust validation 与 transaction。
+- 初始三次时延/token 为 14.209s/1584→1328、10.047s/1588→915、45.514s/1589→3492；repair 为 20.120s/5192→3487。所有调用 `STOP` 且 Provider request ID 存在；cache hit/miss 未由响应提供，明确为 unavailable。
+- 验收库 `integrity_check=ok`、外键违规 0、Campaign/world/constitution/generation record 均为 3、unfinished 0、部分 world 0、重复 idempotency/save/world 0。用户数据库未打开或修改。
+
+### 门禁与结论
+
+- `pnpm check` PASS：Vitest 189 files / 1087 tests，另 2 files / 6 tests 合同 skip；Node 30/30；Rust native 101、platform 5、provider 19、HTTP 11、secrets 3、Tauri 13 全绿，1 个环境变量式真实测试 ignored。Windows E2E 1/1、desktop 281 modules 和移除临时诊断入口后的标准 macOS `.app` 构建均 PASS。
+- 新增追加证据目录 `audit/evidence/v0.3-rc-playtest-real-provider-1934053/`，更新 RC 修复报告与 `DEC-160`。三个问题均完全关闭，状态更新为 `FIXED — READY FOR RC REVALIDATION`；只批准 RC 复验，不构成公开发布批准。未 push、merge、签名、notarize 或发布。

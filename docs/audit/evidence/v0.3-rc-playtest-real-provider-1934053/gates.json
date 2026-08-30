@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "branch": "fix/v0.3-rc-playtest-issues",
+  "gates": [
+    { "command": "pnpm check", "status": "PASS", "vitest": { "filesPassed": 189, "filesSkipped": 2, "testsPassed": 1087, "testsSkipped": 6 }, "nodeTestsPassed": 30, "rust": { "native": 101, "platform": 5, "provider": 19, "secureHttp": 11, "secureSecrets": 3, "tauri": 13, "ignoredEnvironmentTests": 1 } },
+    { "command": "pnpm test:windows-e2e", "status": "PASS", "testsPassed": 1 },
+    { "command": "pnpm build:desktop", "status": "PASS", "viteModules": 281 },
+    { "command": "pnpm --dir windows-app tauri build --bundles app", "status": "PASS", "artifact": "target/release/bundle/macos/Ember Tavern.app", "diagnosticEntrypointIncluded": false }
+  ]
+}

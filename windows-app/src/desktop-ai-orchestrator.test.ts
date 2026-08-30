@@ -126,6 +126,17 @@ describe('DesktopAIOrchestrator', () => {
     ]);
   });
 
+  it('reports constitution drift as a business-rule failure without structural repair', async () => {
+    const provider = new BusinessInvalidProvider();
+    await expect(
+      new DesktopAIOrchestrator(
+        new MutableSettings(profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash')),
+        provider,
+      ).execute('GENERATE_WORLD', worldInput('规则漂移世界'), options('business-rule')),
+    ).rejects.toMatchObject({ code: 'WORLD_BUSINESS_RULE_INVALID' });
+    expect(provider.calls).toHaveLength(1);
+  });
+
   it('fails closed when the repair response still violates the schema', async () => {
     const settings = new MutableSettings(
       profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
@@ -567,6 +578,15 @@ class InvalidThenCapturingProvider extends CapturingProvider {
       };
     }
     return super.generate(request, config);
+  }
+}
+
+class BusinessInvalidProvider extends CapturingProvider {
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    const response = await super.generate(request, config);
+    const output = JSON.parse(response.content) as Record<string, unknown>;
+    output['technologyLevel'] = '不符合世界宪法的技术水平';
+    return { ...response, content: JSON.stringify(output) };
   }
 }
 

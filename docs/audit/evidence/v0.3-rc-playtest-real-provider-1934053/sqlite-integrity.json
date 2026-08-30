@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "database": "ISOLATED_TEST_DATABASE",
+  "integrityCheck": "ok",
+  "foreignKeyViolations": 0,
+  "acceptanceCampaigns": 3,
+  "campaignStates": { "REVIEWING_WORLD": 3 },
+  "worldBibles": 3,
+  "worldConstitutions": 3,
+  "generationRecords": 3,
+  "unfinishedRequests": 0,
+  "partialWorlds": 0,
+  "duplicateIdempotencyKeys": 0,
+  "duplicateCampaignIds": 0,
+  "duplicateWorldsPerCampaign": 0,
+  "userDatabaseOpened": false,
+  "userDatabaseModified": false
+}

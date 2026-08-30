@@ -104,6 +104,15 @@ describe('central prompt catalog', () => {
     );
     expect(TASK_PROMPTS.GENERATE_NPCS.instruction).toContain('existingNpcArchetypes');
     expect(TASK_PROMPTS.GENERATE_QUEST.instruction).toContain('recentQuestStructures');
+    expect(TASK_PROMPTS.GENERATE_WORLD.instruction).toContain(
+      'technologyLevel must exactly equal constitution.technology',
+    );
+    expect(TASK_PROMPTS.GENERATE_WORLD.instruction).toContain(
+      'powerRules must include constitution.magic verbatim',
+    );
+    expect(TASK_PROMPTS.GENERATE_WORLD.instruction).toContain(
+      'constitution.taboos entry must also appear verbatim in forbiddenElements',
+    );
   });
 
   it('centralizes authority, privacy, validation, and JSON rules', () => {
@@ -123,6 +132,9 @@ describe('provider-neutral prompt formatting', () => {
     expect(formatted.messages[0]?.content).toContain('WORLD_DESIGNER');
     expect(formatted.messages[0]?.content).toContain('[SYSTEM_CONTRACT]');
     expect(formatted.messages[0]?.content).toContain('[STABLE_WORLD_TRUTHS]');
+    expect(formatted.messages[0]?.content).toMatch(/exactly one JSON value/i);
+    expect(formatted.messages[0]?.content).toContain('[OUTPUT_SCHEMA]');
+    expect(formatted.messages[0]?.content).toContain('generate_world_v2');
     expect(formatted.messages[1]?.content).toContain(canonicalJson(worldInput));
     expect(formatted.responseFormat).toMatchObject({
       kind: 'JSON_SCHEMA',

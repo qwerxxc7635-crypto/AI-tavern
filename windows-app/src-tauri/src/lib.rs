@@ -646,6 +646,11 @@ where
         .transpose()
         .map_err(|_| ProviderError::InvalidConfig)?;
     let config = runtime_provider_config(&runtime.preset_key, &runtime.base_url, credential)?;
+    let config = if should_disable_thinking(&runtime.preset_key, &request.task) {
+        config.with_thinking_disabled()
+    } else {
+        config
+    };
     let metric_task = request.task.clone();
     let cache_prefix_hash = request.cache_prefix_hash.clone();
     let normalized = NormalizedRequest {
@@ -742,6 +747,10 @@ fn runtime_provider_config(
         "custom" => OpenAiCompatibleConfig::new(base_url, credential),
         _ => Err(ProviderError::InvalidConfig),
     }
+}
+
+fn should_disable_thinking(preset_key: &str, task: &str) -> bool {
+    preset_key == "deepseek" && matches!(task, "GENERATE_WORLD" | "REFINE_WORLD")
 }
 
 fn is_sha256_hex(value: &str) -> bool {
@@ -1978,6 +1987,14 @@ mod tests {
     use std::io::{Read, Write};
     use std::net::TcpListener;
     use time::format_description::well_known::Rfc3339;
+
+    #[test]
+    fn deepseek_world_tasks_disable_thinking_without_affecting_other_tasks_or_providers() {
+        assert!(should_disable_thinking("deepseek", "GENERATE_WORLD"));
+        assert!(should_disable_thinking("deepseek", "REFINE_WORLD"));
+        assert!(!should_disable_thinking("deepseek", "NPC_REPLY"));
+        assert!(!should_disable_thinking("custom", "GENERATE_WORLD"));
+    }
 
     #[test]
     fn cache_telemetry_failure_is_observable_but_does_not_replace_generation() {
