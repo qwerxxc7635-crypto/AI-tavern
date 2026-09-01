@@ -3556,3 +3556,27 @@ DamageChannelCatalog 只拥有 channel identity/common metadata，world-specific
 - Ordinary AI 只能通过 M6 单一 Mechanical Exposure Policy 引用 canonical IDs；不能注册 handler 或使用 developer-only override。
 - M12 必须按 contract 的正向 ownership 与 repository-wide negative checks 审计；出现 generic registry、boolean flag soup、双重 mitigation owner 或 UI/AI/persistence 重算规则均为 release finding。
 - 本决定约束实现架构，不修改任何 V5.2 产品语义，也不承诺 v0.4.1 的 runtime mod/plugin 能力。
+
+## DEC-165：Combat 规则身份使用七字段正整数版本集合与显式兼容门
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：V5.2 §17、M1-T01、`V0.4.1_TASKS_FINAL.md` §1.9
+
+### 背景
+
+BattleRecord、ActiveCombatSave 和 Replay 必须固定创建战斗时的 schema、规则、平衡、引擎、WorldProfile、Character mapping 与 RNG contract 身份。若把 Cargo/app semver、build timestamp 或“当前最新版”当作规则身份，重建或升级后会无法唯一选择旧语义；若反序列化时直接拒绝所有未来版本，M10 compatibility/migration 又没有机会安全检查并迁移。
+
+### 决定
+
+纯 Rust `ember-combat-core` 定义七字段 `CombatVersionSet`：`combatSchemaVersion`、`rulesetVersion`、`balanceVersion`、`engineVersion`、`worldProfileVersion`、`attributeMappingVersion`、`rngContractVersion`。每项是非零 `u32` semantic version；当前均为 1。TypeScript wire contract 使用完全相同的 camelCase JSON shape，并由共享 fixture 校验。
+
+结构解析只验证 exact fields 与正整数，因此未来正版本可以进入显式 migration/compatibility inspection；执行前 `ensure_supported` / `assertSupportedCombatVersionSet` 必须逐字段匹配本引擎支持集合。不得静默替换为 current。稳定 debug identity 使用固定字段顺序和值，不包含系统时间、build time、对象遍历顺序或 package version。
+
+### 影响与边界
+
+- Version set 可直接 flatten 到后续 BattleRecord/ActiveCombatSave JSON；M1-T01 不提前创建 M10 SQLite migration/table。
+- `engineVersion` 表示会影响确定性执行的 engine contract，不等于应用发布版本 0.3.0/0.4.1。
+- 普通 balance 常数变化只推进 balanceVersion；字段所有权继续遵循 DEC-164，避免 version explosion。
+- 当前没有旧 Combat save，因此只支持 version 1；未来版本需要 migration 或中文安全拒绝，不能由 parser fallback。
+- Rust Core 仅依赖 serde（serde_json 只用于测试），继续满足无 Tauri/SQLite/Provider/UI/system-time 边界。

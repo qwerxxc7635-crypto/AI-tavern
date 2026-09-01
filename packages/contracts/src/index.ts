@@ -1,5 +1,18 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
 export {
+  COMBAT_VERSION_FIELDS,
+  CURRENT_COMBAT_VERSION_SET,
+  CombatVersionContractError,
+  assertSupportedCombatVersionSet,
+  combatVersionIdentity,
+  parseCombatVersionSet,
+} from './combat.js';
+export type {
+  CombatVersionContractErrorCode,
+  CombatVersionField,
+  CombatVersionSet,
+} from './combat.js';
+export {
   NPC_TIMELINE_ATTEMPT_STATUSES,
   NPC_TIMELINE_SCOPE_KINDS,
   NPC_TIMELINE_STATUSES,

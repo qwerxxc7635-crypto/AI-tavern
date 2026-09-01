@@ -5199,3 +5199,25 @@
 
 - 文档引用、状态、branch/commit lineage、格式与 diff 在提交前复核；用户 `.gitignore` 仍未暂存。
 - M0-T07 和 M0 Gate 结束状态均为 PASS；唯一下一项为 M1-T01 Combat Version Contract，不进入其他任务或相邻版本。
+
+## 2026-09-01 — M1-T01 完成 Combat Version Contract
+
+### Rust Core 与跨层合同
+
+- 从 M0 Gate 提交 `3e8d4f8` 创建 `task/M1-T01-combat-version-contract`，新增 workspace crate `ember-combat-core`。Core 当前生产依赖只有 serde，不依赖 Tauri、SQLite、Provider、网络、UI、filesystem 或 system time。
+- 新增七字段 `CombatVersionSet` 与非零 `CombatVersion`：combat schema、ruleset、balance、engine、world profile、attribute mapping、RNG contract 当前均为 version 1。提供逐字段显式 support gate、stable wire field names 和固定顺序 deterministic debug identity。
+- 新增 TypeScript `packages/contracts/src/combat.ts` wire parser/export；Rust 与 TypeScript 共享 exact camelCase JSON fixture。Unknown/missing/zero/fractional versions fail closed；未来正整数可先结构解析，再由 compatibility gate 明确拒绝，不回退到 current。
+- Version set 已通过测试证明可 flatten、序列化并恢复到 BattleRecord/ActiveCombatSave 等价 envelope；durable SQLite schema/table 仍由 M10-T01 所有，本任务未提前增加 migration。
+- 新增 `DEC-165` 记录七字段、正整数、结构解析与执行兼容分离、无时间规则身份和 version ownership 边界。
+
+### 定向验证
+
+- `cargo test -p ember-combat-core`：5/5 PASS；覆盖 shared fixture、exact round-trip、BattleRecord/ActiveCombatSave flatten、非法结构、未来版本拒绝与无时间 identity。
+- `pnpm exec vitest run packages/contracts/src/combat.test.ts`：1 file / 6 tests PASS；覆盖 TS parity、unknown/missing/zero/fraction/unsupported future。
+- `pnpm typecheck` PASS；`cargo clippy -p ember-combat-core --all-targets --all-features -- -D warnings` PASS；`cargo tree` 确认生产依赖只有 serde。
+- 完整 `pnpm check` PASS：Vitest 190 files / 1097 tests，另 2 files / 6 tests 按基线合同 skip；Node 33/33；Rust 新 Core 5/5、workspace aggregate 158 PASS，另 1 个真实 credential test ignored；archive interop 双向门禁通过。
+
+### 结束状态
+
+- M1-T01 Scope/DoD 全部满足；格式、diff、共享 fixture 和用户 `.gitignore` 隔离在 closure commit 前复核。
+- M1-T01 结束状态为 PASS；下一项严格为 M1-T02 Combat Seed / RNG Channels。
