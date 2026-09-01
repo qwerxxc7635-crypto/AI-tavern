@@ -5111,3 +5111,25 @@
 - Mapping 覆盖 physical path、public facade、依赖禁令、AI/World/Character/Persistence/Presentation/Test ownership；没有创建空目录、代码或 schema。
 - 文档格式、链接、ownership 单一性与 diff 在提交前复核；无 SPEC BLOCKER。
 - M0-T03 结束状态为 PASS；下一项依赖满足任务为 M0-T04 v0.3 Character Schema Discovery。
+
+## 2026-09-01 — M0-T04 完成 v0.3 Character Schema Discovery
+
+### Character 真源与映射
+
+- 从 M0-T03 提交 `9506d8c` 创建 `task/M0-T04-character-schema-mapping`，逐项读取 PlayerCharacter、CharacterRuleState、UniversalCharacterProfile、NpcProfile/NpcLodProfile、Semantic Equipment 及 migrations 0011/0013/0016；未修改产品代码或数据库 schema。
+- 新增 `docs/v0.4.1/V0_4_1_COMBAT_ATTRIBUTE_MAPPING_MATRIX.md`。冻结 `BODY/FINESSE/INTELLECT/PRESENCE` 到现有 `physique/agility/knowledge/charisma` 的唯一 mapping v1，Save 映射为 `FORTITUDE/REFLEX/MENTAL`，initiative base 使用 `agility`。
+- 四个 WorldCombatProfile 共享同一基础存储映射；Fantasy/Sci-Fi/Cultivation/Urban 的属性名只作为 profile alias。神识、Focus、Neural Enhancement、装备和 status 必须是独立 typed modifier/resource term，不得成为平行基础属性。
+- 玩家导入读取 CharacterRuleState 并与 PlayerCharacter/UniversalCharacterProfile 做逐字段相等校验；drift、非法 allocation 或未知 mapping version 必须拒绝 Combat。Resolved projection 与 mapping/profile version 必须随 Active Combat 保存，replay 不重新解释。
+
+### Schema gaps 与兼容边界
+
+- 明确六个必要 gap：NPC/Enemy numeric Combat projection、Combat proficiency catalog、typed Combat equipment projection、WorldProfile resource key binding、legacy status/trait adapter、mapping/profile version persistence。
+- 发现 migration 0013 从 `skills_json[*].name` 构建 UniversalCharacter skills，而真实 `RuleSkill` 字段为 `key`；因此 Universal textual projection 不得作为 numeric Combat authority。未知 skill/status/trait/equipment 文本统一不产生 Combat 数值效果，禁止 LLM 猜测。
+- v0.3 普通玩家存档使用现有属性与确定性 defaults，无需 M0 eager migration；NPC 没有合法 projection 时不能进入真实 roster，旧 Active Combat 缺少受支持版本时必须安全拒绝。
+- 新增 `DEC-163` 记录 mapping、source precedence、version/replay 和禁止第二属性系统的决定。
+
+### 验证与结束状态
+
+- Matrix 覆盖 source field、Combat role、四种 WorldProfile mapping、default/migration、version 与 schema gap；各 gap 标明 blocking point 与最小后续扩展方向。
+- Prettier、文档链接/结构、任务状态和 `git diff --check` 在提交前复核；用户已有 `.gitignore` 修改继续保持未暂存且不纳入任务提交。未发现 SPEC BLOCKER。
+- M0-T04 结束状态为 PASS；下一项严格为 M0-T05 Combat Extensibility Architecture Contract。

@@ -3509,3 +3509,27 @@ DeepSeek 的严格 JSON 任务若使用 Provider 默认 thinking，可在没有�
 - AI 内容仍走现有 Orchestrator/Provider/Candidate；最终 mechanics、numbers、budget 与 validation 由 Core/native 负责。
 - durable persistence 延后到 M10 并复用 migration/archive/CampaignStore；M2/M4 只定义 serializable Runtime snapshots。
 - 若后续实现证明新 crate 不能保持无平台依赖或必须复制语义，必须作为架构 finding 回到 M0-T05/M12 审查，不能静默形成双核心。
+
+## DEC-163：Combat Attribute Adapter 复用四项基础属性并持久化映射版本
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：V5.2 §4.5.2.1、M0-T04、[`v0.4.1/V0_4_1_COMBAT_ATTRIBUTE_MAPPING_MATRIX.md`](v0.4.1/V0_4_1_COMBAT_ATTRIBUTE_MAPPING_MATRIX.md)
+
+### 背景
+
+v0.3 已有不可变的 `physique/agility/knowledge/charisma`，并在 PlayerCharacter、CharacterRuleState 和 UniversalCharacterProfile 中维护投影。Combat 若再创建 Strength/Dexterity/Focus/神识等基础字段，会产生两个角色真源；若 Ability 直接引用任意 JSON key 或从职业、描述、世界文本猜数值，则同一存档会因内容或模型变化得到不同战斗结果。NPC、熟练、资源、装备和 legacy status 目前又确实缺少完整的 typed Combat projection。
+
+### 决定
+
+`combatAttributeMappingVersion=1` 使用四个 canonical roles：`BODY -> physique`、`FINESSE -> agility`、`INTELLECT -> knowledge`、`PRESENCE -> charisma`；Saving Throw 固定为 `FORTITUDE -> physique`、`REFLEX -> agility`、`MENTAL -> charisma`，initiative base 固定使用 `agility`。四个 WorldCombatProfile 共享该存储映射，世界名称只是显示/内容 alias；神识、Focus、Neural Enhancement、装备与 status 只能作为独立 typed modifier/resource term，不能变成平行基础属性。
+
+玩家导入以 CharacterRuleState 为规则态读取点，并与 PlayerCharacter/UniversalCharacterProfile 逐字段校验；drift 或非法值拒绝 Combat。Combat start 保存 resolved projection、source revision、mapping/profile version，恢复与 replay 不按后来映射重新推导。Ability 只引用 allowlisted abstract role/save type，禁止数据库字段路径和叙事推断。
+
+### 影响与边界
+
+- M0-T04 只冻结 adapter contract，不修改 schema、迁移或数值 balance formula。
+- NPC numeric stats、Combat proficiency catalog、typed equipment projection、profile resource binding、legacy effect adapter 与版本持久化是明确 gap，必须在相应后续任务最小补齐。
+- `derivedAttributes` 和 world extensions 可以保存非基础扩展数据，但不得绕过本决定成为第二套基础属性。
+- 未知 skill/status/trait/equipment 文本默认无 Combat 数值效果；不调用 LLM 解释。
+- 改变 mapping version 必须保留旧版本 replay 支持或明确安全拒绝，不能用新规则静默解释旧 Active Combat。
