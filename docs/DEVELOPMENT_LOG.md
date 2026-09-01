@@ -5179,3 +5179,23 @@
 
 - M0-T06 Scope/DoD 全部满足；用户变更隔离、文档格式、链接、diff 和 commit scope 在提交前复核。
 - M0-T06 结束状态为 PASS；下一项严格为 M0-T07 Task / Log / Commit Protocol。
+
+## 2026-09-01 — M0-T07 完成 Task / Log / Commit Protocol；M0 Gate PASS
+
+### 执行与证据协议
+
+- 从 M0-T06 提交 `7dda1e4` 创建 `task/M0-T07-task-log-commit-protocol`。新增 `docs/v0.4.1/V0_4_1_TASK_EXECUTION_PROTOCOL.md`，固定 TASKS、DEVELOPMENT_LOG、DECISIONS、`docs/audit/` 与 `docs/audit/evidence/v0.4.1/` 的权威职责。
+- 冻结 `NOT_STARTED -> IN_PROGRESS -> PASS/FAIL/BLOCKED` 与显式 `NOT_RUN` 状态语义；Task 只有在 Scope/DoD、相关测试、diff review、文档和 closure commit 全部满足时才是 PASS。
+- 冻结 `develop/v0.4.1-combat` 线性快进与 `task/<TASK-ID>-<scope>` 独立分支/commit；显式路径暂存，用户 `.gitignore`、credential、local DB、build/cache 和临时诊断不得混入。
+- 定义每 Task 最小日志字段、machine/platform evidence 目录与 manifest、Fake/real Provider/platform 证据边界、SPEC BLOCKER 内容、milestone Gate closure 和 final release phrase 保留规则。
+
+### M0 Gate 复核
+
+- M0-T01 Scope `751e278`、M0-T02 Repository Mapping `3639a5d`、M0-T03 Module Mapping `9506d8c`、M0-T04 Attribute Matrix `1fbc5bf`、M0-T05 Extensibility `4e0d129`、M0-T06 Baseline `7dda1e4` 均独立 PASS。
+- M0 baseline 的本地完整测试零失败；六项 Vitest skip、一个 credential-only ignored test 与远端 platform `NOT_RUN` 均保持显式，未伪装为新 gate PASS。
+- Extensibility checklist、Character schema gaps、single Rust Core、existing SQLite/AI/persistence ownership 与 v0.4.1 scope 彼此一致；无开放 SPEC BLOCKER。
+
+### 验证与结束状态
+
+- 文档引用、状态、branch/commit lineage、格式与 diff 在提交前复核；用户 `.gitignore` 仍未暂存。
+- M0-T07 和 M0 Gate 结束状态均为 PASS；唯一下一项为 M1-T01 Combat Version Contract，不进入其他任务或相邻版本。

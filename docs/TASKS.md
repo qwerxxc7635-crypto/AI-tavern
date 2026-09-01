@@ -12,7 +12,9 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M0-T04 — v0.3 Character Schema Discovery | PASS | 2026-09-01 | [`V0_4_1_COMBAT_ATTRIBUTE_MAPPING_MATRIX.md`](v0.4.1/V0_4_1_COMBAT_ATTRIBUTE_MAPPING_MATRIX.md) |
 | M0-T05 — Combat Extensibility Architecture Contract | PASS | 2026-09-01 | [`COMBAT_EXTENSIBILITY_CONTRACT.md`](v0.4.1/COMBAT_EXTENSIBILITY_CONTRACT.md) |
 | M0-T06 — Baseline Tests / Branch / CI | PASS | 2026-09-01 | [`V0_4_1_BASELINE_AND_CI.md`](v0.4.1/V0_4_1_BASELINE_AND_CI.md) |
-| M0-T07 — Task / Log / Commit Protocol | IN_PROGRESS | 2026-09-01 | 下一项；冻结任务证据与独立提交协议 |
+| M0-T07 — Task / Log / Commit Protocol | PASS | 2026-09-01 | [`V0_4_1_TASK_EXECUTION_PROTOCOL.md`](v0.4.1/V0_4_1_TASK_EXECUTION_PROTOCOL.md) |
+| M0 Gate | PASS | 2026-09-01 | M0-T01..T07 全部独立验收；无 SPEC BLOCKER |
+| M1-T01 — Combat Version Contract | IN_PROGRESS | 2026-09-01 | 下一项；实现可序列化版本身份合同 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
