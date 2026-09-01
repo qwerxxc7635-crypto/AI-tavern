@@ -1,0 +1,20 @@
+{
+  "rngContractVersion": 1,
+  "streams": [
+    {
+      "channelId": "initiative",
+      "stateHex": "a5f73a890ba2500a",
+      "cursor": 0
+    },
+    {
+      "channelId": "resolution",
+      "stateHex": "f72cf555e20d6795",
+      "cursor": 0
+    },
+    {
+      "channelId": "utilityTieBreak",
+      "stateHex": "f59d20119ff704a0",
+      "cursor": 0
+    }
+  ]
+}

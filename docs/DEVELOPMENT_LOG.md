@@ -5221,3 +5221,25 @@
 
 - M1-T01 Scope/DoD 全部满足；格式、diff、共享 fixture 和用户 `.gitignore` 隔离在 closure commit 前复核。
 - M1-T01 结束状态为 PASS；下一项严格为 M1-T02 Combat Seed / RNG Channels。
+
+## 2026-09-01 — M1-T02 完成 Combat Seed / RNG Channels
+
+### RNG Core
+
+- 从 M1-T01 提交 `65acb06` 创建 `task/M1-T02-combat-rng-channels`，在 pure `ember-combat-core` 新增唯一 RNG executor；没有使用 `rand`、system time、OS randomness、Provider、SQLite、Tauri 或 UI state。
+- 固定 `initiative/resolution/utilityTieBreak` 三个 stable channels。每个 channel 从 32 位小写 hex randomSeed、combatInstanceId、rngContractVersion 和 channelId 经 domain-separated length-prefixed SHA-256 独立派生 64-bit state，再使用 SplitMix64 与独立 cursor。
+- bounded draw 使用 rejection sampling；channel 明确传入。Utility 连续消费 100 次不会改变下一次 Resolution roll；seed 或 combatInstanceId 变化会改变 streams。
+- Snapshot 固定三 channel 顺序并保存 16 位小写 `stateHex` 与 JS-safe cursor；restore 对 version/order/state/cursor/unknown field fail closed，能在暂停点产生与原对象完全相同的后续 rolls。`CombatRng` 不实现 Clone。
+
+### 跨层 checkpoint contract
+
+- TypeScript `packages/contracts/src/combat.ts` 只新增 channel/snapshot DTO 与 exact parser，不实现随机算法。Rust/TS 共享初始 checkpoint fixture，固定三个初始 state 与 JSON shape。
+- snapshot/inspection 只需 immutable borrow，不推进 cursor；UI Preview/Log/Tooltip/LegalTargets/default Intent 尚无任何 Core RNG 调用路径。
+- 新增 `DEC-166` 记录 derivation、SplitMix64、rejection sampling、safe JSON 与 rngContractVersion ownership。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：12/12 PASS；包含三组跨平台 golden d20 vectors、channel isolation、seed/instance isolation、snapshot/resume、read-only inspection、shared fixture 与负向边界。
+- `pnpm exec vitest run packages/contracts/src/combat.test.ts`：1 file / 12 tests PASS；`pnpm typecheck` 与 strict Core Clippy PASS。
+- 首次完整门禁在两个 test-only non-null assertions 被 ESLint 拒绝；改为显式 fixture 缺失检查，不放宽 lint。随后完整 `pnpm check` PASS：Vitest 190 files / 1102 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust 165 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Format/diff/dependency negative scan 与用户 `.gitignore` 隔离在 closure commit 前复核。M1-T02 结束状态为 PASS；下一项严格为 M1-T03 CombatState Aggregate。

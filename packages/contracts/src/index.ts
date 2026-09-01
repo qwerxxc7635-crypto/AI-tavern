@@ -1,13 +1,19 @@
 export type { Conversation, ConversationKind, Message, MessageRole } from './conversation.js';
 export {
+  COMBAT_RNG_CHANNELS,
   COMBAT_VERSION_FIELDS,
   CURRENT_COMBAT_VERSION_SET,
+  CombatRngContractError,
   CombatVersionContractError,
   assertSupportedCombatVersionSet,
   combatVersionIdentity,
+  parseCombatRngSnapshot,
   parseCombatVersionSet,
 } from './combat.js';
 export type {
+  CombatRngChannel,
+  CombatRngSnapshot,
+  CombatRngStreamSnapshot,
   CombatVersionContractErrorCode,
   CombatVersionField,
   CombatVersionSet,

@@ -3580,3 +3580,27 @@ BattleRecord、ActiveCombatSave 和 Replay 必须固定创建战斗时的 schema
 - 普通 balance 常数变化只推进 balanceVersion；字段所有权继续遵循 DEC-164，避免 version explosion。
 - 当前没有旧 Combat save，因此只支持 version 1；未来版本需要 migration 或中文安全拒绝，不能由 parser fallback。
 - Rust Core 仅依赖 serde（serde_json 只用于测试），继续满足无 Tauri/SQLite/Provider/UI/system-time 边界。
+
+## DEC-166：Combat RNG v1 使用长度前缀 SHA-256 派生与独立 SplitMix64 streams
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：V5.2 §17.2、M1-T02
+
+### 背景
+
+Initiative、Resolution 与 Utility TieBreak 必须从同一 Combat seed/instance/version 确定性派生，但任何一个 channel 的额外消费都不能影响另一个。派生若直接拼接字符串会有字段边界歧义；使用系统 RNG、时间或容器遍历会破坏跨平台 replay。Snapshot 里的原生 `u64` state 若作为 JSON number 经过 JavaScript，又可能丢失精度。
+
+### 决定
+
+`rngContractVersion=1` 固定三个 channel ID 与顺序：`initiative`、`resolution`、`utilityTieBreak`。每个初始 stream state 使用 domain-separated、长度前缀的 SHA-256：randomSeed、combatInstanceId、big-endian rngContractVersion、channelId 依次输入，取 digest 前 64 bit（big-endian）。每个 channel 使用独立 SplitMix64 state/cursor；bounded draw 使用 rejection sampling，不引入 modulo bias。
+
+Random seed 复用现有 world seed 的 32 位小写 hex 形状。Snapshot 按固定 channel 顺序保存 `channelId/stateHex/cursor`：state 是 16 位小写 hex，cursor 最大为 JavaScript `Number.MAX_SAFE_INTEGER`。Restore 拒绝错序、缺失/重复 channel、非法 state、越界 cursor、未知字段与不支持的 rngContractVersion。
+
+### 影响与边界
+
+- 算法、输入编码、channel ID/order、raw draw/cursor 语义或 bounded sampling 改变时必须推进 rngContractVersion；不能只改实现而沿用 v1。
+- Rust Core 是唯一 RNG executor；TypeScript 只验证/传输共享 snapshot fixture，不生成 roll。
+- `CombatRng` 不实现 `Clone`，避免通过随意复制分叉权威 cursor；checkpoint 使用显式 snapshot/restore。
+- Preview/Log/Tooltip/LegalTargets/animation/default Intent 不获得隐式 RNG；后续 Core query 必须只借用 immutable state。规则执行只能显式选择一个 channel。
+- M1-T02 不决定 Initiative roster 顺序或 Resolution consumption order；M2 scheduler/M3 resolution 必须按 V5.2 在合法执行点调用本 RNG。
