@@ -3604,3 +3604,27 @@ Random seed 复用现有 world seed 的 32 位小写 hex 形状。Snapshot 按�
 - `CombatRng` 不实现 `Clone`，避免通过随意复制分叉权威 cursor；checkpoint 使用显式 snapshot/restore。
 - Preview/Log/Tooltip/LegalTargets/animation/default Intent 不获得隐式 RNG；后续 Core query 必须只借用 immutable state。规则执行只能显式选择一个 channel。
 - M1-T02 不决定 Initiative roster 顺序或 Resolution consumption order；M2 scheduler/M3 resolution 必须按 V5.2 在合法执行点调用本 RNG。
+
+## DEC-167：CombatState 使用单一 typed aggregate 与 exact serde JSON 哈希
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：V5.2 §11.2.1、§17，M1-T03
+
+### 背景
+
+Combat Runtime 必须同时保存 combatants、行动资源、timeline/round、objective、reinforcement、provisional delta、scheduler、pending reaction、result candidate 与 RNG checkpoint。若这些分散在 React local state、多个可独立写入的对象或无序 map 中，Save/Load/Replay 会恢复出不同权威状态；若哈希依赖运行时对象遍历、浮点、系统时间或展示字段，则同一规则输入也不能得到稳定 state identity。
+
+### 决定
+
+纯 Rust `ember-combat-core` 拥有唯一 `CombatState` typed aggregate。M1-T03 要求的全部 Runtime 分区、版本、seed、revision、last committed sequence 与 RNG snapshot 都位于该聚合；UI selection、animation、tooltip、layout、toast 等 presentation state 不进入结构。所有可变集合使用语义有序 `Vec`，不使用 map/object iteration；权威字段只使用整数、布尔、字符串、enum/tagged union 与显式 optional，不使用未约束 float 或时间戳。
+
+`combatSchemaVersion=1` 的 canonical state bytes 定义为该 exact、`deny_unknown_fields` Rust struct 的 compact serde JSON bytes，字段顺序由 struct contract 固定，集合顺序属于权威状态。State hash 是这些 bytes 的 lowercase SHA-256。Checkpoint envelope 同时保存 state 与 hash，restore 先验证 hash；版本 support gate 与 committed/restored invariant validation 分别继续由 M1-T01 与 M1-T04 执行。
+
+### 影响与边界
+
+- `serde_json` 成为 Core 的最小 production dependency，只负责 canonical serialization；Core 仍不依赖 Tauri、SQLite、Provider、网络、filesystem、UI 或 system time。
+- Rust state 是权威可执行对象；TypeScript 后续只承载 serde wire projection/ViewModel，不维护第二套 mutable CombatState 或规则 executor。
+- Working State 在 effect pipeline 内可以暂时变化；只有后续 M1-T04 validator 通过的 state 才允许 Atomic Commit 或 restore 成为权威 checkpoint。
+- 调整字段、enum wire value、字段顺序、canonical encoding 或集合排序语义会改变 state hash，必须由 combatSchemaVersion/兼容迁移明确管理，不能静默解释旧存档。
+- 本任务只建立聚合、序列化与完整性 envelope；不提前实现 scheduler、objective、cost、effect、persistence 或 UI 行为。

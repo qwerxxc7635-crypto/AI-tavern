@@ -5243,3 +5243,20 @@
 - `pnpm exec vitest run packages/contracts/src/combat.test.ts`：1 file / 12 tests PASS；`pnpm typecheck` 与 strict Core Clippy PASS。
 - 首次完整门禁在两个 test-only non-null assertions 被 ESLint 拒绝；改为显式 fixture 缺失检查，不放宽 lint。随后完整 `pnpm check` PASS：Vitest 190 files / 1102 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust 165 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Format/diff/dependency negative scan 与用户 `.gitignore` 隔离在 closure commit 前复核。M1-T02 结束状态为 PASS；下一项严格为 M1-T03 CombatState Aggregate。
+
+## 2026-09-01 — M1-T03 完成 CombatState Aggregate
+
+### 单一权威 Runtime State
+
+- 从 M1-T02 提交 `9df4cae` 创建 `task/M1-T03-combat-state-aggregate`，在 pure `ember-combat-core` 新增唯一 `CombatState`；没有新增 SQLite schema、Tauri command、Provider、UI state 或第二套 TypeScript engine。
+- 聚合覆盖 combatants、HP/AP/Reaction/resources/shield/statuses/ability usage、timeline、round/roster、objectives、reinforcement、provisional delta、scheduler checkpoint、pending reaction、result candidates/confirmed result，以及 versions、seed、revision、sequence 与 RNG snapshot。
+- Runtime 子结构均为 exact serde DTO，unknown fields fail closed；集合使用显式有序 `Vec`，权威状态不含 map、float、系统时间或 presentation state。UI-only 字段不能被反序列化进 `CombatState`。
+- `combatSchemaVersion=1` 使用 compact serde JSON bytes 作为 canonical state encoding，并以 lowercase SHA-256 建立 state hash；snapshot envelope 在 restore 前验证 hash，篡改会 fail closed。只读 serialization/hash/snapshot 不推进任何 RNG cursor。
+- 新增 `DEC-167` 记录单一 aggregate、canonical encoding、hash 与后续 version/invariant ownership；`serde_json` 仅作为 Core canonical serialization dependency。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：17/17 PASS，其中新增 5 项覆盖全部 state partition round-trip、稳定 hash/envelope restore、tamper/unknown UI field rejection、collection order 与 RNG read-only。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings` PASS；代码格式检查 PASS。
+- 完整 `pnpm check` PASS：Vitest 190 files / 1103 tests，另 2 files / 6 tests 按基线合同 skip；Node 33/33；Rust workspace 170 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、diff 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T03 结束状态为 PASS；下一项严格为 M1-T04 CombatStateInvariantValidator。

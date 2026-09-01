@@ -16,7 +16,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M0 Gate | PASS | 2026-09-01 | M0-T01..T07 全部独立验收；无 SPEC BLOCKER |
 | M1-T01 — Combat Version Contract | PASS | 2026-09-01 | Rust/TS exact contract + shared fixture；版本身份可序列化、可追踪、无系统时间 |
 | M1-T02 — Combat Seed / RNG Channels | PASS | 2026-09-01 | SHA-256 length-prefixed derivation + SplitMix64；3 channels 独立 cursor/snapshot |
-| M1-T03 — CombatState Aggregate | IN_PROGRESS | 2026-09-01 | 下一项；建立权威可序列化 Runtime State |
+| M1-T03 — CombatState Aggregate | PASS | 2026-09-01 | 单一 Rust Runtime State；exact serde JSON + SHA-256 snapshot/hash；无 UI state |
+| M1-T04 — CombatStateInvariantValidator | IN_PROGRESS | 2026-09-01 | 下一项；统一拒绝非法 committed/restored state |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

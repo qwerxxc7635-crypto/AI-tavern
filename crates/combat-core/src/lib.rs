@@ -4,11 +4,20 @@
 //! and platform services. Runtime behavior is added only by the owning milestone.
 
 mod rng;
+mod state;
 mod version;
 
 pub use rng::{
     COMBAT_RNG_CHANNELS, CombatRng, CombatRngError, CombatRngSnapshot, RngChannel,
     RngStreamSnapshot,
+};
+pub use state::{
+    AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,
+    CombatStateHashError, CombatantRuntime, CombatantState, CostCommitState, DurationClock,
+    EventSchedulerCheckpoint, HookPhase, ObjectiveKind, ObjectiveRuntime, ObjectiveRuntimeState,
+    PendingReactionWindow, ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReinforcementRuntime,
+    ReinforcementRuntimeState, ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus,
+    RoundRuntimeState, SchedulerItem, SchedulerItemKind, StatusRuntime, TimelineEntry,
 };
 pub use version::{
     CURRENT_COMBAT_VERSIONS, CombatVersion, CombatVersionField, CombatVersionSet,
