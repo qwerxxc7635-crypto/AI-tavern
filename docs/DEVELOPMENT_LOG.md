@@ -5050,3 +5050,23 @@
 
 - 发布分支先正常合并当时的 `origin/main`，保留完整历史，再通过 PR #3 以普通 merge 进入 `main`；最终 `v0.3.0` 为指向发布后 `main` HEAD 的 annotated tag。GitHub Release 固定入口为 `https://github.com/qwerxxc7635-crypto/AI-tavern/releases/tag/v0.3.0`。
 - 用户已有 `.gitignore` 修改始终保持未暂存，未进入任何发布提交。发布过程未读取、打印或上传真实 API Key，未修改用户数据库，也未开始 V0.4。
+
+## 2026-09-01 — M0-T01 完成 v0.4.1 Scope Freeze
+
+### 输入与基线
+
+- 从正式发布基线 `210e699d0aba355b5f00fd4bf6ed777e6977356d`（`v0.3.0`）创建 `task/M0-T01-v0-4-1-scope-freeze`；用户已有 `.gitignore` 变更继续保持未暂存且不纳入任务提交。
+- 核对 V5.2 Combat SOT、`V0.4.1_TASKS_FINAL.md` 和 Runtime Combat Assets 三项输入。两份文档 SHA-256 分别为 `f0d38e3ab772817f8a0bde3409d2b5fdac5f6e922c22aa9703988807470ec07c`、`7e31d914bb303ad5c8cbf2a24bf75da4e11d2724313eb01967371115692b954b`；素材包 `SHA256SUMS.txt` 全项 PASS，包声明 119 个 Runtime Assets。
+- 修改前基线 `pnpm check` PASS：Vitest 189 files / 1091 tests，另 2 files / 6 tests 按合同 skip；Node 33/33；Rust workspace 全绿，1 个需明确 Credential 授权的真实 DeepSeek 测试 ignored。Windows 平台证据本机 `NOT_RUN`。
+
+### 范围冻结
+
+- 新增 `docs/v0.4.1/V0_4_1_SCOPE_AND_RELEASE_GATE.md`，冻结 v0.4.1 Combat System 的权威优先级、IN/OUT OF SCOPE、0.4.2/0.4.3/0.4.4 边界、架构与数据红线、SPEC BLOCKER 判定和 Gate A–G/最终 Release Gate。
+- 文档只提供范围入口与证据要求，不复制 V5.2 具体规则，不创建 V5.3，也不提前实现 Map、Dialogue、World Generation、iOS 或任何 Combat Runtime 代码。
+- `docs/TASKS.md` 增加 v0.4.1 当前执行状态：M0-T01 PASS，下一项严格为 M0-T02 Repository Baseline Audit。
+
+### 验证与结束状态
+
+- Runtime Assets 的官方校验清单逐项 PASS；没有重新生成、修改或复制素材。
+- 文档格式、链接、任务状态与 diff 在提交前复核；M0-T01 未发现 Scope 冲突或 SPEC BLOCKER。
+- M0-T01 结束状态为 PASS；下一任务严格为 M0-T02，不在本任务提交中包含仓库映射或 Combat 实现。

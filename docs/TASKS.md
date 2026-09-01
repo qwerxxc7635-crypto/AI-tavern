@@ -1,4 +1,19 @@
-# Ember Tavern V0.3 执行任务
+# Ember Tavern 执行任务
+
+## 当前执行版本：v0.4.1 Combat System
+
+v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V5.2（2）.md`，唯一任务拆分来源是用户交付的 `V0.4.1_TASKS_FINAL.md`。仓库内的范围入口为 [`v0.4.1/V0_4_1_SCOPE_AND_RELEASE_GATE.md`](v0.4.1/V0_4_1_SCOPE_AND_RELEASE_GATE.md)。本节只记录执行状态，不复制或改写冻结规则。
+
+| Task | Status | Date | Evidence / next step |
+|---|---|---|---|
+| M0-T01 — v0.4.1 Scope Freeze | PASS | 2026-09-01 | [`V0_4_1_SCOPE_AND_RELEASE_GATE.md`](v0.4.1/V0_4_1_SCOPE_AND_RELEASE_GATE.md) |
+| M0-T02 — Repository Baseline Audit | IN_PROGRESS | 2026-09-01 | 下一项；只读映射真实 v0.3 仓库，不顺手重构 |
+
+M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
+
+---
+
+# Ember Tavern V0.3 历史执行任务
 
 版本：V0.3 Design Freeze
 
