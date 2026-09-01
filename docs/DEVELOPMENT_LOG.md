@@ -5133,3 +5133,24 @@
 - Matrix 覆盖 source field、Combat role、四种 WorldProfile mapping、default/migration、version 与 schema gap；各 gap 标明 blocking point 与最小后续扩展方向。
 - Prettier、文档链接/结构、任务状态和 `git diff --check` 在提交前复核；用户已有 `.gitignore` 修改继续保持未暂存且不纳入任务提交。未发现 SPEC BLOCKER。
 - M0-T04 结束状态为 PASS；下一项严格为 M0-T05 Combat Extensibility Architecture Contract。
+
+## 2026-09-01 — M0-T05 完成 Combat Extensibility Architecture Contract
+
+### 扩展机制与所有权冻结
+
+- 从 M0-T04 提交 `1fbc5bf` 创建 `task/M0-T05-combat-extensibility-contract`，读取 `V0.4.1_TASKS_FINAL.md` §1 与 V5.2 相关边界；未新增 Combat 代码、schema、catalog 空壳或未来功能。
+- 新增 `docs/v0.4.1/COMBAT_EXTENSIBILITY_CONTRACT.md`：封闭语义使用 Enum/tagged union，开放非执行词汇使用 stable ID + static catalog，可执行 primitive 使用 typed static handler set，V5.2 明确例外使用 subsystem-owned local typed override，四世界使用 developer-defined profile composition。
+- 冻结 `DamageChannelCatalog` 只拥有 channel identity/common metadata；world-specific `primaryMitigationByChannel` 只由 resolved WorldCombatProfile 拥有。Core、Balance、AI Exposure、Presentation、Persistence 的职责不可混入 handler 或跨层复制。
+- 冻结 combatSchema/ruleset/balance/worldProfile/attributeMapping/rngContract 六类默认 version ownership；只有现有版本无法唯一解释且影响 replay 时才允许增加独立版本。
+
+### 禁止项与审计入口
+
+- 明确禁止 Generic Rule Capability Engine、Runtime Plugin Registry、脚本/表达式 VM、万能 Ability Graph、AI runtime code、per-Ability State mutation、flat duplicated whitelist、boolean flag soup、四套 Combat Engine 和 distributed semantic switch。
+- Contract 增加 change admission template 以及 representation/ownership/version/negative-search 四组 checklist，可由每个 milestone review 和 M12 独立审计直接复用。
+- 新增 `DEC-164` 记录最窄静态机制、单一 mitigation owner 与 version ownership 决定。
+
+### 验证与结束状态
+
+- Contract 覆盖 M0-T05 Scope/DoD 且没有形成第二份产品规则 SOT；文档只引用 V5.2 与 TASKS 的实现约束。
+- Prettier、链接、结构、diff 和提交范围在提交前复核；用户 `.gitignore` 保持未暂存。无 SPEC BLOCKER。
+- M0-T05 结束状态为 PASS；下一项严格为 M0-T06 Baseline Tests / Branch / CI。

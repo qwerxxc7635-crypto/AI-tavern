@@ -3533,3 +3533,26 @@ v0.3 已有不可变的 `physique/agility/knowledge/charisma`，并在 PlayerCha
 - `derivedAttributes` 和 world extensions 可以保存非基础扩展数据，但不得绕过本决定成为第二套基础属性。
 - 未知 skill/status/trait/equipment 文本默认无 Combat 数值效果；不调用 LLM 解释。
 - 改变 mapping version 必须保留旧版本 replay 支持或明确安全拒绝，不能用新规则静默解释旧 Active Combat。
+
+## DEC-164：Combat 扩展按语义性质选择最窄静态机制
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：`V0.4.1_TASKS_FINAL.md` §1、M0-T05、[`v0.4.1/COMBAT_EXTENSIBILITY_CONTRACT.md`](v0.4.1/COMBAT_EXTENSIBILITY_CONTRACT.md)
+
+### 背景
+
+Combat 同时存在封闭状态、开放内容词汇、可执行 primitive、少量规则例外和四世界组合。若全部做 Enum，会形成 enum/whitelist explosion；若全部做动态 Registry/Capability/DSL，则 AI 或存档可能注入执行语义，并使 validation、RNG、save/replay 和 ownership 无法唯一。把 balance、tooltip、AI exposure 和 execution 塞进同一 handler 也会形成新的巨型事实源。
+
+### 决定
+
+封闭权威语义使用 Enum/tagged union 与 owner-local exhaustive dispatch；非执行内容词汇使用 stable ID + immutable static catalog；Effect Primitive 使用 typed static handler set；只有 V5.2 已要求的例外使用所属子系统的 local typed override；世界差异通过 developer-defined WorldCombatProfile composition。v0.4.1 不提供 runtime handler registration、generic capability engine、脚本/VM 或 arbitrary ability graph。
+
+DamageChannelCatalog 只拥有 channel identity/common metadata，world-specific `primaryMitigationByChannel` 只由 resolved WorldCombatProfile 拥有。规则执行、balance、AI exposure、presentation 和 persistence 各有单一职责，禁止跨层复制 semantic switch。
+
+### 影响与边界
+
+- semantic/catalog/handler change 默认由 `rulesetVersion` 管理；balance、profile、attribute mapping、RNG 和 schema 使用各自既有 owner，只有无法由现有版本唯一解释且影响 replay 时才新增版本。
+- Ordinary AI 只能通过 M6 单一 Mechanical Exposure Policy 引用 canonical IDs；不能注册 handler 或使用 developer-only override。
+- M12 必须按 contract 的正向 ownership 与 repository-wide negative checks 审计；出现 generic registry、boolean flag soup、双重 mitigation owner 或 UI/AI/persistence 重算规则均为 release finding。
+- 本决定约束实现架构，不修改任何 V5.2 产品语义，也不承诺 v0.4.1 的 runtime mod/plugin 能力。
