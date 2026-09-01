@@ -3,7 +3,9 @@ use std::{error::Error, fmt};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use crate::{CombatRngSnapshot, CombatVersionSet};
+use crate::{
+    CombatRngSnapshot, CombatStateInvariantError, CombatStateInvariantValidator, CombatVersionSet,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -375,6 +377,12 @@ impl CombatState {
             state: self.clone(),
         })
     }
+
+    /// Must succeed before an atomic state/result commit. Working copies may
+    /// remain unvalidated while their effect and lethal resolution are active.
+    pub fn validate_for_commit(&self) -> Result<(), CombatStateInvariantError> {
+        CombatStateInvariantValidator::validate(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -385,17 +393,21 @@ pub struct CombatStateEnvelope {
 }
 
 impl CombatStateEnvelope {
-    pub fn verify_and_restore(self) -> Result<CombatState, CombatStateHashError> {
+    pub fn verify_and_restore(self) -> Result<CombatState, CombatStateRestoreError> {
         let actual = self
             .state
             .state_hash_sha256()
-            .map_err(|_| CombatStateHashError::Serialization)?;
+            .map_err(|_| CombatStateRestoreError::Hash(CombatStateHashError::Serialization))?;
         if actual != self.state_hash_sha256 {
-            return Err(CombatStateHashError::Mismatch {
-                expected: self.state_hash_sha256,
-                actual,
-            });
+            return Err(CombatStateRestoreError::Hash(
+                CombatStateHashError::Mismatch {
+                    expected: self.state_hash_sha256,
+                    actual,
+                },
+            ));
         }
+        CombatStateInvariantValidator::validate(&self.state)
+            .map_err(CombatStateRestoreError::Invariant)?;
         Ok(self.state)
     }
 }
@@ -416,6 +428,23 @@ impl fmt::Display for CombatStateHashError {
 }
 
 impl Error for CombatStateHashError {}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CombatStateRestoreError {
+    Hash(CombatStateHashError),
+    Invariant(CombatStateInvariantError),
+}
+
+impl fmt::Display for CombatStateRestoreError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Hash(error) => error.fmt(formatter),
+            Self::Invariant(_) => formatter.write_str("restored combat state violates invariants"),
+        }
+    }
+}
+
+impl Error for CombatStateRestoreError {}
 
 #[cfg(test)]
 mod tests {
@@ -463,7 +492,9 @@ mod tests {
         snapshot.state.combatants[0].hit_points -= 1;
         assert!(matches!(
             snapshot.verify_and_restore(),
-            Err(CombatStateHashError::Mismatch { .. })
+            Err(CombatStateRestoreError::Hash(
+                CombatStateHashError::Mismatch { .. }
+            ))
         ));
 
         let mut unknown: Value = serde_json::to_value(fixture()).unwrap();

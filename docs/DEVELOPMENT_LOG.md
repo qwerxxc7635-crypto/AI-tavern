@@ -5260,3 +5260,20 @@
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings` PASS；代码格式检查 PASS。
 - 完整 `pnpm check` PASS：Vitest 190 files / 1103 tests，另 2 files / 6 tests 按基线合同 skip；Node 33/33；Rust workspace 170 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、diff 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T03 结束状态为 PASS；下一项严格为 M1-T04 CombatStateInvariantValidator。
+
+## 2026-09-01 — M1-T04 完成 CombatStateInvariantValidator
+
+### 统一 commit / restore 边界
+
+- 从 M1-T03 提交 `6474401` 创建 `task/M1-T04-combat-state-invariant-validator`，新增 pure Core `CombatStateInvariantValidator`；所有错误包含 stable code、combatantId 与可选 resourceId，Validator 只拒绝、不静默 clamp、不产生 UI 文案。
+- 覆盖 HP、Shield、AP、ReactionCharges 的上下界与 effective max，普通 resource 的非负 `min/current/max`，以及压力资源同时具备且满足合法范围的 `minValue/overheatThreshold/hardMaxValue` contract。
+- 覆盖 `Active -> HP>0`、`Downed/Defeated -> HP=0`；Removed 不被错误等同于 Defeated。当前 combatants 与未部署 reinforcement 的 initial runtime snapshot 均使用同一校验路径。
+- 新增 `CombatState::validate_for_commit` 作为后续 Atomic State/Result Commit 入口。Envelope restore 固定先验 SHA-256，再做 invariant validation；重算了合法 hash 的非法 Save 仍被拒绝。
+- 测试证明 Working State 可在不可观察阶段暂时为 `Active + HP=0`，但 commit validation 会拒绝；完成同一 Working State 的 Downed LethalResolution 后才通过。新增 `DEC-168` 固定统一 owner 与拒绝型语义。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：24/24 PASS；新增 7 项覆盖所有 bounded combatant 上下界、resource/Heat contract、三种 HP/state 关系、Working/commit 边界、hash-valid invalid save 与 reinforcement restore。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。
+- 完整 `pnpm check` PASS：Vitest 190 files / 1103 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 177 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T04 结束状态为 PASS；下一项严格为 M1-T05 CombatAttributeResolver。

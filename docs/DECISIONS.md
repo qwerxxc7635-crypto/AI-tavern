@@ -3628,3 +3628,28 @@ Combat Runtime 必须同时保存 combatants、行动资源、timeline/round、o
 - Working State 在 effect pipeline 内可以暂时变化；只有后续 M1-T04 validator 通过的 state 才允许 Atomic Commit 或 restore 成为权威 checkpoint。
 - 调整字段、enum wire value、字段顺序、canonical encoding 或集合排序语义会改变 state hash，必须由 combatSchemaVersion/兼容迁移明确管理，不能静默解释旧存档。
 - 本任务只建立聚合、序列化与完整性 envelope；不提前实现 scheduler、objective、cost、effect、persistence 或 UI 行为。
+
+## DEC-168：CombatState 不变量由单一拒绝型 Validator 守卫 commit 与 restore
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：V5.2 §11.1.1、§11.3，M1-T04
+
+### 背景
+
+Effect/Damage 的 Working State 可以在 LethalResolution 前暂时出现 `Active + HP=0`，但任何正式 state/result commit 与 Save/Load restore 都不能暴露该状态。若每条 Ability、Effect、persistence adapter 各自做一部分检查，边界会漂移；若 Validator 静默 clamp 或修复非法 state，则会掩盖缺失的 LethalResolution、错误成本或损坏存档，并产生无法审计的 replay 分歧。
+
+### 决定
+
+`CombatStateInvariantValidator` 是 Core 内唯一 committed/restored state invariant owner。它按稳定 combatant/resource 顺序检查当前 combatants 与未部署 reinforcement 的 initial runtime snapshots，返回结构化 code、combatantId 与可选 resourceId；它只拒绝、不修改输入，也不生成玩家文案。
+
+统一覆盖 `0 <= HP/Shield/AP/ReactionCharges <= effective max`、普通 bounded resource 的非负合法区间、压力资源完整 `minValue/overheatThreshold/hardMaxValue` contract，以及 `Active -> HP>0`、`Downed/Defeated -> HP=0`。压力资源的 effective max 与 overheat threshold 都必须落在 stable `[minValue, hardMaxValue]` 内；不额外发明二者的动态先后关系。
+
+`CombatState::validate_for_commit` 是 Atomic State/Result Commit 共用入口。`CombatStateEnvelope::verify_and_restore` 固定先验证 SHA-256，再执行同一 Validator；hash 正确但 invariant 非法的 save 仍 fail closed。Working copy 可以独立构造和修改，但只有完成 LethalResolution 并通过此入口后才能成为权威 state。
+
+### 影响与边界
+
+- Effective max 降低时的 `current=min(current,newMax)` 由后续 typed effect transition 在验证前执行；Validator 不替调用方补写 state。
+- Heal/Revive legality 属于后续 command/effect validation；本项只保证成功 transition 的最终 HP/state 关系，不提前实现 Heal primitive。
+- Duplicate IDs、timeline/roster membership、objective monotonicity 与 scheduler consistency 由其 owning tasks 增加专属 rules validation，M1-T04 不把所有业务校验塞入 invariant owner。
+- Native persistence 在 M10 恢复 ActiveCombatSave 时必须调用 Core envelope restore，不能只验 JSON/hash 或自行复制数值检查。
