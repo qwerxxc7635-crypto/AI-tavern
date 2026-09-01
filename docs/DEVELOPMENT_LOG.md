@@ -5154,3 +5154,28 @@
 - Contract 覆盖 M0-T05 Scope/DoD 且没有形成第二份产品规则 SOT；文档只引用 V5.2 与 TASKS 的实现约束。
 - Prettier、链接、结构、diff 和提交范围在提交前复核；用户 `.gitignore` 保持未暂存。无 SPEC BLOCKER。
 - M0-T05 结束状态为 PASS；下一项严格为 M0-T06 Baseline Tests / Branch / CI。
+
+## 2026-09-01 — M0-T06 完成 Baseline Tests / Branch / CI
+
+### Branch 与环境基线
+
+- 从 M0-T05 提交 `4e0d12939f6d592663f806afdc794d4c2959b8d7` 建立 `develop/v0.4.1-combat`，并创建独立任务分支 `task/M0-T06-baseline-ci`。v0.4.1 继续采用 accepted task commit 线性快进与每 Task 独立 branch/commit。
+- 新增 `docs/v0.4.1/V0_4_1_BASELINE_AND_CI.md`，记录正式 v0.3.0 base、HEAD、macOS/arm64、Node/pnpm/Rust/SQLite/Git、lock/workflow SHA-256、32 个 migration、save schema 3、world schema 1 和尚不存在 Combat durable tables。
+- 工作树唯一基线变更仍为用户 `.gitignore`；diff SHA-256 为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987`，保持未暂存、不纳入提交。
+
+### 完整测试基线
+
+- `pnpm check` exit 0：Prettier、release metadata 0.3.0、zh-CN、ESLint、TypeScript 全部 PASS。
+- Vitest 189 files / 1091 tests PASS，另 2 files / 6 tests 按既有合同 skip；Node 33/33 PASS；Rust aggregate 153 PASS、0 fail、1 个需显式授权 DeepSeek credential 的测试 ignored。
+- archive interop 的 TypeScript 14/14 双向运行与 native 1/1 PASS。基线已知失败为 0；后续不得用新增 skip/ignore 或删除测试掩盖 Combat regression。
+
+### CI/平台诚实边界
+
+- 静态确认 CI shared matrix 覆盖 Windows/macOS，另有 Windows NSIS/install lifecycle 与 macOS app lifecycle/evidence jobs；相关 workflow contract tests 已通过。
+- 本地未触发远端 CI，因此 Windows/macOS GitHub jobs、Windows NSIS/WebView2/Credential Manager 和 packaged macOS lifecycle 均记录为 `NOT_RUN`；真实 Provider 指标为 `NOT_EVALUATED`，未冒充 PASS。
+- 文档冻结 baseline reproduction/failure attribution：相同 commit/toolchain 可复现才是 BASELINE/ENVIRONMENT，否则是新 regression；flaky 不得靠重复运行降级。
+
+### 结束状态
+
+- M0-T06 Scope/DoD 全部满足；用户变更隔离、文档格式、链接、diff 和 commit scope 在提交前复核。
+- M0-T06 结束状态为 PASS；下一项严格为 M0-T07 Task / Log / Commit Protocol。
