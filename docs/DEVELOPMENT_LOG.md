@@ -5090,3 +5090,24 @@
 - 映射引用均来自当前 HEAD 的真实文件/API/SQL/CI，不依据旧 PRD 猜测；基线 `pnpm check` 继续沿用 M0-T01 修改前真实 PASS 证据。
 - 文档结构、格式、链接、diff 与用户 `.gitignore` 隔离在提交前复核；无 SPEC BLOCKER。
 - M0-T02 结束状态为 PASS；下一任务严格为 M0-T03 Combat Module Mapping。
+
+## 2026-09-01 — M0-T03 完成 Combat Module Mapping
+
+### 唯一权威 Runtime 边界
+
+- 从 M0-T02 提交 `3639a5d` 创建 `task/M0-T03-combat-module-mapping`。新增 `docs/v0.4.1/V0_4_1_COMBAT_MODULE_MAPPING.md`，把 V5.2 的 core/abilities/effects/statuses/tags/reactions/ai/balance/profiles/persistence/presentation 映射到真实 workspace。
+- 冻结一套纯 Rust `ember-combat-core` 作为唯一权威 Combat Runtime：无 Tauri、rusqlite、Provider、UI、system time 或动态 plugin 依赖。TypeScript 只承载 wire contracts、AI orchestration 和 React presentation，不实现第二套可执行 Combat Engine。
+- 生产路径继续为 React typed gateway -> Tauri -> native adapter -> Combat Core -> existing CampaignStore/SQLite；Core 不反向依赖 presentation/persistence。
+- 新增 `DEC-162` 记录上述重大架构选择、理由和可审计边界。
+
+### 子系统归属
+
+- Ability/Effect/Tag/Status/Reaction/Scheduler/Profile/Balance/Utility AI 的规则解释集中于 Core；AI content 复用 `AI_TASKS`、GeneratorRunner、DesktopAIOrchestrator、Candidate、Provider 和 Prompt packages，native facade 负责 programmatic numbers/validation/commit。
+- M10 才通过现有 migration/archive/CampaignStore 增加 BattleRecord/ActiveCombatSave；M2/M4 仅定义稳定 Runtime snapshots。Event Ledger 只接 selected committed facts，不复制第二套 ledger。
+- Combat UI 复用现有 React service、localization、primitives/game-components 与 design tokens；legal targets/cost/mechanical facts 来自 Core query，不在 UI 重算。
+
+### 验证与结束状态
+
+- Mapping 覆盖 physical path、public facade、依赖禁令、AI/World/Character/Persistence/Presentation/Test ownership；没有创建空目录、代码或 schema。
+- 文档格式、链接、ownership 单一性与 diff 在提交前复核；无 SPEC BLOCKER。
+- M0-T03 结束状态为 PASS；下一项依赖满足任务为 M0-T04 v0.3 Character Schema Discovery。

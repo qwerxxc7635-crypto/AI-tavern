@@ -3484,3 +3484,28 @@ DeepSeek 的严格 JSON 任务若使用 Provider 默认 thinking，可在没有�
 ### 影响与可逆性
 
 职业池以真实样本校准为 4096 token、60 秒无进度、150 秒 operation。其他任务仍保留自身 Schema/历史预算，不因本决定统一放大 token。具体数值可随脱敏统计调整，fail-closed、信号贯穿和单事务边界不可撤销。
+
+## DEC-162：Combat Runtime 使用单一纯 Rust Core，TypeScript 只承载合同、编排与表现
+
+- 日期：2026-09-01
+- 状态：已采纳
+- 依据：V5.2、M0-T02 Repository Mapping、[`v0.4.1/V0_4_1_COMBAT_MODULE_MAPPING.md`](v0.4.1/V0_4_1_COMBAT_MODULE_MAPPING.md)
+
+### 背景
+
+当前桌面生产写入通过 Tauri/Rust `CampaignStore`，同时仓库已有 TypeScript contracts/domain/application/persistence 用于共享合同、纯规则与互操作测试。若 v0.4.1 在 TypeScript 和 Rust 各实现一套 Combat scheduler、RNG、damage、status、objective 与 replay，将无法可靠保证相同输入得到相同 State/RNG/Result；若只实现 TypeScript，则真实 Tauri/SQLite 桌面链路没有权威 Combat Runtime。
+
+### 决定
+
+新增一个纯 Rust `ember-combat-core` workspace crate，作为唯一权威 Combat Runtime。它只消费版本化定义、seed、initial state 与 accepted commands，不依赖 Tauri、rusqlite、Provider、HTTP、credential、UI、素材或系统时间。Ability/Effect/Tag/Status/Reaction/Scheduler/Profile/Balance/Utility AI 的可执行语义都集中在该 Core。
+
+`ember-native-bridge` 继续作为现有生产适配器：从 Character/World/Item/Encounter facts 组装输入，调用 Core，并通过现有 `CampaignStore` 短事务完成 checkpoint 与 confirmed result commit。TypeScript 只新增 Rust serde 对应的 wire contracts、现有 AI task/candidate orchestration 和 React presentation，不再实现第二套可执行 Combat Engine。双方使用固定 JSON fixture 和版本拒绝测试校验跨层格式。
+
+### 影响与边界
+
+- 新 crate 只用于建立可编译的纯 Core 依赖边界，不引入新数据库、Event Ledger、AI pipeline、Provider、credential、plugin registry、DSL 或 ECS。
+- Combat Core 不读取 SQLite 字段，也不生成中文 UI；native/application adapters 和 presentation 各自只做所属投影。
+- UI 的 legal targets、cost preview 与 mechanical facts 来自 Core query；UI 不复制规则。
+- AI 内容仍走现有 Orchestrator/Provider/Candidate；最终 mechanics、numbers、budget 与 validation 由 Core/native 负责。
+- durable persistence 延后到 M10 并复用 migration/archive/CampaignStore；M2/M4 只定义 serializable Runtime snapshots。
+- 若后续实现证明新 crate 不能保持无平台依赖或必须复制语义，必须作为架构 finding 回到 M0-T05/M12 审查，不能静默形成双核心。
