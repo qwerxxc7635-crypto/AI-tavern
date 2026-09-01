@@ -3,11 +3,19 @@
 //! This crate must remain independent of persistence, UI, providers, system time,
 //! and platform services. Runtime behavior is added only by the owning milestone.
 
+mod attribute;
 mod invariant;
 mod rng;
 mod state;
 mod version;
 
+pub use attribute::{
+    CombatAttributeProfile, CombatAttributeResolver, CombatAttributeResolverError,
+    CombatAttributeResolverErrorCode, CombatAttributeRole, CombatProficiencyDefinition,
+    CombatSaveType, LegacyAttributeModifier, LegacyAttributeModifierKind, ResolvedCombatAttributes,
+    ResolvedProficiency, V03BaseAttributes, V03CombatAttributeSource, V03HitPoints,
+    V03PlayerCombatSource, V03RuleSkill, V03UniversalAttributeProjection, WorldCombatProfileId,
+};
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
 };

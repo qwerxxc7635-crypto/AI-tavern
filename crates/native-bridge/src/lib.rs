@@ -7,6 +7,7 @@ mod adventure_play;
 mod cache_metrics;
 mod career_pool;
 mod character_creation;
+mod combat_attribute_adapter;
 #[cfg(test)]
 mod cyberpunk_e2e;
 mod dialogue_suggestions;
@@ -47,6 +48,7 @@ pub use adventure_play::*;
 pub use cache_metrics::*;
 pub use career_pool::*;
 pub use character_creation::*;
+pub use combat_attribute_adapter::*;
 pub use dialogue_suggestions::*;
 pub use director_budget::*;
 pub use dynamic_locations::*;

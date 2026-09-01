@@ -3653,3 +3653,29 @@ Effect/Damage 的 Working State 可以在 LethalResolution 前暂时出现 `Acti
 - Heal/Revive legality 属于后续 command/effect validation；本项只保证成功 transition 的最终 HP/state 关系，不提前实现 Heal primitive。
 - Duplicate IDs、timeline/roster membership、objective monotonicity 与 scheduler consistency 由其 owning tasks 增加专属 rules validation，M1-T04 不把所有业务校验塞入 invariant owner。
 - Native persistence 在 M10 恢复 ActiveCombatSave 时必须调用 Core envelope restore，不能只验 JSON/hash 或自行复制数值检查。
+
+## DEC-169：Combat Attribute 以 native 一致性快照进入单一 Core Resolver
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §3.3、§4.5.2.1、M0-T04 Mapping Matrix、M1-T05
+
+### 背景
+
+v0.3 玩家基础属性同时投影在 `PlayerCharacter.attributes`、`CharacterRuleState.baseAttributes` 和可选 `UniversalCharacterProfile.attributes`。直接让 Combat Core 查询 SQLite 会破坏纯规则边界；只取任一副本又会掩盖 drift。把职业名、`derivedAttributes`、proficiencies 文本或 NPC prose 交给 LLM/启发式解释会创建第二套属性真源，也无法稳定 replay。
+
+### 决定
+
+`ember-native-bridge` 在单一 SQLite deferred read transaction 中读取 Rules、Player 与 Universal 三投影，保留 rule/universal revision、HP、numeric skills 与已验证 legacy status/trait attribute modifiers，规范化为 v0.3 Combat source 后调用 `ember-combat-core::CombatAttributeResolver`。Core 逐字段校验四项基础属性均为 1..5、总和 10 且三投影一致；任何 drift、未知 schema/mapping/profile version 或没有 typed Combat projection 的 NPC 都 fail closed。
+
+`combatAttributeMappingVersion=1` 固定 `BODY->physique`、`FINESSE->agility`、`INTELLECT->knowledge`、`PRESENCE->charisma`，`FORTITUDE->physique`、`REFLEX->agility`、`MENTAL->charisma`，initiative base 使用有效 agility。Fantasy/Sci-Fi/Cultivation/Urban 共享这一真源；profile 只提供独立、版本化的 base defense 与 initiative modifier，不重命名或替换基础属性。
+
+Legacy status 与 trait modifiers 保留不同 category/source ID，按 canonical tuple 排序并拒绝重复，避免先揉入 base 后再次加算。Combat proficiency 只能来自 developer-defined typed catalog：匹配的 numeric RuleSkill（含其 typed trait modifier）优先，显式 textual alias 仅授予 catalog 声明的 bounded baseline；未知 skill/proficiency、career、description、`derivedAttributes` 与 extension prose 对数值完全中立。
+
+### 影响与边界
+
+- Resolver 输入/输出均可序列化，输出保存 player/source revisions、mapping/profile versions、raw/effective attributes、HP、resolved proficiencies 与 applied legacy modifiers，后续 InitialState/Replay 无需重读变化后的角色表。
+- Resolver 不持有 RNG、网络、Provider、system time 或 SQLite；native adapter 只读取且不修改 Character data。
+- GAP-01 仍明确存在：NPC/Enemy 必须先获得后续任务拥有的 typed Combat projection，当前 prose-only NPC 被拒绝。
+- GAP-03/04/05 的装备、World resource binding 与完整 Combat Status semantics 仍由 M3/M4/M5/M10 owning tasks 关闭；本项没有把 neutral fallback 冒充完整 profile combat data。
+- Proficiency adapter/precedence 已类型化，但具体 production catalog definitions、balance 与持久化 compatibility evidence 仍由对应 content/profile 与 M10 tasks 提供。

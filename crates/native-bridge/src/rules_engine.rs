@@ -599,7 +599,7 @@ fn apply_action(
     }
 }
 
-fn load_state(
+pub(crate) fn load_state(
     connection: &Connection,
     player_character_id: &str,
 ) -> Result<Option<CharacterRulesState>, CampaignStoreError> {

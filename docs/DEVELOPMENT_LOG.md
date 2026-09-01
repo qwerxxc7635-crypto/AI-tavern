@@ -5277,3 +5277,20 @@
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。
 - 完整 `pnpm check` PASS：Vitest 190 files / 1103 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 177 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T04 结束状态为 PASS；下一项严格为 M1-T05 CombatAttributeResolver。
+
+## 2026-09-02 — M1-T05 完成 CombatAttributeResolver
+
+### Pure Core mapping 与真实 native source adapter
+
+- 从 M1-T04 提交 `711abd1` 创建 `task/M1-T05-combat-attribute-resolver`。Core 新增 version-gated `CombatAttributeResolver`；native bridge 只新增对 Core 的单向依赖，没有让 Core 依赖 rusqlite、Tauri、Provider、UI、filesystem 或 system time。
+- Native adapter 在一个 deferred SQLite read transaction 中读取真实 v0.3 `character_rule_states`、`player_characters.attributes_json` 与可选 `universal_character_profiles`，交给 Core 做 1..5/总和 10、schema/revision 与三投影逐字段一致性校验；不修改数据库。
+- 固定 BODY/FINESSE/INTELLECT/PRESENCE、FORTITUDE/REFLEX/MENTAL 与 initiative base 映射。四个 WorldProfile 使用同一 canonical source；profile base defense/initiative modifier 作为独立 versioned terms，不把世界 alias 变成平行属性。
+- Legacy status/trait attribute modifier 保存 category/source/role，canonical sort、checked addition 与 duplicate rejection；numeric RuleSkill + typed trait modifier 优先于 developer catalog 的 exact textual baseline。未知文本、career、derived attribute、NPC prose 无数值路径，prose-only NPC 明确拒绝。
+- Resolved snapshot 保存 source/universal revision、attribute/profile versions、base/effective attributes、HP、proficiencies 与 applied modifiers；查询方法覆盖 Attack/Defense/Ability DC、三 Save、initiative 与 base defense。新增 `DEC-169` 记录单一 snapshot/Resolver 边界。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：29/29 PASS；其中 5 项 M1-T05 测试覆盖四角色、三 Save、四 Profile、Mental、proficiency precedence、unknown text、canonical modifier order、projection drift、invalid allocation、future version/source schema、unknown role、NPC rejection、determinism 与 RNG 零消费。
+- `cargo test -p ember-native-bridge combat_attribute_adapter`：3/3 PASS；真实 migrated v0.3 SQLite fixture 覆盖三投影、status/trait/skill、四 Profile、关闭重开、unknown Universal text 中立与合法 allocation drift rejection。
+- Core/native strict Clippy、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 190 files / 1103 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 185 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- GAP-01、GAP-03/04/05 的后续 owner 保持显式，未通过 hardcode/default 提前宣称关闭。Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T05 结束状态为 PASS；下一项严格为 M1-T06 Command Envelope / Command Source。

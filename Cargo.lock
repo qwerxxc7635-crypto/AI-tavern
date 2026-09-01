@@ -796,6 +796,7 @@ dependencies = [
 name = "ember-native-bridge"
 version = "0.3.0"
 dependencies = [
+ "ember-combat-core",
  "ember-platform-services",
  "ember-secure-http",
  "regex",
