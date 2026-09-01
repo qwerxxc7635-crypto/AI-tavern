@@ -5070,3 +5070,23 @@
 - Runtime Assets 的官方校验清单逐项 PASS；没有重新生成、修改或复制素材。
 - 文档格式、链接、任务状态与 diff 在提交前复核；M0-T01 未发现 Scope 冲突或 SPEC BLOCKER。
 - M0-T01 结束状态为 PASS；下一任务严格为 M0-T02，不在本任务提交中包含仓库映射或 Combat 实现。
+
+## 2026-09-01 — M0-T02 完成 Repository Baseline Audit
+
+### 真实生产架构
+
+- 从 M0-T01 提交 `751e278` 创建 `task/M0-T02-repository-baseline`，只读审计 pnpm/Cargo workspace、React/Tauri、Rust Native、SQLite migrations、事务、Event Ledger、AI、Candidate、Provider、Character、Save、Tests 与 CI；未修改产品代码或 schema。
+- 确认桌面生产写入路径为 `React service -> Tauri command -> Rust CampaignStore -> short SQLite transaction`。TypeScript contracts/domain/application/persistence 是共享合同、规则/参考实现和互操作测试层；Windows UI 当前不直接依赖 TS persistence，Combat 不能只实现 TS 测试层。
+- 当前 SQLite schema 32、82 张表、portable save schema 3 / world schema 1；Event Ledger 是最小审计层而非完整 Event Sourcing。Rust/TS archive 双实现与互操作 fixture 必须在 M10 同步扩展。
+
+### 可复用能力与缺口
+
+- 新增 `docs/v0.4.1/V0_4_1_REPOSITORY_MAPPING.md`，逐项记录现有 contracts/domain/application/ai-core/prompts/persistence、CampaignStore、Tauri、secure Provider/Credential、Character/Rules、Save/Import、UI/localization 与 CI 的复用边界。
+- Character 的唯一基础属性为 `physique/agility/knowledge/charisma`，1–5 且总和 10，并由 SQLite 保证不可变；CombatAttributeResolver 必须在 M0-T04 显式映射，不能创建平行 Strength/Agility/Focus 属性。
+- 记录 11 组 Combat Schema/API gaps，包括 versions/RNG/state/scheduler/effects/profiles/AI/UI/persistence/tests；这些缺口与 v0.4.1 TASKS 一致，未发现需要第二套基础设施或重新设计产品规则的理由。
+
+### 验证与结束状态
+
+- 映射引用均来自当前 HEAD 的真实文件/API/SQL/CI，不依据旧 PRD 猜测；基线 `pnpm check` 继续沿用 M0-T01 修改前真实 PASS 证据。
+- 文档结构、格式、链接、diff 与用户 `.gitignore` 隔离在提交前复核；无 SPEC BLOCKER。
+- M0-T02 结束状态为 PASS；下一任务严格为 M0-T03 Combat Module Mapping。

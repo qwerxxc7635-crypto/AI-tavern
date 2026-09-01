@@ -7,7 +7,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | Task | Status | Date | Evidence / next step |
 |---|---|---|---|
 | M0-T01 — v0.4.1 Scope Freeze | PASS | 2026-09-01 | [`V0_4_1_SCOPE_AND_RELEASE_GATE.md`](v0.4.1/V0_4_1_SCOPE_AND_RELEASE_GATE.md) |
-| M0-T02 — Repository Baseline Audit | IN_PROGRESS | 2026-09-01 | 下一项；只读映射真实 v0.3 仓库，不顺手重构 |
+| M0-T02 — Repository Baseline Audit | PASS | 2026-09-01 | [`V0_4_1_REPOSITORY_MAPPING.md`](v0.4.1/V0_4_1_REPOSITORY_MAPPING.md) |
+| M0-T03 — Combat Module Mapping | IN_PROGRESS | 2026-09-01 | 下一项；把 V5.2 模块映射到真实包/目录/API |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
