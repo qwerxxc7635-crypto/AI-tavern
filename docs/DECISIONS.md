@@ -3702,3 +3702,26 @@ Core 使用一个 exact、versioned `CombatCommandEnvelope`，固定包含 stabl
 - Command Boundary 只确定身份、结构、source 权限与 accepted history；M1-T07 拥有共享 precondition，M2 拥有 reservation/execution，M4 拥有 reaction exactly-once，M7 拥有 stable barrier。
 - accepted history 保存实际 Player/UtilityAI/Test 外部选择；可由相同 state/规则重算的 Internal action 不污染历史。
 - command、accepted sequence 与 rule identity 不包含 wall clock、随机 UUID 生成或展示字段；调用方必须提供稳定 ID。
+
+## DEC-171：Submission 与 Execution 共用一个只读 Precondition Rule System
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §4.2、§11.0.1–11.0.2，M1-T07
+
+### 背景
+
+Command 在提交时需要检查 authority、输入稳定点、actor/ability/target、成本余额、cooldown、usage、tags 与 target legality；PreAction/Reaction 又可能使其中动态事实失效。分别实现“UI 提交验证”和“执行前验证”会造成规则漂移，而在 Execution 再检查已经由 Reservation 锁定的原始余额，又会把合法嵌套反应误判为余额不足。
+
+### 决定
+
+Core 只提供一个 `PreconditionRuleSystem::evaluate`。调用方传入同一有序 `PreconditionRuleSpec` 集合，并选择 Submission 或 ExecutionRevalidation 时点；Submission 评估全部规则，Execution 只评估 `revalidateBeforeResolution=true` 的规则。`with_default_timing` 固定 V5.2 默认：source authority、stable input point 与 AP/resource/item 原始余额只在 Submission 检查；actor/ability/target、cooldown、usage、tags、legal targets 与 stateful hard limit 默认动态复查。规则仍可使用显式 metadata 表达已冻结的例外，不增加第二个 evaluator。
+
+数值状态直接从权威 `CombatState` 只读获取；Ability catalog、disabled abilities、Tags、`GetLegalTargets()` 与 inventory owner 通过 typed facts 投影输入。Redirect 后使用显式 effective target，而不篡改原 Command identity。结果按声明顺序返回 stable ruleId、failure code 与可选 subjectId，不返回 UI 文案。非法/重复 ruleId、负成本或非法 typed ID 在评估前 fail closed。
+
+### 影响与边界
+
+- Validation 不修改 state、不 Reserve/Commit/Release 成本、不增加 usage/cooldown，也不消费 RNG；M2-T01/T02/T03 分别拥有 reservation、submission orchestration 与 execution revalidation lifecycle。
+- Resistance、Armor、Save bonus 与普通 Damage immunity 不在默认 precondition set 中；只有 Ability/Ruleset 明确把 Tag/Immunity 定义为 legality 时，才通过 typed Tag/LegalTargets rule 参与。
+- UI 与 Utility AI 只能消费同一规则层结果，不能复制敌我、状态、资源或目标合法性判断。
+- Rule order 是 deterministic output order；系统不用 map iteration、system time、Provider 或 LLM。

@@ -5311,3 +5311,19 @@
 - TypeScript focused：2 files / 27 tests PASS；新增 command contract 15 tests。TypeScript、ESLint 与 Prettier PASS。
 - 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 192 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T06 结束状态为 PASS；下一项严格为 M1-T07 Shared Precondition Rule System。
+
+## 2026-09-02 — M1-T07 完成 Shared Precondition Rule System；M1 Gate PASS
+
+### 单一 evaluator 与两个检查时点
+
+- 从 M1-T06 提交 `648c16e` 创建 `task/M1-T07-shared-precondition-rules`。Pure Core 新增唯一 `PreconditionRuleSystem`；Submission 与 ExecutionRevalidation 传入同一 rule set，后者只筛选 `revalidateBeforeResolution=true`，没有复制第二套规则 switch。
+- Rules 覆盖 source controls actor、stable input point、actor/ability/target existence/state/legality、AP/resource/item availability、cooldown、Normal Owner Turn/per-battle usage、actor/target required/forbidden Tags 与 resource hard limit。默认 metadata 遵守原始余额只在 Submission 检查、动态状态在 Execution 复查的 V5.2 边界。
+- Evaluator 直接只读 `CombatState` 的 actor/AP/resource/usage/cooldown；Ability、Tag、LegalTargets 与 inventory 使用 typed facts。Reaction redirect 使用 effective target，不改原 Command。所有 failure 输出 stable ruleId/code/subjectId 且保持规则声明顺序；UI 不在 Core 内生成文案。
+- Definition validation 拒绝非法/重复 ruleId、负 bound 与非法 typed stable ID。评估不修改 State，不占用/扣除成本，不增加 usage/cooldown，不消费 RNG；Reservation 与 lifecycle orchestration 保留给 M2 owning tasks。新增 `DEC-171` 固定单一 evaluator、metadata 与 owner 边界。
+
+### 验证与 M1 Gate
+
+- `cargo test -p ember-combat-core`：43/43 PASS，其中新增 7 项覆盖两时点同系统、Submission-only filtering、PreAction actor/ability/cooldown 失效、合法 Redirect、成本/Tag/target/usage/Heat structured failures、missing facts fail closed、非法 definitions、deterministic order/serialization 与 RNG read-only。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
+- 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 199 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- M1-T01 Version、T02 RNG、T03 State、T04 Invariant、T05 Attribute Adapter、T06 Command Boundary、T07 Precondition 均有独立实现与测试，M1 Gate PASS。用户 `.gitignore` 继续隔离；无 SPEC BLOCKER。下一项严格为 M2-T01 Cost Reservation Model。

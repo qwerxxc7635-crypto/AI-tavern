@@ -20,7 +20,9 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M1-T04 — CombatStateInvariantValidator | PASS | 2026-09-01 | HP/Shield/AP/resource/Heat/Reaction/state invariants；commit/restore fail closed |
 | M1-T05 — CombatAttributeResolver | PASS | 2026-09-02 | 三投影 snapshot adapter；四角色/三 Save/四 Profile；文本无隐式数值权限 |
 | M1-T06 — Command Envelope / Command Source | PASS | 2026-09-02 | Rust/TS exact envelope + accepted ledger；Player/UtilityAI/Replay/Test/Internal source 分离 |
-| M1-T07 — Shared Precondition Rule System | IN_PROGRESS | 2026-09-02 | 下一项；Submission 与 Execution 共用单一 precondition evaluator |
+| M1-T07 — Shared Precondition Rule System | PASS | 2026-09-02 | 单一只读 evaluator；Submission 全量检查，Execution 按 metadata 复查动态条件 |
+| M1 Gate | PASS | 2026-09-02 | M1-T01..T07 全部独立验收；Version/RNG/State/Invariant/Adapter/Command/Precondition 闭环通过 |
+| M2-T01 — Cost Reservation Model | IN_PROGRESS | 2026-09-02 | 下一项；Available→Reserved→Committed/Released，绑定 command identity |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

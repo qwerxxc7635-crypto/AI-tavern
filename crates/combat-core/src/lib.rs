@@ -6,6 +6,7 @@
 mod attribute;
 mod command;
 mod invariant;
+mod precondition;
 mod rng;
 mod state;
 mod version;
@@ -25,6 +26,12 @@ pub use command::{
 };
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
+};
+pub use precondition::{
+    EntityTagFacts, ItemQuantityFact, PreconditionDefinitionError, PreconditionDefinitionErrorCode,
+    PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
+    PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
+    PreconditionTiming,
 };
 pub use rng::{
     COMBAT_RNG_CHANNELS, CombatRng, CombatRngError, CombatRngSnapshot, RngChannel,
