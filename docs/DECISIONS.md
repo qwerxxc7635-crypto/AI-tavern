@@ -3679,3 +3679,26 @@ Legacy status 与 trait modifiers 保留不同 category/source ID，按 canonica
 - GAP-01 仍明确存在：NPC/Enemy 必须先获得后续任务拥有的 typed Combat projection，当前 prose-only NPC 被拒绝。
 - GAP-03/04/05 的装备、World resource binding 与完整 Combat Status semantics 仍由 M3/M4/M5/M10 owning tasks 关闭；本项没有把 neutral fallback 冒充完整 profile combat data。
 - Proficiency adapter/precedence 已类型化，但具体 production catalog definitions、balance 与持久化 compatibility evidence 仍由对应 content/profile 与 M10 tasks 提供。
+
+## DEC-170：所有 Combat 输入使用单一 versioned Command Boundary
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §7、§11、§17，M1-T06
+
+### 背景
+
+玩家、Utility AI、Replay、测试与规则内部动作都会驱动 Combat，但它们的权限与历史语义不同。若 UI、AI 和 Replay 各自调用规则方法，command identity、版本、actor 与 payload 会分散，无法统一做幂等、重放或后续 precondition revalidation；若内部确定性动作也写入 accepted command history，恢复时会重复执行可重算规则动作。
+
+### 决定
+
+Core 使用一个 exact、versioned `CombatCommandEnvelope`，固定包含 stable `commandId`、typed `source`、stable `actorId`、完整 `CombatVersionSet` 与 tagged payload。Player、UtilityAI、Test 是可接受的外部 source；Replay 必须携带原 accepted source；InternalDeterministic 必须携带 ruleId。TypeScript wire parser 与 Rust serde 使用共享 fixture，并拒绝未知字段、非法 stable ID、不支持版本及不安全 sequence。
+
+`AcceptedCommandLedger` 是外部接受边界：按从 1 开始且不超过 JavaScript safe integer 的 `acceptedSequence` 排序，以 commandId 幂等；同 ID 同内容返回原 receipt，不同内容 fail closed。Replay 只验证已记录 command 与 sequence/source/payload 的一致性，不再次接受；Internal deterministic action 可走统一 envelope，但永不进入 accepted history。UtilityAI 不获得修改玩家战术偏好或替玩家解决 Ask reaction 的权限。
+
+### 影响与边界
+
+- 当前 payload union 只覆盖 V5.2 已冻结的 Ability、EndTurn、Escape、Tactical Strategy/Preference、Reaction resolution 与内部 rule action，不建立通用 DSL 或 runtime registry。
+- Command Boundary 只确定身份、结构、source 权限与 accepted history；M1-T07 拥有共享 precondition，M2 拥有 reservation/execution，M4 拥有 reaction exactly-once，M7 拥有 stable barrier。
+- accepted history 保存实际 Player/UtilityAI/Test 外部选择；可由相同 state/规则重算的 Internal action 不污染历史。
+- command、accepted sequence 与 rule identity 不包含 wall clock、随机 UUID 生成或展示字段；调用方必须提供稳定 ID。

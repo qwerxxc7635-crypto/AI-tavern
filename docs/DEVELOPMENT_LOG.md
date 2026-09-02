@@ -5294,3 +5294,20 @@
 - `cargo test -p ember-native-bridge combat_attribute_adapter`：3/3 PASS；真实 migrated v0.3 SQLite fixture 覆盖三投影、status/trait/skill、四 Profile、关闭重开、unknown Universal text 中立与合法 allocation drift rejection。
 - Core/native strict Clippy、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 190 files / 1103 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 185 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - GAP-01、GAP-03/04/05 的后续 owner 保持显式，未通过 hardcode/default 提前宣称关闭。Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T05 结束状态为 PASS；下一项严格为 M1-T06 Command Envelope / Command Source。
+
+## 2026-09-02 — M1-T06 完成 Command Envelope / Command Source
+
+### 统一边界与 source 权限
+
+- 从 M1-T05 提交 `34500fe` 创建 `task/M1-T06-command-envelope-source`。Pure Core 新增 exact `CombatCommandEnvelope`、typed payload/source、accepted command 与 ledger；没有新增 SQLite schema、Provider、UI action、precondition、reservation 或 execution 实现。
+- Player、UtilityAI、Replay、Test、InternalDeterministic source 在类型层分离。只有 Player/UtilityAI/Test 可进入 accepted history；Replay 必须匹配已有 accepted command，Internal action 仅验证并返回可执行 typed value，二者都不会推进 accepted sequence。
+- 外部 accepted sequence 从 1 单调递增并受 JavaScript safe integer 上限保护；重复 commandId 且内容完全相同幂等返回原 command，不同 source/actor/version/payload 使用同 ID 时 fail closed。Restore 拒绝 sequence gap、重复 ID、内部 payload 与非法 source 权限。
+- UtilityAI 可提交真实 Ability/EndTurn/Escape command，但不能修改玩家战术策略/偏好，也不能替 Player 解决 Ask reaction。Reaction choice/selection 一致性、Internal target canonical order、stable ID 与完整 version support 均在边界拒绝非法输入。
+- TypeScript 新增同构 exact parser 和共享 JSON fixture，覆盖六类外部 payload、Replay 与 Internal envelope；unknown fields、unsafe sequence、非法 ID、accepted Replay/Internal、UtilityAI 越权及 incoherent reaction 均被拒绝。新增 `DEC-170` 固定 accepted/replay/internal 历史语义。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：36/36 PASS，其中新增 7 项覆盖共享 wire fixture、所有外部 payload、幂等/conflict、source 权限、Replay、Internal 与 malformed history/version/ID；strict Core Clippy 与 Rustfmt PASS。
+- TypeScript focused：2 files / 27 tests PASS；新增 command contract 15 tests。TypeScript、ESLint 与 Prettier PASS。
+- 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 192 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M1-T06 结束状态为 PASS；下一项严格为 M1-T07 Shared Precondition Rule System。

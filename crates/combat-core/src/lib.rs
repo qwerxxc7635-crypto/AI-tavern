@@ -4,6 +4,7 @@
 //! and platform services. Runtime behavior is added only by the owning milestone.
 
 mod attribute;
+mod command;
 mod invariant;
 mod rng;
 mod state;
@@ -15,6 +16,12 @@ pub use attribute::{
     CombatSaveType, LegacyAttributeModifier, LegacyAttributeModifierKind, ResolvedCombatAttributes,
     ResolvedProficiency, V03BaseAttributes, V03CombatAttributeSource, V03HitPoints,
     V03PlayerCombatSource, V03RuleSkill, V03UniversalAttributeProjection, WorldCombatProfileId,
+};
+pub use command::{
+    AcceptedCombatCommand, AcceptedCommandLedger, AcceptedCommandReceipt, AcceptedCommandSource,
+    CombatCommandBoundaryError, CombatCommandBoundaryErrorCode, CombatCommandEnvelope,
+    CombatCommandPayload, CombatCommandSource, CommandAcceptanceStatus, InternalCombatCommand,
+    ReactionDecisionChoice, TacticalPreferenceValue,
 };
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,

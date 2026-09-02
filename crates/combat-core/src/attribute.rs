@@ -140,6 +140,7 @@ pub struct V03PlayerCombatSource {
 #[serde(
     tag = "sourceType",
     rename_all = "SCREAMING_SNAKE_CASE",
+    rename_all_fields = "camelCase",
     deny_unknown_fields
 )]
 pub enum V03CombatAttributeSource {

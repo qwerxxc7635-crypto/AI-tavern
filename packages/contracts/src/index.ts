@@ -19,6 +19,19 @@ export type {
   CombatVersionSet,
 } from './combat.js';
 export {
+  CombatCommandContractError,
+  parseAcceptedCombatCommand,
+  parseCombatCommandEnvelope,
+} from './combat-command.js';
+export type {
+  AcceptedCombatCommand,
+  AcceptedCombatCommandSource,
+  CombatCommandEnvelope,
+  CombatCommandPayload,
+  CombatCommandSource,
+  TacticalPreferenceValue,
+} from './combat-command.js';
+export {
   NPC_TIMELINE_ATTEMPT_STATUSES,
   NPC_TIMELINE_SCOPE_KINDS,
   NPC_TIMELINE_STATUSES,

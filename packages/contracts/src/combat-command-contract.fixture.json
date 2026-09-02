@@ -1,0 +1,23 @@
+{
+  "acceptedSequence": 1,
+  "commandId": "command-tactical-strategy-001",
+  "source": {
+    "kind": "PLAYER",
+    "controllerId": "player-main"
+  },
+  "actorId": "combatant-player",
+  "versions": {
+    "combatSchemaVersion": 1,
+    "rulesetVersion": 1,
+    "balanceVersion": 1,
+    "engineVersion": 1,
+    "worldProfileVersion": 1,
+    "attributeMappingVersion": 1,
+    "rngContractVersion": 1
+  },
+  "payload": {
+    "kind": "SET_TACTICAL_STRATEGY",
+    "companionId": "combatant-companion",
+    "strategyId": "BALANCED"
+  }
+}
