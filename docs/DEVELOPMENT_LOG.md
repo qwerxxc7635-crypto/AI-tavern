@@ -5505,3 +5505,18 @@
 - `cargo test -p ember-combat-core`：108/108 PASS，其中新增 4 项覆盖共享 exact fixture、HARD_CC 单次 ceil 反例、负数/除零/bounds/overflow，以及 signed scalar 与 nonnegative state write 分离。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 264 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M3-T01 结束状态为 PASS；下一项严格为 M3-T02 ResolutionResolver（Closed Tagged Union）。
+
+## 2026-09-03 — M3-T02 完成 ResolutionResolver（Closed Tagged Union）
+
+### 六类封闭语义的唯一解释点
+
+- 从 M3-T01 提交 `2d7afb9` 创建 `task/M3-T02-resolution-resolver`。新增 closed `ResolutionType / ResolutionRequest / ResolutionResult` tagged unions 与唯一 pure Core `ResolutionResolver`；AttackRoll、SavingThrow、OpposedCheck、AutoHit、ConditionalCheck、AttemptEscape 全部由 exhaustive match 解释，无 registry/plugin fallback。
+- AttackRoll 使用 raw d20：Natural 20 忽略低 total 自动命中并暴击，Natural 1 忽略高 total/ForceCritical 自动 miss；19 等扩展 critical range 必须先按 `total >= defense` 命中。SavingThrow/Conditional/Escape 与双方 Opposed raw extremes 默认都只加入 total。
+- Opposed tie 默认 Defender Wins，typed developer override 才可切换 Attacker Wins；Conditional 明确选择无骰确定比较或 d20+modifier，并区分 `AT_LEAST/GREATER_THAN`。AutoHit 不携带 raw roll且默认 non-critical，后续 Resistance/Immunity/Effect validation 仍不被跳过。
+- 所有 d20 强制 1..20，critical range minimum 强制 2..20，total checked-add overflow fail closed。Serde `deny_unknown_fields` 与空 struct AutoHit variant 拒绝未知 Resolution、额外 runtime handler 字段。新增 `DEC-183`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：114/114 PASS，其中新增 6 项覆盖 Attack natural/critical range、非 Attack natural extremes、Opposed tie/override、Conditional/AutoHit、malformed/overflow 与 exact closed JSON union。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 270 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- 已重新完整读取用户 995 行执行附件并核对当前 branch/working tree；Scope/DoD、V5.2 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M3-T02 结束状态为 PASS；下一项严格为 M3-T03 DamageChannelCatalog。

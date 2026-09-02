@@ -4000,3 +4000,28 @@ Pure Core 新增透明整数类型 `CombatFixed`，固定 `COMBAT_FIXED_SCALE=1_
 - Signed Fixed 仅用于 Resistance/Weakness 等精确加减/clamp；进入非负 multiplier 或 Integer State write 前必须显式验证。
 - 本任务只提供数值 contract，不提前实现 Resolution、Armor/Resistance pipeline 或 DamageBundle；后续模块必须复用这些入口。
 - 可调 balance 数值仍来自版本化配置；scale 与 rounding structure 是冻结机制。
+
+## DEC-183：六类 Resolution 使用封闭 tagged union 与单一 exhaustive resolver
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §4.3–4.4，M3-T02
+
+### 背景
+
+ResolutionType 是冻结且真正封闭的权威规则语义。若 Ability、UI 或 AI 按字符串各自解释命中、Natural 20/1、Opposed tie 或 Escape，会形成 distributed semantic switch；若为新增内容开放 runtime handler registry，则生成内容可以绕过固定规则。
+
+### 决定
+
+Pure Core 新增闭合 `ResolutionType`、`ResolutionRequest` 与 `ResolutionResult` tagged union，只包含 AttackRoll、SavingThrow、OpposedCheck、AutoHit、ConditionalCheck、AttemptEscape。唯一 `ResolutionResolver` exhaustive match 所有分支；serde 拒绝未知 type 与字段，零参数 AutoHit 也使用空 struct variant，不能夹带 plugin/runtime code。
+
+AttackRoll 以原始 d20 判断 Natural 20 自动命中并暴击、Natural 1 自动未命中；扩展 critical range 只有在普通 total 判定命中后才暴击，ForceCritical 也不能覆盖 Natural 1 miss。SavingThrow、OpposedCheck、ConditionalCheck 与 AttemptEscape 的 Natural 20/1 默认仅作为 total 数值，不继承自动成功/失败。OpposedCheck 默认 `attackerTotal <= defenderTotal` 时 Defender Wins，只有 typed developer tie rule 可改为 attacker wins。
+
+ConditionalCheck 明确选择有/无 d20 及 `AT_LEAST/GREATER_THAN`，资源是否足够仍不属于此模块；AutoHit 不骰点且默认不暴击。所有 raw d20 必须在 1..20，total 使用 checked i64 addition，非法 critical range 与 overflow 结构化失败。
+
+### 影响与边界
+
+- UI/AI/Tooltip 只消费 typed result，不再解释 ResolutionType 数学；玩家中文投影由后续 UI owner 完成。
+- Resolver 接收已经由 RNG/context owner 产生并记录的 raw roll，本身不抽 RNG、不写 CombatState，避免第二个消费入口。
+- 特殊 natural override、critical override 等只能来自后续受信任白名单 Rule Definition；本任务不建立 boolean capability soup 或 runtime registry。
+- Damage、Save 后 Effect 与 Immunity 仍由后续 Effect/Damage owners 处理；AutoHit 不代表跳过这些验证。

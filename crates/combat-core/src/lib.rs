@@ -11,6 +11,7 @@ mod invariant;
 mod numeric;
 mod objective;
 mod precondition;
+mod resolution;
 mod resolution_context;
 mod rng;
 mod runtime_commit;
@@ -59,6 +60,10 @@ pub use precondition::{
     PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
     PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
     PreconditionTiming,
+};
+pub use resolution::{
+    ConditionalComparison, OpposedTieRule, ResolutionError, ResolutionErrorCode, ResolutionRequest,
+    ResolutionResolver, ResolutionResult, ResolutionType,
 };
 pub use resolution_context::{
     ResolutionContext, ResolutionContextError, ResolutionContextErrorCode,
