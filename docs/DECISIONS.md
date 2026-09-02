@@ -3775,3 +3775,28 @@ Service 自动注入不可省略的 source-controls-actor、stable-input-point�
 - `GetLegalTargets()` 与 Ability catalog 的实际实现由后续 owning tasks 提供；Submission 不复制敌我/状态判断。
 - Submission 成功只 Reserve，不扣费、不增加 cooldown/usage、不创建 ResolutionContext；这些依次属于 M2-T03/T04。
 - Replay/Internal 不可通过 live submission acceptance；UtilityAI 必须匹配 UtilityAI control assignment。
+
+## DEC-174：ResolutionContext 是 CombatState 内唯一可恢复的 Command 执行游标
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §10.1–10.2、§11.0、M2-T03
+
+### 背景
+
+Submission 成功后，PreAction hooks、Redirect、roll 与 Ask Reaction 可能跨多个稳定提交点甚至应用重启。若 resume 重新从 Command 构建临时对象，已经完成的 Hook、消费的 RNG、redirect target 和 Reservation 状态会丢失或重复；若 UI 保存自己的上下文，又会形成第二套权威执行状态。
+
+### 决定
+
+`CombatState` 只允许一个 optional active `ResolutionContext`。contextId 固定等于 source commandId，并保存完整 AcceptedCombatCommand/acceptedSequence、状态、current/completed hook phases、original/effective target IDs、ordered redirect history、reservationId、eventChainId、当前完整 RNG checkpoint、resolved roll records 与 ordered Ask suspension history。
+
+Create 要求 accepted command versions/actor 与 State 一致，且有成本 Command 的 Reservation 仍为 Reserved；相同参数重试返回原 context，不推进 revision。Redirect 只更新 effective target 并追加可重建历史，不改变 original Command。Resolved roll record 必须引用 State 已消费后的 Resolution channel cursor，重复相同 record 幂等，冲突值 fail closed；记录 API 本身不抽 RNG。
+
+Ask suspend 将当前 hook 与全 channel RNG checkpoint 写入同一 context；ActiveCombatSave 使用 CombatState canonical snapshot 保存。Resume 只在 window identity 与 checkpoint 完全相等时将最后一个 suspension 标记 resumed，并继续原 hook/context；不重建 Command、Reservation、targets、completed hooks 或 rolls。Hook transition 单调，PreAction 完成并进入 BeforeRoll 后才可标记 ReadyForExecutionRevalidation。
+
+### 影响与边界
+
+- PendingReactionWindow 的 eligible items、decision exactly-once 与 accepted decision identity 仍由 M4 owning tasks 建立；M2-T03 只提供可挂接的 context suspension lifecycle。
+- M2-T03 不 commit cost/usage、不进入 Resolution、不执行 Hook/Effect；后续 owner 调用 typed transition。
+- Context 与 Cost ledger 一起由统一 `CombatStateInvariantValidator` 在 hash restore 后检查，非法 sequence、redirect replay、roll、RNG、suspension 或 reservation binding 均拒绝。
+- Ask 等待期间无需持有 SQLite transaction；M10 只需原子保存整个 CombatState checkpoint。

@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     CombatInventoryItemState, CombatRngSnapshot, CombatStateInvariantError,
-    CombatStateInvariantValidator, CombatVersionSet, CostReservationRecord,
+    CombatStateInvariantValidator, CombatVersionSet, CostReservationRecord, ResolutionContext,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -350,6 +350,7 @@ pub struct CombatState {
     pub combatants: Vec<CombatantRuntime>,
     pub combat_inventory: Vec<CombatInventoryItemState>,
     pub cost_reservations: Vec<CostReservationRecord>,
+    pub resolution_context: Option<ResolutionContext>,
     pub timeline: Vec<TimelineEntry>,
     pub round: RoundRuntimeState,
     pub objectives: ObjectiveRuntimeState,
@@ -547,6 +548,7 @@ mod tests {
             combatants: vec![player.clone(), enemy.clone()],
             combat_inventory: vec![],
             cost_reservations: vec![],
+            resolution_context: None,
             timeline: vec![
                 TimelineEntry {
                     combatant_id: player.combatant_id.clone(),

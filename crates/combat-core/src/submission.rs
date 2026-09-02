@@ -548,6 +548,7 @@ mod tests {
                 current_quantity: 1,
             }],
             cost_reservations: vec![],
+            resolution_context: None,
             timeline: vec![],
             round: RoundRuntimeState {
                 round_number: 1,

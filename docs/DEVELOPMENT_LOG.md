@@ -5361,3 +5361,20 @@
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
 - 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 212 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T02 结束状态为 PASS；下一项严格为 M2-T03 ResolutionContext Lifecycle。
+
+## 2026-09-02 — M2-T03 完成 ResolutionContext Lifecycle
+
+### 可恢复的单一执行上下文
+
+- 从 M2-T02 提交 `78e7882` 创建 `task/M2-T03-resolution-context-lifecycle`。`CombatState` 新增唯一 optional active ResolutionContext；保存 accepted command/sequence、status、current/completed hooks、original/effective targets、redirect history、reservation、eventChain、全 channel RNG checkpoint、resolved rolls 与 Ask suspension history。
+- contextId 固定等于 commandId；Create 校验 version/actor/reservation 且相同重试幂等。已有不同 active context 时 fail closed，不并行创建第二个 Command 执行游标。
+- Redirect 追加 stable sequence/from/to/rule history，restore 可从 original targets 重放并必须精确得到 effective targets。Hook transition 使用固定 typed 顺序，完成 PreAction 并到 BeforeRoll 后才可进入 ReadyForExecutionRevalidation，重复/跳跃 transition 被拒绝。
+- Resolved roll 只接受 State 已消费后的 Resolution cursor，保存 rollId/channel/sides/value/cursorAfter；相同 record 重试不推进 state revision/RNG，冲突记录拒绝。该 API 不抽取 RNG。
+- Ask suspend 保存当前 hook 与完全相同的 RNG snapshot；经 canonical State hash save/restore 后，resume 标记同一 suspension 并继续同一 context。RNG cursor 漂移、window mismatch、重复 suspension sequence、reservation mismatch 均 fail closed；AP/Reservation、roll 与 completed hook 不重复。新增 `DEC-174`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：62/62 PASS，其中新增 6 项覆盖 create/idempotency/active conflict、redirect replay+restore、resolved roll cursor/idempotency/conflict、Ask suspend-crash-restore-resume、hook monotonicity/ready gate，以及 reservation/RNG/tampered context rejection。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
+- 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 218 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T03 结束状态为 PASS；下一项严格为 M2-T04 Execution Revalidation + Atomic Usage Commit。

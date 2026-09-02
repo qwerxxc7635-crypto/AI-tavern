@@ -8,6 +8,7 @@ mod command;
 mod cost;
 mod invariant;
 mod precondition;
+mod resolution_context;
 mod rng;
 mod state;
 mod submission;
@@ -40,6 +41,11 @@ pub use precondition::{
     PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
     PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
     PreconditionTiming,
+};
+pub use resolution_context::{
+    ResolutionContext, ResolutionContextError, ResolutionContextErrorCode,
+    ResolutionContextLifecycle, ResolutionContextStatus, ResolutionSuspensionRecord,
+    ResolvedRollRecord, TargetRedirectRecord,
 };
 pub use rng::{
     COMBAT_RNG_CHANNELS, CombatRng, CombatRngError, CombatRngSnapshot, RngChannel,
