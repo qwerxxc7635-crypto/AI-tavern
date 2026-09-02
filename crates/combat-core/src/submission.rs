@@ -98,6 +98,7 @@ impl CombatSubmissionService {
             effective_target_id,
             source_controls_actor,
             stable_input_point: request.stable_input_point,
+            reservation_id: None,
             known_ability_ids: &request.known_ability_ids,
             disabled_ability_ids: &request.disabled_ability_ids,
             legal_target_ids: &request.legal_target_ids,
@@ -151,38 +152,10 @@ impl CombatSubmissionService {
 }
 
 fn submission_rules(request: &CombatSubmissionRequest) -> Vec<PreconditionRuleSpec> {
-    let mut rules = vec![
-        system_rule(
-            "submission.source-controls-actor",
-            PreconditionRule::SourceControlsActor,
-        ),
-        system_rule(
-            "submission.stable-input-point",
-            PreconditionRule::StableInputPoint,
-        ),
-        system_rule("submission.actor-exists", PreconditionRule::ActorExists),
-        system_rule("submission.actor-may-act", PreconditionRule::ActorMayAct),
-    ];
-    if let CombatCommandPayload::UseAbility { target_id, .. } = &request.envelope.payload {
-        rules.push(system_rule(
-            "submission.ability-exists",
-            PreconditionRule::AbilityExists,
-        ));
-        rules.push(system_rule(
-            "submission.ability-enabled",
-            PreconditionRule::AbilityEnabled,
-        ));
-        if target_id.is_some() {
-            rules.push(system_rule(
-                "submission.target-exists",
-                PreconditionRule::TargetExists,
-            ));
-            rules.push(system_rule(
-                "submission.target-legal",
-                PreconditionRule::TargetLegal,
-            ));
-        }
-    }
+    let mut rules = mandatory_command_rules(
+        &request.envelope.payload,
+        selected_target_id(&request.envelope).is_some(),
+    );
     for (index, cost) in request.costs.iter().enumerate() {
         let rule = match &cost.asset {
             CombatCostAsset::ActionPoints { .. } => PreconditionRule::ActionPointsAtLeast {
@@ -203,6 +176,45 @@ fn submission_rules(request: &CombatSubmissionRequest) -> Vec<PreconditionRuleSp
         rules.push(system_rule(&format!("submission.cost.{index}"), rule));
     }
     rules.extend(request.ability_preconditions.iter().cloned());
+    rules
+}
+
+pub(crate) fn mandatory_command_rules(
+    payload: &CombatCommandPayload,
+    has_effective_target: bool,
+) -> Vec<PreconditionRuleSpec> {
+    let mut rules = vec![
+        system_rule(
+            "submission.source-controls-actor",
+            PreconditionRule::SourceControlsActor,
+        ),
+        system_rule(
+            "submission.stable-input-point",
+            PreconditionRule::StableInputPoint,
+        ),
+        system_rule("submission.actor-exists", PreconditionRule::ActorExists),
+        system_rule("submission.actor-may-act", PreconditionRule::ActorMayAct),
+    ];
+    if matches!(payload, CombatCommandPayload::UseAbility { .. }) {
+        rules.push(system_rule(
+            "submission.ability-exists",
+            PreconditionRule::AbilityExists,
+        ));
+        rules.push(system_rule(
+            "submission.ability-enabled",
+            PreconditionRule::AbilityEnabled,
+        ));
+        if has_effective_target {
+            rules.push(system_rule(
+                "submission.target-exists",
+                PreconditionRule::TargetExists,
+            ));
+            rules.push(system_rule(
+                "submission.target-legal",
+                PreconditionRule::TargetLegal,
+            ));
+        }
+    }
     rules
 }
 
@@ -526,6 +538,8 @@ mod tests {
                 uses_this_normal_owner_turn: 0,
                 uses_this_battle: 0,
             }],
+            basic_attack_count_this_normal_owner_turn: 0,
+            once_usage_counters: vec![],
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,

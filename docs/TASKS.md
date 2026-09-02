@@ -25,7 +25,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M2-T01 — Cost Reservation Model | PASS | 2026-09-02 | AP/Resource/Item/ReactionCharge line ledger；nested、interrupt、save/resume 幂等 |
 | M2-T02 — Submission Validation | PASS | 2026-09-02 | 单一 atomic service 串联 boundary/authority/preconditions/accepted history/reserve；fail 零副作用 |
 | M2-T03 — ResolutionContext Lifecycle | PASS | 2026-09-02 | Active context 持久化 command/roll/hook/redirect/reservation/eventChain/RNG；Ask crash-resume 同一上下文 |
-| M2-T04 — Execution Revalidation + Atomic Usage Commit | IN_PROGRESS | 2026-09-02 | 下一项；动态复查后 Cost+cooldown/usage 原子 commit，fail cancel/0 RNG |
+| M2-T04 — Execution Revalidation + Atomic Usage Commit | PASS | 2026-09-02 | 同一 Preconditions 动态复查；Cost+cooldown/usage/MAP/once 原子 commit；cancel release/0 RNG |
+| M2-T05 — Canonical EventChain Scheduler | IN_PROGRESS | 2026-09-02 | 下一项；唯一 scheduler 按 canonical event/hook/reaction 顺序推进至稳定点 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

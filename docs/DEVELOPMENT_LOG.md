@@ -5378,3 +5378,19 @@
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
 - 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 218 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T03 结束状态为 PASS；下一项严格为 M2-T04 Execution Revalidation + Atomic Usage Commit。
+
+## 2026-09-02 — M2-T04 完成 Execution Revalidation + Atomic Usage Commit
+
+### 同一规则系统与唯一 pre-resolution commit
+
+- 从 M2-T03 提交 `652c15e` 创建 `task/M2-T04-execution-revalidation-usage`。新增 pure Core `ExecutionRevalidationService`，只接受 `ReadyForExecutionRevalidation` context；Submission 与 Execution 现同时复用 `mandatory_command_rules` 和唯一 `PreconditionRuleSystem`，Execution 只筛选 metadata 标记的动态规则。
+- 强制复查 actor 可行动、ability existence/enabled、redirect 后 effective target existence/legality，以及 Reservation 仍属于同 command 且为 Reserved；Ability catalog 的 cooldown、owner-turn/per-battle usage、BasicAttack/MAP、once counter、Tag/Heat 等规则通过同一 ordered specs 追加。
+- PASS 后在 working clone 内一次性将 context 置为 `ResolutionStarted`、Reservation 转为 Committed、设置 cooldown，并增加实际声明的 owner-turn/per-battle/BasicAttack 与 OwnerTurn/Round/Battle once counters；任一 cost、counter、overflow 或 invariant 错误都不改变原 State。
+- Fail 作为 Pre-Resolution Cancel 清除 active context并默认 Release Reservation；只有明确 `consumeCostOnInterrupt=true` 的 line 保留为 Interrupted cost。两条路径都保持完整 RNG snapshot 不变；Cancel 不增加任何 usage。`ResolutionStarted` restore 强制关联 Reservation 已 Committed，避免 crash/resume 重复提交。
+- Miss、Save Success、Resolution 后 Immunity 用例验证不调用退款路径，已提交成本、cooldown 与 counters 保持不变。新增 `DEC-175` 固定该原子边界与后续 owner。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：68/68 PASS，其中新增 6 项覆盖完整原子提交、动态 actor cancel、interrupt cost、redirect target、usage 错误 rollback，以及 Miss/Save/Immunity 不退款；strict Core Clippy、Rustfmt 与 `git diff --check` PASS。
+- 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 224 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、参考任务文件 SHA-256 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T04 结束状态为 PASS；下一项严格为 M2-T05 Canonical EventChain Scheduler。

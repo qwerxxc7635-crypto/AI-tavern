@@ -15,6 +15,8 @@ pub enum ResolutionContextStatus {
     ExecutingHooks,
     SuspendedForReaction,
     ReadyForExecutionRevalidation,
+    ResolutionStarted,
+    CancelledBeforeResolution,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -342,6 +344,12 @@ impl ResolutionContextLifecycle {
         let Some(context) = &state.resolution_context else {
             return Ok(());
         };
+        if context.status == ResolutionContextStatus::CancelledBeforeResolution {
+            return Err(context_error(
+                ResolutionContextErrorCode::InvalidContext,
+                &context.context_id,
+            ));
+        }
         validate_context_shape(context)?;
         if context.command.command_id != context.context_id
             || context.command.accepted_sequence != context.accepted_sequence
@@ -358,6 +366,29 @@ impl ResolutionContextLifecycle {
             context.reservation_id.as_deref(),
             &context.context_id,
         )?;
+        if let Some(reservation_id) = &context.reservation_id {
+            let reservation = state
+                .cost_reservations
+                .iter()
+                .find(|reservation| reservation.reservation_id == *reservation_id)
+                .ok_or_else(|| {
+                    context_error(
+                        ResolutionContextErrorCode::ReservationMismatch,
+                        &context.context_id,
+                    )
+                })?;
+            let expected = if context.status == ResolutionContextStatus::ResolutionStarted {
+                CostReservationStatus::Committed
+            } else {
+                CostReservationStatus::Reserved
+            };
+            if reservation.status != expected {
+                return Err(context_error(
+                    ResolutionContextErrorCode::ReservationMismatch,
+                    &context.context_id,
+                ));
+            }
+        }
         CombatRng::restore(context.rng_checkpoint.clone()).map_err(|_| {
             context_error(ResolutionContextErrorCode::RngMismatch, &context.context_id)
         })?;
@@ -985,6 +1016,8 @@ mod tests {
                 uses_this_normal_owner_turn: 0,
                 uses_this_battle: 0,
             }],
+            basic_attack_count_this_normal_owner_turn: 0,
+            once_usage_counters: vec![],
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,

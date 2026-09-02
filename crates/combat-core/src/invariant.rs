@@ -11,6 +11,8 @@ pub enum CombatStateInvariantCode {
     ShieldOutOfRange,
     ActionPointsOutOfRange,
     ReactionChargesOutOfRange,
+    BasicAttackCounterInvalid,
+    UsageCounterInvalid,
     ResourceBoundsInvalid,
     ResourceOutOfRange,
     PressureResourceContractIncomplete,
@@ -100,6 +102,25 @@ fn validate_combatant(combatant: &CombatantRuntime) -> Result<(), CombatStateInv
             combatant,
             CombatStateInvariantCode::ReactionChargesOutOfRange,
         ));
+    }
+    if combatant.basic_attack_count_this_normal_owner_turn < 0 {
+        return Err(combatant_error(
+            combatant,
+            CombatStateInvariantCode::BasicAttackCounterInvalid,
+        ));
+    }
+    for (index, counter) in combatant.once_usage_counters.iter().enumerate() {
+        if !(0..=1).contains(&counter.uses)
+            || combatant.once_usage_counters[..index]
+                .iter()
+                .any(|previous| previous.counter_id == counter.counter_id)
+        {
+            return Err(CombatStateInvariantError {
+                code: CombatStateInvariantCode::UsageCounterInvalid,
+                combatant_id: combatant.combatant_id.clone(),
+                resource_id: Some(counter.counter_id.clone()),
+            });
+        }
     }
     for resource in &combatant.resources {
         validate_resource(combatant, resource)?;
@@ -438,6 +459,8 @@ mod tests {
                 ],
                 statuses: Vec::new(),
                 ability_usage: Vec::new(),
+                basic_attack_count_this_normal_owner_turn: 0,
+                once_usage_counters: Vec::new(),
                 initiative_result: 12,
                 initiative_base_stat: 2,
                 last_committed_timeline_order: Some(0),

@@ -6,6 +6,7 @@
 mod attribute;
 mod command;
 mod cost;
+mod execution;
 mod invariant;
 mod precondition;
 mod resolution_context;
@@ -33,6 +34,10 @@ pub use cost::{
     CostReservationReceipt, CostReservationRecord, CostReservationRequest, CostReservationStatus,
     ReservedCombatCost,
 };
+pub use execution::{
+    AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
+    ExecutionRevalidationRequest, ExecutionRevalidationService, OnceUsageCommit,
+};
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
 };
@@ -58,7 +63,7 @@ pub use state::{
     ObjectiveRuntime, ObjectiveRuntimeState, PendingReactionWindow, ProvisionalDeltaEntry,
     ProvisionalRuntimeDelta, ReinforcementRuntime, ReinforcementRuntimeState, ResourceState,
     ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, SchedulerItem,
-    SchedulerItemKind, StatusRuntime, TimelineEntry,
+    SchedulerItemKind, StatusRuntime, TimelineEntry, UsageCounterScope, UsageCounterState,
 };
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,

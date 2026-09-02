@@ -42,6 +42,7 @@ impl PreconditionRuleSpec {
 pub enum PreconditionRule {
     SourceControlsActor,
     StableInputPoint,
+    ReservationOwned,
     ActorExists,
     ActorMayAct,
     AbilityExists,
@@ -55,6 +56,8 @@ pub enum PreconditionRule {
     CooldownReady,
     NormalOwnerTurnUsesBelow { maximum: i64 },
     BattleUsesBelow { maximum: i64 },
+    BasicAttackCountBelow { maximum: i64 },
+    OnceCounterUnused { counter_id: String },
     ActorHasTag { tag_id: String },
     ActorLacksTag { tag_id: String },
     TargetHasTag { tag_id: String },
@@ -93,6 +96,7 @@ pub struct PreconditionEvaluationContext<'a> {
     pub effective_target_id: Option<&'a str>,
     pub source_controls_actor: bool,
     pub stable_input_point: bool,
+    pub reservation_id: Option<&'a str>,
     pub known_ability_ids: &'a [String],
     pub disabled_ability_ids: &'a [String],
     pub legal_target_ids: &'a [String],
@@ -104,6 +108,7 @@ pub struct PreconditionEvaluationContext<'a> {
 pub enum PreconditionFailureCode {
     SourceNotAuthorized,
     UnstableInputPoint,
+    ReservationNotOwned,
     ActorMissing,
     ActorCannotAct,
     AbilityMissing,
@@ -119,6 +124,8 @@ pub enum PreconditionFailureCode {
     CooldownActive,
     NormalOwnerTurnUsageExhausted,
     BattleUsageExhausted,
+    BasicAttackUsageExhausted,
+    OnceCounterAlreadyUsed,
     RequiredActorTagMissing,
     ForbiddenActorTagPresent,
     RequiredTargetTagMissing,
@@ -201,6 +208,20 @@ fn evaluate_rule(
             PreconditionFailureCode::UnstableInputPoint,
             None,
         ),
+        PreconditionRule::ReservationOwned => {
+            let owned = context.reservation_id.is_some_and(|reservation_id| {
+                context.state.cost_reservations.iter().any(|reservation| {
+                    reservation.reservation_id == reservation_id
+                        && reservation.command_id == context.command.command_id
+                        && reservation.status == crate::CostReservationStatus::Reserved
+                })
+            });
+            failure_if(
+                !owned,
+                PreconditionFailureCode::ReservationNotOwned,
+                context.reservation_id.map(str::to_owned),
+            )
+        }
         PreconditionRule::ActorExists => failure_if(
             actor.is_none(),
             PreconditionFailureCode::ActorMissing,
@@ -304,6 +325,21 @@ fn evaluate_rule(
                 ability_id.map(str::to_owned),
             )
         }
+        PreconditionRule::BasicAttackCountBelow { maximum } => failure_if(
+            !actor.is_some_and(|value| value.basic_attack_count_this_normal_owner_turn < *maximum),
+            PreconditionFailureCode::BasicAttackUsageExhausted,
+            Some(context.command.actor_id.clone()),
+        ),
+        PreconditionRule::OnceCounterUnused { counter_id } => failure_if(
+            !actor.is_some_and(|value| {
+                value
+                    .once_usage_counters
+                    .iter()
+                    .any(|counter| counter.counter_id == *counter_id && counter.uses == 0)
+            }),
+            PreconditionFailureCode::OnceCounterAlreadyUsed,
+            Some(counter_id.clone()),
+        ),
         PreconditionRule::ActorHasTag { tag_id } => tag_failure(
             context,
             &context.command.actor_id,
@@ -463,8 +499,10 @@ fn validate_rule(rule: &PreconditionRule) -> Result<(), PreconditionDefinitionEr
         | PreconditionRule::ActorLacksTag { tag_id }
         | PreconditionRule::TargetHasTag { tag_id }
         | PreconditionRule::TargetLacksTag { tag_id } => validate_stable_id(tag_id),
+        PreconditionRule::OnceCounterUnused { counter_id } => validate_stable_id(counter_id),
         PreconditionRule::SourceControlsActor
         | PreconditionRule::StableInputPoint
+        | PreconditionRule::ReservationOwned
         | PreconditionRule::ActorExists
         | PreconditionRule::ActorMayAct
         | PreconditionRule::AbilityExists
@@ -472,6 +510,7 @@ fn validate_rule(rule: &PreconditionRule) -> Result<(), PreconditionDefinitionEr
         | PreconditionRule::TargetExists
         | PreconditionRule::TargetLegal
         | PreconditionRule::CooldownReady => Ok(()),
+        PreconditionRule::BasicAttackCountBelow { maximum } => validate_non_negative(*maximum),
     }
 }
 
@@ -823,6 +862,7 @@ mod tests {
             effective_target_id: Some("enemy-1"),
             source_controls_actor: true,
             stable_input_point: true,
+            reservation_id: None,
             known_ability_ids: known,
             disabled_ability_ids: &[],
             legal_target_ids: legal,
@@ -939,6 +979,8 @@ mod tests {
                 uses_this_normal_owner_turn: 0,
                 uses_this_battle: 0,
             }],
+            basic_attack_count_this_normal_owner_turn: 0,
+            once_usage_counters: vec![],
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,

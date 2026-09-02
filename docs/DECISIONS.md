@@ -3800,3 +3800,28 @@ Ask suspend 将当前 hook 与全 channel RNG checkpoint 写入同一 context；
 - M2-T03 不 commit cost/usage、不进入 Resolution、不执行 Hook/Effect；后续 owner 调用 typed transition。
 - Context 与 Cost ledger 一起由统一 `CombatStateInvariantValidator` 在 hash restore 后检查，非法 sequence、redirect replay、roll、RNG、suspension 或 reservation binding 均拒绝。
 - Ask 等待期间无需持有 SQLite transaction；M10 只需原子保存整个 CombatState checkpoint。
+
+## DEC-175：Execution Revalidation 与 Usage/Cost 共用一个原子 Pre-Resolution Commit
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §11.0.2–11.0.4，M2-T04
+
+### 背景
+
+PreAction/Reaction 可以使 actor、ability、redirect target、cooldown、usage、Tag 或其他动态条件失效。若 Execution 使用另一套规则，或先扣成本再更新 cooldown/counter，失败、崩溃与恢复都可能产生规则漂移、半提交或重复计数。另一方面，已经进入 Resolution 的 Miss、Save Success 或普通 outcome Immunity 不能被误当成执行前取消并退款。
+
+### 决定
+
+`ExecutionRevalidationService` 只接受处于 `ReadyForExecutionRevalidation` 的持久化 context，并调用与 Submission 相同的 `PreconditionRuleSystem` 和共享 mandatory command rules；evaluator 仅执行 `revalidateBeforeResolution=true` 的规则。它强制复查 actor/ability/effective target 及 Reservation 的 command ownership/status，再追加 Ability catalog 的同一 rule specs。source authority、stable input 与已锁定的原始余额按 metadata 不重复判断。
+
+失败路径在 working state 中移除 active context，并调用统一 Cost Reservation cancel：默认 Release，只有显式 `consumeCostOnInterrupt=true` 的 line 进入 Interrupted/committed disposition。返回的 terminal context 标记 `CancelledBeforeResolution`，但不作为 active context 持久化；不增加 cooldown/usage/MAP/once counter，不消费 Resolution RNG。
+
+通过路径在同一个 working state 中把 context 标记 `ResolutionStarted`、Reservation 转为 Committed，并按 typed `AbilityUsageCommitPlan` 设置 cooldown、增加实际声明的 owner-turn/per-battle/BasicAttack counters、标记指定 scope 的 once counters。任一 cost、counter、overflow 或 invariant 错误都会丢弃整个 working state；全部通过后才替换权威 State。完整 RNG snapshot 在此边界保持不变，首次 Resolution RNG 只能发生在提交之后。
+
+### 影响与边界
+
+- `ResolutionStarted` context 要求关联 Reservation 已 Committed；保存/恢复因此可判定 pre-resolution commit 已完成，重启不会重复扣费或增加 usage。
+- Miss、Save Success、Resolution 后 Immunity/Damage=0 不调用 cancel/release，已提交 cost 与 usage 保持不变；这些 outcome 的具体计算仍属于后续 Resolution/Effect tasks。
+- Once counter scope 是 typed OwnerTurn/Round/Battle；对应 reset 时点由 M6/M7 的 round/turn owners 实现，本任务只建立权威 runtime state 与唯一 commit 点。
+- Usage plan 是受信任 Ability catalog projection，不接受生成模型自由文本；Core 仍校验 command ability identity、counter existence/scope、重复项、范围、overflow 与最终 State invariant。

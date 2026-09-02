@@ -80,6 +80,22 @@ pub struct AbilityUsageState {
     pub uses_this_battle: i64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum UsageCounterScope {
+    OwnerTurn,
+    Round,
+    Battle,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct UsageCounterState {
+    pub counter_id: String,
+    pub scope: UsageCounterScope,
+    pub uses: i64,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatantRuntime {
@@ -98,6 +114,8 @@ pub struct CombatantRuntime {
     pub resources: Vec<ResourceState>,
     pub statuses: Vec<StatusRuntime>,
     pub ability_usage: Vec<AbilityUsageState>,
+    pub basic_attack_count_this_normal_owner_turn: i64,
+    pub once_usage_counters: Vec<UsageCounterState>,
     pub initiative_result: i64,
     pub initiative_base_stat: i64,
     pub last_committed_timeline_order: Option<u32>,
@@ -719,6 +737,8 @@ mod tests {
                 uses_this_normal_owner_turn: 0,
                 uses_this_battle: 0,
             }],
+            basic_attack_count_this_normal_owner_turn: 0,
+            once_usage_counters: vec![],
             initiative_result: 10,
             initiative_base_stat: 3,
             last_committed_timeline_order: None,
