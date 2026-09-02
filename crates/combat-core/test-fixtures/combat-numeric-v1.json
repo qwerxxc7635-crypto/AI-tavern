@@ -1,0 +1,38 @@
+{
+  "combatFixedScale": 1000000,
+  "fixedMulFloor": [
+    { "value": 7, "multiplierFixed": 300000, "expected": 2 },
+    { "value": 3, "multiplierFixed": 1250000, "expected": 3 },
+    { "value": 0, "multiplierFixed": 800000, "expected": 0 }
+  ],
+  "fixedScalarMulFloor": [
+    { "leftFixed": 3700000, "rightFixed": 800000, "expectedFixed": 2960000 },
+    { "leftFixed": 1, "rightFixed": 500000, "expectedFixed": 0 }
+  ],
+  "ratioFixedFloor": [
+    { "numerator": 1, "denominator": 3, "expectedFixed": 333333 },
+    { "numerator": 4, "denominator": 5, "expectedFixed": 800000 }
+  ],
+  "ceilDiv": [
+    { "numerator": 0, "denominator": 3, "expected": 0 },
+    { "numerator": 6, "denominator": 3, "expected": 2 },
+    { "numerator": 7, "denominator": 3, "expected": 3 }
+  ],
+  "percentIntegerFloor": [
+    { "reference": 3, "percentFixed": 300000, "expected": 0 },
+    { "reference": 10, "percentFixed": 300000, "expected": 3 }
+  ],
+  "percentRestoreAtLeastOne": [
+    { "effectiveMaximum": 3, "percentFixed": 300000, "expected": 1 },
+    { "effectiveMaximum": 10, "percentFixed": 300000, "expected": 3 }
+  ],
+  "hardCcDurationSingleCeil": [
+    { "baseDuration": 3, "resistanceFixed": 750000, "drFixed": 500000, "expected": 2 },
+    { "baseDuration": 2, "resistanceFixed": 1000000, "drFixed": 1000000, "expected": 2 },
+    { "baseDuration": 1, "resistanceFixed": 0, "drFixed": 1000000, "expected": 1 }
+  ],
+  "damageFloor": [
+    { "preciseDamageFixed": 3700000, "expected": 3 },
+    { "preciseDamageFixed": 999999, "expected": 0 }
+  ]
+}

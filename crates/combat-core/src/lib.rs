@@ -8,6 +8,7 @@ mod command;
 mod cost;
 mod execution;
 mod invariant;
+mod numeric;
 mod objective;
 mod precondition;
 mod resolution_context;
@@ -45,6 +46,9 @@ pub use execution::{
 };
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
+};
+pub use numeric::{
+    COMBAT_FIXED_SCALE, CombatFixed, CombatNumeric, CombatNumericError, CombatNumericErrorCode,
 };
 pub use objective::{
     CombatObjectiveRuntime, ObjectiveEvaluation, ObjectiveEvaluationPoint, ObjectiveRuntimeError,

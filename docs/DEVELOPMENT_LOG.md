@@ -5490,3 +5490,18 @@
 - M2-T01..T10 的 Core suites 共同覆盖相同 version/seed/state/accepted inputs 下 command identity、reservation/context、event order、RNG cursor、objective/result、provisional state hash 与 finalization plan 的 deterministic closure；M2 Gate PASS。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 260 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T10 与 M2 Gate 结束状态为 PASS；下一项严格为 M3-T01 Fixed-Point Combat Numeric。
+
+## 2026-09-02 — M3-T01 完成 Fixed-Point Combat Numeric
+
+### 百万分之一整数与唯一取整入口
+
+- 从 M2-T10 提交 `4f9ef4e` 创建 `task/M3-T01-fixed-point-combat-numeric`。新增 transparent `CombatFixed(i64)` 与 `COMBAT_FIXED_SCALE=1_000_000`；只接受 scaled integer，不提供 float 构造或写回 State 路径。
+- 新增 checked `CombatNumeric`：integer×fixed floor、fixed×fixed floor、ratio fixed floor、overflow-safe ceilDiv、百分比 Integer State floor、SoloRecovery/Revive minimum-one restore、precise Damage 最终 floor，以及 HARD_CC `base × resistance × DR → single ceil → min 1`。
+- 所有乘法/组合使用 checked i128 中间值并在 i64 边界检查；negative state inputs、zero/negative denominator、invalid clamp bounds、conversion/add/sub overflow 均结构化 fail closed。Signed Fixed 保留给 Resistance/Weakness 的精确 add/sub/clamp，但非负写入入口必须重新验证。
+- 新增共享 `test-fixtures/combat-numeric-v1.json`，以纯整数 exact vectors 锁定 scale、30%/80%/1.25x、1/3 ratio、ceil、普通百分比可为 0、minimum-one restore、HARD_CC 和 3.7 Damage floor。另用 `2 × 0.55 × 0.9` 锁定 single ceil=1，而错误的中途 ceil=2。新增 `DEC-182`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：108/108 PASS，其中新增 4 项覆盖共享 exact fixture、HARD_CC 单次 ceil 反例、负数/除零/bounds/overflow，以及 signed scalar 与 nonnegative state write 分离。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 264 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M3-T01 结束状态为 PASS；下一项严格为 M3-T02 ResolutionResolver（Closed Tagged Union）。

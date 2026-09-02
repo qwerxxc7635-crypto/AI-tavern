@@ -3975,3 +3975,28 @@ Core 将同一 typed key 的连续变化折叠为 snapshot-before→final-after�
 - Snapshot hash/order、identity/version、delta discontinuity、运行态投影漂移、scripted policy 缺失或非 scripted 伪造 override 均 fail closed。
 - 本任务不写 SQLite、不创建 commit marker、不复制 Event Ledger；跨崩溃查询 marker、事务 exactly-once 与 ActiveCombatSave cleanup 由 M10 持久化任务实现。
 - `Aborted` 使用 Loop Guard overflow item sequence 并始终回滚且无 canonical runtime delta；普通 Defeat 亦不保留可回滚消耗。
+
+## DEC-182：Combat Fixed Scalar 统一为百万分之一整数并显式选择最终取整
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §4.5.1.1，M3-T01
+
+### 背景
+
+百分比、Resistance、Penetration、Damage multiplier 与 Duration multiplier 若使用平台 IEEE float 或隐式 cast，会在 Rust/TypeScript、Save/Load 和 Replay 间产生边界差异。若每个中间步骤各自 round/ceil，HARD_CC duration 与 Damage 也会偏离冻结公式。
+
+### 决定
+
+Pure Core 新增透明整数类型 `CombatFixed`，固定 `COMBAT_FIXED_SCALE=1_000_000`。它只保存 scaled `i64`；integer→fixed、乘法与组合 duration 使用 checked `i128` 中间值并在返回 `i64` 时检查范围，任何 overflow、负的 state-write 输入、零/负 denominator 或反向 clamp bounds 都返回结构化错误，禁止 wrap/saturate/float fallback。
+
+`CombatNumeric` 提供唯一非负运算：integer×fixed floor、fixed×fixed floor、ratio fixed floor、ceilDiv、百分比 Integer State floor、SoloRecovery/Revive 型至少 1 恢复、precise Damage 最终单次 floor。HARD_CC 接口一次计算 `baseDuration × resistanceFixed × drFixed`，只在合并分子后做一次 ceil，再应用最短 1 Clock；不暴露可在中途 ceil 的内部步骤。
+
+共享 `combat-numeric-v1.json` exact-value fixture 固定 30%/80%/1.25x、1/3 ratio、ceil 边界、0-result 普通百分比、minimum-one restore、3.7 Damage floor 与 HARD_CC 组合结果，供不同平台实现读取同一整数向量。
+
+### 影响与边界
+
+- CombatState 继续只含整数；UI 可用浮点展示但没有写回 `CombatFixed`/State 的接口。
+- Signed Fixed 仅用于 Resistance/Weakness 等精确加减/clamp；进入非负 multiplier 或 Integer State write 前必须显式验证。
+- 本任务只提供数值 contract，不提前实现 Resolution、Armor/Resistance pipeline 或 DamageBundle；后续模块必须复用这些入口。
+- 可调 balance 数值仍来自版本化配置；scale 与 rounding structure 是冻结机制。
