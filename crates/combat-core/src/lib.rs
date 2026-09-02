@@ -3,6 +3,7 @@
 //! This crate must remain independent of persistence, UI, providers, system time,
 //! and platform services. Runtime behavior is added only by the owning milestone.
 
+mod attack;
 mod attribute;
 mod command;
 mod cost;
@@ -24,6 +25,12 @@ mod terminal;
 mod turn;
 mod version;
 
+pub use attack::{
+    AttackClassification, AttackRuleError, AttackRuleErrorCode, BasicAttackBalanceConfig,
+    BasicAttackRules, BasicAttackUsageDecision, CriticalDamageOverride, CriticalDamagePlan,
+    CriticalDamageRules, CriticalEligibility, DamageComponentTiming, DamageDiceDefinition,
+    MultipleAttackPenaltyOverride,
+};
 pub use attribute::{
     CombatAttributeProfile, CombatAttributeResolver, CombatAttributeResolverError,
     CombatAttributeResolverErrorCode, CombatAttributeRole, CombatProficiencyDefinition,

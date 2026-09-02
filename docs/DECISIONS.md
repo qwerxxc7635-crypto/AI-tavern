@@ -4075,3 +4075,28 @@ Armor 分支严格计算 percentage penetration→flat penetration→effective a
 - Pipeline output 保留 raw/post-mitigation/rounded/shield/hp/overkill/effective defense facts，供后续 DamageResolved 使用；M3-T07 前不做 atomic state commit。
 - Shield multiplier、Bypass/Disable、ShieldBroken 与 recharge interruption 仍由 M3-T08；普通 DamageBundle working-state 继承与 event timing 仍由 M3-T07。
 - SavingThrow 成功后的半伤/效果分支由 Ability/Effect 定义先解析为 damage input，不能把“save success”误当 Attack hit gate。
+
+## DEC-186：Critical damage 产出骰子计划，MAP 只读取已提交的 Normal Turn counter
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §3.2、§4.4、§10.8.2，M2-T04/M2-T07，M3-T02/M3-T05
+
+### 背景
+
+暴击若直接翻倍最终伤害，会错误翻倍固定加成；若复用首次攻击暴击状态处理后续 DoT，会把持续伤害整体翻倍。MAP 若从本地 UI 点击数或 Extra Turn 临时计数推导，会与已提交 usage counter、Save/Resume 和 Replay 分叉。与此同时，少量规则例外需要 typed local override，而不能扩张成通用 capability registry 或一组散乱 flags。
+
+### 决定
+
+Pure Core 新增 `CriticalDamageRules`，接收 M3-T02 typed ResolutionResult 与每个 Damage Component 的 `DamageDiceDefinition`。默认只有实际命中的 AttackRoll critical 能触发；eligible component 只把 dice count ×2，die sides 与 fixed bonus 原样保留。Instant component 可逐项声明 Eligible/Ineligible；DamageOverTimeTick 默认必须 Ineligible，只有携带稳定 rule ID 的 `AllowDamageOverTime` 攻击子系统 local override 才允许 eligible。输出只是后续 RNG/Effect 消费的骰子计划，本任务不自行抽骰。
+
+新增 `BasicAttackRules`，只读取 Combatant 已提交的 `basicAttackCountThisNormalOwnerTurn`，返回本次 Accuracy penalty、是否应在 M2-T04 pre-resolution atomic commit 增加 counter，以及 before/after 值。版本化 Balance Config 明确 max uses 与三档 penalty；v0.4.1 baseline 是 max 3、0/-3/-6，但数值可调且必须保持非正、单调不增。达到上限直接拒绝。
+
+普通非 BasicAttack 不吃 penalty、不增加 counter。`IgnorePenalty` 只适用于 BasicAttack，仍计数并服从 max；`CountAsBasicAttack` 只适用于其他 Ability，显式使其共用计数与 penalty。两者都是带 rule ID 的 closed local override，非法组合 fail closed。
+
+### 影响与边界
+
+- Natural 20/1、CriticalRange 先命中再暴击和 ForceCritical 的权威判定仍唯一归 M3-T02 ResolutionResolver；本模块消费结果并拒绝 `critical=true + hit=false` 的伪造结果。
+- Normal Owner Turn Start 的 counter reset 与 Extra Turn 不重置仍唯一归 M2-T07 TurnRoundStateMachine；本模块没有第二套 clock/reset。
+- MAP 只影响 Accuracy，不改伤害；Critical plan 只决定待掷骰数，不绕过 M3-T04 mitigation。
+- Power Budget/Exploit 对特殊 override 的准入仍由 M6；本模块只验证 typed shape 与局部语义。

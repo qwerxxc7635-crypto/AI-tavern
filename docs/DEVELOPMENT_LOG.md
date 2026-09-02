@@ -5552,3 +5552,18 @@
 - `cargo test -p ember-combat-core`：128/128 PASS，其中新增 8 项覆盖 miss/profile short-circuit、Armor exact math/single floor/spillover、Resistance 单分支、penetration/weakness/caps、显式 immunity、typed 零伤害原因、NONE 默认 Shield 恒等式，以及 unsupported/invalid fail-closed。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 284 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、V5.2 §4.5 与 M3-T02/T03 dependencies 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入任务提交；无 SPEC BLOCKER。M3-T04 结束状态为 PASS；下一项严格为 M3-T05 Critical / BasicAttack / MAP。
+
+## 2026-09-03 — M3-T05 完成 Critical / BasicAttack / MAP
+
+### Crit-eligible 骰子计划与 committed counter 决策
+
+- 从 M3-T04 提交 `2e87e0b` 创建 `task/M3-T05-critical-basicattack-map`。新增 `CriticalDamageRules`：只消费 M3-T02 的 typed ResolutionResult，不再解释骰面；只有命中的 AttackRoll critical 会使 Eligible component 的 dice count checked ×2，die sides 与 fixed bonus 永不自动翻倍。
+- 每个 Component 显式区分 Instant/DoT timing 与 Eligible/Ineligible。DoT 默认必须 Ineligible，不继承首次攻击 critical；只有带 stable rule ID 的 `AllowDamageOverTime` local typed override 能改变该默认，未新增通用 capability registry 或 runtime handler。
+- 新增 `BasicAttackRules`，从已 committed `basicAttackCountThisNormalOwnerTurn` 计算本次 penalty 与 atomic usage commit 所需 increment。v0.4.1 baseline 为 max 3 和 0/-3/-6；config 允许调参但拒绝正向/非单调 penalty、非正 max 与负 counter，第 4 次 BasicAttack fail closed。
+- 非 BasicAttack 默认 penalty 0 且不计数；`IgnorePenalty` 仍受 max 且仍计数，`CountAsBasicAttack` 才让其他 Ability 显式共享规则。两个 override 都限定在攻击子系统、携带 rule ID 并拒绝不兼容组合。M2-T07 既有回归继续证明 Extra Turn 不重置该 committed counter。新增 `DEC-186`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：136/136 PASS，其中新增 8 项覆盖 baseline 三档/第 4 次拒绝、tunable monotonic config、非 Basic 默认/显式计入、Ignore 不越 cap、eligible dice/fixed bonus、DoT 默认/typed override、CriticalRange miss/非 Attack，以及 malformed outcome/config/counter/dice fail-closed。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 292 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、V5.2 §3.2/§4.4 与 M3-T02 dependency 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入任务提交；无 SPEC BLOCKER。M3-T05 结束状态为 PASS；下一项严格为 M3-T06 Typed Effect Primitive Handler Set。
