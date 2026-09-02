@@ -5442,3 +5442,19 @@
 - `cargo test -p ember-combat-core`：84/84 PASS，其中新增 6 项覆盖 roster snapshot/filter/order、完整 lifecycle、controlled/downed Action skip、Defeated/Removed RoundEnd、pending reorder、中途加入 next-round-only、Extra Turn clock isolation、illegal transition 与 tampered restore。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 240 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T07 结束状态为 PASS；下一项严格为 M2-T08 CombatObjective Runtime / Protect Removed。
+
+## 2026-09-02 — M2-T08 完成 CombatObjective Runtime / Protect Removed
+
+### 冻结定义与 committed-only 单调结算
+
+- 从 M2-T07 提交 `445981a` 创建 `task/M2-T08-combat-objective-runtime`。新增 pure Core `CombatObjectiveRuntime`，一次性校验并排序六类 objective、required IDs 与 tracked combatant IDs；required Eliminate 必须有冻结目标，DefeatTarget/Protect 必须有单一 target，Survive 必须为正整数轮数。
+- Eliminate/DefeatTarget 默认只认 Defeated，定义显式开启时才把 Removed 视为击败；Downed 不完成。预声明 reinforcement 从初始 runtime snapshot 参与冻结集合，`isDeployed=false` 或 Timeline 缺席不等于不存在。
+- Survive 只读取 Turn/Round State Machine 已提交的 `completedRoundCount`，第 N 次 RoundEnd 推进完成后才结算。Escape/Scripted 只接受版本化 committed signal；重复相同 signal 幂等，冲突 signal fail closed。
+- Protect 仅在显式 flag 下因 Downed 失败，Defeated 必然失败；committed Removed 写入持久化 `ProtectRemoved` failure record 且不可逆。Working clone 的未提交 removal、Timeline absence 与未部署状态不会触发失败；后续试图把该目标恢复为非 Removed 会被统一 invariant 拒绝。
+- Evaluation 只允许 BattleStart/RoundStart/OwnerTurnStart/Action quiescent/OwnerTurnEnd/RoundEnd 对应稳定点，Scheduler 有 queued/current item 时拒绝。required fail 产生 Defeat candidate；全部 required complete 且无 required fail 产生 Victory；optional fail 不阻止，Escape/Scripted 产生 typed candidate。候选只生成不确认，最终 arbitration 保留给 M2-T09。新增 `DEC-179`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：92/92 PASS，其中新增 8 项覆盖定义排序/形状、reinforcement 冻结 Eliminate、Downed/Removed policy、Survive exact RoundEnd、Protect committed Removed/不可逆、optional/required 与 signals、quiescent/replay determinism、无候选时 sequence 上限 no-op。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 248 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T08 结束状态为 PASS；下一项严格为 M2-T09 Terminal Outcome Arbitration。

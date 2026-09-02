@@ -1135,6 +1135,8 @@ mod tests {
                 required_objective_ids: vec![],
                 completed_objective_ids: vec![],
                 failed_objective_ids: vec![],
+                committed_signals: vec![],
+                failure_records: vec![],
             },
             reinforcements: ReinforcementRuntimeState {
                 reinforcements: vec![],

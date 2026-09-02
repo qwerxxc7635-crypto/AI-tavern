@@ -3900,3 +3900,28 @@ RoundEnd 只有在 roster 无 Pending 时才能把 `completedRoundCount` 从 `ro
 - 统一 invariant 校验 round/completed 关系、连续唯一 roster slots、成员引用、active normal slot、extra continuation 与 RoundEnd settled 状态；hash-valid phase/roster 篡改 fail closed。
 - Status tick/duration/cooldown 的实际推进、Reaction refresh 与资源恢复仍按任务表由 M4 等 owner 在这些固定 phase 上执行；M2-T07 不提前复制它们。
 - Objective 只读取 `completedRoundCount` 的 committed RoundEnd 边界；具体 Survive/Protect/terminal 逻辑由 M2-T08/T09 实现。
+
+## DEC-179：CombatObjective 只在 committed quiescent point 单调结算
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §10，M2-T08
+
+### 背景
+
+Objective 若读取 Trigger Chain 中的 working state、实时 Timeline 成员或尚未部署单位的可见性，会把短暂 removal、展示顺序和 reinforcement phase 混入胜负判断。尤其 Protect 一旦在 committed state 观察到 Removed，后续错误重建单位不能抹去失败事实。
+
+### 决定
+
+Pure Core 新增唯一 `CombatObjectiveRuntime`。Battle 创建时一次性校验并按 stable objective ID 固定定义、required IDs 与 tracked combatant IDs；Eliminate 的预声明 reinforcement 即使尚未部署也属于冻结集合。DefeatTarget/Protect 固定单一 target，Survive 固定正整数轮数，Escape 与 Scripted 只接受显式 committed signal。
+
+Objective evaluation 只允许 phase 对应的稳定点，且 Scheduler 必须没有 pending/current item。它只读取 committed `CombatState`，不会观察 provisional working removal、Timeline 缺席或 `isDeployed=false` 本身。Eliminate/DefeatTarget 默认只认 Defeated；只有定义显式声明时 Removed 才计为击败。Survive 仅在第 N 次 RoundEnd 已把 `completedRoundCount` 推进后完成。
+
+Protect 对 Downed 使用显式 `failOnDowned`，对 Defeated 必然失败，对 committed Removed 必然记录 `ProtectRemoved`。completed/failed IDs、committed signals 与 failure records 都是排序、互斥、单调的权威状态；带 `ProtectRemoved` 记录的目标不得在后续 committed state 恢复为非 Removed。Required failure 产生 Defeat candidate；全部 required complete 且无 required failure 产生 Victory candidate；optional failure 不阻止该条件。Escape/Scripted completion 产生其 typed candidate，但候选的最终竞争与 confirmed result 仍由 M2-T09 唯一负责。
+
+### 影响与边界
+
+- 相同 committed state 与 signal history 产生相同 completed/failed 集合及 candidate identity/sequence；重复 evaluation 是 byte-for-byte no-op，不消费 RNG。
+- Objective 定义、signal 与 failure record 纳入统一 State invariant；未知 target、重复/乱序 ID、非法形状、冲突 signal 或 Removed 后复活即使重算 State hash 也 fail closed。
+- `completedRoundCount`、reinforcement 初始 snapshot 与 committed combatant state 是语义输入；UI 是否显示、Timeline 是否包含目标不是 Objective 事实来源。
+- 本任务只生成 terminal candidates，不确认 result、不关闭 CombatScreen；quiescent arbitration 属于 M2-T09。

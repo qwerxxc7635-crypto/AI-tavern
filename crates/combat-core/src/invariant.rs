@@ -1,8 +1,9 @@
 use std::{error::Error, fmt};
 
 use crate::{
-    CanonicalEventChainScheduler, CombatState, CombatantRuntime, CombatantState,
-    CostReservationModel, ResolutionContextLifecycle, ResourceState, TurnRoundStateMachine,
+    CanonicalEventChainScheduler, CombatObjectiveRuntime, CombatState, CombatantRuntime,
+    CombatantState, CostReservationModel, ResolutionContextLifecycle, ResourceState,
+    TurnRoundStateMachine,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +23,7 @@ pub enum CombatStateInvariantCode {
     ResolutionContextInvalid,
     EventSchedulerInvalid,
     TurnRoundStateInvalid,
+    ObjectiveRuntimeInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,6 +79,13 @@ impl CombatStateInvariantValidator {
         TurnRoundStateMachine::validate_state(state).map_err(|error| {
             CombatStateInvariantError {
                 code: CombatStateInvariantCode::TurnRoundStateInvalid,
+                combatant_id: error.subject_id,
+                resource_id: None,
+            }
+        })?;
+        CombatObjectiveRuntime::validate_state(state).map_err(|error| {
+            CombatStateInvariantError {
+                code: CombatStateInvariantCode::ObjectiveRuntimeInvalid,
                 combatant_id: error.subject_id,
                 resource_id: None,
             }
@@ -498,6 +507,8 @@ mod tests {
                 required_objective_ids: Vec::new(),
                 completed_objective_ids: Vec::new(),
                 failed_objective_ids: Vec::new(),
+                committed_signals: Vec::new(),
+                failure_records: Vec::new(),
             },
             reinforcements: ReinforcementRuntimeState {
                 reinforcements: Vec::new(),

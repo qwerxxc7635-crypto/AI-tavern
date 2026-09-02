@@ -8,6 +8,7 @@ mod command;
 mod cost;
 mod execution;
 mod invariant;
+mod objective;
 mod precondition;
 mod resolution_context;
 mod rng;
@@ -43,6 +44,10 @@ pub use execution::{
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
 };
+pub use objective::{
+    CombatObjectiveRuntime, ObjectiveEvaluation, ObjectiveEvaluationPoint, ObjectiveRuntimeError,
+    ObjectiveRuntimeErrorCode,
+};
 pub use precondition::{
     EntityTagFacts, PreconditionDefinitionError, PreconditionDefinitionErrorCode,
     PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
@@ -66,11 +71,13 @@ pub use state::{
     AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,
     CombatStateHashError, CombatStateRestoreError, CombatantRuntime, CombatantState,
     CostCommitState, DurationClock, EventSchedulerCheckpoint, EventSchedulerStatus, HookPhase,
-    LoopGuardEngineFailure, LoopGuardFailureReason, LoopGuardRollbackPolicy, ObjectiveKind,
-    ObjectiveRuntime, ObjectiveRuntimeState, PendingReactionWindow, ProvisionalDeltaEntry,
-    ProvisionalRuntimeDelta, ReinforcementRuntime, ReinforcementRuntimeState, ResourceState,
-    ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, SchedulerItem,
-    SchedulerItemKind, StatusRuntime, TimelineEntry, UsageCounterScope, UsageCounterState,
+    LoopGuardEngineFailure, LoopGuardFailureReason, LoopGuardRollbackPolicy,
+    ObjectiveCommittedOutcome, ObjectiveCommittedSignal, ObjectiveFailureReason,
+    ObjectiveFailureRecord, ObjectiveKind, ObjectiveRuntime, ObjectiveRuntimeState,
+    PendingReactionWindow, ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReinforcementRuntime,
+    ReinforcementRuntimeState, ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus,
+    RoundRuntimeState, SchedulerItem, SchedulerItemKind, StatusRuntime, TimelineEntry,
+    UsageCounterScope, UsageCounterState,
 };
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,

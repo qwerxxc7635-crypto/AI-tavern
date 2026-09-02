@@ -182,6 +182,38 @@ pub struct ObjectiveRuntime {
     pub rounds_required: Option<u64>,
     pub fail_on_downed: bool,
     pub removed_counts_as_defeated: bool,
+    pub terminal_priority: Option<i32>,
+    pub scripted_result: Option<CombatResultType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ObjectiveCommittedOutcome {
+    Satisfied,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ObjectiveCommittedSignal {
+    pub objective_id: String,
+    pub outcome: ObjectiveCommittedOutcome,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ObjectiveFailureReason {
+    ProtectDowned,
+    ProtectDefeated,
+    ProtectRemoved,
+    Scripted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ObjectiveFailureRecord {
+    pub objective_id: String,
+    pub reason: ObjectiveFailureReason,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -191,6 +223,8 @@ pub struct ObjectiveRuntimeState {
     pub required_objective_ids: Vec<String>,
     pub completed_objective_ids: Vec<String>,
     pub failed_objective_ids: Vec<String>,
+    pub committed_signals: Vec<ObjectiveCommittedSignal>,
+    pub failure_records: Vec<ObjectiveFailureRecord>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -647,10 +681,14 @@ mod tests {
                     rounds_required: None,
                     fail_on_downed: false,
                     removed_counts_as_defeated: false,
+                    terminal_priority: None,
+                    scripted_result: None,
                 }],
                 required_objective_ids: vec!["objective-eliminate".to_owned()],
                 completed_objective_ids: vec![],
                 failed_objective_ids: vec![],
+                committed_signals: vec![],
+                failure_records: vec![],
             },
             reinforcements: ReinforcementRuntimeState {
                 reinforcements: vec![ReinforcementRuntime {
