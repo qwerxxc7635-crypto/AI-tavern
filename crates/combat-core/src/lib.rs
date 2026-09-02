@@ -6,6 +6,7 @@
 mod attribute;
 mod command;
 mod cost;
+mod damage_channel;
 mod execution;
 mod invariant;
 mod numeric;
@@ -40,6 +41,10 @@ pub use cost::{
     CostReservationErrorCode, CostReservationModel, CostReservationMutationStatus,
     CostReservationReceipt, CostReservationRecord, CostReservationRequest, CostReservationStatus,
     ReservedCombatCost,
+};
+pub use damage_channel::{
+    DamageChannelCatalog, DamageChannelCatalogError, DamageChannelCatalogErrorCode,
+    DamageChannelDefinition, DamageChannelId,
 };
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,

@@ -35,7 +35,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M2 Gate | PASS | 2026-09-02 | M2-T01..T10 独立验收；command→reservation→context→scheduler→phase→objective→result→finalization deterministic contract 闭环 |
 | M3-T01 — Fixed-Point Combat Numeric | PASS | 2026-09-02 | SCALE=1,000,000；i128 checked 中间值；percent/Damage floor、HARD_CC 合并后 single ceil；共享 exact fixture |
 | M3-T02 — ResolutionResolver（Closed Tagged Union） | PASS | 2026-09-03 | 六类封闭 tagged union；单一 resolver；Attack natural/crit、非 Attack natural、Opposed tie 规则 |
-| M3-T03 — DamageChannelCatalog | IN_PROGRESS | 2026-09-03 | 下一项；stable DamageChannelId/static catalog，PrimaryMitigation 仅归 WorldCombatProfile |
+| M3-T03 — DamageChannelCatalog | PASS | 2026-09-03 | 15 个冻结基础 Channel；stable string ID；不可变 canonical catalog；无 PrimaryMitigation/handler owner |
+| M3-T04 — Mitigation Pipeline | IN_PROGRESS | 2026-09-03 | 下一项；固定测试 Profile 注入唯一 PrimaryMitigation，Armor/Resistance→rounding→Shield→HP |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

@@ -4025,3 +4025,28 @@ ConditionalCheck 明确选择有/无 d20 及 `AT_LEAST/GREATER_THAN`，资源是
 - Resolver 接收已经由 RNG/context owner 产生并记录的 raw roll，本身不抽 RNG、不写 CombatState，避免第二个消费入口。
 - 特殊 natural override、critical override 等只能来自后续受信任白名单 Rule Definition；本任务不建立 boolean capability soup 或 runtime registry。
 - Damage、Save 后 Effect 与 Immunity 仍由后续 Effect/Damage owners 处理；AutoHit 不代表跳过这些验证。
+
+## DEC-184：Damage Channel 使用开放稳定 ID 与一次性版本化静态目录
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §4.5、§5.2–5.5，M0-T05，M3-T03
+
+### 背景
+
+Damage Channel 是可由开发者扩展的内容词汇，不是应由全局 Enum 封死的执行语义；但任意运行时注册又会让 AI 或插件绕过版本化规则。与此同时，同一 Channel 在不同 WorldCombatProfile 中是否支持、采用 ARMOR/RESISTANCE/NONE，必须只有一个权威来源，不能同时写进 Channel Catalog。
+
+### 决定
+
+Pure Core 新增透明 `DamageChannelId`，使用受验证、可序列化的小写 stable string，而非 giant `DamageType` enum。`DamageChannelCatalog` 只能从一组完整的 code-owned/versioned definitions 一次性构造，构造时校验并按 channel ID canonical sort；它只暴露只读 slice、lookup 与 contains，没有 incremental `register`、handler 或可执行回调。
+
+每个 `DamageChannelDefinition` 只拥有 `channelId`、canonical ordered semantic tags 与 presentation/localization key。Serde 拒绝未知字段，因而误放 `primaryMitigation` 也会 fail closed；Catalog 的反序列化复用同一完整集合验证，拒绝空目录、重复 ID、非法 ID/tag/key。v0.4.1 内建目录只列出四个基础 Profile 正文明确声明的 15 个通道身份，不加入未冻结名称的五行扩展。
+
+World-specific supported channels 与 `primaryMitigationByChannel` 仍由 M5 `WorldCombatProfile.DefenseBehavior` 唯一拥有。M3-T04 在 M5 完成前只通过固定测试 Profile 接口注入该事实，不将四世界映射复制到 Damage Catalog 或 pipeline。
+
+### 影响与边界
+
+- 不同输入顺序构建的同一目录会得到相同 lookup order 与 JSON；stable ID 自身反序列化也执行相同验证。
+- Semantic tags 只表达分类，presentation key 只提供展示查找身份；二者都不携带规则执行、AI allowlist、本地化文案或 balance 数值。
+- 新 Channel 需要修改代码或版本化 rules data，并整体重建/验证目录；本任务没有 runtime dynamic handler registration。
+- `PrimaryMitigation` 仍是封闭 typed 语义，但只有后续 WorldCombatProfile 持有具体 Channel→mitigation 映射。

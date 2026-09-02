@@ -5520,3 +5520,19 @@
 - `cargo test -p ember-combat-core`：114/114 PASS，其中新增 6 项覆盖 Attack natural/critical range、非 Attack natural extremes、Opposed tie/override、Conditional/AutoHit、malformed/overflow 与 exact closed JSON union。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 270 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - 已重新完整读取用户 995 行执行附件并核对当前 branch/working tree；Scope/DoD、V5.2 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M3-T02 结束状态为 PASS；下一项严格为 M3-T03 DamageChannelCatalog。
+
+## 2026-09-03 — M3-T03 完成 DamageChannelCatalog
+
+### Stable ID、不可变目录与单一规则所有权
+
+- 从 M3-T02 提交 `814bba6` 创建 `task/M3-T03-damage-channel-catalog`。新增 transparent `DamageChannelId(String)`，只接受确定性小写 stable ID 并在直接构造、FromStr 与 serde decode 时使用同一验证；它保持开放词汇，不新增 giant DamageType enum。
+- 新增 `DamageChannelDefinition` 与 immutable `DamageChannelCatalog`。目录从完整 code-owned/versioned definitions 一次性构造，校验后按 Channel ID canonical sort，并只提供 read-only entries/lookup/contains；不存在 incremental register、runtime handler、脚本或 mutable registry。
+- Definition 只含 `channelId / semanticTags / presentationKey`；semantic tags 必须为已排序、唯一的 namespaced IDs，presentation key 必须 namespaced。Serde 拒绝 unknown fields、重复 Channel、空目录与非法元数据；不同输入顺序会生成完全相同的 canonical JSON。
+- v0.4.1 built-in catalog 收录 V5.2 四个基础 Profile 明确声明的 15 个身份：Physical、Fantasy 四元素/Arcane、Sci-Fi Kinetic/Thermal/Electromagnetic/Plasma/Radiation、Cultivation Qi/Soul、Urban Ballistic/Psychic/Occult。未提前猜测五行扩展名。
+- Catalog 类型与 wire shape 均没有 `PrimaryMitigation`。WorldProfile 是否支持 Channel 及其 `primaryMitigationByChannel` 仍唯一归 M5；反序列化时夹带该字段会 fail closed。新增 `DEC-184`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：120/120 PASS，其中新增 6 项覆盖 stable ID round-trip/拒绝、canonical order/lookup、跨输入顺序 exact JSON、duplicate/unknown mitigation 拒绝、metadata 顺序/唯一性，以及 15 个冻结基础 Channel。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 276 PASS、1 个 credential-only ignore；archive interop双向通过。
+- Scope/DoD、V5.2 与 M0-T05 ownership contract 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入任务提交；无 SPEC BLOCKER。M3-T03 结束状态为 PASS；下一项严格为 M3-T04 Mitigation Pipeline。
