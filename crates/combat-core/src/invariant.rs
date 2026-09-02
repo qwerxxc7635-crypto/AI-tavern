@@ -1,8 +1,8 @@
 use std::{error::Error, fmt};
 
 use crate::{
-    CombatState, CombatantRuntime, CombatantState, CostReservationModel,
-    ResolutionContextLifecycle, ResourceState,
+    CanonicalEventChainScheduler, CombatState, CombatantRuntime, CombatantState,
+    CostReservationModel, ResolutionContextLifecycle, ResourceState,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -20,6 +20,7 @@ pub enum CombatStateInvariantCode {
     CombatantStateHitPointsMismatch,
     CostReservationLedgerInvalid,
     ResolutionContextInvalid,
+    EventSchedulerInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -61,6 +62,13 @@ impl CombatStateInvariantValidator {
         ResolutionContextLifecycle::validate_state(state).map_err(|error| {
             CombatStateInvariantError {
                 code: CombatStateInvariantCode::ResolutionContextInvalid,
+                combatant_id: error.subject_id,
+                resource_id: None,
+            }
+        })?;
+        CanonicalEventChainScheduler::validate_state(state).map_err(|error| {
+            CombatStateInvariantError {
+                code: CombatStateInvariantCode::EventSchedulerInvalid,
                 combatant_id: error.subject_id,
                 resource_id: None,
             }

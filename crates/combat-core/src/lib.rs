@@ -11,6 +11,7 @@ mod invariant;
 mod precondition;
 mod resolution_context;
 mod rng;
+mod scheduler;
 mod state;
 mod submission;
 mod version;
@@ -55,6 +56,10 @@ pub use resolution_context::{
 pub use rng::{
     COMBAT_RNG_CHANNELS, CombatRng, CombatRngError, CombatRngSnapshot, RngChannel,
     RngStreamSnapshot,
+};
+pub use scheduler::{
+    CanonicalEventChainScheduler, EventSchedulerError, EventSchedulerErrorCode,
+    NON_COMBATANT_INITIATIVE_ORDER, SchedulerCandidate,
 };
 pub use state::{
     AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,

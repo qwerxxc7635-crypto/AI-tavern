@@ -5394,3 +5394,19 @@
 - `cargo test -p ember-combat-core`：68/68 PASS，其中新增 6 项覆盖完整原子提交、动态 actor cancel、interrupt cost、redirect target、usage 错误 rollback，以及 Miss/Save/Immunity 不退款；strict Core Clippy、Rustfmt 与 `git diff --check` PASS。
 - 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 224 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、参考任务文件 SHA-256 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T04 结束状态为 PASS；下一项严格为 M2-T05 Canonical EventChain Scheduler。
+
+## 2026-09-02 — M2-T05 完成 Canonical EventChain Scheduler
+
+### 单一稳定 priority queue
+
+- 从 M2-T04 提交 `8af4072` 创建 `task/M2-T05-canonical-eventchain-scheduler`。新增 pure Core `CanonicalEventChainScheduler`；Trigger、Reaction、EncounterRule、System 共享一个 `SchedulerItem` queue，不存在递归 Trigger 路径或独立 Reaction stack。
+- Queue 严格按 phase ASC、explicit priority DESC、冻结的 source initiative ASC、source stable ID ASC、effect stable ID ASC、sequence ASC 排序。初始 candidates 先稳定建序再分配 chain-local sequence，因此调用方输入/模块注册顺序反转仍得到完全相同的 items 与 dequeue order。
+- Combatant source 入队时读取 committed timeline index；刚离开 timeline 时使用 `lastCommittedTimelineOrder`，非 Combatant 使用冻结常量 `2_147_483_647`。测试在入队后反转 timeline/修改 fallback，已入队顺序保持不变。
+- `dequeueNext` 只允许一个 current item；child 必须在完成该 item 时以 parent depth+1、新 sequence 回到同一 queue。相同前五键时旧 sibling 先执行，更早 phase 的 child 可按 tuple 抢先；当前 item 未完成时重复 dequeue/root injection 被拒绝。
+- Scheduler checkpoint 纳入统一 State invariant：chain/ID、depth、initiative bound、canonical queue order、queued count state、sequence uniqueness/range 均 fail closed；所有 mutation 使用 working clone 并推进 revision，排序/入队/出队/完成不消费 RNG。新增 `DEC-176`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：74/74 PASS，其中新增 6 项覆盖六键排序与输入逆序、same-key sibling/child、higher-priority child、Trigger/Reaction 共队、initiative freeze/fallback、递归入口拒绝、RNG 零消费及 tampered restore。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 230 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、素材 SHA256SUMS 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T05 结束状态为 PASS；下一项严格为 M2-T06 Loop Guard Counter Contract。

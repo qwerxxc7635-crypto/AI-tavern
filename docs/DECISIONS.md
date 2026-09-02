@@ -3825,3 +3825,28 @@ PreAction/Reaction 可以使 actor、ability、redirect target、cooldown、usag
 - Miss、Save Success、Resolution 后 Immunity/Damage=0 不调用 cancel/release，已提交 cost 与 usage 保持不变；这些 outcome 的具体计算仍属于后续 Resolution/Effect tasks。
 - Once counter scope 是 typed OwnerTurn/Round/Battle；对应 reset 时点由 M6/M7 的 round/turn owners 实现，本任务只建立权威 runtime state 与唯一 commit 点。
 - Usage plan 是受信任 Ability catalog projection，不接受生成模型自由文本；Core 仍校验 command ability identity、counter existence/scope、重复项、范围、overflow 与最终 State invariant。
+
+## DEC-176：Trigger 与 Reaction 只通过同一个 Canonical EventChain priority queue
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §8.2，M2-T05
+
+### 背景
+
+同一 Hook 的 Trigger、Auto/UtilityAI/Ask Reaction 和执行期间产生的 child 若分别依赖模块遍历、FIFO、Reaction stack 或函数递归，会改变 event order，继而改变 Resolution RNG 消费与最终 CombatState。Timeline 又可能在 item 入队后变化，因此出队时重算 initiative 排名同样会造成 Replay 分歧。
+
+### 决定
+
+Pure Core 只提供一个 `CanonicalEventChainScheduler`，Trigger、Reaction、EncounterRule 与 System candidate 全部成为同一种 `SchedulerItem` 并进入同一有序 queue。权威比较严格固定为 `phasePriority ASC → explicitPriority DESC → sourceInitiativeOrder ASC → sourceStableId ASC → effectStableId ASC → sequence ASC`；Rust `String` 的 case-sensitive UTF-8 lexicographic order 直接承担 stable ID 比较，不使用 locale。
+
+初始 candidates 先按稳定 source/effect identity 及完整 typed tie identity 建序，再分配 chain 内单调 sequence。Combatant source 在入队时读取当前 committed timeline 的索引；已离开 timeline 的 combatant 使用 runtime `lastCommittedTimelineOrder`；非 Combatant 使用 `2_147_483_647`。该值写入 item 后不再随 timeline 改动重算。
+
+执行者每次只能把 queue head 移入唯一 `currentItem`。当前 item 未完成时禁止再次 dequeue 或伪装成新 root 入队；执行产生的 child 只能通过 `completeCurrentWithChildren` 以 `parent.depth + 1`、新 sequence 插回同一 queue，然后再按完整 tuple 选 head。因此同键 sibling 依靠旧 sequence 先于 child，而拥有更早 phase 或更高 explicit priority 的 child 可以合法抢先，没有隐含 DFS 顺序。
+
+### 影响与边界
+
+- Queue mutation 使用 working State、revision 与统一 invariant commit；非法 stable ID、sequence exhaustion、depth overflow 或 checkpoint 结构错误不会留下半状态。
+- Scheduler checkpoint validator 拒绝 chain mismatch、depth 0、越界 initiative、queued counted item、重复/无效 sequence 与非 canonical queue order；hash-valid tampered save 仍 fail closed。
+- Begin/enqueue/dequeue/complete/sort 都不访问 RNG；后续 Resolution owner 只能在合法 item 真正开始执行后按该 dequeue order 消费。
+- M2-T05 只固定 queue discipline；dequeue eligibility、exact `executedEventCount`、limit overflow/Aborted 与 Ask suspend/resume counter 由紧随其后的 M2-T06/M4 owners 实现，不提前混入本任务。
