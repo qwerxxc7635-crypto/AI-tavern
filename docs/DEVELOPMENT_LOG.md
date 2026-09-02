@@ -5473,3 +5473,20 @@
 - `cargo test -p ember-combat-core`：98/98 PASS，其中新增 6 项覆盖 simultaneous Victory/Defeat/Escape、Scripted/explicit priority、developer override replay、stable ID tie、active chain/no-candidate、exactly-once 与 tampered state。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 254 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T09 结束状态为 PASS；下一项严格为 M2-T10 Runtime Commit / Rollback Contract。
+
+## 2026-09-02 — M2-T10 完成 Runtime Commit / Rollback Contract 与 M2 Gate
+
+### 可由 Existing Domain Transaction 直接消费的 deterministic plan
+
+- 从 M2-T09 提交 `5ac7038` 创建 `task/M2-T10-runtime-commit-rollback`。新增 pure Core `RuntimeCommitContract`：捕获包含实际恢复值、完整 Combat versions 与 SHA-256 的 typed `PreCombatSnapshot`；不依赖时间、系统随机或数据库自然顺序。
+- Finalization 校验 confirmed State、snapshot combat identity/version、Provisional Delta revision、每个 typed key 的 snapshot before 与连续 before→after chain，并交叉检查 HP/Shield/Resource/Item/Status 的 runtime final projection。typed enum tuple key 消除允许冒号的 stable IDs 在字符串拼接下产生碰撞的可能。
+- 连续 runtime facts 折叠为 snapshot-before→final-after，净 no-op 删除并固定排序，生成 canonical domain delta/hash。Victory/Escape 提交 runtime delta；Defeat/Aborted 丢弃 delta并携带完整 rollback snapshot；Aborted final sequence 来自真实 Loop Guard overflow item。
+- ScriptedVictory/Defeat 强制显式声明 `COMMIT_RUNTIME_DELTA / RESTORE_PRECOMBAT_SNAPSHOT / RESTORE_SNAPSHOT_THEN_APPLY_SCRIPTED_DELTA`；第三种只输出经 snapshot 校验的独立 scripted delta。非 scripted result 传入 override 被拒绝。
+- `resultCommitId` 稳定派生自 combatInstanceId、finalResultSequence、result type、canonicalDeltaHash。输出 plan 同时携带 runtime/snapshot/delta hashes、policy、rollback snapshot 与共享 correlation ID 的 `combat.finished` fact；只定义 contract，不新建 durable persistence/Event Ledger。新增 `DEC-181`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：104/104 PASS，其中新增 6 项覆盖 Victory canonical fold/idempotent identity、Defeat rollback、Loop Guard Aborted、Scripted 三 policy、snapshot/delta/runtime drift，以及非 scripted override/identity mismatch。
+- M2-T01..T10 的 Core suites 共同覆盖相同 version/seed/state/accepted inputs 下 command identity、reservation/context、event order、RNG cursor、objective/result、provisional state hash 与 finalization plan 的 deterministic closure；M2 Gate PASS。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 260 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T10 与 M2 Gate 结束状态为 PASS；下一项严格为 M3-T01 Fixed-Point Combat Numeric。

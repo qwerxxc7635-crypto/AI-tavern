@@ -31,7 +31,9 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M2-T07 — Turn / Round Phase State Machine | PASS | 2026-09-02 | Battle/Round/Owner/Action/End 固定迁移；RoundRoster 快照；Extra Turn 独立且不推进 normal clocks |
 | M2-T08 — CombatObjective Runtime / Protect Removed | PASS | 2026-09-02 | 六类 objective；冻结 tracked IDs/required 集合；Survive RoundEnd；Protect committed Removed 不可逆失败 |
 | M2-T09 — Terminal Outcome Arbitration | PASS | 2026-09-02 | quiescent-only；持久化 typed policy；Scripted/explicit/Defeat/Victory/Escape 唯一且 exactly-once |
-| M2-T10 — Runtime Commit / Rollback Contract | IN_PROGRESS | 2026-09-02 | 下一项；PreCombatSnapshot、provisional/final delta hash 与结果 commit/rollback contract |
+| M2-T10 — Runtime Commit / Rollback Contract | PASS | 2026-09-02 | hashed PreCombatSnapshot；canonical folded delta；稳定 resultCommitId；Victory/Escape/Scripted commit 与 Defeat/Aborted rollback |
+| M2 Gate | PASS | 2026-09-02 | M2-T01..T10 独立验收；command→reservation→context→scheduler→phase→objective→result→finalization deterministic contract 闭环 |
+| M3-T01 — Fixed-Point Combat Numeric | IN_PROGRESS | 2026-09-02 | 下一项；固定精度整数 contract、Damage floor、HARD_CC single ceil、percent recovery floor |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

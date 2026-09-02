@@ -3950,3 +3950,28 @@ Pure Core 新增唯一 `TerminalOutcomeArbitrator`。它只接受 Scheduler queu
 - Arbitration 不消费 RNG、不关闭 UI，也不提交/回滚 domain delta；调用方只有在返回 confirmed 后停止后续 phase，M2-T10 再消费该确认态。
 - ScriptedVictory/ScriptedDefeat 的 persistence policy 仍必须由后续 runtime commit contract 显式提供，本任务只决定 result identity。
 - Loop Guard `Aborted` 继续由安全失败路径直接确认，不得被 Encounter policy 降级或覆盖。
+
+## DEC-181：Runtime finalization 输出可幂等消费的 canonical plan，不创建第二套持久化
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §11.2.1–11.2.2，M2-T10
+
+### 背景
+
+Combat 内已提交的 State 仍只是可回滚 runtime state。若 HP、资源、物品等在战斗中提前写入 canonical world，Defeat/Aborted 无法可靠恢复；若结果提交 ID 依赖时间或重新生成的随机数，Domain Transaction 成功后清理 ActiveCombatSave 前崩溃会重复发奖或重复应用 world delta。与此同时，本阶段不能复制现有 SQLite transaction/Event Ledger。
+
+### 决定
+
+Pure Core 新增 `RuntimeCommitContract`。BattleStart 前由 adapter 投影 typed `CanonicalDomainValue`，Core 校验 stable IDs、版本与唯一 typed key，排序并生成 SHA-256 `PreCombatSnapshot`；snapshot 保存实际恢复值而非只有 hash。战斗期间 `ProvisionalRuntimeDelta` 仍是 ordered runtime facts，finalization 要求 revision 与 entry 数一致、每个 key 的 before→after 链连续、首个 before 匹配 snapshot，且可投影字段的最终 after 匹配 confirmed CombatState。
+
+Core 将同一 typed key 的连续变化折叠为 snapshot-before→final-after，删除净 no-op 并按无歧义 enum tuple key 排序，得到 `CanonicalDomainDelta` 与 hash。普通 Victory/Escape 使用 `COMMIT_RUNTIME_DELTA`；Defeat/Aborted 使用空 canonical delta 并携带完整 `RESTORE_PRECOMBAT_SNAPSHOT`。ScriptedVictory/ScriptedDefeat 必须显式选择三种 persistence policy；`RESTORE_SNAPSHOT_THEN_APPLY_SCRIPTED_DELTA` 只接受相对 snapshot 校验后的独立 scripted delta，不误提交整个 combat runtime delta。
+
+`resultCommitId` 由 canonical JSON 中的 `combatInstanceId + finalResultSequence + resultType + canonicalDeltaHash` 做 SHA-256 稳定派生，不使用系统时间或新 RNG。输出 `RuntimeFinalizationPlan` 同时携带 runtime state hash、snapshot hash、delta hash、rollback snapshot、persistence policy 与 correlation 相同的 typed `combat.finished` fact，供 M10 Existing Domain Transaction Adapter 直接以该 ID 作为 idempotency key 消费。
+
+### 影响与边界
+
+- 相同 versions/seed/initial snapshot/accepted execution history 产生相同 runtime hash、canonical delta/hash、result sequence 与 resultCommitId；构建 plan 是只读且不消费 RNG。
+- Snapshot hash/order、identity/version、delta discontinuity、运行态投影漂移、scripted policy 缺失或非 scripted 伪造 override 均 fail closed。
+- 本任务不写 SQLite、不创建 commit marker、不复制 Event Ledger；跨崩溃查询 marker、事务 exactly-once 与 ActiveCombatSave cleanup 由 M10 持久化任务实现。
+- `Aborted` 使用 Loop Guard overflow item sequence 并始终回滚且无 canonical runtime delta；普通 Defeat 亦不保留可回滚消耗。

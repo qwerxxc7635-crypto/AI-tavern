@@ -12,6 +12,7 @@ mod objective;
 mod precondition;
 mod resolution_context;
 mod rng;
+mod runtime_commit;
 mod scheduler;
 mod state;
 mod submission;
@@ -63,6 +64,11 @@ pub use resolution_context::{
 pub use rng::{
     COMBAT_RNG_CHANNELS, CombatRng, CombatRngError, CombatRngSnapshot, RngChannel,
     RngStreamSnapshot,
+};
+pub use runtime_commit::{
+    CanonicalDomainDelta, CanonicalDomainValue, CombatFinishedFact, PreCombatSnapshot,
+    ResultPersistencePolicy, RuntimeCommitContract, RuntimeCommitError, RuntimeCommitErrorCode,
+    RuntimeFinalizationPlan, RuntimeFinalizationRequest,
 };
 pub use scheduler::{
     CanonicalEventChainScheduler, EventSchedulerError, EventSchedulerErrorCode,
