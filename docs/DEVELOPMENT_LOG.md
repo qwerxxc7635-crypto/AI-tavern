@@ -5410,3 +5410,19 @@
 - `cargo test -p ember-combat-core`：74/74 PASS，其中新增 6 项覆盖六键排序与输入逆序、same-key sibling/child、higher-priority child、Trigger/Reaction 共队、initiative freeze/fallback、递归入口拒绝、RNG 零消费及 tampered restore。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 230 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、素材 SHA256SUMS 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T05 结束状态为 PASS；下一项严格为 M2-T06 Loop Guard Counter Contract。
+
+## 2026-09-02 — M2-T06 完成 Loop Guard Counter Contract
+
+### Final Errata exact counter 与失败 checkpoint
+
+- 从 M2-T05 提交 `c2ab5fa` 创建 `task/M2-T06-loop-guard-contract`。Scheduler 新增 dequeue 后、execution 前的唯一 gate：eligibility skip 清除 current item 但不计数；合法 item 只有在 depth/count 两个 bound 通过后才先增加 `executedEventCount` 并标记 counted。
+- Root 固定 depth=1，child 继续通过 parent 完成入口使用 checked depth+1；测试证明 `MaxTriggerDepth=N` 时 depth N 合法、N+1 首次 overflow，`MaxEventCount=N` 时前 N 个合法 execution 可执行、第 N+1 个 overflow。Sibling 与 candidate/queued item 均不增加 counter。
+- Counted current item 进入 checkpoint 后 save/restore，再次 gate 返回 resume 且 State byte-for-byte 不变，不重复 count/revision、不改变 depth；未通过 eligibility 的 Reaction skip 不计数。完整 queue/current/depth/count/nextSequence/EventChainID/max limits 继续由 canonical State serde/hash 保存。
+- Overflow 保存 exact item 与 `MAX_TRIGGER_DEPTH`/`MAX_EVENT_COUNT` reason，进入不可继续的 `ENGINE_FAILURE`，固定 `ABORTED + RESTORE_PRECOMBAT_SNAPSHOT`，同步 confirmed result；不标记/执行 overflow item、不增加 count、不消费 RNG。实际 PreCombatSnapshot 创建/恢复保持由 M2-T10 owner 实现。新增 `DEC-177`。
+- Invariant restore 交叉拒绝 active/failure mismatch、count 超限、无 count 的 counted current、错误 overflow reason/result/policy、改变后不再触顶的 limit、重复 sequence 或继续调度 failure chain。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：78/78 PASS；M2-T06 新增 4 项 exact-value 测试，连同 M2-T05 6 项共覆盖 depth N/N+1、count N/N+1、legality skip、Ask/crash resume、terminal failure/tamper、sibling/child 与 RNG 零消费。strict Core Clippy、Rustfmt 与 `git diff --check` PASS。
+- 首次全量门禁遇到 macOS 系统进程抢占，Vitest forks worker 启动超时并留下 3 timeout/2 worker errors；五个涉及文件随后独立重跑 30/30 PASS。未把该次红灯作为验收，重新执行原始完整 `pnpm check` 后 PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 234 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、参考 SOT/素材与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T06 结束状态为 PASS；下一项严格为 M2-T07 Turn / Round Phase State Machine。

@@ -3850,3 +3850,28 @@ Pure Core 只提供一个 `CanonicalEventChainScheduler`，Trigger、Reaction、
 - Scheduler checkpoint validator 拒绝 chain mismatch、depth 0、越界 initiative、queued counted item、重复/无效 sequence 与非 canonical queue order；hash-valid tampered save 仍 fail closed。
 - Begin/enqueue/dequeue/complete/sort 都不访问 RNG；后续 Resolution owner 只能在合法 item 真正开始执行后按该 dequeue order 消费。
 - M2-T05 只固定 queue discipline；dequeue eligibility、exact `executedEventCount`、limit overflow/Aborted 与 Ask suspend/resume counter 由紧随其后的 M2-T06/M4 owners 实现，不提前混入本任务。
+
+## DEC-177：Loop Guard 在 item 真正执行前以 checkpoint counter 触发固定 Engine Failure
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §8.1.1–8.1.2 Final Errata，M2-T06
+
+### 背景
+
+若 depth 在候选生成或入队时判断、event count 统计 candidate/skip/Ask pause，或者 crash resume 重新遍历历史推导 counter，则相同 command 可能得到不同 overflow item 与 RNG cursor。把超限 item 静默截断继续战斗也会保留不同的 provisional state，违反固定 `Aborted` rollback 语义。
+
+### 决定
+
+Scheduler dequeue 只把唯一 queue head 放入 `currentItem`，尚不计数。调用方完成轻量 eligibility 后必须调用 `gateCurrentForExecution`：非法 item 被 deterministic Skip 并清除，`executedEventCount` 与 RNG 不变；合法 item 先检查 `item.depth > maxTriggerDepth`，再检查下一次执行是否会超过 `maxEventCount`。只有两项都通过才先把 count 加一、把 current item 标记 `executionCounted=true`，随后允许真正执行。
+
+Root depth 固定为 1；child 只能由正在执行的 parent 完成入口创建并使用 checked `parent.depth + 1`；sibling 不共享可变 depth。合法范围因此是 depth 1...N 和前 N 个真正执行的 items，第 N+1 个分别是首次 overflow。恢复一个已经 counted 的 current item 再过 gate 只返回 `resumed=true`，不改变 state、revision、depth 或 count；Ask suspend 可以原样保存这个 checkpoint。
+
+Overflow item 不标记 counted、不执行、不消费 RNG、不增加 count。Checkpoint 进入 `ENGINE_FAILURE`，保存 exact reason/overflow item/queue/count/next sequence/limits，并强制记录 `result=ABORTED`、`rollbackPolicy=RESTORE_PRECOMBAT_SNAPSHOT`；State 的 confirmed result 同步固定为 Aborted。该状态终止 enqueue/dequeue/complete，restore 后不能从触顶前继续。
+
+### 影响与边界
+
+- Checkpoint validator 交叉校验 active/failure 状态、current/count、overflow 原因与 exact limit 条件、result/rollback policy、sequence 与 queue；即使重新计算 State hash，伪造 failure 或放宽 limit 也会 fail closed。
+- Limits 在 EventChain begin 时由已绑定版本的 ruleset/engine contract 投影并存入 checkpoint；UI/生成内容没有修改入口。M10 的 BattleRecord/ActiveCombatSave 必须原样持久化，不得用新默认覆盖。
+- M2-T06 已定义并固定 rollback 要求，但战前快照与真正 Runtime rollback 由 M2-T10 的明确 owner 建立；本任务不创建临时 SQLite 表或伪造 durable persistence。
+- Loop Guard failure 不参与 M2-T09 的普通 terminal candidate 竞争；它是直接固定 Aborted 的 engine safety path。

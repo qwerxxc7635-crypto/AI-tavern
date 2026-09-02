@@ -2,7 +2,11 @@ use std::{cmp::Ordering, error::Error, fmt};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{CombatState, EventSchedulerCheckpoint, SchedulerItem, SchedulerItemKind};
+use crate::{
+    CombatResultType, CombatState, EventSchedulerCheckpoint, EventSchedulerStatus,
+    LoopGuardEngineFailure, LoopGuardFailureReason, LoopGuardRollbackPolicy, SchedulerItem,
+    SchedulerItemKind,
+};
 
 pub const NON_COMBATANT_INITIATIVE_ORDER: u32 = 2_147_483_647;
 
@@ -22,11 +26,20 @@ pub enum EventSchedulerErrorCode {
     SchedulerMissing,
     CurrentItemActive,
     CurrentItemMissing,
+    CurrentItemNotExecuting,
+    CurrentItemAlreadyExecuting,
     InvalidStableId,
     InvalidCheckpoint,
     SequenceExhausted,
     DepthExhausted,
     StateInvariantViolation,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SchedulerExecutionGateOutcome {
+    Skipped { item: SchedulerItem },
+    ReadyToExecute { item: SchedulerItem, resumed: bool },
+    EngineFailure { failure: LoopGuardEngineFailure },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +79,8 @@ impl CanonicalEventChainScheduler {
         let mut working = state.clone();
         working.scheduler = Some(EventSchedulerCheckpoint {
             event_chain_id: event_chain_id.clone(),
+            status: EventSchedulerStatus::Active,
+            engine_failure: None,
             executed_event_count: 0,
             queue: Vec::new(),
             current_item: None,
@@ -126,6 +141,101 @@ impl CanonicalEventChainScheduler {
         Ok(Some(item))
     }
 
+    pub fn gate_current_for_execution(
+        state: &mut CombatState,
+        eligible: bool,
+    ) -> Result<SchedulerExecutionGateOutcome, EventSchedulerError> {
+        Self::validate_state(state)?;
+        let mut working = state.clone();
+        let chain_id = active_chain_id(&working)?;
+        let current = working
+            .scheduler
+            .as_ref()
+            .and_then(|scheduler| scheduler.current_item.clone())
+            .ok_or_else(|| {
+                scheduler_error(EventSchedulerErrorCode::CurrentItemMissing, &chain_id)
+            })?;
+
+        if !eligible {
+            if current.execution_counted {
+                return Err(scheduler_error(
+                    EventSchedulerErrorCode::CurrentItemAlreadyExecuting,
+                    &chain_id,
+                ));
+            }
+            working
+                .scheduler
+                .as_mut()
+                .expect("active scheduler was checked")
+                .current_item = None;
+            bump_revision(&mut working, &chain_id)?;
+            commit_working_state(state, working)?;
+            return Ok(SchedulerExecutionGateOutcome::Skipped { item: current });
+        }
+
+        if current.execution_counted {
+            return Ok(SchedulerExecutionGateOutcome::ReadyToExecute {
+                item: current,
+                resumed: true,
+            });
+        }
+
+        let scheduler = working
+            .scheduler
+            .as_ref()
+            .expect("active scheduler was checked");
+        let failure_reason = if current.depth > scheduler.max_trigger_depth {
+            Some(LoopGuardFailureReason::MaxTriggerDepth)
+        } else if scheduler.executed_event_count >= scheduler.max_event_count {
+            Some(LoopGuardFailureReason::MaxEventCount)
+        } else {
+            None
+        };
+        if let Some(reason) = failure_reason {
+            let failure = LoopGuardEngineFailure {
+                reason,
+                overflow_item: current,
+                result: CombatResultType::Aborted,
+                rollback_policy: LoopGuardRollbackPolicy::RestorePrecombatSnapshot,
+            };
+            let scheduler = working
+                .scheduler
+                .as_mut()
+                .expect("active scheduler was checked");
+            scheduler.status = EventSchedulerStatus::EngineFailure;
+            scheduler.current_item = None;
+            scheduler.engine_failure = Some(failure.clone());
+            working.confirmed_result = Some(CombatResultType::Aborted);
+            bump_revision(&mut working, &chain_id)?;
+            commit_working_state(state, working)?;
+            return Ok(SchedulerExecutionGateOutcome::EngineFailure { failure });
+        }
+
+        let scheduler = working
+            .scheduler
+            .as_mut()
+            .expect("active scheduler was checked");
+        scheduler.executed_event_count =
+            scheduler
+                .executed_event_count
+                .checked_add(1)
+                .ok_or_else(|| {
+                    scheduler_error(EventSchedulerErrorCode::SequenceExhausted, &chain_id)
+                })?;
+        let current = scheduler
+            .current_item
+            .as_mut()
+            .expect("current item was checked");
+        current.execution_counted = true;
+        let ready = current.clone();
+        bump_revision(&mut working, &chain_id)?;
+        commit_working_state(state, working)?;
+        Ok(SchedulerExecutionGateOutcome::ReadyToExecute {
+            item: ready,
+            resumed: false,
+        })
+    }
+
     pub fn complete_current_with_children(
         state: &mut CombatState,
         child_candidates: Vec<SchedulerCandidate>,
@@ -139,6 +249,12 @@ impl CanonicalEventChainScheduler {
             .ok_or_else(|| {
                 scheduler_error(EventSchedulerErrorCode::CurrentItemMissing, &chain_id)
             })?;
+        if !parent.execution_counted {
+            return Err(scheduler_error(
+                EventSchedulerErrorCode::CurrentItemNotExecuting,
+                &chain_id,
+            ));
+        }
         let child_depth = parent
             .depth
             .checked_add(1)
@@ -161,10 +277,11 @@ impl CanonicalEventChainScheduler {
 
     #[must_use]
     pub fn is_quiescent(state: &CombatState) -> bool {
-        state
-            .scheduler
-            .as_ref()
-            .is_some_and(|scheduler| scheduler.queue.is_empty() && scheduler.current_item.is_none())
+        state.scheduler.as_ref().is_some_and(|scheduler| {
+            scheduler.status == EventSchedulerStatus::Active
+                && scheduler.queue.is_empty()
+                && scheduler.current_item.is_none()
+        })
     }
 
     pub fn validate_state(state: &CombatState) -> Result<(), EventSchedulerError> {
@@ -175,10 +292,30 @@ impl CanonicalEventChainScheduler {
         if scheduler.next_sequence == 0 {
             return Err(invalid_checkpoint(&scheduler.event_chain_id));
         }
+        match (&scheduler.status, &scheduler.engine_failure) {
+            (EventSchedulerStatus::Active, None) => {}
+            (EventSchedulerStatus::EngineFailure, Some(failure)) => {
+                validate_engine_failure(state, scheduler, failure)?;
+            }
+            _ => return Err(invalid_checkpoint(&scheduler.event_chain_id)),
+        }
+        if scheduler.executed_event_count > scheduler.max_event_count {
+            return Err(invalid_checkpoint(&scheduler.event_chain_id));
+        }
+        if scheduler
+            .current_item
+            .as_ref()
+            .is_some_and(|item| item.execution_counted)
+            && scheduler.executed_event_count == 0
+        {
+            return Err(invalid_checkpoint(&scheduler.event_chain_id));
+        }
 
         let mut prior: Option<&SchedulerItem> = None;
         let mut sequences = Vec::with_capacity(
-            scheduler.queue.len() + usize::from(scheduler.current_item.is_some()),
+            scheduler.queue.len()
+                + usize::from(scheduler.current_item.is_some())
+                + usize::from(scheduler.engine_failure.is_some()),
         );
         for item in &scheduler.queue {
             validate_item(item, &scheduler.event_chain_id)?;
@@ -193,6 +330,9 @@ impl CanonicalEventChainScheduler {
         if let Some(item) = &scheduler.current_item {
             validate_item(item, &scheduler.event_chain_id)?;
             sequences.push(item.sequence);
+        }
+        if let Some(failure) = &scheduler.engine_failure {
+            sequences.push(failure.overflow_item.sequence);
         }
         for (index, sequence) in sequences.iter().enumerate() {
             if *sequence == 0
@@ -352,13 +492,45 @@ fn validate_stable_id(value: &str) -> Result<(), EventSchedulerError> {
 }
 
 fn active_chain_id(state: &CombatState) -> Result<String, EventSchedulerError> {
-    state
-        .scheduler
-        .as_ref()
-        .map(|scheduler| scheduler.event_chain_id.clone())
-        .ok_or_else(|| {
-            scheduler_error(EventSchedulerErrorCode::SchedulerMissing, "event-scheduler")
-        })
+    let scheduler = state.scheduler.as_ref().ok_or_else(|| {
+        scheduler_error(EventSchedulerErrorCode::SchedulerMissing, "event-scheduler")
+    })?;
+    if scheduler.status != EventSchedulerStatus::Active {
+        return Err(scheduler_error(
+            EventSchedulerErrorCode::InvalidCheckpoint,
+            &scheduler.event_chain_id,
+        ));
+    }
+    Ok(scheduler.event_chain_id.clone())
+}
+
+fn validate_engine_failure(
+    state: &CombatState,
+    scheduler: &EventSchedulerCheckpoint,
+    failure: &LoopGuardEngineFailure,
+) -> Result<(), EventSchedulerError> {
+    if scheduler.current_item.is_some()
+        || failure.result != CombatResultType::Aborted
+        || failure.rollback_policy != LoopGuardRollbackPolicy::RestorePrecombatSnapshot
+        || state.confirmed_result != Some(CombatResultType::Aborted)
+        || failure.overflow_item.execution_counted
+    {
+        return Err(invalid_checkpoint(&scheduler.event_chain_id));
+    }
+    validate_item(&failure.overflow_item, &scheduler.event_chain_id)?;
+    let exact_overflow = match failure.reason {
+        LoopGuardFailureReason::MaxTriggerDepth => {
+            failure.overflow_item.depth > scheduler.max_trigger_depth
+        }
+        LoopGuardFailureReason::MaxEventCount => {
+            failure.overflow_item.depth <= scheduler.max_trigger_depth
+                && scheduler.executed_event_count >= scheduler.max_event_count
+        }
+    };
+    if !exact_overflow {
+        return Err(invalid_checkpoint(&scheduler.event_chain_id));
+    }
+    Ok(())
 }
 
 fn bump_revision(state: &mut CombatState, subject_id: &str) -> Result<(), EventSchedulerError> {
@@ -459,6 +631,7 @@ mod tests {
         let first = CanonicalEventChainScheduler::dequeue_next(&mut state)
             .unwrap()
             .unwrap();
+        ready(&mut state);
         let child = CanonicalEventChainScheduler::complete_current_with_children(
             &mut state,
             vec![candidate(
@@ -475,6 +648,7 @@ mod tests {
         let sibling = CanonicalEventChainScheduler::dequeue_next(&mut state)
             .unwrap()
             .unwrap();
+        ready(&mut state);
         CanonicalEventChainScheduler::complete_current(&mut state).unwrap();
         let dequeued_child = CanonicalEventChainScheduler::dequeue_next(&mut state)
             .unwrap()
@@ -502,6 +676,7 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(first.effect_stable_id, "reaction-a");
+        ready(&mut state);
         CanonicalEventChainScheduler::complete_current_with_children(
             &mut state,
             vec![candidate(
@@ -630,6 +805,212 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn depth_limit_allows_exact_n_and_aborts_on_n_plus_one_without_rng() {
+        let mut state = fixture_state();
+        CanonicalEventChainScheduler::begin(&mut state, "chain-1".to_owned(), 2, 10).unwrap();
+        CanonicalEventChainScheduler::enqueue_roots(
+            &mut state,
+            vec![candidate(
+                SchedulerItemKind::Trigger,
+                10,
+                1,
+                "actor-a",
+                "depth-1",
+            )],
+        )
+        .unwrap();
+        CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        ready(&mut state);
+        CanonicalEventChainScheduler::complete_current_with_children(
+            &mut state,
+            vec![candidate(
+                SchedulerItemKind::Trigger,
+                10,
+                1,
+                "actor-a",
+                "depth-2",
+            )],
+        )
+        .unwrap();
+        CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        ready(&mut state);
+        CanonicalEventChainScheduler::complete_current_with_children(
+            &mut state,
+            vec![candidate(
+                SchedulerItemKind::Trigger,
+                10,
+                1,
+                "actor-a",
+                "depth-3",
+            )],
+        )
+        .unwrap();
+        let overflow = CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        let rng_before = state.rng.clone();
+        let outcome =
+            CanonicalEventChainScheduler::gate_current_for_execution(&mut state, true).unwrap();
+        let SchedulerExecutionGateOutcome::EngineFailure { failure } = outcome else {
+            panic!("expected engine failure")
+        };
+        assert_eq!(overflow.depth, 3);
+        assert_eq!(failure.overflow_item, overflow);
+        assert_eq!(failure.reason, LoopGuardFailureReason::MaxTriggerDepth);
+        assert_eq!(failure.result, CombatResultType::Aborted);
+        assert_eq!(
+            failure.rollback_policy,
+            LoopGuardRollbackPolicy::RestorePrecombatSnapshot
+        );
+        assert_eq!(state.scheduler.as_ref().unwrap().executed_event_count, 2);
+        assert_eq!(state.confirmed_result, Some(CombatResultType::Aborted));
+        assert_eq!(state.rng, rng_before);
+    }
+
+    #[test]
+    fn event_count_limit_counts_only_first_n_eligible_executions() {
+        let mut state = fixture_state();
+        CanonicalEventChainScheduler::begin(&mut state, "chain-1".to_owned(), 10, 2).unwrap();
+        CanonicalEventChainScheduler::enqueue_roots(
+            &mut state,
+            vec![
+                candidate(SchedulerItemKind::Trigger, 10, 1, "actor-a", "event-a"),
+                candidate(SchedulerItemKind::Trigger, 10, 1, "actor-a", "event-b"),
+                candidate(SchedulerItemKind::Trigger, 10, 1, "actor-a", "event-c"),
+            ],
+        )
+        .unwrap();
+        for _ in 0..2 {
+            CanonicalEventChainScheduler::dequeue_next(&mut state)
+                .unwrap()
+                .unwrap();
+            let outcome = ready(&mut state);
+            assert!(matches!(
+                outcome,
+                SchedulerExecutionGateOutcome::ReadyToExecute { resumed: false, .. }
+            ));
+            CanonicalEventChainScheduler::complete_current(&mut state).unwrap();
+        }
+        let third = CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        let rng_before = state.rng.clone();
+        let outcome = ready(&mut state);
+        let SchedulerExecutionGateOutcome::EngineFailure { failure } = outcome else {
+            panic!("expected engine failure")
+        };
+        assert_eq!(failure.reason, LoopGuardFailureReason::MaxEventCount);
+        assert_eq!(failure.overflow_item, third);
+        assert_eq!(state.scheduler.as_ref().unwrap().executed_event_count, 2);
+        assert_eq!(state.rng, rng_before);
+    }
+
+    #[test]
+    fn legality_skip_does_not_count_and_resume_does_not_count_twice_or_change_depth() {
+        let mut state = fixture_state();
+        begin(&mut state);
+        CanonicalEventChainScheduler::enqueue_roots(
+            &mut state,
+            vec![
+                candidate(SchedulerItemKind::Reaction, 10, 1, "actor-a", "ask-a"),
+                candidate(SchedulerItemKind::Reaction, 10, 1, "actor-a", "ask-b"),
+            ],
+        )
+        .unwrap();
+        let skipped = CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        let outcome =
+            CanonicalEventChainScheduler::gate_current_for_execution(&mut state, false).unwrap();
+        assert_eq!(
+            outcome,
+            SchedulerExecutionGateOutcome::Skipped { item: skipped }
+        );
+        assert_eq!(state.scheduler.as_ref().unwrap().executed_event_count, 0);
+
+        let current = CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        let first_gate = ready(&mut state);
+        assert!(matches!(
+            first_gate,
+            SchedulerExecutionGateOutcome::ReadyToExecute { resumed: false, .. }
+        ));
+        assert_eq!(state.scheduler.as_ref().unwrap().executed_event_count, 1);
+        let restored = state.snapshot().unwrap().verify_and_restore().unwrap();
+        state = restored;
+        let before_resume = state.clone();
+        let resumed = ready(&mut state);
+        assert_eq!(
+            resumed,
+            SchedulerExecutionGateOutcome::ReadyToExecute {
+                item: SchedulerItem {
+                    execution_counted: true,
+                    ..current
+                },
+                resumed: true,
+            }
+        );
+        assert_eq!(state, before_resume);
+        assert_eq!(state.scheduler.as_ref().unwrap().executed_event_count, 1);
+        assert_eq!(
+            state
+                .scheduler
+                .as_ref()
+                .unwrap()
+                .current_item
+                .as_ref()
+                .unwrap()
+                .depth,
+            1
+        );
+    }
+
+    #[test]
+    fn engine_failure_checkpoint_is_terminal_and_tampering_is_rejected() {
+        let mut state = fixture_state();
+        CanonicalEventChainScheduler::begin(&mut state, "chain-1".to_owned(), 0, 10).unwrap();
+        CanonicalEventChainScheduler::enqueue_roots(
+            &mut state,
+            vec![candidate(
+                SchedulerItemKind::Trigger,
+                10,
+                1,
+                "actor-a",
+                "overflow",
+            )],
+        )
+        .unwrap();
+        CanonicalEventChainScheduler::dequeue_next(&mut state)
+            .unwrap()
+            .unwrap();
+        ready(&mut state);
+        let restored = state.snapshot().unwrap().verify_and_restore().unwrap();
+        assert_eq!(restored, state);
+        assert_eq!(
+            CanonicalEventChainScheduler::dequeue_next(&mut state)
+                .unwrap_err()
+                .code,
+            EventSchedulerErrorCode::InvalidCheckpoint
+        );
+
+        state.scheduler.as_mut().unwrap().max_trigger_depth = 1;
+        assert!(matches!(
+            state.snapshot().unwrap().verify_and_restore(),
+            Err(crate::CombatStateRestoreError::Invariant(
+                crate::CombatStateInvariantError {
+                    code: crate::CombatStateInvariantCode::EventSchedulerInvalid,
+                    ..
+                }
+            ))
+        ));
+    }
+
     fn drain_with_input(candidates: Vec<SchedulerCandidate>) -> Vec<SchedulerItem> {
         let mut state = fixture_state();
         begin(&mut state);
@@ -641,6 +1022,7 @@ mod tests {
         let mut items = Vec::new();
         while let Some(item) = CanonicalEventChainScheduler::dequeue_next(state).unwrap() {
             items.push(item);
+            ready(state);
             CanonicalEventChainScheduler::complete_current(state).unwrap();
         }
         assert!(CanonicalEventChainScheduler::is_quiescent(state));
@@ -649,6 +1031,10 @@ mod tests {
 
     fn begin(state: &mut CombatState) {
         CanonicalEventChainScheduler::begin(state, "chain-1".to_owned(), 32, 256).unwrap();
+    }
+
+    fn ready(state: &mut CombatState) -> SchedulerExecutionGateOutcome {
+        CanonicalEventChainScheduler::gate_current_for_execution(state, true).unwrap()
     }
 
     fn candidate(

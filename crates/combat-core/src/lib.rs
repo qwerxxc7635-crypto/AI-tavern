@@ -59,12 +59,13 @@ pub use rng::{
 };
 pub use scheduler::{
     CanonicalEventChainScheduler, EventSchedulerError, EventSchedulerErrorCode,
-    NON_COMBATANT_INITIATIVE_ORDER, SchedulerCandidate,
+    NON_COMBATANT_INITIATIVE_ORDER, SchedulerCandidate, SchedulerExecutionGateOutcome,
 };
 pub use state::{
     AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,
     CombatStateHashError, CombatStateRestoreError, CombatantRuntime, CombatantState,
-    CostCommitState, DurationClock, EventSchedulerCheckpoint, HookPhase, ObjectiveKind,
+    CostCommitState, DurationClock, EventSchedulerCheckpoint, EventSchedulerStatus, HookPhase,
+    LoopGuardEngineFailure, LoopGuardFailureReason, LoopGuardRollbackPolicy, ObjectiveKind,
     ObjectiveRuntime, ObjectiveRuntimeState, PendingReactionWindow, ProvisionalDeltaEntry,
     ProvisionalRuntimeDelta, ReinforcementRuntime, ReinforcementRuntimeState, ResourceState,
     ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, SchedulerItem,

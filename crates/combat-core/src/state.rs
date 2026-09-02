@@ -278,10 +278,41 @@ pub struct SchedulerItem {
     pub execution_counted: bool,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EventSchedulerStatus {
+    Active,
+    EngineFailure,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LoopGuardFailureReason {
+    MaxTriggerDepth,
+    MaxEventCount,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum LoopGuardRollbackPolicy {
+    RestorePrecombatSnapshot,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct LoopGuardEngineFailure {
+    pub reason: LoopGuardFailureReason,
+    pub overflow_item: SchedulerItem,
+    pub result: CombatResultType,
+    pub rollback_policy: LoopGuardRollbackPolicy,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct EventSchedulerCheckpoint {
     pub event_chain_id: String,
+    pub status: EventSchedulerStatus,
+    pub engine_failure: Option<LoopGuardEngineFailure>,
     pub executed_event_count: u64,
     pub queue: Vec<SchedulerItem>,
     pub current_item: Option<SchedulerItem>,
@@ -646,6 +677,8 @@ mod tests {
             },
             scheduler: Some(EventSchedulerCheckpoint {
                 event_chain_id: "chain-7".to_owned(),
+                status: EventSchedulerStatus::Active,
+                engine_failure: None,
                 executed_event_count: 1,
                 queue: vec![SchedulerItem {
                     kind: SchedulerItemKind::Reaction,
