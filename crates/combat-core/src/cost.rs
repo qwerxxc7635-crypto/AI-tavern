@@ -1148,6 +1148,8 @@ mod tests {
             scheduler: None,
             pending_reaction: None,
             result_candidates: vec![],
+            terminal_priority_policy: crate::TerminalPriorityPolicy::default(),
+            confirmed_result_candidate_id: None,
             confirmed_result: None,
             rng: CombatRng::new(
                 SEED,

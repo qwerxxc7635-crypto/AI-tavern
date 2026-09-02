@@ -421,6 +421,38 @@ pub struct ResultCandidate {
     pub sequence: u64,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum TerminalPriorityTier {
+    ScriptedOutcome,
+    ExplicitObjectivePriority,
+    Defeat,
+    Victory,
+    Escape,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct TerminalPriorityPolicy {
+    pub policy_id: String,
+    pub tiers: Vec<TerminalPriorityTier>,
+}
+
+impl Default for TerminalPriorityPolicy {
+    fn default() -> Self {
+        Self {
+            policy_id: "terminal-priority-default-v1".to_owned(),
+            tiers: vec![
+                TerminalPriorityTier::ScriptedOutcome,
+                TerminalPriorityTier::ExplicitObjectivePriority,
+                TerminalPriorityTier::Defeat,
+                TerminalPriorityTier::Victory,
+                TerminalPriorityTier::Escape,
+            ],
+        }
+    }
+}
+
 /// The single authoritative in-memory Runtime State. Collections use explicit
 /// ordered vectors; rule code may not add map/object iteration to hashing.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -444,6 +476,8 @@ pub struct CombatState {
     pub scheduler: Option<EventSchedulerCheckpoint>,
     pub pending_reaction: Option<PendingReactionWindow>,
     pub result_candidates: Vec<ResultCandidate>,
+    pub terminal_priority_policy: TerminalPriorityPolicy,
+    pub confirmed_result_candidate_id: Option<String>,
     pub confirmed_result: Option<CombatResultType>,
     pub rng: CombatRngSnapshot,
 }
@@ -762,6 +796,8 @@ mod tests {
                 explicit_priority: None,
                 sequence: 6,
             }],
+            terminal_priority_policy: TerminalPriorityPolicy::default(),
+            confirmed_result_candidate_id: None,
             confirmed_result: None,
             rng: CombatRng::new(
                 SEED,

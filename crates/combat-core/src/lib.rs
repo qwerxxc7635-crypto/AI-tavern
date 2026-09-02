@@ -15,6 +15,7 @@ mod rng;
 mod scheduler;
 mod state;
 mod submission;
+mod terminal;
 mod turn;
 mod version;
 
@@ -76,12 +77,16 @@ pub use state::{
     ObjectiveFailureRecord, ObjectiveKind, ObjectiveRuntime, ObjectiveRuntimeState,
     PendingReactionWindow, ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReinforcementRuntime,
     ReinforcementRuntimeState, ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus,
-    RoundRuntimeState, SchedulerItem, SchedulerItemKind, StatusRuntime, TimelineEntry,
-    UsageCounterScope, UsageCounterState,
+    RoundRuntimeState, SchedulerItem, SchedulerItemKind, StatusRuntime, TerminalPriorityPolicy,
+    TerminalPriorityTier, TimelineEntry, UsageCounterScope, UsageCounterState,
 };
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,
     CombatSubmissionError, CombatSubmissionRequest, CombatSubmissionService,
+};
+pub use terminal::{
+    TerminalArbitrationError, TerminalArbitrationErrorCode, TerminalArbitrationOutcome,
+    TerminalOutcomeArbitrator,
 };
 pub use turn::{
     NextTurnOutcome, OwnerTurnStartOutcome, TurnRoundStateMachine, TurnStateError,

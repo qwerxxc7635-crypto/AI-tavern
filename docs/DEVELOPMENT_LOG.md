@@ -5458,3 +5458,18 @@
 - `cargo test -p ember-combat-core`：92/92 PASS，其中新增 8 项覆盖定义排序/形状、reinforcement 冻结 Eliminate、Downed/Removed policy、Survive exact RoundEnd、Protect committed Removed/不可逆、optional/required 与 signals、quiescent/replay determinism、无候选时 sequence 上限 no-op。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 248 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T08 结束状态为 PASS；下一项严格为 M2-T09 Terminal Outcome Arbitration。
+
+## 2026-09-02 — M2-T09 完成 Terminal Outcome Arbitration
+
+### 稳定点唯一 winner 与 policy 持久化
+
+- 从 M2-T08 提交 `3674674` 创建 `task/M2-T09-terminal-outcome-arbitration`。新增 pure Core `TerminalOutcomeArbitrator`，只有 Scheduler queue/current 清空、无 active ResolutionContext、无 PendingReaction 的 committed quiescent state 才能确认；链中途拒绝且 State/RNG 不变，无 candidate 时 byte-for-byte no-op。
+- 默认 typed policy 固定 `ScriptedOutcome → ExplicitObjectivePriority → Defeat → Victory → Escape`；完整五 tier 的开发者 Encounter override 与 stable policy ID 进入 CombatState/hash，Replay 不依赖外部默认。explicit priority 只允许可信 `OBJECTIVE` candidate 使用，同 tier 以 priority DESC、candidate stable ID ASC 唯一决胜。
+- Candidate validator 拒绝空/非法 stable IDs、0/乱序 sequence、duplicate ID、非 Objective 伪造 explicit priority 与 gameplay Aborted candidate。确认原子写入 winner candidate ID、typed result 与 revision，并经统一 State invariant 后提交，不消费 RNG。
+- 重复确认返回同一 winner 且不重复推进 revision。恢复时重新按已存 policy 验证 confirmed candidate 必须仍是 winner，并要求普通 result 保持 quiescent；Loop Guard `Aborted` 仅在真实 Engine Failure checkpoint 下合法，不参加普通 policy 竞争。新增 `DEC-180`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：98/98 PASS，其中新增 6 项覆盖 simultaneous Victory/Defeat/Escape、Scripted/explicit priority、developer override replay、stable ID tie、active chain/no-candidate、exactly-once 与 tampered state。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 254 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T09 结束状态为 PASS；下一项严格为 M2-T10 Runtime Commit / Rollback Contract。

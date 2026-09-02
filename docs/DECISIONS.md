@@ -3925,3 +3925,28 @@ Protect 对 Downed 使用显式 `failOnDowned`，对 Defeated 必然失败，对
 - Objective 定义、signal 与 failure record 纳入统一 State invariant；未知 target、重复/乱序 ID、非法形状、冲突 signal 或 Removed 后复活即使重算 State hash 也 fail closed。
 - `completedRoundCount`、reinforcement 初始 snapshot 与 committed combatant state 是语义输入；UI 是否显示、Timeline 是否包含目标不是 Objective 事实来源。
 - 本任务只生成 terminal candidates，不确认 result、不关闭 CombatScreen；quiescent arbitration 属于 M2-T09。
+
+## DEC-180：Terminal policy 是 CombatState 输入且 normal result 只确认一次
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §10 Terminal Outcome Arbitration，M2-T09
+
+### 背景
+
+同一 EventChain 可能同时产生 Victory、Defeat、Escape、Scripted 与带 objective-specific priority 的候选。如果任一 Effect、Objective 或 UI 在链中途直接写最终结果，反伤、状态 Tick 与后续 Trigger 会因平台时序产生不同胜负。若 Encounter override 没有进入权威 State，Save/Replay 又可能用不同 policy 重算赢家。
+
+### 决定
+
+Pure Core 新增唯一 `TerminalOutcomeArbitrator`。它只接受 Scheduler queue/current 为空、无 active ResolutionContext、无 PendingReaction 的 committed quiescent state；无候选时严格 no-op。默认 typed policy 固定为 `ScriptedOutcome → ExplicitObjectivePriority → Defeat → Victory → Escape`。Encounter 的开发者 override 只能保存为包含五个唯一 tier 的完整 `TerminalPriorityPolicy`，policy ID 与顺序纳入 CombatState/hash；运行期生成内容没有改写入口。
+
+每个候选必须有 stable candidate/source IDs、严格递增且非零 sequence，并禁止普通 gameplay candidate 使用 Aborted。只有 `OBJECTIVE` 来源可以携带 explicit priority；同 tier 先比较显式数值 DESC，再以 candidate stable ID ASC 确定唯一 winner，避免输入或容器顺序成为规则。确认在一个 working clone 内同时写入 `confirmedResultCandidateId`、typed `confirmedResult` 与 revision，通过全局 invariant 后原子替换；重复调用返回同一 candidate 且不再写入。
+
+普通 confirmed result 恢复时必须仍指向按持久化 policy 重算出的同一 winner，并保持 quiescent。`Aborted` 不进入候选竞争，只有 Scheduler 的完整 Engine Failure checkpoint 可以支撑 `confirmedResult=Aborted`；伪造 Aborted 或在正常 winner 后追加更高候选都会 fail closed。
+
+### 影响与边界
+
+- 同 committed state、候选与 policy 得到唯一 candidate/result；simultaneous Victory/Defeat/Escape 默认稳定为 Defeat，Scripted 与 explicit objective priority 依次覆盖。
+- Arbitration 不消费 RNG、不关闭 UI，也不提交/回滚 domain delta；调用方只有在返回 confirmed 后停止后续 phase，M2-T10 再消费该确认态。
+- ScriptedVictory/ScriptedDefeat 的 persistence policy 仍必须由后续 runtime commit contract 显式提供，本任务只决定 result identity。
+- Loop Guard `Aborted` 继续由安全失败路径直接确认，不得被 Encounter policy 降级或覆盖。

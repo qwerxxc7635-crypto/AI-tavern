@@ -3,7 +3,7 @@ use std::{error::Error, fmt};
 use crate::{
     CanonicalEventChainScheduler, CombatObjectiveRuntime, CombatState, CombatantRuntime,
     CombatantState, CostReservationModel, ResolutionContextLifecycle, ResourceState,
-    TurnRoundStateMachine,
+    TerminalOutcomeArbitrator, TurnRoundStateMachine,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -24,6 +24,7 @@ pub enum CombatStateInvariantCode {
     EventSchedulerInvalid,
     TurnRoundStateInvalid,
     ObjectiveRuntimeInvalid,
+    TerminalOutcomeInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -86,6 +87,13 @@ impl CombatStateInvariantValidator {
         CombatObjectiveRuntime::validate_state(state).map_err(|error| {
             CombatStateInvariantError {
                 code: CombatStateInvariantCode::ObjectiveRuntimeInvalid,
+                combatant_id: error.subject_id,
+                resource_id: None,
+            }
+        })?;
+        TerminalOutcomeArbitrator::validate_state(state).map_err(|error| {
+            CombatStateInvariantError {
+                code: CombatStateInvariantCode::TerminalOutcomeInvalid,
                 combatant_id: error.subject_id,
                 resource_id: None,
             }
@@ -520,6 +528,8 @@ mod tests {
             scheduler: None,
             pending_reaction: None,
             result_candidates: Vec::new(),
+            terminal_priority_policy: crate::TerminalPriorityPolicy::default(),
+            confirmed_result_candidate_id: None,
             confirmed_result: None,
             rng: CombatRng::new(
                 SEED,
