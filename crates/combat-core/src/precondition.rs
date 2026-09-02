@@ -81,13 +81,6 @@ pub struct EntityTagFacts {
     pub tag_ids: Vec<String>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ItemQuantityFact {
-    pub owner_id: String,
-    pub item_id: String,
-    pub available_quantity: i64,
-}
-
 /// Read-only inputs for the one precondition evaluator. Combat numbers are read
 /// directly from the authoritative state. Catalog/tag/target/inventory owners
 /// provide typed projections; the evaluator never mutates or persists them.
@@ -102,7 +95,6 @@ pub struct PreconditionEvaluationContext<'a> {
     pub disabled_ability_ids: &'a [String],
     pub legal_target_ids: &'a [String],
     pub entity_tags: &'a [EntityTagFacts],
-    pub item_quantities: &'a [ItemQuantityFact],
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -263,12 +255,12 @@ fn evaluate_rule(
             ),
         },
         PreconditionRule::ItemQuantityAtLeast { item_id, amount } => {
-            match context.item_quantities.iter().find(|value| {
+            match context.state.combat_inventory.iter().find(|value| {
                 value.owner_id == context.command.actor_id && value.item_id == *item_id
             }) {
                 None => Some((PreconditionFailureCode::ItemMissing, Some(item_id.clone()))),
                 Some(value) => failure_if(
-                    value.available_quantity < *amount,
+                    value.current_quantity < *amount,
                     PreconditionFailureCode::InsufficientItemQuantity,
                     Some(item_id.clone()),
                 ),
@@ -535,12 +527,7 @@ mod tests {
             entity_id: "actor-1".to_owned(),
             tag_ids: vec!["weapon-ready".to_owned()],
         }];
-        let items = vec![ItemQuantityFact {
-            owner_id: "actor-1".to_owned(),
-            item_id: "item-arrow".to_owned(),
-            available_quantity: 2,
-        }];
-        let context = context(&state, &command, &known, &legal, &tags, &items);
+        let context = context(&state, &command, &known, &legal, &tags);
         let rules = rules();
 
         let submission =
@@ -573,13 +560,12 @@ mod tests {
             entity_id: "actor-1".to_owned(),
             tag_ids: vec!["weapon-ready".to_owned()],
         }];
-        let items = vec![];
         state.combatants[0].state = CombatantState::Downed;
         state.combatants[0].ability_usage[0].cooldown_remaining = 1;
         let disabled = vec!["ability-strike".to_owned()];
         let context = PreconditionEvaluationContext {
             disabled_ability_ids: &disabled,
-            ..context(&state, &command, &known, &legal, &tags, &items)
+            ..context(&state, &command, &known, &legal, &tags)
         };
 
         let evaluation = PreconditionRuleSystem::evaluate(
@@ -605,8 +591,7 @@ mod tests {
         let known = vec!["ability-strike".to_owned()];
         let legal = vec!["enemy-2".to_owned()];
         let tags = vec![];
-        let items = vec![];
-        let mut context = context(&state, &command, &known, &legal, &tags, &items);
+        let mut context = context(&state, &command, &known, &legal, &tags);
         context.effective_target_id = Some("enemy-2");
         let target_rules = vec![
             PreconditionRuleSpec::with_default_timing(
@@ -635,6 +620,7 @@ mod tests {
         let command = fixture_command();
         state.combatants[0].action_points = 0;
         state.combatants[0].resources[1].current = 9;
+        state.combat_inventory[0].current_quantity = 0;
         state.combatants[0].ability_usage[0].uses_this_normal_owner_turn = 1;
         state.combatants[0].ability_usage[0].uses_this_battle = 3;
         let known = vec!["ability-strike".to_owned()];
@@ -643,12 +629,7 @@ mod tests {
             entity_id: "actor-1".to_owned(),
             tag_ids: vec!["silenced".to_owned()],
         }];
-        let items = vec![ItemQuantityFact {
-            owner_id: "actor-1".to_owned(),
-            item_id: "item-arrow".to_owned(),
-            available_quantity: 0,
-        }];
-        let context = context(&state, &command, &known, &legal, &tags, &items);
+        let context = context(&state, &command, &known, &legal, &tags);
         let evaluation =
             PreconditionRuleSystem::evaluate(PreconditionTiming::Submission, &rules(), &context)
                 .unwrap();
@@ -678,8 +659,7 @@ mod tests {
         command.actor_id = "missing-actor".to_owned();
         let empty: Vec<String> = vec![];
         let tags = vec![];
-        let items = vec![];
-        let context = context(&state, &command, &empty, &empty, &tags, &items);
+        let context = context(&state, &command, &empty, &empty, &tags);
         let evaluation = PreconditionRuleSystem::evaluate(
             PreconditionTiming::Submission,
             &[
@@ -715,8 +695,7 @@ mod tests {
         let command = fixture_command();
         let empty: Vec<String> = vec![];
         let tags = vec![];
-        let items = vec![];
-        let context = context(&state, &command, &empty, &empty, &tags, &items);
+        let context = context(&state, &command, &empty, &empty, &tags);
         for rules in [
             vec![PreconditionRuleSpec::with_default_timing(
                 "bad id",
@@ -744,8 +723,7 @@ mod tests {
         let command = fixture_command();
         let empty: Vec<String> = vec![];
         let tags = vec![];
-        let items = vec![];
-        let context = context(&state, &command, &empty, &empty, &tags, &items);
+        let context = context(&state, &command, &empty, &empty, &tags);
         let rules = vec![
             PreconditionRuleSpec::with_default_timing("first", PreconditionRule::AbilityExists),
             PreconditionRuleSpec::with_default_timing("second", PreconditionRule::TargetLegal),
@@ -829,7 +807,6 @@ mod tests {
         known: &'a [String],
         legal: &'a [String],
         tags: &'a [EntityTagFacts],
-        items: &'a [ItemQuantityFact],
     ) -> PreconditionEvaluationContext<'a> {
         PreconditionEvaluationContext {
             state,
@@ -841,7 +818,6 @@ mod tests {
             disabled_ability_ids: &[],
             legal_target_ids: legal,
             entity_tags: tags,
-            item_quantities: items,
         }
     }
 
@@ -880,6 +856,12 @@ mod tests {
                 combatant("enemy-1", CombatSide::Hostile),
                 combatant("enemy-2", CombatSide::Hostile),
             ],
+            combat_inventory: vec![crate::CombatInventoryItemState {
+                owner_id: "actor-1".to_owned(),
+                item_id: "item-arrow".to_owned(),
+                current_quantity: 2,
+            }],
+            cost_reservations: vec![],
             timeline: vec![],
             round: RoundRuntimeState {
                 round_number: 1,

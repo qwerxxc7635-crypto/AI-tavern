@@ -5,6 +5,7 @@
 
 mod attribute;
 mod command;
+mod cost;
 mod invariant;
 mod precondition;
 mod rng;
@@ -24,11 +25,17 @@ pub use command::{
     CombatCommandPayload, CombatCommandSource, CommandAcceptanceStatus, InternalCombatCommand,
     ReactionDecisionChoice, TacticalPreferenceValue,
 };
+pub use cost::{
+    CombatCostAsset, CombatCostRequestLine, CombatInventoryItemState, CostReservationError,
+    CostReservationErrorCode, CostReservationModel, CostReservationMutationStatus,
+    CostReservationReceipt, CostReservationRecord, CostReservationRequest, CostReservationStatus,
+    ReservedCombatCost,
+};
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
 };
 pub use precondition::{
-    EntityTagFacts, ItemQuantityFact, PreconditionDefinitionError, PreconditionDefinitionErrorCode,
+    EntityTagFacts, PreconditionDefinitionError, PreconditionDefinitionErrorCode,
     PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
     PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
     PreconditionTiming,

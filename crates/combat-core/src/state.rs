@@ -4,7 +4,8 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 use crate::{
-    CombatRngSnapshot, CombatStateInvariantError, CombatStateInvariantValidator, CombatVersionSet,
+    CombatInventoryItemState, CombatRngSnapshot, CombatStateInvariantError,
+    CombatStateInvariantValidator, CombatVersionSet, CostReservationRecord,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -347,6 +348,8 @@ pub struct CombatState {
     pub last_committed_sequence: u64,
     pub phase: CombatPhase,
     pub combatants: Vec<CombatantRuntime>,
+    pub combat_inventory: Vec<CombatInventoryItemState>,
+    pub cost_reservations: Vec<CostReservationRecord>,
     pub timeline: Vec<TimelineEntry>,
     pub round: RoundRuntimeState,
     pub objectives: ObjectiveRuntimeState,
@@ -542,6 +545,8 @@ mod tests {
             last_committed_sequence: 7,
             phase: CombatPhase::Action,
             combatants: vec![player.clone(), enemy.clone()],
+            combat_inventory: vec![],
+            cost_reservations: vec![],
             timeline: vec![
                 TimelineEntry {
                     combatant_id: player.combatant_id.clone(),

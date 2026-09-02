@@ -5327,3 +5327,20 @@
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
 - 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 199 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - M1-T01 Version、T02 RNG、T03 State、T04 Invariant、T05 Attribute Adapter、T06 Command Boundary、T07 Precondition 均有独立实现与测试，M1 Gate PASS。用户 `.gitignore` 继续隔离；无 SPEC BLOCKER。下一项严格为 M2-T01 Cost Reservation Model。
+
+## 2026-09-02 — M2-T01 完成 Cost Reservation Model
+
+### 权威 Reservation ledger
+
+- 从 M1 Gate 提交 `2b650b6` 创建 `task/M2-T01-cost-reservation-model`。`CombatState` 新增 canonical Combat inventory 与 ordered cost reservation ledger；AP、Resource、Item、ReactionCharge 使用封闭 typed asset，不新增通用经济 DSL。
+- Reservation 绑定 reservationId/commandId、safe sequence、可选 parentReservationId 与逐 line amount/interrupt policy/state。Reserve 只计算当前余额减去全部 active reservations，不先扣费；同 identity/content 重试返回原 record，identity collision 或重复 asset fail closed。
+- Parent/child 使用同一 availability，嵌套 Reaction 无法重复占用 Reaction Charge；active child 阻止 parent transition。Commit 在 working clone 中原子扣除全部 line；Cancel 默认 Release，只有 `consumeCostOnInterrupt=true` line 提交，且不会增加 cooldown/usage。
+- Item commit 只修改 Combat Runtime inventory 并追加 ItemQuantity provisional delta，不提交 canonical world inventory。Reservation/Commit/Cancel 均推进 state revision，但幂等重试不推进；RNG snapshot 不变。
+- Ledger 随 CombatState canonical JSON/hash 保存。统一 invariant restore 检查 sequence 连续性、reservation/command uniqueness、parent 顺序、record/line status coherence、definition、asset existence、inventory 非负/唯一与 active reserved coverage；篡改后即使重算 state hash 也 fail closed。Precondition 的 Item check 改为直接读取权威 Combat inventory，移除临时 item facts 副本。新增 `DEC-172`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：49/49 PASS，其中新增 6 项覆盖四类成本 reserve/commit、并发重复占用、nested Reaction、active child transition、interrupt 部分消费、Item provisional delta、atomic failure、malformed request、save/restore、tampered ledger 与 reserve/commit/cancel 幂等。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
+- 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 205 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T01 结束状态为 PASS；下一项严格为 M2-T02 Submission Validation。

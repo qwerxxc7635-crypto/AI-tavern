@@ -1,6 +1,6 @@
 use std::{error::Error, fmt};
 
-use crate::{CombatState, CombatantRuntime, CombatantState, ResourceState};
+use crate::{CombatState, CombatantRuntime, CombatantState, CostReservationModel, ResourceState};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CombatStateInvariantCode {
@@ -13,6 +13,7 @@ pub enum CombatStateInvariantCode {
     PressureResourceContractIncomplete,
     PressureResourceBoundsInvalid,
     CombatantStateHitPointsMismatch,
+    CostReservationLedgerInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +47,11 @@ impl CombatStateInvariantValidator {
         for reinforcement in &state.reinforcements.reinforcements {
             validate_combatant(&reinforcement.initial_runtime_snapshot)?;
         }
+        CostReservationModel::validate_state(state).map_err(|error| CombatStateInvariantError {
+            code: CombatStateInvariantCode::CostReservationLedgerInvalid,
+            combatant_id: error.subject_id,
+            resource_id: None,
+        })?;
         Ok(())
     }
 }
@@ -426,6 +432,8 @@ mod tests {
                 last_committed_timeline_order: Some(0),
                 solo_recovery_available: true,
             }],
+            combat_inventory: Vec::new(),
+            cost_reservations: Vec::new(),
             timeline: Vec::new(),
             round: RoundRuntimeState {
                 round_number: 1,

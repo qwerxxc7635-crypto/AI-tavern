@@ -3717,7 +3717,7 @@ Command 在提交时需要检查 authority、输入稳定点、actor/ability/tar
 
 Core 只提供一个 `PreconditionRuleSystem::evaluate`。调用方传入同一有序 `PreconditionRuleSpec` 集合，并选择 Submission 或 ExecutionRevalidation 时点；Submission 评估全部规则，Execution 只评估 `revalidateBeforeResolution=true` 的规则。`with_default_timing` 固定 V5.2 默认：source authority、stable input point 与 AP/resource/item 原始余额只在 Submission 检查；actor/ability/target、cooldown、usage、tags、legal targets 与 stateful hard limit 默认动态复查。规则仍可使用显式 metadata 表达已冻结的例外，不增加第二个 evaluator。
 
-数值状态直接从权威 `CombatState` 只读获取；Ability catalog、disabled abilities、Tags、`GetLegalTargets()` 与 inventory owner 通过 typed facts 投影输入。Redirect 后使用显式 effective target，而不篡改原 Command identity。结果按声明顺序返回 stable ruleId、failure code 与可选 subjectId，不返回 UI 文案。非法/重复 ruleId、负成本或非法 typed ID 在评估前 fail closed。
+数值状态直接从权威 `CombatState` 只读获取；Ability catalog、disabled abilities、Tags 与 `GetLegalTargets()` owner 通过 typed facts 投影输入，inventory 在 M2-T01 纳入同一 Runtime State 后也直接从 State 读取。Redirect 后使用显式 effective target，而不篡改原 Command identity。结果按声明顺序返回 stable ruleId、failure code 与可选 subjectId，不返回 UI 文案。非法/重复 ruleId、负成本或非法 typed ID 在评估前 fail closed。
 
 ### 影响与边界
 
@@ -3725,3 +3725,28 @@ Core 只提供一个 `PreconditionRuleSystem::evaluate`。调用方传入同一�
 - Resistance、Armor、Save bonus 与普通 Damage immunity 不在默认 precondition set 中；只有 Ability/Ruleset 明确把 Tag/Immunity 定义为 legality 时，才通过 typed Tag/LegalTargets rule 参与。
 - UI 与 Utility AI 只能消费同一规则层结果，不能复制敌我、状态、资源或目标合法性判断。
 - Rule order 是 deterministic output order；系统不用 map iteration、system time、Provider 或 LLM。
+
+## DEC-172：Cost Reservation 是 CombatState 内按 command 绑定的 line-item ledger
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §11.0.3–11.0.4，M2-T01
+
+### 背景
+
+AP、世界资源、Item 与 Reaction Charge 可能同时构成一个 Command 的成本；PreAction 与嵌套 Reaction 期间不能立即扣除，也不能让其他 Command 重复占用。只保存一个聚合 costState 无法表达中断时部分成本 `consumeCostOnInterrupt=true`、Item provisional consumption、父子 Reservation 或恢复后的幂等 transition。
+
+### 决定
+
+`CombatState` 新增 canonical Combat inventory snapshot 与有序 `costReservations` ledger。每个 Reservation 绑定唯一 reservationId、commandId、可选 parentReservationId、safe sequence，以及一个或多个 typed cost line；asset 仅为 ActionPoints、Resource、Item、ReactionCharge。每条 line 独立保存 amount、interrupt policy 与 Reserved/Committed/Released 状态，record 保存 Reserved/Committed/Released/Interrupted 汇总状态。
+
+Reserve 只检查 State 当前可用量减去所有 active reservations，不扣余额；同 command/reservation 与相同内容重复调用返回原 record，不推进 sequence/revision。Commit 在 working clone 中一次性扣除所有 line 后才替换权威 State；Pre-Resolution Cancel 释放普通 line，只提交显式 interrupt cost。父子 Reservation 使用同一 availability 计算，active child 阻止 parent transition。所有 transition 都是幂等且不消费 RNG。
+
+Item 在 Combat Runtime inventory 中扣除，并追加 `ProvisionalDeltaEntry::ItemQuantity`；这不是 Canonical World inventory commit。Ledger 与 inventory 都进入 CombatState canonical JSON/hash，restore 通过统一 state invariant validation 检查 sequence、identity、parent order、line/status coherence、asset existence 与 active reserved coverage。
+
+### 影响与边界
+
+- M2-T01 不增加 cooldown/usage，不进入 Resolution，不发布 outcome event；M2-T04 拥有 Cost + Usage 原子 pre-resolution commit orchestration。
+- Miss、Save Success、Resolution 后 Immunity 不调用 release API，因此 committed cost 自然不退款。
+- Inventory 初始数量仍由后续 native/encounter adapter 从 SQLite canonical data 导入；Combat Core 不查询数据库。
+- M10 ActiveCombatSave 保存整个 state 后即可恢复 reserved/committed lines；重复 reserve/commit/cancel 不会再次扣除。
