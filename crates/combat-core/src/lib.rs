@@ -9,6 +9,7 @@ mod cost;
 mod damage_channel;
 mod execution;
 mod invariant;
+mod mitigation;
 mod numeric;
 mod objective;
 mod precondition;
@@ -52,6 +53,11 @@ pub use execution::{
 };
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
+};
+pub use mitigation::{
+    DamageDefenseProfile, DamageImmunity, DamageMitigationRequest, DamageMitigationResult,
+    MitigationBalanceConfig, MitigationError, MitigationErrorCode, MitigationPipeline,
+    PrimaryMitigation, ZeroDamageReason,
 };
 pub use numeric::{
     COMBAT_FIXED_SCALE, CombatFixed, CombatNumeric, CombatNumericError, CombatNumericErrorCode,

@@ -4050,3 +4050,28 @@ World-specific supported channels 与 `primaryMitigationByChannel` 仍由 M5 `Wo
 - Semantic tags 只表达分类，presentation key 只提供展示查找身份；二者都不携带规则执行、AI allowlist、本地化文案或 balance 数值。
 - 新 Channel 需要修改代码或版本化 rules data，并整体重建/验证目录；本任务没有 runtime dynamic handler registration。
 - `PrimaryMitigation` 仍是封闭 typed 语义，但只有后续 WorldCombatProfile 持有具体 Channel→mitigation 映射。
+
+## DEC-185：减伤流水线只消费 Profile 的唯一映射并在 Shield 前单次取整
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §4.5.1–4.5.9，M3-T02–T04
+
+### 背景
+
+命中、Armor、Channel Resistance、穿透、最终取整与 Shield 若由 Ability 各自拼接，容易产生 Armor+Resistance 双重完整减伤、穿透制造 Weakness、中途多次 round，以及绕过 Shield 直接写 HP。M5 的 WorldCombatProfile 尚未实现，但 M3 又需要验证 pipeline 的依赖方向而不能复制四世界映射。
+
+### 决定
+
+Pure Core 新增 `MitigationPipeline`。入口先消费 M3-T02 的 typed AttackRoll/AutoHit result；miss 在查询 Profile 前短路。命中后只通过 read-only `DamageDefenseProfile.primary_mitigation_for(channelId)` 取得 `ARMOR / RESISTANCE / NONE` 唯一分支，unsupported channel fail closed。该 trait 是 M5 resolved WorldCombatProfile 的接口边界；M3 测试只使用局部固定 TestProfile，不包含任何四世界映射。
+
+Armor 分支严格计算 percentage penetration→flat penetration→effective armor→`armor/(armor+K)`→MaxArmorDR cap，并忽略 Resistance 输入。Resistance 分支只对正抗性应用 penetration 且最低降到 0；已有负抗性不受 penetration 扩大，再 clamp 到 MaxWeakness/MaxResistance，并忽略 Armor。NONE 原样通过。三分支都保持 `CombatFixed` precise damage，到 Shield 前只调用一次 integer floor。
+
+默认 Shield 使用 `min(currentShield, roundedIncomingDamage)`，随后计算 HP spillover/overkill，并输出 resulting integer Shield/HP；当前只返回 pure working result，不写 CombatState、不发布 event。显式 `DamageImmunity` 在 mitigation 前归零，不能用 100% Resistance 伪装。零伤害输出 typed `MISSED / IMMUNE / UNABLE_TO_PENETRATE_DEFENSE / BLOCKED` 原因，供 M8 presentation 唯一映射为“未命中 / 免疫 / 无法破防 / 格挡”，Core 不持有本地化文案。
+
+### 影响与边界
+
+- Balance 的 ArmorK、MaxArmorDR、MaxResistance、MaxWeakness 全部显式注入且校验；Core 不写死建议值。
+- Pipeline output 保留 raw/post-mitigation/rounded/shield/hp/overkill/effective defense facts，供后续 DamageResolved 使用；M3-T07 前不做 atomic state commit。
+- Shield multiplier、Bypass/Disable、ShieldBroken 与 recharge interruption 仍由 M3-T08；普通 DamageBundle working-state 继承与 event timing 仍由 M3-T07。
+- SavingThrow 成功后的半伤/效果分支由 Ability/Effect 定义先解析为 damage input，不能把“save success”误当 Attack hit gate。

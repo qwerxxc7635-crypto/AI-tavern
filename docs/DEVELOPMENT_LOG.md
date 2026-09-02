@@ -5536,3 +5536,19 @@
 - `cargo test -p ember-combat-core`：120/120 PASS，其中新增 6 项覆盖 stable ID round-trip/拒绝、canonical order/lookup、跨输入顺序 exact JSON、duplicate/unknown mitigation 拒绝、metadata 顺序/唯一性，以及 15 个冻结基础 Channel。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 276 PASS、1 个 credential-only ignore；archive interop双向通过。
 - Scope/DoD、V5.2 与 M0-T05 ownership contract 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入任务提交；无 SPEC BLOCKER。M3-T03 结束状态为 PASS；下一项严格为 M3-T04 Mitigation Pipeline。
+
+## 2026-09-03 — M3-T04 完成 Mitigation Pipeline
+
+### 单一 Profile 映射、固定精度与默认 Shield spillover
+
+- 从 M3-T03 提交 `15ae999` 创建 `task/M3-T04-mitigation-pipeline`。新增 pure `MitigationPipeline`，只接受 M3-T02 已解析的 AttackRoll/AutoHit result；miss 在 Profile lookup 前返回零伤害并保持 Shield/HP 不变，其他 ResolutionType 拒绝进入此 Attack damage gate。
+- 新增 read-only `DamageDefenseProfile` 边界和 closed `PrimaryMitigation`。命中后必须由注入的当前 Profile 对 Channel 返回唯一 ARMOR/RESISTANCE/NONE；未知/unsupported Channel fail closed。测试 Profile 只包含当前用例映射，没有复制 Fantasy/Sci-Fi/Cultivation/Urban 表；M5 resolved WorldCombatProfile 将实现该接口。
+- Armor 严格执行 percent penetration→flat penetration→effective armor→递减 DR→cap，Resistance 严格执行 positive-only penetration→weakness/resistance clamp；每个 Component 只走一支，测试向未选分支填入极端值证明不存在双重减伤。Resistance penetration 最低到 0，不能制造 Weakness，也不扩大已有负抗性。
+- Damage 全程使用 M3-T01 `CombatFixed/CombatNumeric`，直到 post-mitigation 后 single floor。默认 Shield 再吸收整数 incoming，输出 shieldDamage/shieldResourceLoss/hpDamage/overkill 与 resulting Shield/HP，并保持总量恒等；不直接写 State 或发布 committed event。
+- `DamageImmunity` 是带 rule ID 的显式 tagged union，与 Resistance 分离。零伤害输出 typed Missed/Immune/UnableToPenetrateDefense/Blocked，M8 presentation 将分别映射为简体中文，避免 Core 成为 localization 第二事实源。新增 `DEC-185`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：128/128 PASS，其中新增 8 项覆盖 miss/profile short-circuit、Armor exact math/single floor/spillover、Resistance 单分支、penetration/weakness/caps、显式 immunity、typed 零伤害原因、NONE 默认 Shield 恒等式，以及 unsupported/invalid fail-closed。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 284 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、V5.2 §4.5 与 M3-T02/T03 dependencies 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入任务提交；无 SPEC BLOCKER。M3-T04 结束状态为 PASS；下一项严格为 M3-T05 Critical / BasicAttack / MAP。
