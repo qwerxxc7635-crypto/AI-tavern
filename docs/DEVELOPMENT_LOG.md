@@ -5344,3 +5344,20 @@
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
 - 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 205 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T01 结束状态为 PASS；下一项严格为 M2-T02 Submission Validation。
+
+## 2026-09-02 — M2-T02 完成 Submission Validation
+
+### 单一原子 submission 入口
+
+- 从 M2-T01 提交 `eca8968` 创建 `task/M2-T02-submission-validation`。新增 pure Core `CombatSubmissionService`，在 State 与 AcceptedCommandLedger working clones 上串联 Command Boundary、source authorization、共享 precondition、accepted history 与 Reservation，全部 PASS 后才一次性替换权威对象。
+- Typed control assignments 精确区分 Player controller、UtilityAI 与 Test authority。Service 强制注入 source/stable input/actor existence+active；UseAbility 强制 ability existence/enabled 和 selected target existence/legal，不能由调用方省略。Ability catalog rules 只追加 cooldown/usage/tag/Heat 等规则。
+- 每条 AP/Resource/Item/ReactionCharge cost 自动转成共享 precondition，并再次由 CostReservationModel 检查所有 active reservations；cost owner 必须等于 command actor。无成本 EndTurn 等 Command 仍走同一入口但不创建空 Reservation。
+- 成功 submission 只接受并 Reserve，不扣余额、不增加 cooldown/usage、不改变 phase、不进入 Resolution、不消费 RNG。任一 malformed boundary、unauthorized/unstable、missing actor/ability、illegal target、precondition 或 reservation conflict 均保持 State、ledger 与 RNG byte-for-byte 不变。
+- Retry 同时复用 accepted command 与 commandId reservation；sequence/revision 不重复推进。若 accepted history 与 Reservation existence 不一致，视为不可能由原子 service 产生的状态并 fail closed。共享 precondition 新增 ReactionChargesAtLeast，默认仅 Submission 检查。新增 `DEC-173`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：56/56 PASS，其中新增 7 项覆盖 valid reserve、authority/stable/actor/ability/target structured failure、自动成本规则、reservation conflict rollback、accepted+reservation retry、UtilityAI control、zero-cost command、malformed boundary 与 wrong cost owner；严格验证 fail 不留 Reservation、不推进 RNG。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。
+- 完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 212 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD 与用户 `.gitignore` 隔离在 closure commit 前复核；无 SPEC BLOCKER。M2-T02 结束状态为 PASS；下一项严格为 M2-T03 ResolutionContext Lifecycle。

@@ -10,6 +10,7 @@ mod invariant;
 mod precondition;
 mod rng;
 mod state;
+mod submission;
 mod version;
 
 pub use attribute::{
@@ -52,6 +53,10 @@ pub use state::{
     ProvisionalRuntimeDelta, ReinforcementRuntime, ReinforcementRuntimeState, ResourceState,
     ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, SchedulerItem,
     SchedulerItemKind, StatusRuntime, TimelineEntry,
+};
+pub use submission::{
+    CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,
+    CombatSubmissionError, CombatSubmissionRequest, CombatSubmissionService,
 };
 pub use version::{
     CURRENT_COMBAT_VERSIONS, CombatVersion, CombatVersionField, CombatVersionSet,

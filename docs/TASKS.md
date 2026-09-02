@@ -23,7 +23,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M1-T07 — Shared Precondition Rule System | PASS | 2026-09-02 | 单一只读 evaluator；Submission 全量检查，Execution 按 metadata 复查动态条件 |
 | M1 Gate | PASS | 2026-09-02 | M1-T01..T07 全部独立验收；Version/RNG/State/Invariant/Adapter/Command/Precondition 闭环通过 |
 | M2-T01 — Cost Reservation Model | PASS | 2026-09-02 | AP/Resource/Item/ReactionCharge line ledger；nested、interrupt、save/resume 幂等 |
-| M2-T02 — Submission Validation | IN_PROGRESS | 2026-09-02 | 下一项；统一 boundary/precondition/reservation 的 submission fail/pass 路径 |
+| M2-T02 — Submission Validation | PASS | 2026-09-02 | 单一 atomic service 串联 boundary/authority/preconditions/accepted history/reserve；fail 零副作用 |
+| M2-T03 — ResolutionContext Lifecycle | IN_PROGRESS | 2026-09-02 | 下一项；持久化 command/roll/hook/redirect/reservation/eventChain/RNG refs 与 Ask resume |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

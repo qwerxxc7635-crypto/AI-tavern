@@ -49,6 +49,7 @@ pub enum PreconditionRule {
     TargetExists,
     TargetLegal,
     ActionPointsAtLeast { amount: i64 },
+    ReactionChargesAtLeast { amount: i64 },
     ResourceAtLeast { resource_id: String, amount: i64 },
     ItemQuantityAtLeast { item_id: String, amount: i64 },
     CooldownReady,
@@ -69,6 +70,7 @@ impl PreconditionRule {
             Self::SourceControlsActor
                 | Self::StableInputPoint
                 | Self::ActionPointsAtLeast { .. }
+                | Self::ReactionChargesAtLeast { .. }
                 | Self::ResourceAtLeast { .. }
                 | Self::ItemQuantityAtLeast { .. }
         )
@@ -109,6 +111,7 @@ pub enum PreconditionFailureCode {
     TargetMissing,
     TargetIllegal,
     InsufficientActionPoints,
+    InsufficientReactionCharges,
     ResourceMissing,
     InsufficientResource,
     ItemMissing,
@@ -238,6 +241,11 @@ fn evaluate_rule(
         PreconditionRule::ActionPointsAtLeast { amount } => failure_if(
             !actor.is_some_and(|value| value.action_points >= *amount),
             PreconditionFailureCode::InsufficientActionPoints,
+            Some(context.command.actor_id.clone()),
+        ),
+        PreconditionRule::ReactionChargesAtLeast { amount } => failure_if(
+            !actor.is_some_and(|value| value.reaction_charges >= *amount),
+            PreconditionFailureCode::InsufficientReactionCharges,
             Some(context.command.actor_id.clone()),
         ),
         PreconditionRule::ResourceAtLeast {
@@ -433,6 +441,7 @@ fn validate_rule_set(rules: &[PreconditionRuleSpec]) -> Result<(), PreconditionD
 fn validate_rule(rule: &PreconditionRule) -> Result<(), PreconditionDefinitionErrorCode> {
     match rule {
         PreconditionRule::ActionPointsAtLeast { amount }
+        | PreconditionRule::ReactionChargesAtLeast { amount }
         | PreconditionRule::NormalOwnerTurnUsesBelow { maximum: amount }
         | PreconditionRule::BattleUsesBelow { maximum: amount } => validate_non_negative(*amount),
         PreconditionRule::ResourceAtLeast {

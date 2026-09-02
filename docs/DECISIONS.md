@@ -3750,3 +3750,28 @@ Item 在 Combat Runtime inventory 中扣除，并追加 `ProvisionalDeltaEntry::
 - Miss、Save Success、Resolution 后 Immunity 不调用 release API，因此 committed cost 自然不退款。
 - Inventory 初始数量仍由后续 native/encounter adapter 从 SQLite canonical data 导入；Combat Core 不查询数据库。
 - M10 ActiveCombatSave 保存整个 state 后即可恢复 reserved/committed lines；重复 reserve/commit/cancel 不会再次扣除。
+
+## DEC-173：Submission 使用 working copies 原子组合 Command、Precondition 与 Reservation
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §11.0.1，M2-T02
+
+### 背景
+
+Command schema/source、控制权、稳定输入点、actor/ability/target、Ability preconditions 与成本 availability 分属已经建立的边界。若先写 accepted history 再发现 target 或 Reservation 失败，或每个调用方自行决定要调用哪些检查，失败 Command 会留下半写入，且 UI/UtilityAI 可以通过漏传基础 rule 绕过验证。
+
+### 决定
+
+`CombatSubmissionService` 是唯一 submission orchestration 入口。它在 State 与 AcceptedCommandLedger 的 working clones 上依次执行 Command Boundary、从 typed control assignments 计算 source authority、同一个 PreconditionRuleSystem、accepted history 与 Cost Reservation；全部通过后才同时替换调用方对象。任何错误都不改变 State、accepted sequence、Reservation、phase 或 RNG。
+
+Service 自动注入不可省略的 source-controls-actor、stable-input-point、actor-exists/active rules。UseAbility 自动增加 ability exists/enabled；存在 selected target 时自动增加 target exists 与由 `GetLegalTargets()` 投影得到的 target legal。每条 AP/Resource/Item/ReactionCharge cost 自动生成对应余额 rule；Ability catalog 只追加 cooldown/usage/tag/Heat 等 typed rules，不能替换 system rules。Cost asset owner 必须是 command actor。
+
+成功且有成本时，reservationId 固定等于 commandId，避免随机 identity；无成本 Command 仍通过同一 boundary。重试必须同时匹配 accepted command 与 Reservation existence/content，否则 fail closed，不修补不可能由原子 service 产生的半状态。
+
+### 影响与边界
+
+- Stable input 的最终 barrier 计算仍由 M7-T05 owner 提供；Submission 只消费其 typed boolean 并强制 rule，不另建 scheduler。
+- `GetLegalTargets()` 与 Ability catalog 的实际实现由后续 owning tasks 提供；Submission 不复制敌我/状态判断。
+- Submission 成功只 Reserve，不扣费、不增加 cooldown/usage、不创建 ResolutionContext；这些依次属于 M2-T03/T04。
+- Replay/Internal 不可通过 live submission acceptance；UtilityAI 必须匹配 UtilityAI control assignment。
