@@ -1123,7 +1123,12 @@ mod tests {
                 round_number: 1,
                 completed_round_count: 0,
                 active_combatant_id: Some("actor-1".to_owned()),
-                roster: vec![],
+                extra_turn_resume_phase: None,
+                roster: vec![crate::RoundRosterEntry {
+                    combatant_id: "actor-1".to_owned(),
+                    normal_turn_slot: 0,
+                    status: crate::RoundRosterStatus::Pending,
+                }],
             },
             objectives: ObjectiveRuntimeState {
                 objectives: vec![],

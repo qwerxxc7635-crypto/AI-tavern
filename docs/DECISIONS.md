@@ -3875,3 +3875,28 @@ Overflow item 不标记 counted、不执行、不消费 RNG、不增加 count。
 - Limits 在 EventChain begin 时由已绑定版本的 ruleset/engine contract 投影并存入 checkpoint；UI/生成内容没有修改入口。M10 的 BattleRecord/ActiveCombatSave 必须原样持久化，不得用新默认覆盖。
 - M2-T06 已定义并固定 rollback 要求，但战前快照与真正 Runtime rollback 由 M2-T10 的明确 owner 建立；本任务不创建临时 SQLite 表或伪造 durable persistence。
 - Loop Guard failure 不参与 M2-T09 的普通 terminal candidate 竞争；它是直接固定 Aborted 的 engine safety path。
+
+## DEC-178：RoundRoster 冻结 Normal Turn 成员集，Extra Turn 使用独立 lifecycle
+
+- 日期：2026-09-02
+- 状态：已采纳
+- 依据：V5.2 §9.1 Round / Turn Phase Ordering，M2-T07
+
+### 背景
+
+若 RoundEnd 由实时 Timeline 或“当前还能行动的人”临时推断，Stun/Freeze、战斗中加入、Defeated/Removed 与 Extra Turn 会使不同模块得到不同回合结束点。若 Extra Turn 复用 Normal Owner Turn Start，又会错误刷新 cooldown、usage、status duration 与 OncePerOwnerTurn，形成行动经济漏洞。
+
+### 决定
+
+Pure Core 新增唯一 `TurnRoundStateMachine`。BattleStart 只能从 round 0 进入首次 RoundStart；此时按 committed Timeline 顺序，只把当时 `Active` 且非 extra timeline entry 的 combatants 复制为连续 slot 的 Pending RoundRoster。成员集在整轮冻结；中途加入 Timeline 的 combatant 不获得本轮 Normal Turn。Timeline 合法变化只可重排尚未完成且非当前的 Pending entries，不能新增 slot、重开 completed slot 或移动当前 lifecycle。
+
+每个 pending slot 依次进入 `OwnerTurnStart → Action（若 typed legality 允许）→ OwnerTurnEnd → Completed`。State Machine 不通过 status 名称猜规则；上游 Status/Restriction owner 给出 `actionAllowed`。即使 actor 在 TurnStart 被控制或变为非 Active而跳过 Action，已开始的 lifecycle 仍到 OwnerTurnEnd 并标记 Completed。尚未开始且已 Downed/Defeated 的 slot 标记 Skipped，Removed 标记 Removed，二者都不阻塞全部 settled 后进入 RoundEnd。
+
+RoundEnd 只有在 roster 无 Pending 时才能把 `completedRoundCount` 从 `roundNumber-1` 精确推进到当前 round；重复完成幂等。下一 RoundStart 才重新从最新 Timeline 构建成员集。`ExtraTurn` 不加入 roster，保存并恢复其 RoundStart/OwnerTurnEnd continuation；begin/complete 只改变 phase 与 active actor，不修改 round number、roster、cooldown、reaction、ability usage、BasicAttack 或 once counters。
+
+### 影响与边界
+
+- `RoundRuntimeState` 新增 `extraTurnResumePhase`，CombatPhase 新增封闭的 `EXTRA_TURN`；checkpoint/hash/restore 因而能区分 normal 与 extra lifecycle。
+- 统一 invariant 校验 round/completed 关系、连续唯一 roster slots、成员引用、active normal slot、extra continuation 与 RoundEnd settled 状态；hash-valid phase/roster 篡改 fail closed。
+- Status tick/duration/cooldown 的实际推进、Reaction refresh 与资源恢复仍按任务表由 M4 等 owner 在这些固定 phase 上执行；M2-T07 不提前复制它们。
+- Objective 只读取 `completedRoundCount` 的 committed RoundEnd 边界；具体 Survive/Protect/terminal 逻辑由 M2-T08/T09 实现。

@@ -28,7 +28,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M2-T04 — Execution Revalidation + Atomic Usage Commit | PASS | 2026-09-02 | 同一 Preconditions 动态复查；Cost+cooldown/usage/MAP/once 原子 commit；cancel release/0 RNG |
 | M2-T05 — Canonical EventChain Scheduler | PASS | 2026-09-02 | 单一 Trigger/Reaction priority queue；六键固定排序、入队冻结 initiative、child 回队不递归 |
 | M2-T06 — Loop Guard Counter Contract | PASS | 2026-09-02 | depth/count exact N+1 overflow；skip/resume 不重复计数；Engine Failure→Aborted rollback contract |
-| M2-T07 — Turn / Round Phase State Machine | IN_PROGRESS | 2026-09-02 | 下一项；冻结 phase order、RoundRoster 与 Extra Turn 语义 |
+| M2-T07 — Turn / Round Phase State Machine | PASS | 2026-09-02 | Battle/Round/Owner/Action/End 固定迁移；RoundRoster 快照；Extra Turn 独立且不推进 normal clocks |
+| M2-T08 — CombatObjective Runtime / Protect Removed | IN_PROGRESS | 2026-09-02 | 下一项；稳定 tracked IDs、required objectives、Survive/Protect/Removed/reinforcement 语义 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

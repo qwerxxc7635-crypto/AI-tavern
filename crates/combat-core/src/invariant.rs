@@ -2,7 +2,7 @@ use std::{error::Error, fmt};
 
 use crate::{
     CanonicalEventChainScheduler, CombatState, CombatantRuntime, CombatantState,
-    CostReservationModel, ResolutionContextLifecycle, ResourceState,
+    CostReservationModel, ResolutionContextLifecycle, ResourceState, TurnRoundStateMachine,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,6 +21,7 @@ pub enum CombatStateInvariantCode {
     CostReservationLedgerInvalid,
     ResolutionContextInvalid,
     EventSchedulerInvalid,
+    TurnRoundStateInvalid,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -69,6 +70,13 @@ impl CombatStateInvariantValidator {
         CanonicalEventChainScheduler::validate_state(state).map_err(|error| {
             CombatStateInvariantError {
                 code: CombatStateInvariantCode::EventSchedulerInvalid,
+                combatant_id: error.subject_id,
+                resource_id: None,
+            }
+        })?;
+        TurnRoundStateMachine::validate_state(state).map_err(|error| {
+            CombatStateInvariantError {
+                code: CombatStateInvariantCode::TurnRoundStateInvalid,
                 combatant_id: error.subject_id,
                 resource_id: None,
             }
@@ -482,6 +490,7 @@ mod tests {
                 round_number: 1,
                 completed_round_count: 0,
                 active_combatant_id: None,
+                extra_turn_resume_phase: None,
                 roster: Vec::new(),
             },
             objectives: ObjectiveRuntimeState {

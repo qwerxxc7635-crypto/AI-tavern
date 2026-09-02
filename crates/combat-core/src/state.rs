@@ -16,6 +16,7 @@ pub enum CombatPhase {
     OwnerTurnStart,
     Action,
     OwnerTurnEnd,
+    ExtraTurn,
     RoundEnd,
     Stable,
     Terminal,
@@ -155,6 +156,7 @@ pub struct RoundRuntimeState {
     pub round_number: u64,
     pub completed_round_count: u64,
     pub active_combatant_id: Option<String>,
+    pub extra_turn_resume_phase: Option<CombatPhase>,
     pub roster: Vec<RoundRosterEntry>,
 }
 
@@ -618,6 +620,7 @@ mod tests {
                 round_number: 1,
                 completed_round_count: 0,
                 active_combatant_id: Some(player.combatant_id.clone()),
+                extra_turn_resume_phase: None,
                 roster: vec![
                     RoundRosterEntry {
                         combatant_id: player.combatant_id.clone(),

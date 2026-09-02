@@ -14,6 +14,7 @@ mod rng;
 mod scheduler;
 mod state;
 mod submission;
+mod turn;
 mod version;
 
 pub use attribute::{
@@ -74,6 +75,10 @@ pub use state::{
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,
     CombatSubmissionError, CombatSubmissionRequest, CombatSubmissionService,
+};
+pub use turn::{
+    NextTurnOutcome, OwnerTurnStartOutcome, TurnRoundStateMachine, TurnStateError,
+    TurnStateErrorCode,
 };
 pub use version::{
     CURRENT_COMBAT_VERSIONS, CombatVersion, CombatVersionField, CombatVersionSet,

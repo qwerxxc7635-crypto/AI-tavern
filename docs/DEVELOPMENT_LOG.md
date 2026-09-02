@@ -5426,3 +5426,19 @@
 - `cargo test -p ember-combat-core`：78/78 PASS；M2-T06 新增 4 项 exact-value 测试，连同 M2-T05 6 项共覆盖 depth N/N+1、count N/N+1、legality skip、Ask/crash resume、terminal failure/tamper、sibling/child 与 RNG 零消费。strict Core Clippy、Rustfmt 与 `git diff --check` PASS。
 - 首次全量门禁遇到 macOS 系统进程抢占，Vitest forks worker 启动超时并留下 3 timeout/2 worker errors；五个涉及文件随后独立重跑 30/30 PASS。未把该次红灯作为验收，重新执行原始完整 `pnpm check` 后 PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 234 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、参考 SOT/素材与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T06 结束状态为 PASS；下一项严格为 M2-T07 Turn / Round Phase State Machine。
+
+## 2026-09-02 — M2-T07 完成 Turn / Round Phase State Machine
+
+### 固定 Normal Turn lifecycle 与冻结 roster
+
+- 从 M2-T06 提交 `44b15af` 创建 `task/M2-T07-turn-round-state-machine`。新增 pure Core `TurnRoundStateMachine`，以显式原子 transition 固定 BattleStart → RoundStart → OwnerTurnStart → Action/disabled → OwnerTurnEnd → RoundEnd → next RoundStart，不依赖模块注册或 map/DB 返回顺序。
+- RoundStart 从 committed Timeline 顺序构建连续 slot 的 Active/normal-only RoundRoster；Stun 等仍是 Active，保留完整 normal lifecycle。尚未开始便 Downed/Defeated 的 slot deterministic Skipped，Removed 为 Removed；全部 settled 后才进入 RoundEnd。
+- Roster 成员集在 RoundStart 冻结。中途加入的 Active combatant 即使已进入 Timeline，也只在下一 RoundStart 获得 slot；Timeline 修改入口只重排未来 Pending entries，不能添加成员、重开已完成 slot或移动当前 actor。
+- OwnerTurnStart 接收 Status/Restriction owner 的 typed `actionAllowed`，不解析 status 名称。Action disabled 或 TurnStart 后 actor Downed 时仍进入 OwnerTurnEnd 并以 Completed 结束已开始 slot；Action 中 PreAction 导致 actor Downed 的 committed state 仍合法，可由 execution revalidation cancel 后正常结束 lifecycle。
+- Extra Turn 使用独立 `EXTRA_TURN` phase 与 continuation，不进入 RoundRoster；测试证明 begin/end 不改变 round、roster、cooldown、ability usage、BasicAttack、OncePerOwnerTurn 或 ReactionCharges。新增 `DEC-178`，统一 invariant 覆盖 phase/active/round/count/roster/extra continuation。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：84/84 PASS，其中新增 6 项覆盖 roster snapshot/filter/order、完整 lifecycle、controlled/downed Action skip、Defeated/Removed RoundEnd、pending reorder、中途加入 next-round-only、Extra Turn clock isolation、illegal transition 与 tampered restore。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 240 PASS、1 个 credential-only ignore；archive interop 双向通过。
+- Scope/DoD、SOT 与用户 `.gitignore` diff SHA-256 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 在 closure commit 前复核；无 SPEC BLOCKER。M2-T07 结束状态为 PASS；下一项严格为 M2-T08 CombatObjective Runtime / Protect Removed。
