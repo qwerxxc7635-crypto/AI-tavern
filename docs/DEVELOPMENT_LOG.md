@@ -5567,3 +5567,18 @@
 - `cargo test -p ember-combat-core`：136/136 PASS，其中新增 8 项覆盖 baseline 三档/第 4 次拒绝、tunable monotonic config、非 Basic 默认/显式计入、Ignore 不越 cap、eligible dice/fixed bonus、DoT 默认/typed override、CriticalRange miss/非 Attack，以及 malformed outcome/config/counter/dice fail-closed。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests，另 2 files / 6 tests 基线 skip；Node 33/33；Rust workspace 292 PASS、1 个 credential-only ignore；archive interop 双向通过。
 - Scope/DoD、V5.2 §3.2/§4.4 与 M3-T02 dependency 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入任务提交；无 SPEC BLOCKER。M3-T05 结束状态为 PASS；下一项严格为 M3-T06 Typed Effect Primitive Handler Set。
+
+## 2026-09-03 — M3-T06 完成 Typed Effect Primitive Handler Set
+
+### 19 个 MUST Primitive 与唯一静态 dispatch
+
+- 从 M3-T05 提交 `262443d` 创建 `task/M3-T06-typed-effect-primitives`。新增 19-member `EffectPrimitiveId::ALL`、closed `EffectDefinition` tagged union 和唯一 exhaustive `EffectHandlerSet::resolve`；没有 runtime register、任意代码/表达式执行或 unknown fallback，Spawn 等 future primitive 明确不在集合。
+- 每个 variant 使用 typed schema，并解析为 `ResolvedEffect` working operation。Flat/percent 使用 M3-T01 fixed math；Gain/Lose 统一正负方向；resource maximum 来自 read-only context；集合要求 stable、排序、唯一 IDs；百分比 ModifyStat 必须明确 referenceStatId。
+- Revive 至少提供 flat/percent 之一并保证最终 >0；percent 使用 minimum-one，二者同时存在按规范相加，附带 tag/status IDs 保持 canonical。真正 Downed legality/Active transition 属 M3-T10；DealDamage bundle/atomicity 属 M3-T07；Status merge 属 M4，未提前侵占。
+- Handler 只拥有 schema、validation 与 deterministic resolution；不含 Balance/Tooltip/AI exposure/theme/SQL/Event Ledger。新增 `DEC-187`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：142/142 PASS，其中新增 6 项覆盖 exact 19 set、amount/sign resolution、Revive exact math、unknown primitive/runtime code rejection、ID/resource/reference fail-closed，以及每个 variant 均经过同一 dispatch。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 298 PASS、1 credential-only ignore，archive interop 双向通过。
+- 用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T06 PASS；下一项严格为 M3-T07 DamageBundle + WorkingState Atomicity。

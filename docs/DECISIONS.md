@@ -4100,3 +4100,23 @@ Pure Core 新增 `CriticalDamageRules`，接收 M3-T02 typed ResolutionResult �
 - Normal Owner Turn Start 的 counter reset 与 Extra Turn 不重置仍唯一归 M2-T07 TurnRoundStateMachine；本模块没有第二套 clock/reset。
 - MAP 只影响 Accuracy，不改伤害；Critical plan 只决定待掷骰数，不绕过 M3-T04 mitigation。
 - Power Budget/Exploit 对特殊 override 的准入仍由 M6；本模块只验证 typed shape 与局部语义。
+
+## DEC-187：Effect Primitive 采用单一 closed typed dispatch 并输出 Working Operation
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §6.2，M0-T05，M3-T06
+
+### 决定
+
+Pure Core 以 `EffectPrimitiveId::ALL` 和 `EffectDefinition` closed tagged union 唯一定义 19 个 v0.4 MUST primitive；`EffectHandlerSet::resolve` 使用一个 exhaustive match 校验并解析为 typed `ResolvedEffect` working operation。不存在注册、动态 handler、脚本、表达式或未知 fallback；serde 拒绝未知 primitive 与字段。
+
+Flat/percent amount 共用固定精度解析；resource maximum 通过只读 context 查询。Gain/Lose 统一解析为有符号 Resource/AP/Reaction delta，Heal/Shield 解析为非负整数，ModifyStat 的百分比形式强制携带明确 reference stat。Revive 强制至少一个恢复来源、最终值 >0，并按 `flat + max(1,floor(MaxHP×percent))` 解析，同时保留 canonical remove-tag/apply-status IDs。
+
+DealDamage 只排入 typed damage operation，留给 M3-T07 bundle；Revive 的 Downed→Active atomic lifecycle 留给 M3-T10；Status merge/tag execution 留给 M4。Core handler 不包含 Power Budget、Tooltip、AI exposure、theme、SQL 或 event-ledger 逻辑。
+
+### 影响与边界
+
+- Primitive 存在事实只有一份；后续层引用 ID/typed definition，不维护第二份 supported list。
+- `Spawn/AreaEffect/GrantExtraTurn` 未进入 v0.4 runtime set。
+- Working operation 不是 committed event；必须经对应 owner、LethalResolution、Invariant 与 atomic commit 后才能发布事实。

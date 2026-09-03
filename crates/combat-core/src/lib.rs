@@ -8,6 +8,7 @@ mod attribute;
 mod command;
 mod cost;
 mod damage_channel;
+mod effect;
 mod execution;
 mod invariant;
 mod mitigation;
@@ -53,6 +54,10 @@ pub use cost::{
 pub use damage_channel::{
     DamageChannelCatalog, DamageChannelCatalogError, DamageChannelCatalogErrorCode,
     DamageChannelDefinition, DamageChannelId,
+};
+pub use effect::{
+    EffectAmount, EffectDefinition, EffectError, EffectErrorCode, EffectHandlerSet,
+    EffectPrimitiveId, EffectValueContext, ResolvedEffect, StatModification,
 };
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
