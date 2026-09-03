@@ -14,6 +14,14 @@ pub enum CanonicalDomainValue {
         combatant_id: String,
         value: i64,
     },
+    MaxHitPoints {
+        combatant_id: String,
+        value: i64,
+    },
+    CombatantState {
+        combatant_id: String,
+        value: crate::CombatantState,
+    },
     Shield {
         combatant_id: String,
         value: i64,
@@ -476,6 +484,12 @@ fn chain_delta(
             },
         )
         | (
+            ProvisionalDeltaEntry::MaxHitPoints { after, .. },
+            ProvisionalDeltaEntry::MaxHitPoints {
+                after: next_after, ..
+            },
+        )
+        | (
             ProvisionalDeltaEntry::Shield { after, .. },
             ProvisionalDeltaEntry::Shield {
                 after: next_after, ..
@@ -500,6 +514,12 @@ fn chain_delta(
             },
         ) => *after = *next_after,
         (
+            ProvisionalDeltaEntry::CombatantState { after, .. },
+            ProvisionalDeltaEntry::CombatantState {
+                after: next_after, ..
+            },
+        ) => *after = *next_after,
+        (
             ProvisionalDeltaEntry::WorldFact { after_digest, .. },
             ProvisionalDeltaEntry::WorldFact {
                 after_digest: next_after,
@@ -519,6 +539,7 @@ fn chain_delta(
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum DomainScalar {
     Integer(i64),
+    CombatantState(crate::CombatantState),
     Boolean(bool),
     Digest(Option<String>),
 }
@@ -526,9 +547,11 @@ enum DomainScalar {
 fn domain_scalar(entry: &CanonicalDomainValue) -> DomainScalar {
     match entry {
         CanonicalDomainValue::HitPoints { value, .. }
+        | CanonicalDomainValue::MaxHitPoints { value, .. }
         | CanonicalDomainValue::Shield { value, .. }
         | CanonicalDomainValue::Resource { value, .. }
         | CanonicalDomainValue::ItemQuantity { value, .. } => DomainScalar::Integer(*value),
+        CanonicalDomainValue::CombatantState { value, .. } => DomainScalar::CombatantState(*value),
         CanonicalDomainValue::StatusPresence { value, .. } => DomainScalar::Boolean(*value),
         CanonicalDomainValue::WorldFact { digest, .. } => DomainScalar::Digest(digest.clone()),
     }
@@ -537,9 +560,13 @@ fn domain_scalar(entry: &CanonicalDomainValue) -> DomainScalar {
 fn delta_before(entry: &ProvisionalDeltaEntry) -> DomainScalar {
     match entry {
         ProvisionalDeltaEntry::HitPoints { before, .. }
+        | ProvisionalDeltaEntry::MaxHitPoints { before, .. }
         | ProvisionalDeltaEntry::Shield { before, .. }
         | ProvisionalDeltaEntry::Resource { before, .. }
         | ProvisionalDeltaEntry::ItemQuantity { before, .. } => DomainScalar::Integer(*before),
+        ProvisionalDeltaEntry::CombatantState { before, .. } => {
+            DomainScalar::CombatantState(*before)
+        }
         ProvisionalDeltaEntry::StatusPresence { before, .. } => DomainScalar::Boolean(*before),
         ProvisionalDeltaEntry::WorldFact { before_digest, .. } => {
             DomainScalar::Digest(before_digest.clone())
@@ -550,9 +577,11 @@ fn delta_before(entry: &ProvisionalDeltaEntry) -> DomainScalar {
 fn delta_after(entry: &ProvisionalDeltaEntry) -> DomainScalar {
     match entry {
         ProvisionalDeltaEntry::HitPoints { after, .. }
+        | ProvisionalDeltaEntry::MaxHitPoints { after, .. }
         | ProvisionalDeltaEntry::Shield { after, .. }
         | ProvisionalDeltaEntry::Resource { after, .. }
         | ProvisionalDeltaEntry::ItemQuantity { after, .. } => DomainScalar::Integer(*after),
+        ProvisionalDeltaEntry::CombatantState { after, .. } => DomainScalar::CombatantState(*after),
         ProvisionalDeltaEntry::StatusPresence { after, .. } => DomainScalar::Boolean(*after),
         ProvisionalDeltaEntry::WorldFact { after_digest, .. } => {
             DomainScalar::Digest(after_digest.clone())
@@ -570,6 +599,16 @@ fn validate_runtime_projection(
             .iter()
             .find(|combatant| combatant.combatant_id == *combatant_id)
             .map(|combatant| DomainScalar::Integer(combatant.hit_points)),
+        ProvisionalDeltaEntry::MaxHitPoints { combatant_id, .. } => state
+            .combatants
+            .iter()
+            .find(|combatant| combatant.combatant_id == *combatant_id)
+            .map(|combatant| DomainScalar::Integer(combatant.max_hit_points)),
+        ProvisionalDeltaEntry::CombatantState { combatant_id, .. } => state
+            .combatants
+            .iter()
+            .find(|combatant| combatant.combatant_id == *combatant_id)
+            .map(|combatant| DomainScalar::CombatantState(combatant.state)),
         ProvisionalDeltaEntry::Shield { combatant_id, .. } => state
             .combatants
             .iter()
@@ -630,6 +669,10 @@ fn validate_snapshot_entry(entry: &CanonicalDomainValue) -> Result<(), RuntimeCo
             combatant_id,
             value,
         }
+        | CanonicalDomainValue::MaxHitPoints {
+            combatant_id,
+            value,
+        }
         | CanonicalDomainValue::Shield {
             combatant_id,
             value,
@@ -641,6 +684,9 @@ fn validate_snapshot_entry(entry: &CanonicalDomainValue) -> Result<(), RuntimeCo
                     combatant_id,
                 ));
             }
+        }
+        CanonicalDomainValue::CombatantState { combatant_id, .. } => {
+            validate_stable_id(combatant_id)?;
         }
         CanonicalDomainValue::Resource {
             combatant_id,
@@ -687,6 +733,11 @@ fn validate_delta_entry(entry: &ProvisionalDeltaEntry) -> Result<(), RuntimeComm
             before,
             after,
         }
+        | ProvisionalDeltaEntry::MaxHitPoints {
+            combatant_id,
+            before,
+            after,
+        }
         | ProvisionalDeltaEntry::Shield {
             combatant_id,
             before,
@@ -699,6 +750,9 @@ fn validate_delta_entry(entry: &ProvisionalDeltaEntry) -> Result<(), RuntimeComm
                     combatant_id,
                 ));
             }
+        }
+        ProvisionalDeltaEntry::CombatantState { combatant_id, .. } => {
+            validate_stable_id(combatant_id)?;
         }
         ProvisionalDeltaEntry::Resource {
             combatant_id,
@@ -759,6 +813,8 @@ fn validate_optional_digest(value: Option<&str>) -> Result<(), RuntimeCommitErro
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 enum DomainKey {
     HitPoints(String),
+    MaxHitPoints(String),
+    CombatantState(String),
     Shield(String),
     Resource(String, String),
     ItemQuantity(String, String),
@@ -770,6 +826,12 @@ fn domain_value_key(entry: &CanonicalDomainValue) -> DomainKey {
     match entry {
         CanonicalDomainValue::HitPoints { combatant_id, .. } => {
             DomainKey::HitPoints(combatant_id.clone())
+        }
+        CanonicalDomainValue::MaxHitPoints { combatant_id, .. } => {
+            DomainKey::MaxHitPoints(combatant_id.clone())
+        }
+        CanonicalDomainValue::CombatantState { combatant_id, .. } => {
+            DomainKey::CombatantState(combatant_id.clone())
         }
         CanonicalDomainValue::Shield { combatant_id, .. } => {
             DomainKey::Shield(combatant_id.clone())
@@ -796,6 +858,12 @@ fn delta_entry_key(entry: &ProvisionalDeltaEntry) -> DomainKey {
         ProvisionalDeltaEntry::HitPoints { combatant_id, .. } => {
             DomainKey::HitPoints(combatant_id.clone())
         }
+        ProvisionalDeltaEntry::MaxHitPoints { combatant_id, .. } => {
+            DomainKey::MaxHitPoints(combatant_id.clone())
+        }
+        ProvisionalDeltaEntry::CombatantState { combatant_id, .. } => {
+            DomainKey::CombatantState(combatant_id.clone())
+        }
         ProvisionalDeltaEntry::Shield { combatant_id, .. } => {
             DomainKey::Shield(combatant_id.clone())
         }
@@ -819,6 +887,8 @@ fn delta_entry_key(entry: &ProvisionalDeltaEntry) -> DomainKey {
 fn domain_key_subject(key: &DomainKey) -> String {
     match key {
         DomainKey::HitPoints(combatant_id) => format!("hit-points:{combatant_id}"),
+        DomainKey::MaxHitPoints(combatant_id) => format!("max-hit-points:{combatant_id}"),
+        DomainKey::CombatantState(combatant_id) => format!("combatant-state:{combatant_id}"),
         DomainKey::Shield(combatant_id) => format!("shield:{combatant_id}"),
         DomainKey::Resource(combatant_id, resource_id) => {
             format!("resource:{combatant_id}:{resource_id}")
@@ -1148,6 +1218,64 @@ mod tests {
                 ..
             })
         ));
+    }
+
+    #[test]
+    fn max_hit_points_and_combatant_state_share_canonical_delta_contract() {
+        let mut state = runtime_state();
+        state.combatants[0].max_hit_points = 8;
+        state.combatants[0].hit_points = 0;
+        state.combatants[0].state = CombatantState::Defeated;
+        let entries = vec![
+            ProvisionalDeltaEntry::MaxHitPoints {
+                combatant_id: "hero".into(),
+                before: 10,
+                after: 8,
+            },
+            ProvisionalDeltaEntry::CombatantState {
+                combatant_id: "hero".into(),
+                before: CombatantState::Active,
+                after: CombatantState::Defeated,
+            },
+            ProvisionalDeltaEntry::HitPoints {
+                combatant_id: "hero".into(),
+                before: 10,
+                after: 0,
+            },
+        ];
+        let snapshot = vec![
+            CanonicalDomainValue::MaxHitPoints {
+                combatant_id: "hero".into(),
+                value: 10,
+            },
+            CanonicalDomainValue::CombatantState {
+                combatant_id: "hero".into(),
+                value: CombatantState::Active,
+            },
+            CanonicalDomainValue::HitPoints {
+                combatant_id: "hero".into(),
+                value: 10,
+            },
+        ];
+
+        let canonical = canonicalize_delta(&snapshot, &entries, Some(&state)).unwrap();
+        assert_eq!(canonical.len(), 3);
+        assert!(canonical.iter().any(|entry| matches!(
+            entry,
+            ProvisionalDeltaEntry::MaxHitPoints {
+                before: 10,
+                after: 8,
+                ..
+            }
+        )));
+        assert!(canonical.iter().any(|entry| matches!(
+            entry,
+            ProvisionalDeltaEntry::CombatantState {
+                before: CombatantState::Active,
+                after: CombatantState::Defeated,
+                ..
+            }
+        )));
     }
 
     fn confirm(state: &mut CombatState, result_type: CombatResultType) {

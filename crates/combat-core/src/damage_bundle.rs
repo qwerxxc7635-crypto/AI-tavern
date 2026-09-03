@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     CombatFixed, CombatState, DamageDefenseProfile, DamageImmunity, DamageMitigationRequest,
-    DamageMitigationResult, MitigationBalanceConfig, MitigationPipeline, ProvisionalDeltaEntry,
-    ResolutionResult, ResolvedEffect, ShieldInteraction,
+    DamageMitigationResult, LethalOutcomeResolver, LethalResolutionCore, MitigationBalanceConfig,
+    MitigationPipeline, PendingLethalOutcome, ProvisionalDeltaEntry, ResolutionResult,
+    ResolvedEffect, ShieldInteraction,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,15 +29,8 @@ pub struct DamageBundle {
     pub source_command_id: String,
     pub source_combatant_id: Option<String>,
     pub target_combatant_id: String,
+    pub event_chain_id: String,
     pub components: Vec<DamageBundleComponent>,
-}
-
-pub trait DamageLethalResolver {
-    fn resolve_after_bundle(
-        &self,
-        working_state: &mut CombatState,
-        target_combatant_id: &str,
-    ) -> Result<(), DamageBundleError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -71,6 +65,13 @@ pub enum CommittedDamageEvent {
         target_combatant_id: String,
         shield_before: i64,
     },
+    TargetDefeated {
+        target_combatant_id: String,
+        source_combatant_id: Option<String>,
+        source_command_id: Option<String>,
+        event_chain_id: String,
+        committed_sequence: u64,
+    },
 }
 
 impl CommittedDamageEvent {
@@ -87,7 +88,9 @@ impl CommittedDamageEvent {
                     policy,
                 ))
             }
-            Self::DamageApplied { .. } | Self::ShieldBroken { .. } => None,
+            Self::DamageApplied { .. }
+            | Self::ShieldBroken { .. }
+            | Self::TargetDefeated { .. } => None,
         }
     }
 }
@@ -103,7 +106,7 @@ pub struct DamageBundleCommit {
 pub struct DamageBundleProcessor;
 
 impl DamageBundleProcessor {
-    pub fn commit<P: DamageDefenseProfile, L: DamageLethalResolver>(
+    pub fn commit<P: DamageDefenseProfile, L: LethalOutcomeResolver>(
         state: &mut CombatState,
         profile: &P,
         balance: &MitigationBalanceConfig,
@@ -182,14 +185,17 @@ impl DamageBundleProcessor {
             });
         }
 
-        let target_is_lethal = working
-            .combatants
-            .iter()
-            .find(|combatant| combatant.combatant_id == bundle.target_combatant_id)
-            .is_some_and(|combatant| combatant.hit_points == 0);
-        if target_is_lethal {
-            lethal_resolver.resolve_after_bundle(&mut working, &bundle.target_combatant_id)?;
-        }
+        let pending_lethal = LethalResolutionCore::resolve_if_needed(
+            &mut working,
+            &bundle.target_combatant_id,
+            lethal_resolver,
+        )
+        .map_err(|error| {
+            bundle_error(
+                DamageBundleErrorCode::LethalResolutionFailed,
+                format!("{}:{:?}", error.subject, error.code),
+            )
+        })?;
 
         let target_after = working
             .combatants
@@ -203,6 +209,14 @@ impl DamageBundleProcessor {
                 )
             })?;
         append_provisional_delta(&mut working, &target_before, &target_after)?;
+        let committed_sequence =
+            working
+                .last_committed_sequence
+                .checked_add(1)
+                .ok_or_else(|| {
+                    bundle_error(DamageBundleErrorCode::NumericOverflow, "committedSequence")
+                })?;
+        working.last_committed_sequence = committed_sequence;
         working.revision = working
             .revision
             .checked_add(1)
@@ -211,8 +225,14 @@ impl DamageBundleProcessor {
             .validate_for_commit()
             .map_err(|_| bundle_error(DamageBundleErrorCode::InvariantFailed, "workingState"))?;
 
-        let committed_events =
-            build_committed_events(&bundle, &working_results, &target_before, &target_after)?;
+        let committed_events = build_committed_events(
+            &bundle,
+            &working_results,
+            &target_before,
+            &target_after,
+            pending_lethal.as_ref(),
+            committed_sequence,
+        )?;
         let committed_state_revision = working.revision;
         *state = working;
         Ok(DamageBundleCommit {
@@ -258,6 +278,7 @@ fn validate_bundle(bundle: &DamageBundle) -> Result<(), DamageBundleError> {
     validate_id(&bundle.bundle_id)?;
     validate_id(&bundle.source_command_id)?;
     validate_id(&bundle.target_combatant_id)?;
+    validate_id(&bundle.event_chain_id)?;
     if let Some(source_id) = &bundle.source_combatant_id {
         validate_id(source_id)?;
     }
@@ -318,6 +339,17 @@ fn append_provisional_delta(
             });
         bump_provisional_revision(state)?;
     }
+    if before.state != after.state {
+        state
+            .provisional_delta
+            .entries
+            .push(ProvisionalDeltaEntry::CombatantState {
+                combatant_id: before.combatant_id.clone(),
+                before: before.state,
+                after: after.state,
+            });
+        bump_provisional_revision(state)?;
+    }
     Ok(())
 }
 
@@ -341,9 +373,22 @@ fn build_committed_events(
     results: &[WorkingDamageResult],
     target_before: &crate::CombatantRuntime,
     target_after: &crate::CombatantRuntime,
+    pending_lethal: Option<&PendingLethalOutcome>,
+    committed_sequence: u64,
 ) -> Result<Vec<CommittedDamageEvent>, DamageBundleError> {
     let shield_broken = target_before.shield > 0 && target_after.shield == 0;
-    let mut events = Vec::with_capacity(results.len() + 1 + usize::from(shield_broken));
+    let target_defeated = crate::lethal::target_defeated_fact(
+        target_before,
+        target_after,
+        pending_lethal,
+        bundle.source_combatant_id.as_deref(),
+        Some(&bundle.source_command_id),
+        &bundle.event_chain_id,
+        committed_sequence,
+    );
+    let mut events = Vec::with_capacity(
+        results.len() + 1 + usize::from(shield_broken) + usize::from(target_defeated.is_some()),
+    );
     let mut total_shield_damage = 0_i64;
     let mut total_hp_damage = 0_i64;
     let mut total_overkill_damage = 0_i64;
@@ -381,6 +426,15 @@ fn build_committed_events(
             bundle_id: bundle.bundle_id.clone(),
             target_combatant_id: bundle.target_combatant_id.clone(),
             shield_before: target_before.shield,
+        });
+    }
+    if let Some(fact) = target_defeated {
+        events.push(CommittedDamageEvent::TargetDefeated {
+            target_combatant_id: fact.target_combatant_id,
+            source_combatant_id: fact.source_combatant_id,
+            source_command_id: fact.source_command_id,
+            event_chain_id: fact.event_chain_id,
+            committed_sequence: fact.committed_sequence,
         });
     }
     Ok(events)
@@ -444,47 +498,74 @@ mod tests {
 
     struct DefeatLethal(Cell<u32>);
 
-    impl DamageLethalResolver for DefeatLethal {
-        fn resolve_after_bundle(
+    impl LethalOutcomeResolver for DefeatLethal {
+        fn resolve(
             &self,
             working_state: &mut CombatState,
             target_combatant_id: &str,
-        ) -> Result<(), DamageBundleError> {
+        ) -> Result<PendingLethalOutcome, crate::LethalResolutionError> {
             self.0.set(self.0.get() + 1);
             let target = working_state
                 .combatants
                 .iter_mut()
                 .find(|combatant| combatant.combatant_id == target_combatant_id)
                 .ok_or_else(|| {
-                    bundle_error(DamageBundleErrorCode::TargetMissing, target_combatant_id)
+                    crate::lethal_error(
+                        crate::LethalResolutionErrorCode::TargetMissing,
+                        target_combatant_id,
+                    )
                 })?;
             target.state = CombatantState::Defeated;
-            Ok(())
+            Ok(PendingLethalOutcome {
+                target_combatant_id: target_combatant_id.into(),
+                kind: crate::PendingLethalOutcomeKind::Defeated,
+            })
         }
     }
 
     struct NoLethal;
-    impl DamageLethalResolver for NoLethal {
-        fn resolve_after_bundle(
+    impl LethalOutcomeResolver for NoLethal {
+        fn resolve(
             &self,
             _working_state: &mut CombatState,
-            _target_combatant_id: &str,
-        ) -> Result<(), DamageBundleError> {
-            Ok(())
+            target_combatant_id: &str,
+        ) -> Result<PendingLethalOutcome, crate::LethalResolutionError> {
+            panic!("nonlethal fixture unexpectedly resolved {target_combatant_id}")
         }
     }
 
     struct FailingLethal;
-    impl DamageLethalResolver for FailingLethal {
-        fn resolve_after_bundle(
+    impl LethalOutcomeResolver for FailingLethal {
+        fn resolve(
             &self,
             _working_state: &mut CombatState,
             target_combatant_id: &str,
-        ) -> Result<(), DamageBundleError> {
-            Err(bundle_error(
-                DamageBundleErrorCode::LethalResolutionFailed,
+        ) -> Result<PendingLethalOutcome, crate::LethalResolutionError> {
+            Err(crate::lethal_error(
+                crate::LethalResolutionErrorCode::ResolverFailed,
                 target_combatant_id,
             ))
+        }
+    }
+
+    struct InvalidInvariantLethal;
+    impl LethalOutcomeResolver for InvalidInvariantLethal {
+        fn resolve(
+            &self,
+            working_state: &mut CombatState,
+            target_combatant_id: &str,
+        ) -> Result<PendingLethalOutcome, crate::LethalResolutionError> {
+            let target = working_state
+                .combatants
+                .iter_mut()
+                .find(|combatant| combatant.combatant_id == target_combatant_id)
+                .unwrap();
+            target.state = CombatantState::Defeated;
+            working_state.combatants[0].max_shield = -1;
+            Ok(PendingLethalOutcome {
+                target_combatant_id: target_combatant_id.into(),
+                kind: crate::PendingLethalOutcomeKind::Defeated,
+            })
         }
     }
 
@@ -751,7 +832,8 @@ mod tests {
         assert_eq!(result.working_results[0].mitigation.overkill_damage, 2);
         assert_eq!(result.working_results[1].mitigation.overkill_damage, 7);
         assert_eq!(state.revision, 2);
-        assert_eq!(state.provisional_delta.revision, 1);
+        assert_eq!(state.last_committed_sequence, 1);
+        assert_eq!(state.provisional_delta.revision, 2);
         assert!(matches!(
             state.provisional_delta.entries[0],
             ProvisionalDeltaEntry::HitPoints {
@@ -760,6 +842,65 @@ mod tests {
                 ..
             }
         ));
+        assert!(matches!(
+            state.provisional_delta.entries[1],
+            ProvisionalDeltaEntry::CombatantState {
+                before: CombatantState::Active,
+                after: CombatantState::Defeated,
+                ..
+            }
+        ));
+        assert!(matches!(
+            result.committed_events.last(),
+            Some(CommittedDamageEvent::TargetDefeated {
+                source_combatant_id: Some(source),
+                source_command_id: Some(command),
+                event_chain_id,
+                committed_sequence: 1,
+                ..
+            }) if source == "ally" && command == "command-a" && event_chain_id == "chain-damage-a"
+        ));
+    }
+
+    #[test]
+    fn shield_break_and_defeat_events_follow_committed_order_without_second_kill_credit() {
+        let mut state = fixture(1, 2);
+        let commit = DamageBundleProcessor::commit(
+            &mut state,
+            &profile(),
+            &balance(),
+            &hit(),
+            &DefeatLethal(Cell::new(0)),
+            bundle(vec![component(0, 5)]),
+        )
+        .unwrap();
+        assert!(matches!(
+            commit.committed_events.as_slice(),
+            [
+                CommittedDamageEvent::DamageResolved { .. },
+                CommittedDamageEvent::DamageApplied { .. },
+                CommittedDamageEvent::ShieldBroken { .. },
+                CommittedDamageEvent::TargetDefeated { .. }
+            ]
+        ));
+
+        let mut already_defeated = fixture(0, 0);
+        already_defeated.combatants[1].state = CombatantState::Defeated;
+        let second = DamageBundleProcessor::commit(
+            &mut already_defeated,
+            &profile(),
+            &balance(),
+            &hit(),
+            &NoLethal,
+            bundle(vec![component(0, 1)]),
+        )
+        .unwrap();
+        assert!(
+            !second
+                .committed_events
+                .iter()
+                .any(|event| matches!(event, CommittedDamageEvent::TargetDefeated { .. }))
+        );
     }
 
     #[test]
@@ -788,7 +929,7 @@ mod tests {
                 &profile(),
                 &balance(),
                 &hit(),
-                &NoLethal,
+                &InvalidInvariantLethal,
                 bundle(vec![component(0, 5)]),
             )
             .unwrap_err()
@@ -897,6 +1038,7 @@ mod tests {
             source_command_id: "command-a".into(),
             source_combatant_id: Some("ally".into()),
             target_combatant_id: "enemy".into(),
+            event_chain_id: "chain-damage-a".into(),
             components,
         }
     }

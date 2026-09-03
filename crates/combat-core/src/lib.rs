@@ -12,6 +12,7 @@ mod damage_channel;
 mod effect;
 mod execution;
 mod invariant;
+mod lethal;
 mod mitigation;
 mod numeric;
 mod objective;
@@ -55,8 +56,7 @@ pub use cost::{
 };
 pub use damage_bundle::{
     CommittedDamageEvent, DamageBundle, DamageBundleCommit, DamageBundleComponent,
-    DamageBundleError, DamageBundleErrorCode, DamageBundleProcessor, DamageLethalResolver,
-    WorkingDamageResult,
+    DamageBundleError, DamageBundleErrorCode, DamageBundleProcessor, WorkingDamageResult,
 };
 pub use damage_channel::{
     DamageChannelCatalog, DamageChannelCatalogError, DamageChannelCatalogErrorCode,
@@ -72,6 +72,13 @@ pub use execution::{
 };
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,
+};
+pub use lethal::{
+    AtomicHealthTransitionProcessor, CommittedLethalEvent, DirectHealthMutationOrigin,
+    HealthMutation, HealthTransitionCommit, HealthTransitionError, HealthTransitionErrorCode,
+    HealthTransitionRequest, LethalOutcomeResolver, LethalResolutionCore, LethalResolutionError,
+    LethalResolutionErrorCode, PendingLethalOutcome, PendingLethalOutcomeKind, TargetDefeatedFact,
+    lethal_error,
 };
 pub use mitigation::{
     DamageDefenseProfile, DamageImmunity, DamageMitigationRequest, DamageMitigationResult,

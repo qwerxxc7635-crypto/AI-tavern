@@ -5612,3 +5612,18 @@
 - `cargo test -p ember-combat-core`：153/153 PASS，其中新增 7 项覆盖标准/EMP 倍率、fractional insufficient Shield、Bypass/Disabled、非法输入、ShieldBroken exactly-once/order、Shield hit/Bypass recharge，以及 Miss/Immune/0/source/policy matrix。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 309 PASS、1 credential-only ignore，archive interop 双向通过。
 - 995 行执行附件、Scope/DoD 与 V5.2 Shield equations/recharge rule 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T08 PASS；下一项严格为 M3-T09 LethalResolution Core。
+
+## 2026-09-03 — M3-T09 完成 LethalResolution Core
+
+### Pending outcome、统一 health transition 与 committed defeat fact
+
+- 从 M3-T08 提交 `cb698ff` 创建 `task/M3-T09-lethal-resolution-core`。新增唯一 `LethalResolutionCore` 与 `LethalOutcomeResolver`；Pending Recovered/Downed/Defeated/PhaseTransition/Scripted 结果不做 serde、不是 Event，且必须与 resolver 完成后的 HP/State shape 一致。
+- 新增 `AtomicHealthTransitionProcessor`，让已解析的 Status Tick/反伤/其他直接 HP mutation 与 MaxHP 变更遵循同一 clone→mutation→lethal→delta→sequence/revision→Invariant→replace 流程。MaxHP 降低先 clamp current，任何失败都保持原 State byte-equivalent。
+- DamageBundle 移除专属 lethal trait，改为复用统一 Core，仍在所有 component 后 exactly once。CombatantState 与 MaxHitPoints 纳入 provisional/canonical delta、snapshot continuity、fold 与 runtime projection，保证最终 commit/rollback 不漏掉 Downed/Defeated 或 maximum 变化。
+- committed TargetDefeated 只在 before 非 Defeated、有效 Pending outcome 最终落到 Defeated 且 atomic commit 成功后返回，携带最低稳定 causal attribution。顺序为 DamageResolved→DamageApplied→ShieldBroken→TargetDefeated；重复作用于已 Defeated target 不产生 kill credit。新增 `DEC-190`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：159/159 PASS，其中新增 6 项覆盖 Status Tick/反伤同一闭环、MaxHP clamp lethal、Recovered/Downed 非 defeat event、invalid pending/mutation rollback、canonical MaxHP/CombatantState delta，以及 ShieldBroken/TargetDefeated order 与 second-kill suppression。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 315 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §4.5.8.1/§8.3/§11.3 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T09 PASS；下一项严格为 M3-T10 Downed / Revive / Solo Recovery。

@@ -4163,3 +4163,28 @@ Recharge 使用 closed `DEFAULT / ALWAYS / NEVER` policy、typed source relation
 - Environmental/DoT/Self 由后续 WorldProfile/Ability mechanical mapping 提供固定 source relation/policy；UI 不推断。
 - Recharge delay/amount 和实际资源恢复属于 M5 resolved WorldCombatProfile balance/lifecycle；本任务只冻结可记录、可回放的判定事实。
 - 持久化 status 造成的 Shield disable 生命周期属于 M4 Status owner；本任务只处理每 Damage Component 已解析的 interaction。
+
+## DEC-190：所有致命写入共享 Pending Lethal Outcome 与一次原子提交边界
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §4.5.8.1、§8.3、§11.1–11.3，M3-T06/M3-T07/M3-T09
+
+### 决定
+
+Pure Core 新增唯一 `LethalResolutionCore` 与 code-owned `LethalOutcomeResolver` boundary。DamageBundle、Status Tick、反伤、已解析的直接 HP Effect 与 MaxHP 变更都必须先在同一 CombatState clone 中完成 Working mutation，再调用该 Core；只有 Active target 到达 0 HP 才进入 resolver。Resolver 返回非序列化 `PendingLethalOutcome`，Core 校验 outcome kind 与最终 HP/State 一致，之后 owner 才能运行全局 invariant 并原子替换正式 State。
+
+`PendingLethalOutcomeKind` 只描述冻结的 Recovered/Downed/Defeated/PhaseTransition/Scripted 生命周期结果，不是 Domain Event、不可序列化，也没有 scheduler/trigger 发布入口。M3-T10 将实现 SOLO/PARTY 具体 policy；M3-T09 只锁定共同闭环和 output validation。
+
+新增 `AtomicHealthTransitionProcessor` 作为非 DamageBundle 的统一原子入口，并将 MaxHP 降低固定为先写新 maximum、再 `current=min(current,newMaximum)`、随后执行 lethal。任何 resolver、mutation、overflow 或 invariant 失败都丢弃 clone。DamageBundle 改为复用同一 Core，仍只在整个普通 bundle 后调用一次。
+
+CombatantState 与 MaxHitPoints 新增为 provisional/canonical domain delta 类型，沿用 M2-T10 的 snapshot continuity、fold、runtime projection 与 rollback validation；否则 Defeated/Downed 或 maximum 变化会在最终 commit/rollback 时与 HP 分叉。每次 atomic health/damage commit 同时单调推进 `lastCommittedSequence`。
+
+`TargetDefeated` 只在 transition 前非 Defeated、存在有效 Pending outcome、commit 后最终 State.Defeated 时返回，并携带 target/sourceCombatant?/sourceCommand?/eventChainId/committedSequence。Damage 事件顺序固定为 per-component DamageResolved→DamageApplied→ShieldBroken（若有）→TargetDefeated（若有）；Downed、Recovered、PhaseTransition 和重复作用于 Defeated target 都不产生第二次 kill fact。
+
+### 影响与边界
+
+- TargetDefeated 是唯一 defeat fact；OnKill 仍只是后续 scheduler 对该 committed fact 的 trigger semantic。
+- Direct health transition 只消费已由 Effect owner 解析完成的 typed mutation；DealDamage 仍必须经过 DamageBundle/Mitigation/Shield，不获得绕过规则的 raw damage API。
+- SOLO charge、PARTY formal member、ExecutableRecoveryPath、Revive 与 terminal candidate 归 M3-T10，不在通用 resolver 内硬编码。
+- Boss phase 与 Scripted policy 由后续 code-owned policy 在 Working State 中完成，Core 只验证最终 lifecycle shape 与全局 invariant。

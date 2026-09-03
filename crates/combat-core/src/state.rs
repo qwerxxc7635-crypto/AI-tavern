@@ -253,6 +253,16 @@ pub enum ProvisionalDeltaEntry {
         before: i64,
         after: i64,
     },
+    MaxHitPoints {
+        combatant_id: String,
+        before: i64,
+        after: i64,
+    },
+    CombatantState {
+        combatant_id: String,
+        before: CombatantState,
+        after: CombatantState,
+    },
     Shield {
         combatant_id: String,
         before: i64,
