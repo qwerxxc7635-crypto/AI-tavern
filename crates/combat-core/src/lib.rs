@@ -21,6 +21,7 @@ mod resolution_context;
 mod rng;
 mod runtime_commit;
 mod scheduler;
+mod shield;
 mod state;
 mod submission;
 mod terminal;
@@ -111,6 +112,12 @@ pub use runtime_commit::{
 pub use scheduler::{
     CanonicalEventChainScheduler, EventSchedulerError, EventSchedulerErrorCode,
     NON_COMBATANT_INITIATIVE_ORDER, SchedulerCandidate, SchedulerExecutionGateOutcome,
+};
+pub use shield::{
+    DamageSourceRelation, RechargeInterruptionDecision, RechargeInterruptionPolicy,
+    RechargeInterruptionReason, ShieldInteraction, ShieldRechargeEvaluator, ShieldResolution,
+    ShieldResolutionError, ShieldResolutionErrorCode, ShieldResolutionRequest,
+    ShieldResolutionResult,
 };
 pub use state::{
     AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,

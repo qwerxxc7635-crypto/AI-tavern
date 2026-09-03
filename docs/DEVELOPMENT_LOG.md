@@ -5597,3 +5597,18 @@
 - `cargo test -p ember-combat-core`：146/146 PASS，其中新增 4 项覆盖乱序排序与 Working Shield/HP 继承、全 Bundle 后 lethal exactly-once、lethal/invariant rollback byte equality、duplicate/non-damage/bad-tag rejection。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 302 PASS、1 credential-only ignore，archive interop 双向通过。
 - 995 行用户执行附件已重新完整读取；Scope/DoD 与 V5.2 §4.5.8 已复核。用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T07 PASS；下一项严格为 M3-T08 Shield / Barrier / Recharge。
+
+## 2026-09-03 — M3-T08 完成 Shield / Barrier / Recharge
+
+### 统一 ShieldResolution 与 committed-only recharge evidence
+
+- 从 M3-T07 提交 `2cd2215` 创建 `task/M3-T08-shield-barrier-recharge`。新增 pure `ShieldResolution` 与 closed `ShieldInteraction`；标准吸收、正 fixed damage multiplier、Bypass 与 Disabled 全部经同一计算入口，Ability 无法直接改 HP/Shield。
+- multiplier 严格使用 SOT 的 floor max absorb、ceil Shield resource loss；剩余 Shield 不足完整吸收 1 点时仍耗尽而不减少 incoming。Mitigation Pipeline 继续保留 raw/postMitigation/rounded/shieldDamage/shieldResourceLoss/hpDamage/overkill/resulting resources。
+- DamageBundle 每 component 携带 typed interaction，继续继承同一 Working State。Commit 后先发布 ordered DamageResolved、再 DamageApplied；只有整个 transition 的 Shield 从正值变 0 时才追加一个 ShieldBroken，多 component 不会中途或重复发布。
+- Recharge 判定只暴露在 `CommittedDamageEvent::DamageResolved` 上。DEFAULT 需要 hostile source 且 Shield 或 HP 实际受损；Miss/Immune/0 damage 不打断，Shield hit 与 Bypass HP hit 打断。ALWAYS/NEVER、source relation 与 decision reason 均为可序列化结构化事实，供后续 log/debug/profile mapping 使用。新增 `DEC-189`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：153/153 PASS，其中新增 7 项覆盖标准/EMP 倍率、fractional insufficient Shield、Bypass/Disabled、非法输入、ShieldBroken exactly-once/order、Shield hit/Bypass recharge，以及 Miss/Immune/0/source/policy matrix。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 309 PASS、1 credential-only ignore，archive interop 双向通过。
+- 995 行执行附件、Scope/DoD 与 V5.2 Shield equations/recharge rule 已复核；用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T08 PASS；下一项严格为 M3-T09 LethalResolution Core。

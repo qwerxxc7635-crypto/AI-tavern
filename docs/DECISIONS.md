@@ -4140,3 +4140,26 @@ Pure Core 新增 `DamageBundleProcessor`。它只接受 M3-T06 已解析的 `Que
 - Lethal 的 SOLO/PARTY/Boss/Scripted 具体政策由 M3-T09/T10 实现该 owner boundary，不在 Bundle 复制。
 - Shield multiplier/bypass/disable、ShieldBroken 与 recharge interruption 由 M3-T08 扩展统一 ShieldResolution；当前保留 M3-T04 默认倍率 1。
 - WorkingDamageResult 仅用于同一事务后续计算；返回的 committed event 列表只在 state 已原子替换后可见。
+
+## DEC-189：所有 Shield Interaction 经过统一解析，Recharge 只消费已提交伤害事实
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §4.5.6、§4.5.8.2、§4.5.9 与 Sci-Fi Shield Recharge Interrupt Rule，M3-T04/M3-T07/M3-T08
+
+### 决定
+
+Pure Core 新增唯一 `ShieldResolution`，在 Primary Mitigation 后消费整数 `roundedIncomingDamage`、当前 Working Shield 与 closed `ShieldInteraction`。标准吸收、正 Fixed `damageMultiplier`、`Bypass`、`Disabled` 都从该入口计算；Ability 不获得直接写 Shield/HP 的旁路。`Bypass/Disabled` 表示该 Damage Component 不使用当前 Shield，二者保持 typed identity 供上游规则与日志区分，本任务不伪造未定义的持久化 disable 状态。
+
+倍率含义严格固定为吸收 1 点 incoming 所需的 Shield Resource：最大吸收使用 floor，资源扣除使用 ceil；若剩余 Shield 不足以完整吸收 1 点，仍耗尽剩余 Shield 且该点完整 spill 到 HP。结果分别保留 `shieldDamage` 与 `shieldResourceLoss`，再由 Mitigation Pipeline 计算 HP/overkill，维持 raw、post-mitigation、rounded 与整数写入边界。
+
+`ShieldBroken` 只根据整个 atomic transition 的 target Shield before `>0`、after `==0` 派生，并在 ordered per-component `DamageResolved` 和 aggregate `DamageApplied` 之后追加一次。因此 Working component 不能发布它，多段伤害也不会重复发布。
+
+Recharge 使用 closed `DEFAULT / ALWAYS / NEVER` policy、typed source relation 与结构化 reason。公开判定入口定义在 `CommittedDamageEvent` 上，且仅 `DamageResolved` 返回 decision；Working result、aggregate 与 ShieldBroken 不能成为误用入口。DEFAULT 只有 hostile source 且 `shieldDamage > 0 || hpDamage > 0` 时中断；ALWAYS/NEVER 保留为开发者映射后的明确策略。
+
+### 影响与边界
+
+- Miss、Immune、最终 0 damage 默认不打断；Shield 实际吸收与 Bypass 后 HP 实际受伤默认打断。
+- Environmental/DoT/Self 由后续 WorldProfile/Ability mechanical mapping 提供固定 source relation/policy；UI 不推断。
+- Recharge delay/amount 和实际资源恢复属于 M5 resolved WorldCombatProfile balance/lifecycle；本任务只冻结可记录、可回放的判定事实。
+- 持久化 status 造成的 Shield disable 生命周期属于 M4 Status owner；本任务只处理每 Damage Component 已解析的 interaction。

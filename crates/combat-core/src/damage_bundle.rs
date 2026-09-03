@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     CombatFixed, CombatState, DamageDefenseProfile, DamageImmunity, DamageMitigationRequest,
     DamageMitigationResult, MitigationBalanceConfig, MitigationPipeline, ProvisionalDeltaEntry,
-    ResolutionResult, ResolvedEffect,
+    ResolutionResult, ResolvedEffect, ShieldInteraction,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,6 +18,7 @@ pub struct DamageBundleComponent {
     pub base_channel_resistance: CombatFixed,
     pub resistance_penetration: CombatFixed,
     pub immunity: DamageImmunity,
+    pub shield_interaction: ShieldInteraction,
     pub tags: Vec<String>,
 }
 
@@ -65,6 +66,30 @@ pub enum CommittedDamageEvent {
         total_hp_damage: i64,
         total_overkill_damage: i64,
     },
+    ShieldBroken {
+        bundle_id: String,
+        target_combatant_id: String,
+        shield_before: i64,
+    },
+}
+
+impl CommittedDamageEvent {
+    pub fn recharge_interruption_decision(
+        &self,
+        source_relation: crate::DamageSourceRelation,
+        policy: crate::RechargeInterruptionPolicy,
+    ) -> Option<crate::RechargeInterruptionDecision> {
+        match self {
+            Self::DamageResolved { result, .. } => {
+                Some(crate::ShieldRechargeEvaluator::from_committed_damage(
+                    result,
+                    source_relation,
+                    policy,
+                ))
+            }
+            Self::DamageApplied { .. } | Self::ShieldBroken { .. } => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -138,6 +163,7 @@ impl DamageBundleProcessor {
                     base_channel_resistance: component.base_channel_resistance,
                     resistance_penetration: component.resistance_penetration,
                     immunity: component.immunity,
+                    shield_interaction: component.shield_interaction,
                     current_shield: target.shield,
                     current_hit_points: target.hit_points,
                 },
@@ -185,7 +211,8 @@ impl DamageBundleProcessor {
             .validate_for_commit()
             .map_err(|_| bundle_error(DamageBundleErrorCode::InvariantFailed, "workingState"))?;
 
-        let committed_events = build_committed_events(&bundle, &working_results)?;
+        let committed_events =
+            build_committed_events(&bundle, &working_results, &target_before, &target_after)?;
         let committed_state_revision = working.revision;
         *state = working;
         Ok(DamageBundleCommit {
@@ -312,8 +339,11 @@ fn bump_provisional_revision(state: &mut CombatState) -> Result<(), DamageBundle
 fn build_committed_events(
     bundle: &DamageBundle,
     results: &[WorkingDamageResult],
+    target_before: &crate::CombatantRuntime,
+    target_after: &crate::CombatantRuntime,
 ) -> Result<Vec<CommittedDamageEvent>, DamageBundleError> {
-    let mut events = Vec::with_capacity(results.len() + 1);
+    let shield_broken = target_before.shield > 0 && target_after.shield == 0;
+    let mut events = Vec::with_capacity(results.len() + 1 + usize::from(shield_broken));
     let mut total_shield_damage = 0_i64;
     let mut total_hp_damage = 0_i64;
     let mut total_overkill_damage = 0_i64;
@@ -346,6 +376,13 @@ fn build_committed_events(
         total_hp_damage,
         total_overkill_damage,
     });
+    if shield_broken {
+        events.push(CommittedDamageEvent::ShieldBroken {
+            bundle_id: bundle.bundle_id.clone(),
+            target_combatant_id: bundle.target_combatant_id.clone(),
+            shield_before: target_before.shield,
+        });
+    }
     Ok(events)
 }
 
@@ -481,7 +518,7 @@ mod tests {
             (state.combatants[1].shield, state.combatants[1].hit_points),
             (0, 8)
         );
-        assert_eq!(result.committed_events.len(), 3);
+        assert_eq!(result.committed_events.len(), 4);
         assert!(matches!(
             result.committed_events[0],
             CommittedDamageEvent::DamageResolved {
@@ -503,6 +540,195 @@ mod tests {
                 ..
             }
         ));
+        assert!(matches!(
+            result.committed_events[3],
+            CommittedDamageEvent::ShieldBroken {
+                shield_before: 5,
+                ..
+            }
+        ));
+        assert_eq!(
+            result
+                .committed_events
+                .iter()
+                .filter(|event| matches!(event, CommittedDamageEvent::ShieldBroken { .. }))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn committed_damage_facts_drive_recharge_for_shield_hit_and_bypass() {
+        let mut shield_state = fixture(10, 5);
+        let shield_commit = DamageBundleProcessor::commit(
+            &mut shield_state,
+            &profile(),
+            &balance(),
+            &hit(),
+            &NoLethal,
+            bundle(vec![component(0, 2)]),
+        )
+        .unwrap();
+        let shield_decision = shield_commit.committed_events[0]
+            .recharge_interruption_decision(
+                crate::DamageSourceRelation::Hostile,
+                crate::RechargeInterruptionPolicy::Default,
+            )
+            .unwrap();
+        assert!(shield_decision.interrupted);
+        assert_eq!(
+            shield_decision.reason,
+            crate::RechargeInterruptionReason::HostileAppliedDamage
+        );
+
+        let mut bypass_state = fixture(10, 5);
+        let mut bypass_component = component(0, 2);
+        bypass_component.shield_interaction = ShieldInteraction::Bypass {};
+        let bypass_commit = DamageBundleProcessor::commit(
+            &mut bypass_state,
+            &profile(),
+            &balance(),
+            &hit(),
+            &NoLethal,
+            bundle(vec![bypass_component]),
+        )
+        .unwrap();
+        assert_eq!(
+            (
+                bypass_state.combatants[1].shield,
+                bypass_state.combatants[1].hit_points
+            ),
+            (5, 8)
+        );
+        assert!(
+            !bypass_commit
+                .committed_events
+                .iter()
+                .any(|event| matches!(event, CommittedDamageEvent::ShieldBroken { .. }))
+        );
+        assert!(
+            bypass_commit.committed_events[0]
+                .recharge_interruption_decision(
+                    crate::DamageSourceRelation::Hostile,
+                    crate::RechargeInterruptionPolicy::Default,
+                )
+                .unwrap()
+                .interrupted
+        );
+    }
+
+    #[test]
+    fn miss_immunity_and_zero_damage_do_not_interrupt_default_recharge() {
+        let missed = ResolutionResult::AutoHit {
+            hit: false,
+            critical: false,
+        };
+        let mut miss_state = fixture(10, 5);
+        let miss_commit = DamageBundleProcessor::commit(
+            &mut miss_state,
+            &profile(),
+            &balance(),
+            &missed,
+            &NoLethal,
+            bundle(vec![component(0, 2)]),
+        )
+        .unwrap();
+
+        let mut immune_component = component(0, 2);
+        immune_component.immunity = DamageImmunity::Immune {
+            rule_id: "status.damage-immunity".into(),
+        };
+        let mut immune_state = fixture(10, 5);
+        let immune_commit = DamageBundleProcessor::commit(
+            &mut immune_state,
+            &profile(),
+            &balance(),
+            &hit(),
+            &NoLethal,
+            bundle(vec![immune_component]),
+        )
+        .unwrap();
+
+        let mut zero_state = fixture(10, 5);
+        let zero_commit = DamageBundleProcessor::commit(
+            &mut zero_state,
+            &profile(),
+            &balance(),
+            &hit(),
+            &NoLethal,
+            bundle(vec![component(0, 0)]),
+        )
+        .unwrap();
+
+        for commit in [&miss_commit, &immune_commit, &zero_commit] {
+            let decision = commit.committed_events[0]
+                .recharge_interruption_decision(
+                    crate::DamageSourceRelation::Hostile,
+                    crate::RechargeInterruptionPolicy::Default,
+                )
+                .unwrap();
+            assert!(!decision.interrupted);
+            assert_eq!(
+                decision.reason,
+                crate::RechargeInterruptionReason::NoAppliedDamage
+            );
+        }
+        assert_eq!(miss_state.combatants[1].shield, 5);
+        assert_eq!(immune_state.combatants[1].shield, 5);
+        assert_eq!(zero_state.combatants[1].shield, 5);
+    }
+
+    #[test]
+    fn recharge_source_and_explicit_policy_are_structured_and_deterministic() {
+        let mut state = fixture(10, 5);
+        let commit = DamageBundleProcessor::commit(
+            &mut state,
+            &profile(),
+            &balance(),
+            &hit(),
+            &NoLethal,
+            bundle(vec![component(0, 2)]),
+        )
+        .unwrap();
+        let event = &commit.committed_events[0];
+
+        let non_hostile = event
+            .recharge_interruption_decision(
+                crate::DamageSourceRelation::NonHostile,
+                crate::RechargeInterruptionPolicy::Default,
+            )
+            .unwrap();
+        assert!(!non_hostile.interrupted);
+        assert_eq!(
+            non_hostile.reason,
+            crate::RechargeInterruptionReason::NonHostileSource
+        );
+        assert!(
+            event
+                .recharge_interruption_decision(
+                    crate::DamageSourceRelation::NonHostile,
+                    crate::RechargeInterruptionPolicy::Always,
+                )
+                .unwrap()
+                .interrupted
+        );
+        assert!(
+            !event
+                .recharge_interruption_decision(
+                    crate::DamageSourceRelation::Hostile,
+                    crate::RechargeInterruptionPolicy::Never,
+                )
+                .unwrap()
+                .interrupted
+        );
+        assert!(
+            commit.committed_events[1]
+                .recharge_interruption_decision(
+                    crate::DamageSourceRelation::Hostile,
+                    crate::RechargeInterruptionPolicy::Always,
+                )
+                .is_none()
+        );
     }
 
     #[test]
@@ -660,6 +886,7 @@ mod tests {
             base_channel_resistance: CombatFixed::from_scaled(0),
             resistance_penetration: CombatFixed::from_scaled(0),
             immunity: DamageImmunity::NotImmune {},
+            shield_interaction: ShieldInteraction::standard(),
             tags: vec![],
         }
     }

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     COMBAT_FIXED_SCALE, CombatFixed, CombatNumeric, CombatNumericError, DamageChannelId,
-    ResolutionResult,
+    ResolutionResult, ShieldInteraction, ShieldResolution, ShieldResolutionRequest,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -56,6 +56,7 @@ pub struct DamageMitigationRequest<'a> {
     pub base_channel_resistance: CombatFixed,
     pub resistance_penetration: CombatFixed,
     pub immunity: DamageImmunity,
+    pub shield_interaction: ShieldInteraction,
     pub current_shield: i64,
     pub current_hit_points: i64,
 }
@@ -232,22 +233,26 @@ impl MitigationPipeline {
         let rounded_incoming_damage =
             CombatNumeric::damage_fixed_to_integer_floor(post_mitigation_damage)
                 .map_err(numeric_failure)?;
-        let shield_damage = request.current_shield.min(rounded_incoming_damage);
-        let remaining_after_shield = rounded_incoming_damage
-            .checked_sub(shield_damage)
-            .ok_or_else(|| mitigation_error(MitigationErrorCode::NumericFailure, "shieldDamage"))?;
+        let shield = ShieldResolution::resolve(ShieldResolutionRequest {
+            rounded_incoming_damage,
+            current_shield: request.current_shield,
+            interaction: request.shield_interaction,
+        })
+        .map_err(|error| {
+            mitigation_error(
+                MitigationErrorCode::InvalidDamageInput,
+                format!("shield:{:?}", error.code),
+            )
+        })?;
+        let shield_damage = shield.shield_damage;
+        let remaining_after_shield = shield.remaining_after_shield;
         let hp_damage = request.current_hit_points.min(remaining_after_shield);
         let overkill_damage = remaining_after_shield
             .checked_sub(hp_damage)
             .ok_or_else(|| {
                 mitigation_error(MitigationErrorCode::NumericFailure, "overkillDamage")
             })?;
-        let resulting_shield = request
-            .current_shield
-            .checked_sub(shield_damage)
-            .ok_or_else(|| {
-                mitigation_error(MitigationErrorCode::NumericFailure, "resultingShield")
-            })?;
+        let resulting_shield = shield.resulting_shield;
         let resulting_hit_points = request
             .current_hit_points
             .checked_sub(hp_damage)
@@ -272,7 +277,7 @@ impl MitigationPipeline {
             post_mitigation_damage,
             rounded_incoming_damage,
             shield_damage,
-            shield_resource_loss: shield_damage,
+            shield_resource_loss: shield.shield_resource_loss,
             hp_damage,
             overkill_damage,
             resulting_shield,
@@ -436,6 +441,7 @@ mod tests {
             base_channel_resistance: fixed(0),
             resistance_penetration: fixed(0),
             immunity: DamageImmunity::NotImmune {},
+            shield_interaction: ShieldInteraction::standard(),
             current_shield: 0,
             current_hit_points: 200,
         }
