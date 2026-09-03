@@ -39,7 +39,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M3-T04 — Mitigation Pipeline | PASS | 2026-09-03 | Resolution gate→Profile lookup→单一 Armor/Resistance/None→single floor→Shield/HP；显式 immunity/typed 零伤害原因 |
 | M3-T05 — Critical / BasicAttack / MAP | PASS | 2026-09-03 | eligible 骰数×2、fixed/DoT 默认不翻倍；typed local override；tunable 0/-3/-6 与 max 3 |
 | M3-T06 — Typed Effect Primitive Handler Set | PASS | 2026-09-03 | 19 个 MUST primitive closed tagged union；单一 exhaustive validate/resolve dispatch；无 runtime code/registry |
-| M3-T07 — DamageBundle + WorkingState Atomicity | IN_PROGRESS | 2026-09-03 | 下一项；稳定 component order、共享 Working Shield/HP、Bundle 后 Lethal/Invariant/atomic commit |
+| M3-T07 — DamageBundle + WorkingState Atomicity | PASS | 2026-09-03 | componentIndex 排序；共享 Working Shield/HP；Bundle 后单次 Lethal→Invariant→atomic commit→ordered facts |
+| M3-T08 — Shield / Barrier / Recharge | IN_PROGRESS | 2026-09-03 | 下一项；shield multiplier/bypass/disable、ShieldBroken exactly-once、structured recharge interruption |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

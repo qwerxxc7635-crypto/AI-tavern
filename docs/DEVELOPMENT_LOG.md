@@ -5582,3 +5582,18 @@
 - `cargo test -p ember-combat-core`：142/142 PASS，其中新增 6 项覆盖 exact 19 set、amount/sign resolution、Revive exact math、unknown primitive/runtime code rejection、ID/resource/reference fail-closed，以及每个 variant 均经过同一 dispatch。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 298 PASS、1 credential-only ignore，archive interop 双向通过。
 - 用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T06 PASS；下一项严格为 M3-T07 DamageBundle + WorkingState Atomicity。
+
+## 2026-09-03 — M3-T07 完成 DamageBundle + WorkingState Atomicity
+
+### Stable component order 与单一 atomic visibility boundary
+
+- 从 M3-T06 提交 `8982bf7` 创建 `task/M3-T07-damage-bundle-atomicity`。新增 `DamageBundleProcessor`，只消费 typed QueueDamage operation；完整校验后按唯一 `componentIndex ASC` 排序，不依赖输入/vector 外的偶然顺序。
+- 全部 component 在同一不可观察 CombatState clone 内复用 M3-T04 pipeline；后一段读取前一段 resulting Shield/HP。普通 Bundle 不暴露 component 间 callback，PostDamage/PostEffect 无法插入中途。
+- 所有 component 完成后仅在最终 HP=0 时调用一次 injected lethal owner；之后记录最终 Shield/HP provisional delta、推进 state revision、运行全局 invariant，再一次替换正式 State。失败路径丢弃 clone，原 State byte-equivalent 且无 committed facts。
+- Commit result 按 componentIndex 返回 DamageResolved facts，随后唯一 DamageApplied aggregate；ShieldBroken/TargetDefeated 的具体 committed 派生分别留给 M3-T08/M3-T09。新增 `DEC-188`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：146/146 PASS，其中新增 4 项覆盖乱序排序与 Working Shield/HP 继承、全 Bundle 后 lethal exactly-once、lethal/invariant rollback byte equality、duplicate/non-damage/bad-tag rejection。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 302 PASS、1 credential-only ignore，archive interop 双向通过。
+- 995 行用户执行附件已重新完整读取；Scope/DoD 与 V5.2 §4.5.8 已复核。用户 `.gitignore` diff SHA-256 仍为 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T07 PASS；下一项严格为 M3-T08 Shield / Barrier / Recharge。

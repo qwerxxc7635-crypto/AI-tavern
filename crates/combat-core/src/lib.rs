@@ -7,6 +7,7 @@ mod attack;
 mod attribute;
 mod command;
 mod cost;
+mod damage_bundle;
 mod damage_channel;
 mod effect;
 mod execution;
@@ -50,6 +51,11 @@ pub use cost::{
     CostReservationErrorCode, CostReservationModel, CostReservationMutationStatus,
     CostReservationReceipt, CostReservationRecord, CostReservationRequest, CostReservationStatus,
     ReservedCombatCost,
+};
+pub use damage_bundle::{
+    CommittedDamageEvent, DamageBundle, DamageBundleCommit, DamageBundleComponent,
+    DamageBundleError, DamageBundleErrorCode, DamageBundleProcessor, DamageLethalResolver,
+    WorkingDamageResult,
 };
 pub use damage_channel::{
     DamageChannelCatalog, DamageChannelCatalogError, DamageChannelCatalogErrorCode,

@@ -4120,3 +4120,23 @@ DealDamage 只排入 typed damage operation，留给 M3-T07 bundle；Revive 的 
 - Primitive 存在事实只有一份；后续层引用 ID/typed definition，不维护第二份 supported list。
 - `Spawn/AreaEffect/GrantExtraTurn` 未进入 v0.4 runtime set。
 - Working operation 不是 committed event；必须经对应 owner、LethalResolution、Invariant 与 atomic commit 后才能发布事实。
+
+## DEC-188：DamageBundle 在单个 Working CombatState 中闭合后一次提交
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §4.5.8–4.5.9，M3-T04/M3-T06/M3-T07
+
+### 决定
+
+Pure Core 新增 `DamageBundleProcessor`。它只接受 M3-T06 已解析的 `QueueDamage` operation，先校验 bundle/ID/tag/唯一 componentIndex，再按 componentIndex ASC 排序；每个 component 在同一个 CombatState clone 中复用 M3-T04 MitigationPipeline，后一个明确读取前一个更新后的整数 Shield/HP。
+
+所有普通 component 完成后，且仅在最终 Working HP=0 时调用一次 `DamageLethalResolver` owner boundary。随后将最终 Shield/HP 作为连续 provisional delta 写入、推进一次 state revision，并运行全局 CombatStateInvariantValidator。只有全部成功才原子替换原 state，并按 component 顺序返回 committed DamageResolved facts，最后返回一个 aggregate DamageApplied fact。
+
+任何输入、mitigation、lethal、overflow 或 invariant 失败都丢弃 working clone，原 state 保持字节等价且不会获得 committed facts。Processor 不提供 component 中途 trigger callback，因此 PostDamage/PostEffect 无法插入普通 Bundle。
+
+### 影响与边界
+
+- Lethal 的 SOLO/PARTY/Boss/Scripted 具体政策由 M3-T09/T10 实现该 owner boundary，不在 Bundle 复制。
+- Shield multiplier/bypass/disable、ShieldBroken 与 recharge interruption 由 M3-T08 扩展统一 ShieldResolution；当前保留 M3-T04 默认倍率 1。
+- WorkingDamageResult 仅用于同一事务后续计算；返回的 committed event 列表只在 state 已原子替换后可见。
