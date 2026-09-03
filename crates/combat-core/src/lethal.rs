@@ -235,7 +235,7 @@ fn apply_mutation(
     Ok(())
 }
 
-fn append_health_delta(
+pub(crate) fn append_health_delta(
     state: &mut CombatState,
     before: &CombatantRuntime,
     after: &CombatantRuntime,
@@ -257,6 +257,13 @@ fn append_health_delta(
             combatant_id: before.combatant_id.clone(),
             before: before.state,
             after: after.state,
+        }),
+        (before.solo_recovery_available != after.solo_recovery_available).then(|| {
+            ProvisionalDeltaEntry::SoloRecoveryAvailable {
+                combatant_id: before.combatant_id.clone(),
+                before: before.solo_recovery_available,
+                after: after.solo_recovery_available,
+            }
         }),
     ]
     .into_iter()
@@ -719,6 +726,7 @@ mod tests {
                 last_committed_timeline_order: None,
                 solo_recovery_available: false,
             }],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![],
             cost_reservations: vec![],
             resolution_context: None,

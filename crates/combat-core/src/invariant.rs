@@ -19,6 +19,7 @@ pub enum CombatStateInvariantCode {
     PressureResourceContractIncomplete,
     PressureResourceBoundsInvalid,
     CombatantStateHitPointsMismatch,
+    FormalPartyContractInvalid,
     CostReservationLedgerInvalid,
     ResolutionContextInvalid,
     EventSchedulerInvalid,
@@ -55,6 +56,7 @@ impl CombatStateInvariantValidator {
         for combatant in &state.combatants {
             validate_combatant(combatant)?;
         }
+        validate_formal_party(state)?;
         for reinforcement in &state.reinforcements.reinforcements {
             validate_combatant(&reinforcement.initial_runtime_snapshot)?;
         }
@@ -100,6 +102,35 @@ impl CombatStateInvariantValidator {
         })?;
         Ok(())
     }
+}
+
+fn validate_formal_party(state: &CombatState) -> Result<(), CombatStateInvariantError> {
+    let mut previous: Option<&str> = None;
+    for member_id in &state.formal_party_member_ids {
+        let member = state
+            .combatants
+            .iter()
+            .find(|combatant| combatant.combatant_id == *member_id)
+            .ok_or_else(|| CombatStateInvariantError {
+                code: CombatStateInvariantCode::FormalPartyContractInvalid,
+                combatant_id: member_id.clone(),
+                resource_id: None,
+            })?;
+        if previous.is_some_and(|value| value >= member_id)
+            || !matches!(
+                member.side,
+                crate::CombatSide::Player | crate::CombatSide::Companion
+            )
+        {
+            return Err(CombatStateInvariantError {
+                code: CombatStateInvariantCode::FormalPartyContractInvalid,
+                combatant_id: member_id.clone(),
+                resource_id: None,
+            });
+        }
+        previous = Some(member_id);
+    }
+    Ok(())
 }
 
 fn validate_combatant(combatant: &CombatantRuntime) -> Result<(), CombatStateInvariantError> {
@@ -357,6 +388,27 @@ mod tests {
     }
 
     #[test]
+    fn formal_party_members_are_stable_sorted_unique_and_player_aligned() {
+        let mut state = valid_state();
+        state.formal_party_member_ids = vec!["combatant-player".into()];
+        assert!(CombatStateInvariantValidator::validate(&state).is_ok());
+
+        for ids in [
+            vec!["missing".into()],
+            vec!["combatant-player".into(), "combatant-player".into()],
+        ] {
+            let mut invalid = state.clone();
+            invalid.formal_party_member_ids = ids;
+            assert_eq!(
+                CombatStateInvariantValidator::validate(&invalid)
+                    .unwrap_err()
+                    .code,
+                CombatStateInvariantCode::FormalPartyContractInvalid
+            );
+        }
+    }
+
+    #[test]
     fn working_state_may_be_temporarily_invalid_but_commit_validation_rejects_it() {
         let committed = valid_state();
         let mut working = committed.clone();
@@ -499,6 +551,7 @@ mod tests {
                 last_committed_timeline_order: Some(0),
                 solo_recovery_available: true,
             }],
+            formal_party_member_ids: vec![],
             combat_inventory: Vec::new(),
             cost_reservations: Vec::new(),
             resolution_context: None,

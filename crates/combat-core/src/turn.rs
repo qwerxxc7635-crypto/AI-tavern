@@ -841,6 +841,7 @@ mod tests {
                 })
                 .collect(),
             combatants,
+            formal_party_member_ids: vec![],
             combat_inventory: vec![],
             cost_reservations: vec![],
             resolution_context: None,

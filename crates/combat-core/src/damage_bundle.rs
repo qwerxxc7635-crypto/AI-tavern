@@ -350,6 +350,17 @@ fn append_provisional_delta(
             });
         bump_provisional_revision(state)?;
     }
+    if before.solo_recovery_available != after.solo_recovery_available {
+        state
+            .provisional_delta
+            .entries
+            .push(ProvisionalDeltaEntry::SoloRecoveryAvailable {
+                combatant_id: before.combatant_id.clone(),
+                before: before.solo_recovery_available,
+                after: after.solo_recovery_available,
+            });
+        bump_provisional_revision(state)?;
+    }
     Ok(())
 }
 
@@ -1056,6 +1067,7 @@ mod tests {
             last_committed_sequence: 0,
             phase: CombatPhase::BattleStart,
             combatants: vec![ally.clone(), enemy.clone()],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![],
             cost_reservations: vec![],
             resolution_context: None,

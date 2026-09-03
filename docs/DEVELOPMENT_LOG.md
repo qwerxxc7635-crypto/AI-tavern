@@ -5627,3 +5627,18 @@
 - `cargo test -p ember-combat-core`：159/159 PASS，其中新增 6 项覆盖 Status Tick/反伤同一闭环、MaxHP clamp lethal、Recovered/Downed 非 defeat event、invalid pending/mutation rollback、canonical MaxHP/CombatantState delta，以及 ShieldBroken/TargetDefeated order 与 second-kill suppression。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 315 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §4.5.8.1/§8.3/§11.3 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T09 PASS；下一项严格为 M3-T10 Downed / Revive / Solo Recovery。
+
+## 2026-09-03 — M3-T10 完成 Downed / Revive / Solo Recovery
+
+### CombatStart 模式锁定、标准 lethal policy 与独立 Revive
+
+- 从 M3-T09 提交 `1957d4a` 创建 `task/M3-T10-downed-revive-solo-recovery`。CombatState 新增 ordered `formalPartyMemberIds`；CombatStart initializer 校验 deployed Active Player/Companion 后一次锁定，SOLO/PARTY 只由该 snapshot 派生，未列入的 Drone/Summon 不改变模式。
+- `StandardLethalPolicy` 实现统一 resolver：SOLO 首次致命按注入比例 minimum-one 恢复、只消耗每战一次 availability；第二次致命 Defeated 并同事务创建 Defeat candidate。默认 30% 但测试注入 40% 得到不同恢复值，且 AP/resource 不变。
+- PARTY formal member 致命进入 Downed；另一 formal Active member或权威调用方已确认的 ExecutableRecoveryPath 可继续，否则同一 Working State 创建 Defeat candidate。没有 Death Save/Stability；非 formal 普通 combatant 默认 Defeated。
+- `RecoveryEffectProcessor` 只消费 typed Heal/Revive。Heal 对 Downed fail closed；Revive 仅接受 Downed+0HP，先恢复正 HP并转 Active，再执行 injected removeTags/applyStatus follow-up，最后 Invariant/atomic commit；对 Active Revive、0 MaxHP、follow-up failure 均不写正式 State。Solo availability 进入 provisional/canonical delta。新增 `DEC-191`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：167/167 PASS，其中新增 8 项覆盖 formal member mode lock/summon exclusion、tunable once recovery、second lethal candidate/fact、PARTY active/recovery-path/no-path、Heal/Revive target split、Revive event/order、follow-up rollback/success，以及 formal-party invariant。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 323 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §6.2/§11.3 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T10 PASS；下一项严格为 M3-T11 EncounterEffect / Reinforcement Adapter。

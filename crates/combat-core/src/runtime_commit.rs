@@ -22,6 +22,10 @@ pub enum CanonicalDomainValue {
         combatant_id: String,
         value: crate::CombatantState,
     },
+    SoloRecoveryAvailable {
+        combatant_id: String,
+        value: bool,
+    },
     Shield {
         combatant_id: String,
         value: i64,
@@ -520,6 +524,12 @@ fn chain_delta(
             },
         ) => *after = *next_after,
         (
+            ProvisionalDeltaEntry::SoloRecoveryAvailable { after, .. },
+            ProvisionalDeltaEntry::SoloRecoveryAvailable {
+                after: next_after, ..
+            },
+        ) => *after = *next_after,
+        (
             ProvisionalDeltaEntry::WorldFact { after_digest, .. },
             ProvisionalDeltaEntry::WorldFact {
                 after_digest: next_after,
@@ -552,6 +562,7 @@ fn domain_scalar(entry: &CanonicalDomainValue) -> DomainScalar {
         | CanonicalDomainValue::Resource { value, .. }
         | CanonicalDomainValue::ItemQuantity { value, .. } => DomainScalar::Integer(*value),
         CanonicalDomainValue::CombatantState { value, .. } => DomainScalar::CombatantState(*value),
+        CanonicalDomainValue::SoloRecoveryAvailable { value, .. } => DomainScalar::Boolean(*value),
         CanonicalDomainValue::StatusPresence { value, .. } => DomainScalar::Boolean(*value),
         CanonicalDomainValue::WorldFact { digest, .. } => DomainScalar::Digest(digest.clone()),
     }
@@ -566,6 +577,9 @@ fn delta_before(entry: &ProvisionalDeltaEntry) -> DomainScalar {
         | ProvisionalDeltaEntry::ItemQuantity { before, .. } => DomainScalar::Integer(*before),
         ProvisionalDeltaEntry::CombatantState { before, .. } => {
             DomainScalar::CombatantState(*before)
+        }
+        ProvisionalDeltaEntry::SoloRecoveryAvailable { before, .. } => {
+            DomainScalar::Boolean(*before)
         }
         ProvisionalDeltaEntry::StatusPresence { before, .. } => DomainScalar::Boolean(*before),
         ProvisionalDeltaEntry::WorldFact { before_digest, .. } => {
@@ -582,6 +596,7 @@ fn delta_after(entry: &ProvisionalDeltaEntry) -> DomainScalar {
         | ProvisionalDeltaEntry::Resource { after, .. }
         | ProvisionalDeltaEntry::ItemQuantity { after, .. } => DomainScalar::Integer(*after),
         ProvisionalDeltaEntry::CombatantState { after, .. } => DomainScalar::CombatantState(*after),
+        ProvisionalDeltaEntry::SoloRecoveryAvailable { after, .. } => DomainScalar::Boolean(*after),
         ProvisionalDeltaEntry::StatusPresence { after, .. } => DomainScalar::Boolean(*after),
         ProvisionalDeltaEntry::WorldFact { after_digest, .. } => {
             DomainScalar::Digest(after_digest.clone())
@@ -609,6 +624,11 @@ fn validate_runtime_projection(
             .iter()
             .find(|combatant| combatant.combatant_id == *combatant_id)
             .map(|combatant| DomainScalar::CombatantState(combatant.state)),
+        ProvisionalDeltaEntry::SoloRecoveryAvailable { combatant_id, .. } => state
+            .combatants
+            .iter()
+            .find(|combatant| combatant.combatant_id == *combatant_id)
+            .map(|combatant| DomainScalar::Boolean(combatant.solo_recovery_available)),
         ProvisionalDeltaEntry::Shield { combatant_id, .. } => state
             .combatants
             .iter()
@@ -688,6 +708,9 @@ fn validate_snapshot_entry(entry: &CanonicalDomainValue) -> Result<(), RuntimeCo
         CanonicalDomainValue::CombatantState { combatant_id, .. } => {
             validate_stable_id(combatant_id)?;
         }
+        CanonicalDomainValue::SoloRecoveryAvailable { combatant_id, .. } => {
+            validate_stable_id(combatant_id)?;
+        }
         CanonicalDomainValue::Resource {
             combatant_id,
             resource_id,
@@ -754,6 +777,9 @@ fn validate_delta_entry(entry: &ProvisionalDeltaEntry) -> Result<(), RuntimeComm
         ProvisionalDeltaEntry::CombatantState { combatant_id, .. } => {
             validate_stable_id(combatant_id)?;
         }
+        ProvisionalDeltaEntry::SoloRecoveryAvailable { combatant_id, .. } => {
+            validate_stable_id(combatant_id)?;
+        }
         ProvisionalDeltaEntry::Resource {
             combatant_id,
             resource_id,
@@ -815,6 +841,7 @@ enum DomainKey {
     HitPoints(String),
     MaxHitPoints(String),
     CombatantState(String),
+    SoloRecoveryAvailable(String),
     Shield(String),
     Resource(String, String),
     ItemQuantity(String, String),
@@ -832,6 +859,9 @@ fn domain_value_key(entry: &CanonicalDomainValue) -> DomainKey {
         }
         CanonicalDomainValue::CombatantState { combatant_id, .. } => {
             DomainKey::CombatantState(combatant_id.clone())
+        }
+        CanonicalDomainValue::SoloRecoveryAvailable { combatant_id, .. } => {
+            DomainKey::SoloRecoveryAvailable(combatant_id.clone())
         }
         CanonicalDomainValue::Shield { combatant_id, .. } => {
             DomainKey::Shield(combatant_id.clone())
@@ -864,6 +894,9 @@ fn delta_entry_key(entry: &ProvisionalDeltaEntry) -> DomainKey {
         ProvisionalDeltaEntry::CombatantState { combatant_id, .. } => {
             DomainKey::CombatantState(combatant_id.clone())
         }
+        ProvisionalDeltaEntry::SoloRecoveryAvailable { combatant_id, .. } => {
+            DomainKey::SoloRecoveryAvailable(combatant_id.clone())
+        }
         ProvisionalDeltaEntry::Shield { combatant_id, .. } => {
             DomainKey::Shield(combatant_id.clone())
         }
@@ -889,6 +922,9 @@ fn domain_key_subject(key: &DomainKey) -> String {
         DomainKey::HitPoints(combatant_id) => format!("hit-points:{combatant_id}"),
         DomainKey::MaxHitPoints(combatant_id) => format!("max-hit-points:{combatant_id}"),
         DomainKey::CombatantState(combatant_id) => format!("combatant-state:{combatant_id}"),
+        DomainKey::SoloRecoveryAvailable(combatant_id) => {
+            format!("solo-recovery-available:{combatant_id}")
+        }
         DomainKey::Shield(combatant_id) => format!("shield:{combatant_id}"),
         DomainKey::Resource(combatant_id, resource_id) => {
             format!("resource:{combatant_id}:{resource_id}")
@@ -1226,6 +1262,7 @@ mod tests {
         state.combatants[0].max_hit_points = 8;
         state.combatants[0].hit_points = 0;
         state.combatants[0].state = CombatantState::Defeated;
+        state.combatants[0].solo_recovery_available = true;
         let entries = vec![
             ProvisionalDeltaEntry::MaxHitPoints {
                 combatant_id: "hero".into(),
@@ -1242,6 +1279,11 @@ mod tests {
                 before: 10,
                 after: 0,
             },
+            ProvisionalDeltaEntry::SoloRecoveryAvailable {
+                combatant_id: "hero".into(),
+                before: false,
+                after: true,
+            },
         ];
         let snapshot = vec![
             CanonicalDomainValue::MaxHitPoints {
@@ -1256,15 +1298,27 @@ mod tests {
                 combatant_id: "hero".into(),
                 value: 10,
             },
+            CanonicalDomainValue::SoloRecoveryAvailable {
+                combatant_id: "hero".into(),
+                value: false,
+            },
         ];
 
         let canonical = canonicalize_delta(&snapshot, &entries, Some(&state)).unwrap();
-        assert_eq!(canonical.len(), 3);
+        assert_eq!(canonical.len(), 4);
         assert!(canonical.iter().any(|entry| matches!(
             entry,
             ProvisionalDeltaEntry::MaxHitPoints {
                 before: 10,
                 after: 8,
+                ..
+            }
+        )));
+        assert!(canonical.iter().any(|entry| matches!(
+            entry,
+            ProvisionalDeltaEntry::SoloRecoveryAvailable {
+                before: false,
+                after: true,
                 ..
             }
         )));
@@ -1337,6 +1391,7 @@ mod tests {
             last_committed_sequence: 0,
             phase: CombatPhase::BattleStart,
             combatants: vec![combatant()],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![CombatInventoryItemState {
                 owner_id: "hero".to_owned(),
                 item_id: "potion".to_owned(),

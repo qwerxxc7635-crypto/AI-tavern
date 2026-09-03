@@ -1111,6 +1111,7 @@ mod tests {
                 last_committed_timeline_order: None,
                 solo_recovery_available: false,
             }],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![CombatInventoryItemState {
                 owner_id: "actor-1".to_owned(),
                 item_id: "item-arrow".to_owned(),

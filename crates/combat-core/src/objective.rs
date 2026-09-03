@@ -1231,6 +1231,7 @@ mod tests {
             last_committed_sequence: 0,
             phase: CombatPhase::BattleStart,
             combatants: vec![ally.clone(), enemy.clone()],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![],
             cost_reservations: vec![],
             resolution_context: None,

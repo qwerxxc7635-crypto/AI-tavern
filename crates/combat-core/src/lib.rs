@@ -17,6 +17,7 @@ mod mitigation;
 mod numeric;
 mod objective;
 mod precondition;
+mod recovery;
 mod resolution;
 mod resolution_context;
 mod rng;
@@ -97,6 +98,12 @@ pub use precondition::{
     PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
     PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
     PreconditionTiming,
+};
+pub use recovery::{
+    CombatPartyMode, CombatPartyPolicy, CommittedRecoveryEvent, ExecutableRecoveryPath,
+    NoReviveFollowups, RecoveryEffectCommit, RecoveryEffectProcessor, RecoveryEffectRequest,
+    RecoveryRuleError, RecoveryRuleErrorCode, ReviveFollowupApplier, SoloRecoveryBalanceConfig,
+    StandardLethalPolicy,
 };
 pub use resolution::{
     ConditionalComparison, OpposedTieRule, ResolutionError, ResolutionErrorCode, ResolutionRequest,

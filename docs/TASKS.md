@@ -42,7 +42,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M3-T07 — DamageBundle + WorkingState Atomicity | PASS | 2026-09-03 | componentIndex 排序；共享 Working Shield/HP；Bundle 后单次 Lethal→Invariant→atomic commit→ordered facts |
 | M3-T08 — Shield / Barrier / Recharge | PASS | 2026-09-03 | 统一 ShieldResolution；倍率/Bypass/Disabled；committed ShieldBroken exactly-once；typed recharge decision |
 | M3-T09 — LethalResolution Core | PASS | 2026-09-03 | 单一 LethalResolutionCore；Pending outcome 非事件；HP/MaxHP/State delta；committed TargetDefeated attribution |
-| M3-T10 — Downed / Revive / Solo Recovery | IN_PROGRESS | 2026-09-03 | 下一项；锁定 SOLO/PARTY policy、once recovery、Downed/Revive 与 second lethal |
+| M3-T10 — Downed / Revive / Solo Recovery | PASS | 2026-09-03 | CombatStart formal-party lock；tunable once SoloRecovery；PARTY Downed/recovery path；atomic Revive |
+| M3-T11 — EncounterEffect / Reinforcement Adapter | IN_PROGRESS | 2026-09-03 | 下一项；Encounter/System 复用统一 pipeline；仅激活预声明 reinforcement；默认下一 Round |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

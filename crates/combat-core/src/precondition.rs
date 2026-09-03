@@ -905,6 +905,7 @@ mod tests {
                 combatant("enemy-1", CombatSide::Hostile),
                 combatant("enemy-2", CombatSide::Hostile),
             ],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![crate::CombatInventoryItemState {
                 owner_id: "actor-1".to_owned(),
                 item_id: "item-arrow".to_owned(),

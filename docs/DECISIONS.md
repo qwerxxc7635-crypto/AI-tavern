@@ -4188,3 +4188,28 @@ CombatantState 与 MaxHitPoints 新增为 provisional/canonical domain delta 类
 - Direct health transition 只消费已由 Effect owner 解析完成的 typed mutation；DealDamage 仍必须经过 DamageBundle/Mitigation/Shield，不获得绕过规则的 raw damage API。
 - SOLO charge、PARTY formal member、ExecutableRecoveryPath、Revive 与 terminal candidate 归 M3-T10，不在通用 resolver 内硬编码。
 - Boss phase 与 Scripted policy 由后续 code-owned policy 在 Working State 中完成，Core 只验证最终 lifecycle shape 与全局 invariant。
+
+## DEC-191：SOLO/PARTY 由 CombatStart formal-party snapshot 锁定，Revive 使用独立原子语义
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §6.2 Revive、§11.1、§11.3，M3-T09/M3-T10
+
+### 决定
+
+CombatState 新增 canonical ordered `formalPartyMemberIds`，由 `CombatPartyPolicy::initialize` 在 CombatStart 对已部署、Active、Player/Companion 成员一次性锁定。一个成员派生 SOLO，多个派生 PARTY；Summon/Pet/Drone 只有被明确列入该 snapshot 才会改变模式。非空 snapshot 不允许重新初始化，save/hash/invariant 保持该 deterministic input。
+
+SOLO 初始化时只给唯一 formal member 一次 `soloRecoveryAvailable`。`StandardLethalPolicy` 通过 M3-T09 resolver boundary 消费 tunable `restoreHpPercent`；默认 300,000 fixed（30%），恢复使用 `max(1,floor(MaxHP×percent/SCALE))`。首次致命只恢复 HP、保持 Active 并消耗 availability，不额外恢复 AP/resource、不授予无敌；第二次致命进入 Defeated，并在同一 Working State 添加 Defeat candidate。
+
+PARTY formal member 致命时进入 Downed。若仍有另一 formal Active member，或调用方依据当前权威 State 给出已验证的 `ExecutableRecoveryPath::Available`，不立即失败；否则同一 Working State 添加 Defeat candidate。仅“数据里拥有 Revive”不能映射为 Available。非 formal 普通 combatant 默认 Defeated；Boss/Scripted 继续使用专属 code-owned resolver。
+
+`soloRecoveryAvailable` 纳入 provisional/canonical delta 与最终 projection，确保战败 rollback 和胜利 commit 不会重复获得 charge。Formal party snapshot 是本场 Combat deterministic state，不作为战斗中变化的 world delta。
+
+Heal/Revive 通过 `RecoveryEffectProcessor` 分开解释：Heal 只允许 Active target，绝不改变 Downed；Revive 只允许 `Downed + HP=0 + MaxHP>0`，先恢复正 HP（cap MaxHP）、内建转为 Active，再调用 M4 Status owner 提供的 typed follow-up boundary 处理 removeTags/applyStatus，最后 Invariant 与 atomic commit。非空 follow-up 在尚无 Status owner 时 fail closed；任何 follow-up/invariant 失败均回滚整个 Working State。成功后才返回 ReviveApplied 与 StateTransition committed facts。
+
+### 影响与边界
+
+- SOLO/PARTY 不随倒地、死亡或战中出现的未列名 summon 动态切换。
+- 30% 是默认 Balance，不是硬编码机制；测试证明其他合法比例改变恢复量而不改变一次性规则。
+- v0.4 不新增 Death Save/Stability Counter；Downed 不获得正常行动的既有 Turn lifecycle 规则继续生效。
+- Revive follow-up 的实际 Status merge/tag owner 属 M4；当前 boundary 固定执行顺序和原子失败语义，不复制 Status Engine。

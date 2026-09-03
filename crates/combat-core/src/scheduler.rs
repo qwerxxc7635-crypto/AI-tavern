@@ -1098,6 +1098,7 @@ mod tests {
             last_committed_sequence: 0,
             phase: CombatPhase::Action,
             combatants: vec![combatant("actor-a"), combatant("actor-b")],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![],
             cost_reservations: vec![],
             resolution_context: None,

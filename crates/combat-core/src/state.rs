@@ -263,6 +263,11 @@ pub enum ProvisionalDeltaEntry {
         before: CombatantState,
         after: CombatantState,
     },
+    SoloRecoveryAvailable {
+        combatant_id: String,
+        before: bool,
+        after: bool,
+    },
     Shield {
         combatant_id: String,
         before: i64,
@@ -475,6 +480,7 @@ pub struct CombatState {
     pub last_committed_sequence: u64,
     pub phase: CombatPhase,
     pub combatants: Vec<CombatantRuntime>,
+    pub formal_party_member_ids: Vec<String>,
     pub combat_inventory: Vec<CombatInventoryItemState>,
     pub cost_reservations: Vec<CostReservationRecord>,
     pub resolution_context: Option<ResolutionContext>,
@@ -675,6 +681,7 @@ mod tests {
             last_committed_sequence: 7,
             phase: CombatPhase::Action,
             combatants: vec![player.clone(), enemy.clone()],
+            formal_party_member_ids: vec![],
             combat_inventory: vec![],
             cost_reservations: vec![],
             resolution_context: None,
