@@ -12,6 +12,7 @@ mod damage_channel;
 mod effect;
 mod encounter;
 mod execution;
+mod gameplay_tag;
 mod invariant;
 mod lethal;
 mod mitigation;
@@ -75,6 +76,10 @@ pub use encounter::{
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
     ExecutionRevalidationRequest, ExecutionRevalidationService, OnceUsageCommit,
+};
+pub use gameplay_tag::{
+    GameplayTagCatalog, GameplayTagCatalogError, GameplayTagCatalogErrorCode,
+    GameplayTagDefinition, GameplayTagId, GameplayTagNamespace, StaticGameplayTagDefinition,
 };
 pub use invariant::{
     CombatStateInvariantCode, CombatStateInvariantError, CombatStateInvariantValidator,

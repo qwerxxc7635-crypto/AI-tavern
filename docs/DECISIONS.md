@@ -4234,3 +4234,23 @@ Reinforcement 不作为 Effect Primitive，也不开放 Spawn/Summon Ability。C
 - 每个 reinforcement 是独立 atomic chain；批次中后项失败不会伪造其事件，也不会回滚此前已正式提交的稳定顺序激活。
 - Runtime registry 的 BattleStart 构造与 initiative RNG 预掷由后续 combat assembly owner 提供；M3-T11 只消费并验证已预声明、已预掷的数据。
 - Effect primitive 集合继续严格为 19 项，不加入 Spawn、Summon 或 runtime code。
+
+## DEC-193：Gameplay Tag 使用开放 Stable ID 与代码拥有的不可变静态 Catalog
+
+- 日期：2026-09-04
+- 状态：已采纳
+- 依据：V5.2 §7、Architecture Contract，M0-T05/M4-T01
+
+### 决定
+
+Gameplay Tag 的权威身份使用 `GameplayTagId` 开放字符串值对象，而不是随内容增长的全局 Enum。ID 至少包含 `Namespace.Name` 两段，长度有界，每段只能由 ASCII 字母开头并包含 ASCII 字母、数字、`_`、`-`；大小写与完整点分路径均属于 stable identity。`GameplayTagNamespace` 显式保存首段，definition 校验两者完全一致。
+
+`GameplayTagCatalog` 只能从 code-owned `&'static [StaticGameplayTagDefinition]` 一次构建，完整校验后按 TagId ASC canonicalize，并建立只读 lookup index；公开 API 不提供 add/register/remove 或 runtime handler。序列化只包含 canonical definitions，反序列化重新执行同一 validation 与排序。消费者的 tag set 必须通过 catalog 的 known-ID 与严格升序唯一校验。
+
+v0.4.1 内建 catalog 仅冻结 V5.2 §7 明示的 15 个公共示例身份，覆盖 Ability、Element、Damage、Status、Character namespace。Tag definition 只含 ID 与 namespace，不携带表达式、执行 logic、handler、AI exposure 或 presentation；具体行为仍由 Effect/Status/Reaction 等 owner 解释。AI 是否可产生/引用 Tag 留给 M6 Mechanical Intent / Exposure Policy，Catalog 不维护第二份 AI 白名单。
+
+### 影响与边界
+
+- 新内容词汇通过版本化静态 catalog 演进，不修改 Rust enum，也不启用 runtime plugin registry。
+- Catalog 只回答身份是否存在及 canonical order，不执行规则，不取代 DamageChannelCatalog 或 WorldCombatProfile。
+- M4-T02 才定义 Status schema/runtime instance；M4-T03 才集中解释 stack/refresh cross-product。

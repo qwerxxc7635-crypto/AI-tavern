@@ -5656,4 +5656,18 @@
 
 - `cargo test -p ember-combat-core`：174/174 PASS，其中新增 7 项覆盖统一 damage/lethal、统一 recovery、外部/Ability source 拒绝、预掷 initiative 与 RNG 不变、next-round roster、save restore、unknown/repeat atomic failure、registry invariant 及无 Spawn/Summon。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 330 PASS、1 credential-only ignore，archive interop双向通过。
-- Scope/DoD、V5.2 §6.3/§6.3.1 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T11 与 M3 Gate/Gate B PASS；下一项严格为 M4-T01 Status Definition / Instance / Merge Policy。
+- Scope/DoD、V5.2 §6.3/§6.3.1 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T11 与 M3 Gate/Gate B PASS；下一项严格为 M4-T01 GameplayTagCatalog。
+
+## 2026-09-04 — M4-T01 完成 GameplayTagCatalog
+
+### Stable TagId、namespace 与静态只读 Catalog
+
+- 从 M3-T11 提交 `e4ed77d` 创建 `task/M4-T01-gameplay-tag-catalog`。新增 `GameplayTagId`/`GameplayTagNamespace` 开放字符串值对象，强制有界点分 Stable ID、合法 segment 与 namespace 首段精确一致；没有扩张型 Tag enum。
+- `GameplayTagCatalog::from_static` 只接受 code-owned static definitions，完整校验后按 TagId ASC canonicalize，并建立不可变 BTreeMap lookup index；无 incremental registration、runtime handler、plugin/DSL 或执行 API。serde restore 重新校验并排序，输入数组顺序不会改变输出字节。
+- 内建 v0.4.1 catalog 精确覆盖 V5.2 §7 列出的 15 个 Ability/Element/Damage/Status/Character 标签示例。Definition wire shape 只有 tagId/namespace，unknown handler/logic 字段 fail closed；AI exposure 不进入 Catalog。消费者可统一校验 known、sorted、unique tag sets。新增 `DEC-193`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：180/180 PASS，其中新增 6 项覆盖 Stable ID/namespace、输入顺序无关 canonical serde、冻结 catalog、malformed/mismatch/duplicate/empty、known canonical set 与无 logic/handler/AI exposure wire shape。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 336 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §7、Architecture Contract 与 M0-T05 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T01 PASS；下一项严格为 M4-T02 Status Definition / Runtime Instance。
