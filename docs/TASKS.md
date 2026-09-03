@@ -46,7 +46,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M3-T11 — EncounterEffect / Reinforcement Adapter | PASS | 2026-09-03 | InternalDeterministic-only；共享 Resolution/Effect/Damage/Recovery/Lethal/Invariant/Commit；预声明援军稳定顺序、下一 Round |
 | M3 Gate | PASS | 2026-09-03 | M3-T01..T11 独立验收；Gate B：fixed numeric→resolution→effect→damage/shield/lethal/recovery→encounter reinforcement 闭环 |
 | M4-T01 — GameplayTagCatalog | PASS | 2026-09-04 | Stable TagId + namespace + immutable static catalog；canonical ordering/serialization；无执行逻辑/动态 handler/AI 白名单 |
-| M4-T02 — Status Definition / Runtime Instance | IN_PROGRESS | 2026-09-04 | 下一项；definition/instance/versioned schema，不提前实现 merge engine |
+| M4-T02 — Status Definition / Runtime Instance | PASS | 2026-09-04 | versioned definition/runtime；typed stack/refresh/duration/tick/trigger；clock identity 与 canonical application order |
+| M4-T03 — Status Merge Policy | IN_PROGRESS | 2026-09-04 | 下一项；集中解释 Add/Replace/HighestOnly/IndependentStacks 与 refresh cross-product |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

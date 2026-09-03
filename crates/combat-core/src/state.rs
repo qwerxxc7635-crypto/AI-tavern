@@ -62,14 +62,19 @@ pub struct ResourceState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct StatusRuntime {
+    pub status_schema_version: u32,
     pub status_instance_id: String,
-    pub definition_id: String,
-    pub source_id: String,
+    pub status_definition_id: String,
+    pub source_combatant_id: Option<String>,
     pub stack_group_id: String,
     pub stack_count: i64,
     pub remaining_duration: Option<i64>,
     pub duration_clock: DurationClock,
     pub application_sequence: u64,
+    pub activation_clock_index: u64,
+    pub applied_round_index: u64,
+    pub applied_owner_turn_index: Option<u64>,
+    pub strength_rank: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -849,14 +854,19 @@ mod tests {
                 hard_max_value: None,
             }],
             statuses: vec![StatusRuntime {
+                status_schema_version: 1,
                 status_instance_id: format!("status-{id}"),
-                definition_id: "status-guarded".to_owned(),
-                source_id: id.to_owned(),
+                status_definition_id: "status-guarded".to_owned(),
+                source_combatant_id: Some(id.to_owned()),
                 stack_group_id: "guarded".to_owned(),
                 stack_count: 1,
                 remaining_duration: Some(2),
                 duration_clock: DurationClock::OwnerTurn,
                 application_sequence: 1,
+                activation_clock_index: 1,
+                applied_round_index: 1,
+                applied_owner_turn_index: Some(0),
+                strength_rank: None,
             }],
             ability_usage: vec![AbilityUsageState {
                 ability_id: "ability-basic-attack".to_owned(),

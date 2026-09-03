@@ -4254,3 +4254,25 @@ v0.4.1 内建 catalog 仅冻结 V5.2 §7 明示的 15 个公共示例身份，�
 - 新内容词汇通过版本化静态 catalog 演进，不修改 Rust enum，也不启用 runtime plugin registry。
 - Catalog 只回答身份是否存在及 canonical order，不执行规则，不取代 DamageChannelCatalog 或 WorldCombatProfile。
 - M4-T02 才定义 Status schema/runtime instance；M4-T03 才集中解释 stack/refresh cross-product。
+
+## DEC-194：Status Definition 与 Runtime Instance 分离版本化，合并行为留给单一 Merge Owner
+
+- 日期：2026-09-04
+- 状态：已采纳
+- 依据：V5.2 §8、§9、§9.0、§9.1，M4-T01/M4-T02
+
+### 决定
+
+Status Definition 使用 `statusSchemaVersion=1` 的 closed schema，显式包含 `statusDefinitionId/tags/stackGroupId/stackMode/maxStacks/duration/refreshPolicy/priority/tickPhase/dispelTags/immunityTags/effects/triggers/strengthRank`。StackMode、RefreshPolicy、activation、tick、expiry 与 trigger hook 都是冻结语义的 tagged enum；Tag 必须来自 M4-T01 GameplayTagCatalog 且为严格升序唯一集合。Effect 复用 M3-T06 typed primitives，Definition 不携带 runtime code。
+
+Duration definition 同时记录 `DurationClock`、正 duration（Permanent 时为 null）、`NEXT_CLOCK/CURRENT_CLOCK` activation 和 expiry phase。M4-T02 只验证持久形状与 stable IDs；clock 消耗行为归 M4-T04。Trigger definition 保存 stable trigger ID、typed hook、priority 与 ordered effects；入队/legality/loop guard 行为归 M4-T06。
+
+Combatant 的 `StatusRuntime` 升级为 versioned runtime record，保存 `statusInstanceId/statusDefinitionId/sourceCombatantId?/stackGroupId/stackCount/remainingDuration/durationClock/applicationSequence/activationClockIndex/appliedRoundIndex/appliedOwnerTurnIndex?/strengthRank?`。Runtime collection 按 `applicationSequence ASC → statusInstanceId ASC` canonicalize/验证，CombatState invariant 在 commit/restore 时拒绝非法版本、ID、层数、duration 或顺序。
+
+M4-T02 不解释 StackMode 与 RefreshPolicy 的 cross-product，也不实现 apply/remove/tick；所有合并行为与非法组合集中由 M4-T03 `StatusMergePolicy` 拥有，避免 schema、runtime 和 UI 各自复制语义。
+
+### 影响与边界
+
+- Runtime record 字段变更属于尚未 durable 落库的 v0.4 snapshot contract；正式旧存档兼容迁移统一在 M10 实现并取证。
+- `applicationSequence` 是 engine 分配的正稳定序列；首次 clock 身份足以让 M4-T04/M10 在 save/load/replay 后继续同一 duration future。
+- Trigger hook enum 是订阅身份，不是第二套 scheduler；M4-T06 必须映射到 Canonical Scheduler。

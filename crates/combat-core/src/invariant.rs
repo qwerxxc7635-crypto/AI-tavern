@@ -26,6 +26,7 @@ pub enum CombatStateInvariantCode {
     TurnRoundStateInvalid,
     ObjectiveRuntimeInvalid,
     ReinforcementRegistryInvalid,
+    StatusRuntimeInvalid,
     TerminalOutcomeInvalid,
 }
 
@@ -242,6 +243,13 @@ fn validate_combatant(combatant: &CombatantRuntime) -> Result<(), CombatStateInv
     for resource in &combatant.resources {
         validate_resource(combatant, resource)?;
     }
+    crate::StatusSchemaValidator::validate_runtime_collection(&combatant.statuses).map_err(
+        |_| CombatStateInvariantError {
+            code: CombatStateInvariantCode::StatusRuntimeInvalid,
+            combatant_id: combatant.combatant_id.clone(),
+            resource_id: None,
+        },
+    )?;
     match combatant.state {
         CombatantState::Active if combatant.hit_points == 0 => Err(combatant_error(
             combatant,

@@ -5671,3 +5671,17 @@
 - `cargo test -p ember-combat-core`：180/180 PASS，其中新增 6 项覆盖 Stable ID/namespace、输入顺序无关 canonical serde、冻结 catalog、malformed/mismatch/duplicate/empty、known canonical set 与无 logic/handler/AI exposure wire shape。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 336 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §7、Architecture Contract 与 M0-T05 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T01 PASS；下一项严格为 M4-T02 Status Definition / Runtime Instance。
+
+## 2026-09-04 — M4-T02 完成 Status Definition / Runtime Instance
+
+### 可版本化 schema、typed hooks 与 runtime clock identity
+
+- 从 M4-T01 提交 `6183d59` 创建 `task/M4-T02-status-definition-runtime-instance`。新增 `StatusDefinition` version 1，覆盖冻结的 tags、stackGroup、stackMode、maxStacks、duration、refreshPolicy、priority、tickPhase、dispel/immunity tags、typed effects/triggers 与 strengthRank；所有开放身份走 stable string/GameplayTagCatalog，所有封闭规则语义走 tagged enum。
+- Duration schema 固定 OWNER_TURN/ROUND/PERMANENT、NEXT_CLOCK/CURRENT_CLOCK、positive duration/null permanent 与 typed expiry phase；本项只验证 record，不提前推进 clock。Trigger schema固定 §8 事件身份、priority 与 ordered Effect primitive；不建立独立 dispatcher/scheduler。
+- `StatusRuntime` 扩充 statusSchemaVersion、definition/source identity、stack、remaining duration、applicationSequence、activationClockIndex、appliedRoundIndex/appliedOwnerTurnIndex 与 strengthRank。Runtime collection 强制 `applicationSequence ASC → statusInstanceId ASC`，并接入全局 CombatState invariant/save restore。新增 `DEC-194`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：186/186 PASS，其中新增 6 项覆盖完整 Definition serde、Runtime clock identity round-trip、非法版本/ID/tag/duration/trigger、canonical application order、runtime duration shape 与 unknown/runtime-code rejection。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 342 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §8/§9/§9.0/§9.1 与 M4-T01 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T02 PASS；下一项严格为 M4-T03 Status Merge Policy。

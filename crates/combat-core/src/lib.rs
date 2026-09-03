@@ -27,6 +27,7 @@ mod runtime_commit;
 mod scheduler;
 mod shield;
 mod state;
+mod status;
 mod submission;
 mod terminal;
 mod turn;
@@ -154,6 +155,12 @@ pub use state::{
     ReinforcementRuntimeState, ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus,
     RoundRuntimeState, SchedulerItem, SchedulerItemKind, StatusRuntime, TerminalPriorityPolicy,
     TerminalPriorityTier, TimelineEntry, UsageCounterScope, UsageCounterState,
+};
+pub use status::{
+    CURRENT_STATUS_SCHEMA_VERSION, StatusActivationPolicy, StatusDefinition,
+    StatusDurationDefinition, StatusExpiryPhase, StatusRefreshPolicy, StatusSchemaError,
+    StatusSchemaErrorCode, StatusSchemaValidator, StatusStackMode, StatusTickPhase,
+    StatusTriggerDefinition, StatusTriggerHook,
 };
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,

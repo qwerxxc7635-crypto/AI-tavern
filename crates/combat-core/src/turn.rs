@@ -683,14 +683,19 @@ mod tests {
         controlled.combatants[0]
             .statuses
             .push(crate::StatusRuntime {
+                status_schema_version: 1,
                 status_instance_id: "status-stun".to_owned(),
-                definition_id: "stun".to_owned(),
-                source_id: "actor-b".to_owned(),
+                status_definition_id: "stun".to_owned(),
+                source_combatant_id: Some("actor-b".to_owned()),
                 stack_group_id: "stun".to_owned(),
                 stack_count: 1,
                 remaining_duration: Some(1),
                 duration_clock: crate::DurationClock::OwnerTurn,
                 application_sequence: 1,
+                activation_clock_index: 1,
+                applied_round_index: 1,
+                applied_owner_turn_index: Some(0),
+                strength_rank: None,
             });
         TurnRoundStateMachine::begin_round(&mut controlled).unwrap();
         start_next(&mut controlled);
