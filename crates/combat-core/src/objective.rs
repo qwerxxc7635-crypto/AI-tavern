@@ -913,6 +913,7 @@ mod tests {
             .initial_runtime_snapshot
             .clone();
         defeat(&mut deployed);
+        state.timeline.push(timeline(&deployed, 3));
         state.combatants.push(deployed);
         state.reinforcements.reinforcements[0].is_deployed = true;
         let second =

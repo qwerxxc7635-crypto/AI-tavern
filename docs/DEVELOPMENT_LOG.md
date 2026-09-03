@@ -5642,3 +5642,18 @@
 - `cargo test -p ember-combat-core`：167/167 PASS，其中新增 8 项覆盖 formal member mode lock/summon exclusion、tunable once recovery、second lethal candidate/fact、PARTY active/recovery-path/no-path、Heal/Revive target split、Revive event/order、follow-up rollback/success，以及 formal-party invariant。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 323 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §6.2/§11.3 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T10 PASS；下一项严格为 M3-T11 EncounterEffect / Reinforcement Adapter。
+
+## 2026-09-03 — M3-T11 完成 EncounterEffect / Reinforcement Adapter
+
+### 统一内部规则入口与预声明援军激活
+
+- 从 M3-T10 提交 `3de01be` 创建 `task/M3-T11-encounter-effect-reinforcement`。新增 `EncounterRuleExecutor`，只接受现有 command boundary 验证的 InternalDeterministic/InternalRuleAction；rule ID、stable-sorted targets 与版本均 fail closed，且内部 action 不进入玩家 AcceptedCommand history。
+- Encounter damage 通过 `ResolutionResolver` 与同一 `EffectHandlerSet` 解析，随后复用 DamageBundle→WorkingState→Lethal→Invariant→atomic commit。Heal/Revive 复用 Recovery processor。局部数值覆盖收敛在 typed `EncounterDamageRule`/services，不建立第二套 handler、Generic Capability Engine 或直接 State writer。
+- Reinforcement activation 只消费 CombatState 中预声明 stable ID、definition snapshot、objective membership 与 stored initiative；unknown、重复部署或 live-state collision 不写状态。多目标按 command 的 Stable ID ASC 逐个 atomic commit并生成 ordered `ReinforcementActivated` facts，不访问 RNG。
+- 新单位按 `InitiativeResult DESC → InitiativeBaseStat DESC → StableCombatantID ASC` 进入 normal timeline，但当前 RoundRoster 保持原样；下一 RoundStart 才进入 roster。save/hash round-trip 保留部署位和预掷 initiative。全局 invariant 新增 registry identity、ordered uniqueness、undeployed absence 与 deployed live/timeline 唯一性校验；Effect registry 仍无 Spawn/Summon。新增 `DEC-192`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：174/174 PASS，其中新增 7 项覆盖统一 damage/lethal、统一 recovery、外部/Ability source 拒绝、预掷 initiative 与 RNG 不变、next-round roster、save restore、unknown/repeat atomic failure、registry invariant 及无 Spawn/Summon。
+- strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 330 PASS、1 credential-only ignore，archive interop双向通过。
+- Scope/DoD、V5.2 §6.3/§6.3.1 与 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M3-T11 与 M3 Gate/Gate B PASS；下一项严格为 M4-T01 Status Definition / Instance / Merge Policy。

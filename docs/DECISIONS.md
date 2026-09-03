@@ -4213,3 +4213,24 @@ Heal/Revive 通过 `RecoveryEffectProcessor` 分开解释：Heal 只允许 Activ
 - 30% 是默认 Balance，不是硬编码机制；测试证明其他合法比例改变恢复量而不改变一次性规则。
 - v0.4 不新增 Death Save/Stability Counter；Downed 不获得正常行动的既有 Turn lifecycle 规则继续生效。
 - Revive follow-up 的实际 Status merge/tag owner 属 M4；当前 boundary 固定执行顺序和原子失败语义，不复制 Status Engine。
+
+## DEC-192：Encounter 仅作为可信命令来源，援军只能激活预声明运行时条目
+
+- 日期：2026-09-03
+- 状态：已采纳
+- 依据：V5.2 §6.3、§6.3.1，M2-T07/M3-T06/M3-T09/M3-T11
+
+### 决定
+
+Encounter/Boss/System Rule 不拥有第二条 CombatState 写入路径。`EncounterRuleExecutor` 只接受经现有 command boundary 验证的 `InternalDeterministic + InternalRuleAction`，并要求 source/payload rule ID 一致、目标 stable ID 严格升序且 command versions 与当前 State 一致。该来源不会写入玩家 `AcceptedCommandLedger`。伤害 action 先由统一 `ResolutionResolver` 和 `EffectHandlerSet` 解析，再进入既有 DamageBundle→WorkingState→Lethal→Invariant→atomic commit；Heal/Revive 同样进入既有 Recovery processor。Encounter 伤害调整只使用 subsystem-owned `EncounterDamageRule`，不创建 Generic Capability Engine。
+
+Reinforcement 不作为 Effect Primitive，也不开放 Spawn/Summon Ability。CombatStart 预声明 registry 持有 stable combatant ID、definition reference、initial runtime snapshot、objective membership 与预掷 initiative；激活只查找该条目、拒绝 unknown/already-deployed/conflicting live state，将 snapshot 恢复为 Active 并附着已存 initiative。多个目标由 command boundary 保证 stable ID 升序，再逐个执行独立 clone→Invariant→atomic commit，成功后才发布 `ReinforcementActivated` fact。
+
+激活会重建 normal timeline 的冻结先攻顺序 `InitiativeResult DESC → InitiativeBaseStat DESC → StableCombatantID ASC`，但不改写当前 `RoundRoster`，所以新单位只会在下一次 RoundStart 构建 roster 时进入。路径不访问 Combat RNG；部署位与预掷 initiative 都进入既有 CombatState save/hash。全局 invariant 新增 registry 完整性检查：条目有序唯一，snapshot identity/definition/Active shape 一致；未部署单位不得出现在 live combatants、timeline 或 roster，已部署单位必须恰好存在一个 live combatant 和 normal timeline entry。
+
+### 影响与边界
+
+- Encounter 仍只能调用当前 owner 已实现的具体执行入口；M4 Status 等后续 owner 未实现前不会获得通用状态写权限。
+- 每个 reinforcement 是独立 atomic chain；批次中后项失败不会伪造其事件，也不会回滚此前已正式提交的稳定顺序激活。
+- Runtime registry 的 BattleStart 构造与 initiative RNG 预掷由后续 combat assembly owner 提供；M3-T11 只消费并验证已预声明、已预掷的数据。
+- Effect primitive 集合继续严格为 19 项，不加入 Spawn、Summon 或 runtime code。

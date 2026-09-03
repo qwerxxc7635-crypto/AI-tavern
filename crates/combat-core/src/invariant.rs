@@ -25,6 +25,7 @@ pub enum CombatStateInvariantCode {
     EventSchedulerInvalid,
     TurnRoundStateInvalid,
     ObjectiveRuntimeInvalid,
+    ReinforcementRegistryInvalid,
     TerminalOutcomeInvalid,
 }
 
@@ -57,9 +58,7 @@ impl CombatStateInvariantValidator {
             validate_combatant(combatant)?;
         }
         validate_formal_party(state)?;
-        for reinforcement in &state.reinforcements.reinforcements {
-            validate_combatant(&reinforcement.initial_runtime_snapshot)?;
-        }
+        validate_reinforcements(state)?;
         CostReservationModel::validate_state(state).map_err(|error| CombatStateInvariantError {
             code: CombatStateInvariantCode::CostReservationLedgerInvalid,
             combatant_id: error.subject_id,
@@ -102,6 +101,60 @@ impl CombatStateInvariantValidator {
         })?;
         Ok(())
     }
+}
+
+fn validate_reinforcements(state: &CombatState) -> Result<(), CombatStateInvariantError> {
+    let mut previous: Option<&str> = None;
+    for reinforcement in &state.reinforcements.reinforcements {
+        let id = reinforcement.combatant_id.as_str();
+        let snapshot = &reinforcement.initial_runtime_snapshot;
+        validate_combatant(snapshot)?;
+        let live_matches = state
+            .combatants
+            .iter()
+            .filter(|combatant| combatant.combatant_id == id)
+            .count();
+        let timeline_matches = state
+            .timeline
+            .iter()
+            .filter(|entry| !entry.is_extra_turn && entry.combatant_id == id)
+            .count();
+        let roster_contains = state
+            .round
+            .roster
+            .iter()
+            .any(|entry| entry.combatant_id == id);
+        let objective_ids_are_ordered = reinforcement
+            .objective_membership_ids
+            .windows(2)
+            .all(|pair| pair[0] < pair[1]);
+        let deployed_snapshot_matches = state.combatants.iter().any(|combatant| {
+            combatant.combatant_id == id
+                && combatant.definition_id == reinforcement.definition_ref
+                && combatant.initiative_result == reinforcement.initiative_result
+                && combatant.initiative_base_stat == reinforcement.initiative_base_stat
+        });
+
+        if id.is_empty()
+            || previous.is_some_and(|value| value >= id)
+            || snapshot.combatant_id != id
+            || snapshot.definition_id != reinforcement.definition_ref
+            || snapshot.state != CombatantState::Active
+            || !objective_ids_are_ordered
+            || (!reinforcement.is_deployed
+                && (live_matches != 0 || timeline_matches != 0 || roster_contains))
+            || (reinforcement.is_deployed
+                && (live_matches != 1 || timeline_matches != 1 || !deployed_snapshot_matches))
+        {
+            return Err(CombatStateInvariantError {
+                code: CombatStateInvariantCode::ReinforcementRegistryInvalid,
+                combatant_id: reinforcement.combatant_id.clone(),
+                resource_id: None,
+            });
+        }
+        previous = Some(id);
+    }
+    Ok(())
 }
 
 fn validate_formal_party(state: &CombatState) -> Result<(), CombatStateInvariantError> {

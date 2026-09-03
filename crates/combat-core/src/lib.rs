@@ -10,6 +10,7 @@ mod cost;
 mod damage_bundle;
 mod damage_channel;
 mod effect;
+mod encounter;
 mod execution;
 mod invariant;
 mod lethal;
@@ -66,6 +67,10 @@ pub use damage_channel::{
 pub use effect::{
     EffectAmount, EffectDefinition, EffectError, EffectErrorCode, EffectHandlerSet,
     EffectPrimitiveId, EffectValueContext, ResolvedEffect, StatModification,
+};
+pub use encounter::{
+    CommittedEncounterEvent, EncounterDamageRule, EncounterDamageServices, EncounterRuleError,
+    EncounterRuleErrorCode, EncounterRuleExecutor, ReinforcementActivationCommit,
 };
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
