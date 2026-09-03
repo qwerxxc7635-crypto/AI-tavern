@@ -28,6 +28,7 @@ mod scheduler;
 mod shield;
 mod state;
 mod status;
+mod status_merge;
 mod submission;
 mod terminal;
 mod turn;
@@ -161,6 +162,10 @@ pub use status::{
     StatusDurationDefinition, StatusExpiryPhase, StatusRefreshPolicy, StatusSchemaError,
     StatusSchemaErrorCode, StatusSchemaValidator, StatusStackMode, StatusTickPhase,
     StatusTriggerDefinition, StatusTriggerHook,
+};
+pub use status_merge::{
+    StatusMergeEngine, StatusMergeError, StatusMergeErrorCode, StatusMergeNoOpReason,
+    StatusMergeOutcome, StatusMergePolicy,
 };
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,

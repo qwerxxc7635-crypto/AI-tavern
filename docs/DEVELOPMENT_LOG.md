@@ -5685,3 +5685,17 @@
 - `cargo test -p ember-combat-core`：186/186 PASS，其中新增 6 项覆盖完整 Definition serde、Runtime clock identity round-trip、非法版本/ID/tag/duration/trigger、canonical application order、runtime duration shape 与 unknown/runtime-code rejection。
 - strict Clippy、Rustfmt、Prettier、`git diff --check` 与完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 342 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §8/§9/§9.0/§9.1 与 M4-T01 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T02 PASS；下一项严格为 M4-T03 Status Merge Policy。
+
+## 2026-09-04 — M4-T03 完成 Status Merge Policy
+
+### 单一 merge owner、canonical lookup 与原子 outcome
+
+- 从 M4-T02 提交 `7b11f03` 创建 `task/M4-T03-status-merge-policy`。新增 `StatusMergePolicy`，在进入 Runtime 前集中拒绝 Add+IndependentDuration、Replace 非 ReplaceDuration/maxStacks≠1、HighestOnly 缺 rank/maxStacks≠1/IndependentDuration，以及 IndependentStacks 非 IndependentDuration；enum 只承载数据，不解释行为。
+- 新增唯一 `StatusMergeEngine`。Candidate 只取 exact stackGroup 并显式按 `applicationSequence ASC → statusInstanceId ASC` 排序；unique mode 遇到旧数据重复实例 deterministic fail closed，不依赖数组/Map/DB 顺序，也不在 Runtime 静默执行迁移修复。
+- Add 保留既有 instance/activation、checked 增层到 cap 后继续执行 Keep/Refresh/Extend/Replace duration；Replace 原子返回 removed/applied；HighestOnly 严格按 rank DESC、definition ID ASC 决胜，完全相同定义/rank 才 refresh；IndependentStacks 达 cap 后不 eviction、不 refresh。Typed Apply/Replace/NoOp outcome 固定单次提交与后续事件投影所需 metadata，但本项不直接写 State 或发布 Event。新增 `DEC-195`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：194/194 PASS，其中新增 8 项覆盖非法 cross-product、Add 四种 refresh/cap、Replace incoming identity、HighestOnly rank/ID/reapply、IndependentStacks cap、输入顺序无关 duplicate failure、malformed incoming/sequence，以及 over-cap/cross-clock existing state fail-closed。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 351 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §9.0 与 M4-T02 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T03 PASS；下一项严格为 M4-T04 Duration / Cooldown Clock。

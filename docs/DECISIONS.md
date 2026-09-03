@@ -4276,3 +4276,24 @@ M4-T02 不解释 StackMode 与 RefreshPolicy 的 cross-product，也不实现 ap
 - Runtime record 字段变更属于尚未 durable 落库的 v0.4 snapshot contract；正式旧存档兼容迁移统一在 M10 实现并取证。
 - `applicationSequence` 是 engine 分配的正稳定序列；首次 clock 身份足以让 M4-T04/M10 在 save/load/replay 后继续同一 duration future。
 - Trigger hook enum 是订阅身份，不是第二套 scheduler；M4-T06 必须映射到 Canonical Scheduler。
+
+## DEC-195：Status 合并由单一 Policy/Engine 解释并返回原子 transition
+
+- 日期：2026-09-04
+- 状态：已采纳
+- 依据：V5.2 §9.0，M4-T02/M4-T03
+
+### 决定
+
+`StatusMergePolicy` 是 `stackMode + refreshPolicy + maxStacks + strengthRank` cross-product 的唯一前置验证 owner；非法组合在任何 Runtime merge 前 fail closed。`StatusMergeEngine` 是四种 stack mode 与五种 refresh policy 的唯一行为解释入口，不在 Status enum、UI、持久层或内容定义中复制逻辑。
+
+查找只接受完全相同 `stackGroupId`，并始终按 `applicationSequence ASC → statusInstanceId ASC` 排序。Add 保留既有 logical identity/activation，层数 capped 后仍执行 refresh；Replace 只允许 incoming identity 完整替换；HighestOnly 只比较 `strengthRank DESC → statusDefinitionId ASC`，完全相同定义与 rank 才 refresh；IndependentStacks 只新增独立 identity，达到上限后 no-op 且不淘汰或刷新任何现有实例。
+
+Engine 返回 typed atomic outcome：Apply 只描述一次 stack/duration transition，Replace 同时携带 old/new 以固定 `StatusRemoved(old) → StatusApplied(new)`，NoOp 携带结构化原因且不暗示事件。Engine 不直接写 CombatState 或发布 Event；M4-T06 owner 在成功 commit 后投影事件。意外出现多个本应唯一的同组实例时 Runtime deterministic fail closed，canonical migration/repair 留给 M10，避免运行时静默修复旧数据。
+
+### 影响与边界
+
+- Refresh 保留原 `statusInstanceId` 与 `activationClockIndex`；真正替换才使用 incoming application identity、duration 与 activation。
+- Extend 使用 checked addition；overflow、malformed incoming、重复 instance ID 与非单调 application sequence 都在 mutation 前拒绝。
+- Hard duration cap 属具体 Ruleset/Control owner，当前通用 merge 不猜测未提供的 cap。
+- Clock 推进/expiry 属 M4-T04；dispel/immunity 属 M4-T05；trigger scheduling 与 committed event publication 属 M4-T06。
