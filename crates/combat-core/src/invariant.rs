@@ -607,6 +607,7 @@ mod tests {
                 ability_usage: Vec::new(),
                 basic_attack_count_this_normal_owner_turn: 0,
                 once_usage_counters: Vec::new(),
+                normal_owner_turn_index: 0,
                 initiative_result: 12,
                 initiative_base_stat: 2,
                 last_committed_timeline_order: Some(0),

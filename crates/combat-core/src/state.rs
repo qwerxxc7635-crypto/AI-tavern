@@ -74,6 +74,8 @@ pub struct StatusRuntime {
     pub activation_clock_index: u64,
     pub applied_round_index: u64,
     pub applied_owner_turn_index: Option<u64>,
+    pub tick_eligible_clock_index: u64,
+    pub last_duration_advanced_clock_index: Option<u64>,
     pub strength_rank: Option<i64>,
 }
 
@@ -122,6 +124,7 @@ pub struct CombatantRuntime {
     pub ability_usage: Vec<AbilityUsageState>,
     pub basic_attack_count_this_normal_owner_turn: i64,
     pub once_usage_counters: Vec<UsageCounterState>,
+    pub normal_owner_turn_index: u64,
     pub initiative_result: i64,
     pub initiative_base_stat: i64,
     pub last_committed_timeline_order: Option<u32>,
@@ -866,6 +869,8 @@ mod tests {
                 activation_clock_index: 1,
                 applied_round_index: 1,
                 applied_owner_turn_index: Some(0),
+                tick_eligible_clock_index: 1,
+                last_duration_advanced_clock_index: None,
                 strength_rank: None,
             }],
             ability_usage: vec![AbilityUsageState {
@@ -876,6 +881,7 @@ mod tests {
             }],
             basic_attack_count_this_normal_owner_turn: 0,
             once_usage_counters: vec![],
+            normal_owner_turn_index: 0,
             initiative_result: 10,
             initiative_base_stat: 3,
             last_committed_timeline_order: None,

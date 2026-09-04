@@ -4297,3 +4297,26 @@ Engine 返回 typed atomic outcome：Apply 只描述一次 stack/duration transi
 - Extend 使用 checked addition；overflow、malformed incoming、重复 instance ID 与非单调 application sequence 都在 mutation 前拒绝。
 - Hard duration cap 属具体 Ruleset/Control owner，当前通用 merge 不猜测未提供的 cap。
 - Clock 推进/expiry 属 M4-T04；dispel/immunity 属 M4-T05；trigger scheduling 与 committed event publication 属 M4-T06。
+
+## DEC-196：Status Duration、Cooldown 与 Counter 使用分离且可恢复的权威时钟
+
+- 日期：2026-09-04
+- 状态：已采纳
+- 依据：V5.2 §9.1，M2-T07/M4-T03/M4-T04
+
+### 决定
+
+Status Duration 只由 `StatusClockEngine` 解释。Runtime Status 除 application/activation identity 外保存 `tickEligibleClockIndex` 与 `lastDurationAdvancedClockIndex`，Combatant 保存单调 `normalOwnerTurnIndex`；这些字段进入既有 CombatState serde/hash/invariant，使跳过回合、CURRENT_CLOCK 已过 Tick、重复 phase 调用与 save/load 后都能恢复同一 future。
+
+NEXT_CLOCK 只把首次 duration/tick eligibility 指向下一个对应 clock，Status 本体在 merge commit 后立即存在并生效。CURRENT_CLOCK 必须携带 exact matching lifecycle window，且 expiry 尚未经过；若 TickPhase 已经过，duration 仍可计入当前 clock，但首次 Tick 门槛推进到下一 clock，禁止补 Tick。没有 matching window、过期 window 或 PERMANENT+CURRENT 一律 fail closed。
+
+Duration decrement 只在 Definition 声明的 exact expiry phase 执行，并用 last-advanced index 保证每个 clock 至多一次；Tick eligibility 独立按 Definition tickPhase 判断，始终先 Tick、后 duration advance/expiry。OWNER_TURN、ROUND 与 PERMANENT 不互相借用时钟；Extra Turn 显式返回 no advance。
+
+Cooldown 保持独立语义，不复用 Status engine。进入 Normal Owner Turn Start 时单调推进 owner index、将正 cooldown 减一并重置 owner-turn usage/BasicAttack/OncePerOwnerTurn；RoundStart 只刷新 ReactionCharges 与 OncePerRound。OncePerBattle 不在这些 transition 中重置。所有修改沿用 TurnRoundStateMachine clone→invariant→commit 边界，Extra Turn 路径不调用任何上述推进。
+
+### 影响与边界
+
+- `Cooldown=3` 在使用后的三个后续 Normal Owner Turn Start 依次变为 2/1/0，第四个正常回合可用；Extra Turn 不缩短它。
+- “Stun 1 Turn”可在目标下一 Normal Owner Turn Start Tick/限制行动，并在 OwnerTurnEnd 才过期，不会在 TurnStart 先消失。
+- M4-T04 只给出 typed tick/expiry decision；Status effect atomic execution 与 Trigger scheduler publication 仍归 M4-T06。
+- 旧 snapshot 字段补齐与正式数据库 migration/evidence 归 M10，不在 Runtime 静默填充或修复。

@@ -523,6 +523,7 @@ mod tests {
         let old = runtime("old", "status-old", "shared", 2, 1, 2, Some(3));
         let mut incoming = runtime("new", "status-new", "shared", 3, 1, 5, Some(8));
         incoming.activation_clock_index = 99;
+        incoming.tick_eligible_clock_index = 99;
 
         assert_eq!(
             StatusMergeEngine::merge(
@@ -779,6 +780,8 @@ mod tests {
             activation_clock_index: 10,
             applied_round_index: 1,
             applied_owner_turn_index: Some(1),
+            tick_eligible_clock_index: 10,
+            last_duration_advanced_clock_index: None,
             strength_rank,
         }
     }

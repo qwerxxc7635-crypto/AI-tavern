@@ -5,6 +5,7 @@
 
 mod attack;
 mod attribute;
+mod clock;
 mod command;
 mod cost;
 mod damage_bundle;
@@ -46,6 +47,11 @@ pub use attribute::{
     CombatSaveType, LegacyAttributeModifier, LegacyAttributeModifierKind, ResolvedCombatAttributes,
     ResolvedProficiency, V03BaseAttributes, V03CombatAttributeSource, V03HitPoints,
     V03PlayerCombatSource, V03RuleSkill, V03UniversalAttributeProjection, WorldCombatProfileId,
+};
+pub use clock::{
+    ClockLifecycleWindow, StatusApplicationClockContext, StatusClockAssignment, StatusClockEngine,
+    StatusClockError, StatusClockErrorCode, StatusClockObservation, StatusClockPolicy,
+    StatusDurationAdvancePoint, StatusDurationTransition, StatusTickDecision,
 };
 pub use command::{
     AcceptedCombatCommand, AcceptedCommandLedger, AcceptedCommandReceipt, AcceptedCommandSource,

@@ -156,9 +156,31 @@ impl StatusSchemaValidator {
                 &instance.status_instance_id,
             ));
         }
+        if instance.tick_eligible_clock_index < instance.activation_clock_index {
+            return Err(schema_error(
+                StatusSchemaErrorCode::InvalidRuntimeInstance,
+                &instance.status_instance_id,
+            ));
+        }
+        if instance
+            .last_duration_advanced_clock_index
+            .is_some_and(|index| {
+                index < instance.activation_clock_index
+                    || instance.duration_clock == DurationClock::Permanent
+            })
+        {
+            return Err(schema_error(
+                StatusSchemaErrorCode::InvalidRuntimeInstance,
+                &instance.status_instance_id,
+            ));
+        }
         match (instance.duration_clock, instance.remaining_duration) {
-            (DurationClock::Permanent, None) => {}
-            (DurationClock::OwnerTurn | DurationClock::Round, Some(value)) if value > 0 => {}
+            (DurationClock::Permanent, None)
+                if instance.activation_clock_index == 0
+                    && instance.tick_eligible_clock_index == 0
+                    && instance.last_duration_advanced_clock_index.is_none() => {}
+            (DurationClock::OwnerTurn | DurationClock::Round, Some(value))
+                if value > 0 && instance.activation_clock_index > 0 => {}
             _ => {
                 return Err(schema_error(
                     StatusSchemaErrorCode::InvalidDuration,
@@ -438,7 +460,18 @@ mod tests {
             StatusSchemaErrorCode::InvalidDuration
         );
         permanent.remaining_duration = None;
+        permanent.activation_clock_index = 0;
+        permanent.tick_eligible_clock_index = 0;
         StatusSchemaValidator::validate_runtime(&permanent).unwrap();
+
+        let mut premature_tick = runtime("status-a", 1);
+        premature_tick.tick_eligible_clock_index = premature_tick.activation_clock_index - 1;
+        assert_eq!(
+            StatusSchemaValidator::validate_runtime(&premature_tick)
+                .unwrap_err()
+                .code,
+            StatusSchemaErrorCode::InvalidRuntimeInstance
+        );
     }
 
     #[test]
@@ -510,6 +543,8 @@ mod tests {
             activation_clock_index: 12,
             applied_round_index: 3,
             applied_owner_turn_index: Some(8),
+            tick_eligible_clock_index: 12,
+            last_duration_advanced_clock_index: None,
             strength_rank: Some(7),
         }
     }

@@ -5697,5 +5697,19 @@
 ### 验证与结束状态
 
 - `cargo test -p ember-combat-core`：194/194 PASS，其中新增 8 项覆盖非法 cross-product、Add 四种 refresh/cap、Replace incoming identity、HighestOnly rank/ID/reapply、IndependentStacks cap、输入顺序无关 duplicate failure、malformed incoming/sequence，以及 over-cap/cross-clock existing state fail-closed。
-- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 351 PASS、1 credential-only ignore，archive interop 双向通过。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 350 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §9.0 与 M4-T02 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T03 PASS；下一项严格为 M4-T04 Duration / Cooldown Clock。
+
+## 2026-09-04 — M4-T04 完成 Duration / Cooldown Clock
+
+### 可恢复 Status clock、exact phase 与独立 cooldown lifecycle
+
+- 从 M4-T03 提交 `3adf04d` 创建 `task/M4-T04-duration-cooldown-clock`。新增 `StatusClockPolicy/Engine`，集中解释 OWNER_TURN/ROUND/PERMANENT、NEXT_CLOCK/CURRENT_CLOCK、tick eligibility 与 OwnerTurnEnd/RoundEnd/explicit hook expiry；wrong phase、重复同 clock、Extra Turn 都返回 deterministic unchanged。
+- Runtime Status 新增 `tickEligibleClockIndex/lastDurationAdvancedClockIndex`，Combatant 新增 `normalOwnerTurnIndex` 并进入既有 serde/hash/invariant。NEXT 只延后计时/Tick，不延后规则效果；CURRENT 必须有 matching unexpired lifecycle，已过 Tick 不补发，PERMANENT 不计时且禁止 CURRENT。
+- TurnRoundStateMachine 在 RoundStart 原子刷新 ReactionCharges/OncePerRound，在 Normal Owner Turn Start 原子推进 owner index、正 cooldown 减一并重置 ability/BasicAttack/OncePerOwnerTurn；OncePerBattle 保留。Extra Turn 既不进入 roster，也不推进或重置这些时钟。新增 `DEC-196`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：202/202 PASS，其中本项新增 8 项覆盖 NEXT_OWNER 的完整一回合、ROUND 两次 Tick 后过期、CURRENT before/after tick/invalid context、PERMANENT、explicit hook exactly-once、wrong phase/Extra Turn、Round/Owner reset ownership，以及 CD3 的 T1→T4 exact progression。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 358 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §9.1 与 M2-T07/M4-T03 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T04 PASS；下一项严格为 M4-T05 HARD_CC / Control Resistance / DR。

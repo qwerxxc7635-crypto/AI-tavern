@@ -754,6 +754,7 @@ mod tests {
             ability_usage: vec![],
             basic_attack_count_this_normal_owner_turn: 0,
             once_usage_counters: vec![],
+            normal_owner_turn_index: 0,
             initiative_result: initiative,
             initiative_base_stat: base,
             last_committed_timeline_order: None,

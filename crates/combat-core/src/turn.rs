@@ -1,6 +1,9 @@
 use std::{error::Error, fmt};
 
-use crate::{CombatPhase, CombatState, CombatantState, RoundRosterEntry, RoundRosterStatus};
+use crate::{
+    CombatPhase, CombatState, CombatantState, RoundRosterEntry, RoundRosterStatus,
+    UsageCounterScope,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TurnStateErrorCode {
@@ -69,6 +72,14 @@ impl TurnRoundStateMachine {
         working.round.active_combatant_id = None;
         working.round.extra_turn_resume_phase = None;
         working.round.roster = roster.clone();
+        for combatant in &mut working.combatants {
+            combatant.reaction_charges = combatant.max_reaction_charges;
+            for counter in &mut combatant.once_usage_counters {
+                if counter.scope == UsageCounterScope::Round {
+                    counter.uses = 0;
+                }
+            }
+        }
         working.phase = CombatPhase::RoundStart;
         commit(state, working, "round-start")?;
         Ok(roster)
@@ -113,6 +124,29 @@ impl TurnRoundStateMachine {
                 .ok_or_else(|| turn_error(TurnStateErrorCode::CombatantMissing, &combatant_id))?;
             match combatant_state {
                 CombatantState::Active => {
+                    let combatant = working
+                        .combatants
+                        .iter_mut()
+                        .find(|combatant| combatant.combatant_id == combatant_id)
+                        .ok_or_else(|| {
+                            turn_error(TurnStateErrorCode::CombatantMissing, &combatant_id)
+                        })?;
+                    combatant.normal_owner_turn_index = combatant
+                        .normal_owner_turn_index
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            turn_error(TurnStateErrorCode::NumericOverflow, &combatant_id)
+                        })?;
+                    combatant.basic_attack_count_this_normal_owner_turn = 0;
+                    for usage in &mut combatant.ability_usage {
+                        usage.uses_this_normal_owner_turn = 0;
+                        usage.cooldown_remaining = usage.cooldown_remaining.saturating_sub(1);
+                    }
+                    for counter in &mut combatant.once_usage_counters {
+                        if counter.scope == UsageCounterScope::OwnerTurn {
+                            counter.uses = 0;
+                        }
+                    }
                     working.round.active_combatant_id = Some(combatant_id.clone());
                     working.phase = CombatPhase::OwnerTurnStart;
                     bump_revision(&mut working, &combatant_id)?;
@@ -695,6 +729,8 @@ mod tests {
                 activation_clock_index: 1,
                 applied_round_index: 1,
                 applied_owner_turn_index: Some(0),
+                tick_eligible_clock_index: 1,
+                last_duration_advanced_clock_index: None,
                 strength_rank: None,
             });
         TurnRoundStateMachine::begin_round(&mut controlled).unwrap();
@@ -781,6 +817,75 @@ mod tests {
     }
 
     #[test]
+    fn round_and_normal_owner_turn_start_advance_only_their_owned_clocks() {
+        let mut state = battle_start_state();
+        state.combatants[0].reaction_charges = 0;
+        state.combatants[0].once_usage_counters.extend([
+            UsageCounterState {
+                counter_id: "once-round".to_owned(),
+                scope: UsageCounterScope::Round,
+                uses: 1,
+            },
+            UsageCounterState {
+                counter_id: "once-battle".to_owned(),
+                scope: UsageCounterScope::Battle,
+                uses: 1,
+            },
+        ]);
+        state.combatants[0]
+            .once_usage_counters
+            .sort_by(|left, right| left.counter_id.cmp(&right.counter_id));
+
+        TurnRoundStateMachine::begin_round(&mut state).unwrap();
+        let actor = &state.combatants[0];
+        assert_eq!(actor.reaction_charges, actor.max_reaction_charges);
+        assert_eq!(counter(actor, "once-round"), 0);
+        assert_eq!(counter(actor, "once-owner"), 1);
+        assert_eq!(counter(actor, "once-battle"), 1);
+        assert_eq!(actor.normal_owner_turn_index, 0);
+        assert_eq!(actor.ability_usage[0].cooldown_remaining, 2);
+
+        assert_eq!(start_next(&mut state), "actor-a");
+        let actor = &state.combatants[0];
+        assert_eq!(actor.normal_owner_turn_index, 1);
+        assert_eq!(actor.ability_usage[0].cooldown_remaining, 1);
+        assert_eq!(actor.ability_usage[0].uses_this_normal_owner_turn, 0);
+        assert_eq!(actor.basic_attack_count_this_normal_owner_turn, 0);
+        assert_eq!(counter(actor, "once-owner"), 0);
+        assert_eq!(counter(actor, "once-round"), 0);
+        assert_eq!(counter(actor, "once-battle"), 1);
+    }
+
+    #[test]
+    fn cooldown_three_used_on_t1_becomes_usable_at_t4_normal_owner_turn_start() {
+        let mut state = battle_start_state();
+        state.combatants.truncate(1);
+        state.timeline.truncate(1);
+
+        TurnRoundStateMachine::begin_round(&mut state).unwrap();
+        start_next(&mut state);
+        state.combatants[0].ability_usage[0].cooldown_remaining = 3;
+        TurnRoundStateMachine::enter_action_or_owner_turn_end(&mut state, true).unwrap();
+        TurnRoundStateMachine::end_action(&mut state).unwrap();
+        TurnRoundStateMachine::complete_owner_turn(&mut state).unwrap();
+        finish_round(&mut state);
+
+        for expected in [2, 1, 0] {
+            TurnRoundStateMachine::begin_round(&mut state).unwrap();
+            start_next(&mut state);
+            assert_eq!(
+                state.combatants[0].ability_usage[0].cooldown_remaining,
+                expected
+            );
+            TurnRoundStateMachine::enter_action_or_owner_turn_end(&mut state, true).unwrap();
+            TurnRoundStateMachine::end_action(&mut state).unwrap();
+            TurnRoundStateMachine::complete_owner_turn(&mut state).unwrap();
+            finish_round(&mut state);
+        }
+        assert_eq!(state.combatants[0].normal_owner_turn_index, 4);
+    }
+
+    #[test]
     fn illegal_transitions_and_hash_valid_roster_tampering_fail_closed() {
         let mut state = battle_start_state();
         let before = state.clone();
@@ -814,11 +919,28 @@ mod tests {
         combatant_id
     }
 
+    fn counter(combatant: &CombatantRuntime, id: &str) -> i64 {
+        combatant
+            .once_usage_counters
+            .iter()
+            .find(|counter| counter.counter_id == id)
+            .unwrap()
+            .uses
+    }
+
     fn finish_one_normal_turn(state: &mut CombatState) {
         start_next(state);
         TurnRoundStateMachine::enter_action_or_owner_turn_end(state, true).unwrap();
         TurnRoundStateMachine::end_action(state).unwrap();
         TurnRoundStateMachine::complete_owner_turn(state).unwrap();
+    }
+
+    fn finish_round(state: &mut CombatState) {
+        assert_eq!(
+            TurnRoundStateMachine::advance_to_next_normal_turn_or_round_end(state).unwrap(),
+            NextTurnOutcome::RoundEndReached
+        );
+        TurnRoundStateMachine::complete_round_end(state).unwrap();
     }
 
     fn battle_start_state() -> CombatState {
@@ -916,6 +1038,7 @@ mod tests {
                 scope: UsageCounterScope::OwnerTurn,
                 uses: 1,
             }],
+            normal_owner_turn_index: 0,
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,

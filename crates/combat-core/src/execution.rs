@@ -632,6 +632,7 @@ mod tests {
                     uses: 0,
                 },
             ],
+            normal_owner_turn_index: 0,
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,
