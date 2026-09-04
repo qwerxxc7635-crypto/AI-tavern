@@ -5727,3 +5727,17 @@
 - `cargo test -p ember-combat-core`：212/212 PASS，其中新增 10 项覆盖 tier/Boss balance、single-ceil 反例、DR 0→3 与 pre-application level、Miss/Save/Schema/immunity、Restriction、pending+merge NoOp、quiet reset、malformed input/global invariant，以及受控完整回合/Extra Turn/Skipped 集成。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 368 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §9.2 与 M4-T04 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T05 PASS；下一项严格为 M4-T06 Trigger Pipeline。
+
+## 2026-09-04 — M4-T06 完成 Trigger Pipeline
+
+### Typed fact boundary、唯一 Scheduler 与 execution permit
+
+- 从 M4-T05 提交 `b4df646` 创建 `task/M4-T06-trigger-pipeline`。新增 `CanonicalTriggerPipeline`，把 Status Definition 的 typed hook 适配到 M2 唯一 Canonical Scheduler：root 使用 `enqueue_roots`，执行中 child 使用 `complete_current_with_children`，不建立递归 dispatcher、第二队列或事件总线。
+- Trigger signal 拆为 Lifecycle、Calculated Outcome 与 Committed Event 三类。Committed Damage/Status/Defeat 必须匹配当前 `lastCommittedSequence + EventChainID`；OnKill 只从 committed TargetDefeated 派生并验证 causal source owner，Working Damage/Working State 不可作为 committed signal。
+- Hook phase 固定 version 1 code-owned priority；订阅 identity 由 owner/status instance/definition/trigger/hook 的 length-prefixed SHA-256 生成。执行时按 committed current Status 重新确认 legality；前序移除则 Skip。只有 Scheduler eligibility 与 loop guard 返回 Ready 后才生成携带 typed Effects 的 `ScheduledTriggerPermit`，Reaction queue head、Skip 与 Engine Failure 都不释放 Effect。新增 `DEC-198`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：220/220 PASS，其中新增 8 项覆盖 typed hook/canonical order、calculated/committed 隔离、OnKill causal source、permit gate、失效 Skip、child 同队列 + crash resume、overflow 无 Effect，以及拒绝消费 Reaction item。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 376 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §8/§8.1/§8.2/§8.3/§11.1 与 M2-T05/M4-T02 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T06 PASS；下一项严格为 M4-T07 Reaction Core。

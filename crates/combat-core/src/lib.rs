@@ -33,6 +33,7 @@ mod status;
 mod status_merge;
 mod submission;
 mod terminal;
+mod trigger;
 mod turn;
 mod version;
 
@@ -188,6 +189,11 @@ pub use submission::{
 pub use terminal::{
     TerminalArbitrationError, TerminalArbitrationErrorCode, TerminalArbitrationOutcome,
     TerminalOutcomeArbitrator,
+};
+pub use trigger::{
+    CalculatedTriggerHook, CanonicalTriggerPipeline, CommittedTriggerEvent, LifecycleTriggerHook,
+    ScheduledTriggerPermit, TRIGGER_PHASE_PRIORITY_CONTRACT_VERSION, TriggerDispatchOutcome,
+    TriggerPipelineError, TriggerPipelineErrorCode, TriggerSignal,
 };
 pub use turn::{
     NextTurnOutcome, OwnerTurnStartOutcome, TurnRoundStateMachine, TurnStateError,

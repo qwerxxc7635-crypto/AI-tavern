@@ -4343,3 +4343,25 @@ quiet counter 只由 `HardCcDrEngine` 在 `NormalOwnerTurnCompleted` 推进，�
 - Miss、Save Success、explicit immunity、level 3 immunity、Schema Reject 与 Status merge NoOp 的 effective duration 都为 0，且无 DR state write。
 - M4-T05 不实现 AI category 推断、WorldCombatProfile 装配或 Trigger dispatch；分别归 M6、M5 与 M4-T06。
 - Runtime DR 字段的数据库 migration 与旧存档 backfill 归 M10。
+
+## DEC-198：Trigger 只有 Canonical Scheduler execution permit 能释放 Effect
+
+- 日期：2026-09-04
+- 状态：已采纳
+- 依据：V5.2 §8、§8.1、§8.2、§8.3、§11.1，M2-T05/M4-T02/M4-T06
+
+### 决定
+
+Trigger 输入按语义拆为 `LifecycleTriggerHook`、`CalculatedTriggerHook` 与 `CommittedTriggerEvent`，不接受一个可任意填写全部 Hook 的通用事件字段。DamageApplied、StatusApplied、StatusRemoved、TargetDefeated 只有携带当前 `lastCommittedSequence` 且属于当前 `EventChainID` 才能成为 committed signal；Working Damage/Working State 类型无法进入该接口。OnKill 不建立第二个 defeat event，只从 committed TargetDefeated 派生，并只对其非空 causal source owner 收集。
+
+`CanonicalTriggerPipeline` 是 Status Trigger 的唯一适配入口。初始项调用 M2 `CanonicalEventChainScheduler::enqueue_roots`，执行中产生的 child 调用 `complete_current_with_children`，Trigger 不自建递归、FIFO 或事件总线。Hook phase 使用 `TRIGGER_PHASE_PRIORITY_CONTRACT_VERSION=1` 的 code-owned 整数，显式 priority 与 source initiative/stable identity/sequence 仍完全交给既有 Scheduler canonical tuple。
+
+每个订阅用 owner、status instance、definition、trigger 与 hook 的 length-prefixed SHA-256 形成有界 stable `effectStableId`，既区分 Independent Stack，也不把可变数组位置当身份。Checkpoint 恢复后从 committed current Status + version-bound Definition 重新匹配该身份；Status 已被前序项移除则 dequeue-time deterministic Skip。
+
+Trigger Effect 只存在于 `ScheduledTriggerPermit`。Pipeline 必须先确认 queue head 是 Trigger、重新确认订阅仍合法，再调用既有 Scheduler eligibility + depth/count gate；只有 `ReadyToExecute` 才复制 typed Effects。Skip、错误 item kind 或 Loop Guard Engine Failure 均不释放 Effect、RNG 或额外计数。
+
+### 影响与边界
+
+- Definition catalog 输入顺序不影响候选身份或 queue order；重复 Definition ID fail closed，缺失 Definition 的 committed Status 不能静默跳过。
+- Reaction 仍与 Trigger 共用同一 Scheduler，但其 Auto/Ask/Disabled、ownership、charge/cost 与 pending window 由 M4-T07 实现；Trigger gate 明确拒绝消费 Reaction queue head。
+- OncePerChain/Turn/Round/Battle usage 与 stat snapshot 分别归 M4-T08/M4-T09；本项不提前添加计数语义。
