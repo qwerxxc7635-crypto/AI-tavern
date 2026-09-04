@@ -749,6 +749,7 @@ mod tests {
             },
             refresh_policy,
             priority: 0,
+            control_category: crate::ControlCategory::None,
             tick_phase: StatusTickPhase::None,
             dispel_tags: Vec::new(),
             immunity_tags: Vec::new(),

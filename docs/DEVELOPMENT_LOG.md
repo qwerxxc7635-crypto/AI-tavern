@@ -5713,3 +5713,17 @@
 - `cargo test -p ember-combat-core`：202/202 PASS，其中本项新增 8 项覆盖 NEXT_OWNER 的完整一回合、ROUND 两次 Tick 后过期、CURRENT before/after tick/invalid context、PERMANENT、explicit hook exactly-once、wrong phase/Extra Turn、Round/Owner reset ownership，以及 CD3 的 T1→T4 exact progression。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 358 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §9.1 与 M2-T07/M4-T03 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T04 PASS；下一项严格为 M4-T05 HARD_CC / Control Resistance / DR。
+
+## 2026-09-04 — M4-T05 完成 HARD_CC / Control Resistance / DR
+
+### Typed category、single-ceil 与 status-commit-gated DR
+
+- 从 M4-T04 提交 `7e2b950` 创建 `task/M4-T05-hard-cc-control-dr`。Status Definition 增加 closed HARD_CC/RESTRICTION/NONE category；新增 `ControlApplicationEngine`，严格执行 resolution gate→explicit immunity→level 3 immunity→resistance×DR→single ceil/min 1，无按控制名称分支或中间取整。
+- `ControlBalanceConfig` 提供可调 Normal/Elite/Boss 1.00/0.75/0.50 与 DR level 0/1/2 的 1.00/0.50/0.25。Boss modifier 与 typed immunity evidence 分离；matching immunity tag 必须确实存在于 Definition immunityTags，显式 rule ID 也经 stable-ID validation。
+- Combatant 新增聚合 `HardCcDrRuntime` 并接入 serde/hash/global invariant。成功 HARD_CC 只产生 pending DR transition；它必须接收 M4-T03 Applied/Replaced 才可写 Working State，NoOp 拒绝。OwnerTurnEnd 调用唯一 quiet engine；受控但完整的 Normal Turn 计数，Extra Turn 和 Skipped/Removed 不计，连续两个 quiet full turns 才 reset。新增 `DEC-197`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：212/212 PASS，其中新增 10 项覆盖 tier/Boss balance、single-ceil 反例、DR 0→3 与 pre-application level、Miss/Save/Schema/immunity、Restriction、pending+merge NoOp、quiet reset、malformed input/global invariant，以及受控完整回合/Extra Turn/Skipped 集成。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 368 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §9.2 与 M4-T04 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T05 PASS；下一项严格为 M4-T06 Trigger Pipeline。

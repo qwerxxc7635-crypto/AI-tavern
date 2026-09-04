@@ -4320,3 +4320,26 @@ Cooldown 保持独立语义，不复用 Status engine。进入 Normal Owner Turn
 - “Stun 1 Turn”可在目标下一 Normal Owner Turn Start Tick/限制行动，并在 OwnerTurnEnd 才过期，不会在 TurnStart 先消失。
 - M4-T04 只给出 typed tick/expiry decision；Status effect atomic execution 与 Trigger scheduler publication 仍归 M4-T06。
 - 旧 snapshot 字段补齐与正式数据库 migration/evidence 归 M10，不在 Runtime 静默填充或修复。
+
+## DEC-197：Control 使用单一时长管线与延迟到 Status 成功提交的 HARD_CC DR transition
+
+- 日期：2026-09-04
+- 状态：已采纳
+- 依据：V5.2 §9.2，M3-T01/M4-T03/M4-T04/M4-T05
+
+### 决定
+
+Status Definition 新增 closed `ControlCategory = HARD_CC | RESTRICTION | NONE`，由后续 Mechanical Mapping/固定 Ruleset 决定，不从名称或描述推断。`ControlApplicationEngine` 是控制命中后的唯一 duration/DR owner：先处理 Miss/Save/Schema gate，再处理 typed immunity evidence，再处理 HARD_CC level 3 temporary immunity，之后复用 M3-T01 `hard_cc_duration_single_ceil`，按 `baseDuration × resistanceFixed × drFixed` 宽整数计算并只在末尾 ceil/min 1。
+
+Normal/Elite/Boss 初始 resistance multiplier 为 1.00/0.75/0.50，HARD_CC level 0/1/2 DR multiplier 为 1.00/0.50/0.25；数值放入可验证 `ControlBalanceConfig`，顺序机制冻结。Boss 没有隐含的全局免疫：0.50 modifier 与 matching immunity tag/显式 code-owned immunity rule 分离，避免类型名称偷偷改变规则。
+
+Combatant 保存聚合 `HardCcDrRuntime { level, quietOwnerTurns, appliedSinceOwnerTurnEnd }` 并由全局 invariant 校验。HARD_CC 计算使用施加前 level；Engine 只返回 `PendingHardCcDrCommit`。该 pending 必须观察 M4-T03 `Applied/Replaced` transition 才能写入 Working State；NoOp/拒绝不能递增 DR，调用方随后仍需与 Status 一起经过同一 invariant/commit 边界。
+
+quiet counter 只由 `HardCcDrEngine` 在 `NormalOwnerTurnCompleted` 推进，并接入 TurnRoundStateMachine 的 OwnerTurnEnd 最后稳定点。成功施加后的首个 OwnerTurnEnd 只清 applied flag；之后连续两个完整 Normal Owner Turn 才归零 level。Action Disabled 仍完成 lifecycle 并计数；Extra Turn、Skipped 与 Removed slot 原样返回，不计数。
+
+### 影响与边界
+
+- RESTRICTION 使用 target duration multiplier，但不使用 HARD_CC DR，也不会被 level 3 temporary immunity 阻挡。
+- Miss、Save Success、explicit immunity、level 3 immunity、Schema Reject 与 Status merge NoOp 的 effective duration 都为 0，且无 DR state write。
+- M4-T05 不实现 AI category 推断、WorldCombatProfile 装配或 Trigger dispatch；分别归 M6、M5 与 M4-T06。
+- Runtime DR 字段的数据库 migration 与旧存档 backfill 归 M10。

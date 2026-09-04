@@ -13,6 +13,7 @@ pub enum CombatStateInvariantCode {
     ActionPointsOutOfRange,
     ReactionChargesOutOfRange,
     BasicAttackCounterInvalid,
+    HardCcDrStateInvalid,
     UsageCounterInvalid,
     ResourceBoundsInvalid,
     ResourceOutOfRange,
@@ -225,6 +226,16 @@ fn validate_combatant(combatant: &CombatantRuntime) -> Result<(), CombatStateInv
         return Err(combatant_error(
             combatant,
             CombatStateInvariantCode::BasicAttackCounterInvalid,
+        ));
+    }
+    if combatant.hard_cc_dr.level > 3
+        || combatant.hard_cc_dr.quiet_owner_turns > 2
+        || combatant.hard_cc_dr.applied_since_owner_turn_end
+            && (combatant.hard_cc_dr.level == 0 || combatant.hard_cc_dr.quiet_owner_turns != 0)
+    {
+        return Err(combatant_error(
+            combatant,
+            CombatStateInvariantCode::HardCcDrStateInvalid,
         ));
     }
     for (index, counter) in combatant.once_usage_counters.iter().enumerate() {
@@ -449,6 +460,29 @@ mod tests {
     }
 
     #[test]
+    fn rejects_impossible_hard_cc_dr_runtime_state() {
+        for invalid in [
+            crate::HardCcDrRuntime {
+                level: 4,
+                quiet_owner_turns: 0,
+                applied_since_owner_turn_end: false,
+            },
+            crate::HardCcDrRuntime {
+                level: 1,
+                quiet_owner_turns: 1,
+                applied_since_owner_turn_end: true,
+            },
+        ] {
+            let mut state = valid_state();
+            state.combatants[0].hard_cc_dr = invalid;
+            assert_eq!(
+                validation_error(&state).code,
+                CombatStateInvariantCode::HardCcDrStateInvalid
+            );
+        }
+    }
+
+    #[test]
     fn formal_party_members_are_stable_sorted_unique_and_player_aligned() {
         let mut state = valid_state();
         state.formal_party_member_ids = vec!["combatant-player".into()];
@@ -608,6 +642,7 @@ mod tests {
                 basic_attack_count_this_normal_owner_turn: 0,
                 once_usage_counters: Vec::new(),
                 normal_owner_turn_index: 0,
+                hard_cc_dr: crate::HardCcDrRuntime::default(),
                 initiative_result: 12,
                 initiative_base_stat: 2,
                 last_committed_timeline_order: Some(0),

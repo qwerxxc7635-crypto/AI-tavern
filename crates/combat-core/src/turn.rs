@@ -1,8 +1,8 @@
 use std::{error::Error, fmt};
 
 use crate::{
-    CombatPhase, CombatState, CombatantState, RoundRosterEntry, RoundRosterStatus,
-    UsageCounterScope,
+    CombatPhase, CombatState, CombatantState, ControlTurnCompletion, HardCcDrEngine,
+    RoundRosterEntry, RoundRosterStatus, UsageCounterScope,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -225,6 +225,16 @@ impl TurnRoundStateMachine {
             .clone()
             .ok_or_else(|| turn_error(TurnStateErrorCode::ActiveTurnMissing, "owner-turn"))?;
         let mut working = state.clone();
+        let combatant = working
+            .combatants
+            .iter_mut()
+            .find(|combatant| combatant.combatant_id == combatant_id)
+            .ok_or_else(|| turn_error(TurnStateErrorCode::CombatantMissing, &combatant_id))?;
+        combatant.hard_cc_dr = HardCcDrEngine::advance_quiet_turn(
+            combatant.hard_cc_dr,
+            ControlTurnCompletion::NormalOwnerTurnCompleted,
+        )
+        .map_err(|_| turn_error(TurnStateErrorCode::StateInvariantViolation, &combatant_id))?;
         let entry = working
             .round
             .roster
@@ -626,7 +636,7 @@ mod tests {
     use super::*;
     use crate::{
         AbilityUsageState, CURRENT_COMBAT_VERSIONS, CombatRng, CombatSide, CombatantRuntime,
-        ObjectiveRuntimeState, ProvisionalRuntimeDelta, ReinforcementRuntimeState,
+        HardCcDrRuntime, ObjectiveRuntimeState, ProvisionalRuntimeDelta, ReinforcementRuntimeState,
         RoundRuntimeState, TimelineEntry, UsageCounterScope, UsageCounterState,
     };
 
@@ -753,6 +763,41 @@ mod tests {
         assert_eq!(downed.phase, CombatPhase::OwnerTurnEnd);
         TurnRoundStateMachine::complete_owner_turn(&mut downed).unwrap();
         assert_eq!(downed.round.roster[0].status, RoundRosterStatus::Completed);
+    }
+
+    #[test]
+    fn hard_cc_quiet_reset_counts_controlled_full_turn_but_not_extra_or_skipped_slot() {
+        let prior = HardCcDrRuntime {
+            level: 2,
+            quiet_owner_turns: 1,
+            applied_since_owner_turn_end: false,
+        };
+        let mut controlled = battle_start_state();
+        controlled.combatants[0].hard_cc_dr = prior;
+        TurnRoundStateMachine::begin_round(&mut controlled).unwrap();
+        start_next(&mut controlled);
+        TurnRoundStateMachine::enter_action_or_owner_turn_end(&mut controlled, false).unwrap();
+        TurnRoundStateMachine::complete_owner_turn(&mut controlled).unwrap();
+        assert_eq!(
+            controlled.combatants[0].hard_cc_dr,
+            HardCcDrRuntime::default()
+        );
+
+        let mut extra = battle_start_state();
+        extra.combatants[0].hard_cc_dr = prior;
+        TurnRoundStateMachine::begin_round(&mut extra).unwrap();
+        TurnRoundStateMachine::begin_extra_turn(&mut extra, "actor-a").unwrap();
+        TurnRoundStateMachine::complete_extra_turn(&mut extra).unwrap();
+        assert_eq!(extra.combatants[0].hard_cc_dr, prior);
+
+        let mut skipped = battle_start_state();
+        skipped.combatants[0].hard_cc_dr = prior;
+        TurnRoundStateMachine::begin_round(&mut skipped).unwrap();
+        skipped.combatants[0].state = CombatantState::Downed;
+        skipped.combatants[0].hit_points = 0;
+        assert_eq!(start_next(&mut skipped), "actor-b");
+        assert_eq!(skipped.round.roster[0].status, RoundRosterStatus::Skipped);
+        assert_eq!(skipped.combatants[0].hard_cc_dr, prior);
     }
 
     #[test]
@@ -1039,6 +1084,7 @@ mod tests {
                 uses: 1,
             }],
             normal_owner_turn_index: 0,
+            hard_cc_dr: crate::HardCcDrRuntime::default(),
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,

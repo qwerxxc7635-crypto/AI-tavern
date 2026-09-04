@@ -45,6 +45,14 @@ pub enum StatusTickPhase {
     None,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ControlCategory {
+    HardCc,
+    Restriction,
+    None,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE", deny_unknown_fields)]
 pub enum StatusExpiryPhase {
@@ -108,6 +116,7 @@ pub struct StatusDefinition {
     pub duration: StatusDurationDefinition,
     pub refresh_policy: StatusRefreshPolicy,
     pub priority: i32,
+    pub control_category: ControlCategory,
     pub tick_phase: StatusTickPhase,
     pub dispel_tags: Vec<GameplayTagId>,
     pub immunity_tags: Vec<GameplayTagId>,
@@ -350,6 +359,7 @@ mod tests {
         assert!(encoded.contains("\"statusSchemaVersion\":1"));
         assert!(encoded.contains("\"stackMode\":\"ADD\""));
         assert!(encoded.contains("\"refreshPolicy\":\"REFRESH_DURATION\""));
+        assert!(encoded.contains("\"controlCategory\":\"NONE\""));
         assert!(encoded.contains("\"tickPhase\":\"OWNER_TURN_START\""));
         assert!(encoded.contains("\"strengthRank\":7"));
     }
@@ -510,6 +520,7 @@ mod tests {
             },
             refresh_policy: StatusRefreshPolicy::RefreshDuration,
             priority: 20,
+            control_category: ControlCategory::None,
             tick_phase: StatusTickPhase::OwnerTurnStart,
             dispel_tags: vec![GameplayTagId::new("Element.Fire").unwrap()],
             immunity_tags: vec![GameplayTagId::new("Character.Mechanical").unwrap()],

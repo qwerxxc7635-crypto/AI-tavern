@@ -49,7 +49,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M4-T02 — Status Definition / Runtime Instance | PASS | 2026-09-04 | versioned definition/runtime；typed stack/refresh/duration/tick/trigger；clock identity 与 canonical application order |
 | M4-T03 — Status Merge Policy | PASS | 2026-09-04 | 单一 merge owner；四种 stack mode 与五种 refresh policy；非法 cross-product 前置拒绝；canonical candidate order |
 | M4-T04 — Duration / Cooldown Clock | PASS | 2026-09-04 | Status NEXT/CURRENT activation、tick gate、exact expiry；normal owner cooldown/counter；Extra Turn 不推进 |
-| M4-T05 — HARD_CC / Control Resistance / DR | IN_PROGRESS | 2026-09-04 | 下一项；single-ceil control duration、DR、quiet-turn reset 与 Boss policy |
+| M4-T05 — HARD_CC / Control Resistance / DR | PASS | 2026-09-04 | typed control category；immunity→DR→single-ceil；pending atomic DR commit；2 full owner-turn reset |
+| M4-T06 — Trigger Pipeline | IN_PROGRESS | 2026-09-04 | 下一项；typed hooks 统一进入 Canonical Scheduler，分离 working/calculated/committed |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
