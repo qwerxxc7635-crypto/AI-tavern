@@ -51,7 +51,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M4-T04 — Duration / Cooldown Clock | PASS | 2026-09-04 | Status NEXT/CURRENT activation、tick gate、exact expiry；normal owner cooldown/counter；Extra Turn 不推进 |
 | M4-T05 — HARD_CC / Control Resistance / DR | PASS | 2026-09-04 | typed control category；immunity→DR→single-ceil；pending atomic DR commit；2 full owner-turn reset |
 | M4-T06 — Trigger Pipeline | PASS | 2026-09-04 | typed lifecycle/calculated/committed signal；status Trigger 仅由 Canonical Scheduler 发放 execution permit；OnKill 从 committed TargetDefeated 派生 |
-| M4-T07 — Reaction Core | IN_PROGRESS | 2026-09-04 | 下一项；Auto/Ask/Disabled、ownership、ReactionCharges、reservation 与 legality |
+| M4-T07 — Reaction Core | PASS | 2026-09-05 | Auto/Ask/AI_EVALUATE/Disabled；Player/UtilityAI ownership；ReactionCharges + atomic reservation；single Ask suspension legality |
+| M4-T08 — Multi-Reaction / Pending Snapshot Contract | IN_PROGRESS | 2026-09-05 | 下一项；共享队列多选、selectedReactionId、Trigger/Skip exactly-once 与完整 pending snapshot continuation |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

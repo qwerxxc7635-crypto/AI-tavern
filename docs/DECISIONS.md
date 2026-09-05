@@ -4364,4 +4364,27 @@ Trigger Effect 只存在于 `ScheduledTriggerPermit`。Pipeline 必须先确认 
 
 - Definition catalog 输入顺序不影响候选身份或 queue order；重复 Definition ID fail closed，缺失 Definition 的 committed Status 不能静默跳过。
 - Reaction 仍与 Trigger 共用同一 Scheduler，但其 Auto/Ask/Disabled、ownership、charge/cost 与 pending window 由 M4-T07 实现；Trigger gate 明确拒绝消费 Reaction queue head。
-- OncePerChain/Turn/Round/Battle usage 与 stat snapshot 分别归 M4-T08/M4-T09；本项不提前添加计数语义。
+- 任务归属更正（2026-09-05）：正式任务文档中的 M4-T08 是 Multi-Reaction / Pending Snapshot Contract，M4 没有 M4-T09。先前将 usage/stat snapshot 归给这两个编号的说明错误，不能作为延后冻结规则的依据；对应规则覆盖仍须按正式任务与 Gate C 验收。
+
+## DEC-199：Reaction 复用唯一 Scheduler，并在 execution permit 后提交子成本
+
+- 日期：2026-09-05
+- 状态：已采纳
+- 依据：V5.2 §10、§10.1，M2-T01/M4-T06/M4-T07
+
+### 决定
+
+Reaction 不建立第二套 dispatcher 或队列。所有候选作为 `SchedulerItemKind::Reaction` 进入 M2 Canonical Scheduler；route 时按 owner、definition、hook/priority 身份重新绑定，并在 current item 上执行 legality check。Disabled 不入队，owner 非 Active 或 typed costs 不足时 Skip 且不消耗 event count/cost；缺失成本资产与损坏状态不是“不合法机会”，而是 deterministic failure。
+
+Auto 直接请求 execution permit；AI_EVALUATE 与非玩家所有权的 Ask 必须经过 UtilityAI typed decision；只有 Player side 且 CombatControlAssignment 为 matching Player controller 的 Ask 才能建立玩家窗口。Companion/Enemy 即使内容声明 Ask 也不得产生 Player prompt，错误地赋予 Player authority 时 fail closed。
+
+Scheduler gate 返回 Ready 后，Reaction 才用确定性子 reservation identity 原子 reserve+commit costs，其中 Definition 必须包含且只包含 owner 的一条 ReactionCharge cost。checkpoint 中已计数 item 只允许在 matching reservation 已 committed 时恢复，且不重复扣费或再次请求 UtilityAI decision。
+
+基础 Ask 复用现有 ResolutionContext suspension lifecycle，并在 `PendingReactionWindow` 记录 command/context/chain/hook/owner/target/RNG 结果身份；current Scheduler item 保留原位，挂起期间所有 queue mutation 被拒绝且 chain 非 quiescent。M4-T07 只冻结单项 Ask suspension；多项 eligible item 快照、selectedReactionId、Trigger/Skip、exactly-once 与恢复后 continuation 由紧随其后的 M4-T08 扩展。
+
+### 影响与边界
+
+- Reaction definition 只携带 typed costs/effects 与执行模式，不直接修改 CombatState；Effect 仍需消费 execution permit 后走既有原子执行管线。
+- `InsufficientAvailable` 可转换为 Skip；其他 CostReservation 错误保持可观察，不能被候选过滤吞掉。
+- Window 与 reservation ID 使用 domain-separated SHA-256，避免合法 128 字符 EventChainID 经字符串拼接后越界。
+- SQLite durable pending persistence、正式 migration 与 crash-restart orchestration 归 M10；M4-T08 只负责可序列化的内存 snapshot contract。

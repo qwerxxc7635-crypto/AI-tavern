@@ -33,6 +33,7 @@ pub enum EventSchedulerErrorCode {
     SequenceExhausted,
     DepthExhausted,
     StateInvariantViolation,
+    SuspendedForReaction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -277,6 +278,9 @@ impl CanonicalEventChainScheduler {
 
     #[must_use]
     pub fn is_quiescent(state: &CombatState) -> bool {
+        if state.pending_reaction.is_some() {
+            return false;
+        }
         state.scheduler.as_ref().is_some_and(|scheduler| {
             scheduler.status == EventSchedulerStatus::Active
                 && scheduler.queue.is_empty()
@@ -492,6 +496,12 @@ fn validate_stable_id(value: &str) -> Result<(), EventSchedulerError> {
 }
 
 fn active_chain_id(state: &CombatState) -> Result<String, EventSchedulerError> {
+    if let Some(window) = &state.pending_reaction {
+        return Err(scheduler_error(
+            EventSchedulerErrorCode::SuspendedForReaction,
+            &window.window_id,
+        ));
+    }
     let scheduler = state.scheduler.as_ref().ok_or_else(|| {
         scheduler_error(EventSchedulerErrorCode::SchedulerMissing, "event-scheduler")
     })?;

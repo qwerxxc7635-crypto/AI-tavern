@@ -624,7 +624,7 @@ mod tests {
         assert_eq!(decoded.reinforcements.reinforcements.len(), 1);
         assert_eq!(decoded.provisional_delta.entries.len(), 2);
         assert!(decoded.scheduler.is_some());
-        assert!(decoded.pending_reaction.is_some());
+        assert!(decoded.pending_reaction.is_none());
         assert_eq!(decoded.result_candidates.len(), 1);
     }
 
@@ -806,22 +806,7 @@ mod tests {
                 max_trigger_depth: 32,
                 max_event_count: 256,
             }),
-            pending_reaction: Some(PendingReactionWindow {
-                window_id: "reaction-window-8".to_owned(),
-                resolution_context_id: "resolution-7".to_owned(),
-                source_command_id: "command-7".to_owned(),
-                actor_id: player.combatant_id.clone(),
-                target_ids: vec![enemy.combatant_id.clone()],
-                ability_id: Some("ability-basic-attack".to_owned()),
-                event_chain_id: "chain-7".to_owned(),
-                hook_phase: HookPhase::PreEffect,
-                eligible_reaction_ids: vec!["reaction-guard".to_owned()],
-                selected_reaction_id: None,
-                cost_state: CostCommitState::Reserved,
-                resolved_rolls: vec![17],
-                sequence_number: 8,
-                accepted_reaction_decision_command_id: None,
-            }),
+            pending_reaction: None,
             result_candidates: vec![ResultCandidate {
                 candidate_id: "candidate-escape".to_owned(),
                 result_type: CombatResultType::Escape,

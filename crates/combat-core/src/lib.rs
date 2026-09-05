@@ -21,6 +21,7 @@ mod mitigation;
 mod numeric;
 mod objective;
 mod precondition;
+mod reaction;
 mod recovery;
 mod resolution;
 mod resolution_context;
@@ -124,6 +125,11 @@ pub use precondition::{
     PreconditionEvaluation, PreconditionEvaluationContext, PreconditionFailure,
     PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
     PreconditionTiming,
+};
+pub use reaction::{
+    CURRENT_REACTION_SCHEMA_VERSION, CanonicalReactionCore, ReactionBinding, ReactionDefinition,
+    ReactionExecutionMode, ReactionExecutionPermit, ReactionRouteOutcome, ReactionRuleError,
+    ReactionRuleErrorCode, UtilityReactionDecision,
 };
 pub use recovery::{
     CombatPartyMode, CombatPartyPolicy, CommittedRecoveryEvent, ExecutableRecoveryPath,

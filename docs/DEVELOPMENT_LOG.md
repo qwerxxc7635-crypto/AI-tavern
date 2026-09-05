@@ -5741,3 +5741,18 @@
 - `cargo test -p ember-combat-core`：220/220 PASS，其中新增 8 项覆盖 typed hook/canonical order、calculated/committed 隔离、OnKill causal source、permit gate、失效 Skip、child 同队列 + crash resume、overflow 无 Effect，以及拒绝消费 Reaction item。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests 基线 skip），Node 33/33，Rust workspace 376 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §8/§8.1/§8.2/§8.3/§11.1 与 M2-T05/M4-T02 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T06 PASS；下一项严格为 M4-T07 Reaction Core。
+
+## 2026-09-05 — M4-T07 完成 Reaction Core
+
+### 基础模式、所有权与原子成本边界
+
+- 从 M4-T06 提交 `42d6601` 创建 `task/M4-T07-reaction-core`。新增 `CanonicalReactionCore`，Reaction 与 Status Trigger 共用唯一 Canonical Scheduler；支持 Auto、Ask、AI_EVALUATE、Disabled，并在出队执行前重新检查 owner active、ReactionCharges 与全部 typed costs。
+- PlayerCommandSource 只有 Player side + matching Player assignment 才能打开 Ask；Companion/Enemy 的 Ask 统一路由 UtilityAI，错误 Player assignment fail closed。UtilityAI 必须提供绑定 owner/reaction 的 typed decision，已计数恢复不再次请求决策。
+- 执行通过 M2 scheduler gate 后才 reserve+commit Reaction 子成本；不可用成本只做合法性 Skip，缺失资产/损坏 ledger 返回错误。恢复中的 counted item 必须已有 committed reservation，避免免费执行与重复扣费。稳定 Window/Reservation identity 使用 domain-separated SHA-256，合法最大长度 EventChainID 不溢出 Stable ID。
+- 单项 Ask 将现有 ResolutionContext 标记为 `SuspendedForReaction`，保留 Scheduler current item、queue、RNG 与 resolved rolls，并写入基础 `PendingReactionWindow`；挂起期间 Scheduler 不能入队、出队、完成或被视为 quiescent。完整多项 snapshot、选择和 exactly-once decision 明确保留给 M4-T08。新增 `DEC-199`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：233/233 PASS，其中 Reaction 12 项覆盖 Auto、Disabled、depleted charge、Player/UtilityAI ownership、Ask suspend/restore、共享队列阻塞、成本错误/恢复、Hook mismatch 与最大长度 identity。
+- strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 389 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §10/§10.1 与 M4-T06/M2-T01 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T07 PASS；下一项严格为 M4-T08 Multi-Reaction / Pending Snapshot Contract。
