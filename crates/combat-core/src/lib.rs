@@ -127,9 +127,11 @@ pub use precondition::{
     PreconditionTiming,
 };
 pub use reaction::{
-    CURRENT_REACTION_SCHEMA_VERSION, CanonicalReactionCore, ReactionBinding, ReactionDefinition,
-    ReactionExecutionMode, ReactionExecutionPermit, ReactionRouteOutcome, ReactionRuleError,
-    ReactionRuleErrorCode, UtilityReactionDecision,
+    CURRENT_REACTION_SCHEMA_VERSION, CanonicalReactionCore, CombatantCostSnapshot, CostSnapshot,
+    PendingReactionSnapshot, ReactionBinding, ReactionContinuationSnapshot,
+    ReactionDecisionOutcome, ReactionDecisionStatus, ReactionDefinition, ReactionExecutionMode,
+    ReactionExecutionPermit, ReactionRouteOutcome, ReactionRuleError, ReactionRuleErrorCode,
+    ResolutionContextSnapshot, UtilityReactionDecision,
 };
 pub use recovery::{
     CombatPartyMode, CombatPartyPolicy, CommittedRecoveryEvent, ExecutableRecoveryPath,
@@ -172,11 +174,11 @@ pub use state::{
     HardCcDrRuntime, HookPhase, LoopGuardEngineFailure, LoopGuardFailureReason,
     LoopGuardRollbackPolicy, ObjectiveCommittedOutcome, ObjectiveCommittedSignal,
     ObjectiveFailureReason, ObjectiveFailureRecord, ObjectiveKind, ObjectiveRuntime,
-    ObjectiveRuntimeState, PendingReactionWindow, ProvisionalDeltaEntry, ProvisionalRuntimeDelta,
-    ReinforcementRuntime, ReinforcementRuntimeState, ResourceState, ResultCandidate,
-    RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, SchedulerItem, SchedulerItemKind,
-    StatusRuntime, TerminalPriorityPolicy, TerminalPriorityTier, TimelineEntry, UsageCounterScope,
-    UsageCounterState,
+    ObjectiveRuntimeState, PendingReactionItem, PendingReactionWindow, ProvisionalDeltaEntry,
+    ProvisionalRuntimeDelta, ReactionWindowStatus, ReinforcementRuntime, ReinforcementRuntimeState,
+    ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
+    SchedulerItem, SchedulerItemKind, StatusRuntime, TerminalPriorityPolicy, TerminalPriorityTier,
+    TimelineEntry, UsageCounterScope, UsageCounterState,
 };
 pub use status::{
     CURRENT_STATUS_SCHEMA_VERSION, ControlCategory, StatusActivationPolicy, StatusDefinition,

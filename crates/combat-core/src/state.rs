@@ -412,6 +412,21 @@ pub enum CostCommitState {
     Released,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ReactionWindowStatus {
+    Unresolved,
+    ResolvedTrigger,
+    ResolvedSkip,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct PendingReactionItem {
+    pub reaction_id: String,
+    pub scheduler_item: SchedulerItem,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct PendingReactionWindow {
@@ -424,7 +439,9 @@ pub struct PendingReactionWindow {
     pub event_chain_id: String,
     pub hook_phase: HookPhase,
     pub eligible_reaction_ids: Vec<String>,
+    pub eligible_items: Vec<PendingReactionItem>,
     pub selected_reaction_id: Option<String>,
+    pub status: ReactionWindowStatus,
     pub cost_state: CostCommitState,
     pub resolved_rolls: Vec<i64>,
     pub sequence_number: u64,

@@ -278,7 +278,11 @@ impl CanonicalEventChainScheduler {
 
     #[must_use]
     pub fn is_quiescent(state: &CombatState) -> bool {
-        if state.pending_reaction.is_some() {
+        if state
+            .pending_reaction
+            .as_ref()
+            .is_some_and(|window| window.status == crate::ReactionWindowStatus::Unresolved)
+        {
             return false;
         }
         state.scheduler.as_ref().is_some_and(|scheduler| {
@@ -432,7 +436,7 @@ fn freeze_source_initiative_order(
         .unwrap_or(NON_COMBATANT_INITIATIVE_ORDER))
 }
 
-fn canonical_cmp(left: &SchedulerItem, right: &SchedulerItem) -> Ordering {
+pub(crate) fn canonical_cmp(left: &SchedulerItem, right: &SchedulerItem) -> Ordering {
     left.phase_priority
         .cmp(&right.phase_priority)
         .then_with(|| right.explicit_priority.cmp(&left.explicit_priority))
@@ -496,7 +500,9 @@ fn validate_stable_id(value: &str) -> Result<(), EventSchedulerError> {
 }
 
 fn active_chain_id(state: &CombatState) -> Result<String, EventSchedulerError> {
-    if let Some(window) = &state.pending_reaction {
+    if let Some(window) = &state.pending_reaction
+        && window.status == crate::ReactionWindowStatus::Unresolved
+    {
         return Err(scheduler_error(
             EventSchedulerErrorCode::SuspendedForReaction,
             &window.window_id,

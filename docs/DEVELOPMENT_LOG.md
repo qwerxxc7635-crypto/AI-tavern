@@ -5753,6 +5753,22 @@
 
 ### 验证与结束状态
 
-- `cargo test -p ember-combat-core`：233/233 PASS，其中 Reaction 12 项覆盖 Auto、Disabled、depleted charge、Player/UtilityAI ownership、Ask suspend/restore、共享队列阻塞、成本错误/恢复、Hook mismatch 与最大长度 identity。
+- `cargo test -p ember-combat-core`：233/233 PASS，其中 Reaction 13 项覆盖 Auto、Disabled、depleted charge、Player/UtilityAI ownership、Ask suspend/restore、共享队列阻塞、成本错误/恢复、Hook mismatch 与最大长度 identity。
 - strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 389 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §10/§10.1 与 M4-T06/M2-T01 DependsOn 已复核；用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交；无 SPEC BLOCKER。M4-T07 PASS；下一项严格为 M4-T08 Multi-Reaction / Pending Snapshot Contract。
+
+## 2026-09-05 — M4-T08 完成 Multi-Reaction / Pending Snapshot Contract 与 M4 Runtime Gate
+
+### 同队列多选、exactly-once 与可序列化 continuation
+
+- 从 M4-T07 提交 `9e3ab91` 创建 `task/M4-T08-multi-reaction-pending-snapshot`。Ask Window 只从 queue head 起收集 canonical order 中连续、同 `phasePriority + explicitPriority + sourceInitiativeOrder + sourceStableId` 的 Player Ask items；遇到 Auto、UtilityAI、其他 source 或不同 key 立即停止。挂起项携带完整 SchedulerItem key/depth/sequence，不建立第二队列。
+- `ResolveReactionCommand` 先经过统一 AcceptedCommandLedger。Trigger 必须提供 listed `selectedReactionId`，只恢复并执行所选 item；未选 listed items 保留原 key/sequence 回到同一 Scheduler。Skip 固定丢弃窗口列出的全部 items。相同 commandId 幂等返回 AlreadyResolved 且无 permit，不同 commandId 对 resolved Window 冲突拒绝；清窗后的同一已接受命令仍只返回幂等结果。
+- ReactionCharges > 1 允许后续 queue opportunity 再开 Window，不在一个 Window 连续触发多项。前项执行后，回队项在 queue head 重新检查 charge/cost/owner legality；耗尽时无 RNG、无 Cost、无 event-count 地 Skip。Auto 与 Ask 的组合实测共用一条 Scheduler 并按 canonical 顺序消耗两次 charge。
+- 新增序列化 `PendingReactionSnapshot`、`ResolutionContextSnapshot`、`CostSnapshot` 与聚合 `ReactionContinuationSnapshot`，投影 ruleset versions、state revision、Window/queue/depth/sequence、完整 ResolutionContext/RNG cursor、cost balances/reservation ledger。权威仍是单一 CombatState；这些 contract 供 M10 接入现有 SQLite，不引入平行事实源或长期事务。
+- Pending invariant 覆盖 unresolved/resolved-trigger/resolved-skip lifecycle、selected placement、原 sequence 回队、cost state、context suspension/resume 与 tamper rejection。内存 state serialize/verify/restore 后以同一决策分别续跑，结果 State、AcceptedCommands、RNG、Cost、queue 与 completed hooks 完全相同；loop-guard overflow 固定无 permit/charge/RNG 并保留可验证 checkpoint。新增 `DEC-200`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：240/240 PASS，其中 Reaction 20 项；M4-T08 新增 7 项覆盖 multi-select deterministic continuation、Skip/conflict/clear 后 replay、ReactionCharges>1、Auto+Ask shared queue、Ask overflow、pending tamper 与 snapshot unknown field。
+- strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 396 PASS、1 credential-only ignore，archive interop 双向通过。
+- M4-T01..T08 与 M4 Runtime Gate PASS；覆盖 Status merge/clock/immediate runtime semantics、HARD_CC DR、typed Trigger、Reaction ownership/order/charges 与 pending memory exactly-once resume。按任务 SOT，本项不接 SQLite；durable crash-resume 明确由 M10-T02 接入、M11-T03 最终关闭，当前不将其误报为已验收。用户 `.gitignore` diff SHA-256 保持不变且未纳入提交；无 SPEC BLOCKER。下一项严格为 M5-T01。

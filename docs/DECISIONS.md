@@ -4388,3 +4388,26 @@ Scheduler gate 返回 Ready 后，Reaction 才用确定性子 reservation identi
 - `InsufficientAvailable` 可转换为 Skip；其他 CostReservation 错误保持可观察，不能被候选过滤吞掉。
 - Window 与 reservation ID 使用 domain-separated SHA-256，避免合法 128 字符 EventChainID 经字符串拼接后越界。
 - SQLite durable pending persistence、正式 migration 与 crash-restart orchestration 归 M10；M4-T08 只负责可序列化的内存 snapshot contract。
+
+## DEC-200：Multi-Reaction Window 是 Scheduler 连续前缀的可恢复暂停视图
+
+- 日期：2026-09-05
+- 状态：已采纳
+- 依据：V5.2 §10.1、§10.1.1、§10.2，M2-T06/M4-T07/M4-T08
+
+### 决定
+
+一个 PendingReactionWindow 只抽取当前 Scheduler queue head 所在 source/hook checkpoint 的连续 Player Ask 前缀。前缀必须共享 `phasePriority + explicitPriority + sourceInitiativeOrder + sourceStableId`，并保持 Scheduler 已确定的 `effectStableId ASC → sequence ASC`；首个不匹配项形成硬边界。每个抽取项在 Window 中保存完整原 SchedulerItem，包含 eventChain、depth、六键排序值、sequence 与 executionCounted=false，Window 不是另一套调度器。
+
+Trigger 只恢复 selectedReactionId 对应 item 为 current，其他 listed item 以原 key/sequence 回到 canonical queue；Skip 不恢复任何 listed item。Decision 必须先成为统一 AcceptedCommand，Window 保存唯一 accepted commandId 和 resolved status。相同 commandId 重放只报告 AlreadyResolved 且不再发 execution permit；不同 commandId 冲突拒绝。selected item 完成并清窗后，未选项才可再次出队，并重新做 owner/charge/cost legality。
+
+Pending 状态对 unresolved、resolved trigger、resolved skip 分别验证 ResolutionContext lifecycle、Scheduler item placement 与 cost state。Window unresolved 时 Scheduler current 必须为空且抽取 sequence 不得留在 queue；resolved trigger 时 selected item 只能处于 current/已完成/明确 loop-guard failure 之一，未选项必须仍在 queue；resolved skip 时所有 listed sequence 均缺席。任何重复 sequence、错误 hook/key/source、非法 selected ID 或不一致状态都在 restore 时 fail closed。
+
+`ReactionContinuationSnapshot` 由 `PendingReactionSnapshot + ResolutionContextSnapshot + CostSnapshot` 构成，显式携带版本、state revision、Scheduler checkpoint、ResolutionContext/RNG、resolved rolls、cost balance 与 reservation ledger。它是权威 CombatState 的 typed serialization projection，不创建新的事实源；内存 round-trip 后继续同一 decision 必须产生相同 State/AcceptedCommands，且不 reroll、不双扣、不重复前序 hook。
+
+### 影响与边界
+
+- ReactionCharges > 1 只允许多个后续 opportunity；一个 Trigger 永远只执行 selected item。
+- Auto、UtilityAI、Ask 与回队项始终共用 M2 Scheduler；任何非 Ask item 都会截断当前 Ask 前缀。
+- Scheduler/Cost 子系统在顶层 clone→validate→commit 内允许必要的短暂中间形状，但只有完整 Reaction outcome 可成为对外稳定 State。
+- 本决定不定义 SQLite 表或 migration。M10 只能把这些 contract 接入现有 persistence transaction/compatibility gate；durable crash-resume 在 M11-T03 关闭。
