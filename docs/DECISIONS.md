@@ -4411,3 +4411,24 @@ Pending 状态对 unresolved、resolved trigger、resolved skip 分别验证 Res
 - Auto、UtilityAI、Ask 与回队项始终共用 M2 Scheduler；任何非 Ask item 都会截断当前 Ask 前缀。
 - Scheduler/Cost 子系统在顶层 clone→validate→commit 内允许必要的短暂中间形状，但只有完整 Reaction outcome 可成为对外稳定 State。
 - 本决定不定义 SQLite 表或 migration。M10 只能把这些 contract 接入现有 persistence transaction/compatibility gate；durable crash-resume 在 M11-T03 关闭。
+
+## DEC-201：WorldCombatProfile 由单一不可变 Resolver 组合并独占 world mitigation 映射
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §4.5.5、§5.1、§5.6，M3 Gate/M4 Gate/M5-T01
+
+### 决定
+
+既有 `WorldCombatProfileId` 已精确覆盖 Fantasy、Sci-Fi、Cultivation、Urban，因此 Core 将其复用为 `WorldType` 别名，不新增语义重复的第二个 enum。唯一 resolution path 是 developer-owned definitions/modules → `WorldCombatProfileResolver` → immutable `WorldCombatProfile`；Resolver 没有增量注册 API，AI/UI/Persistence 均不能绕过它直接拼装 resolved rules。
+
+每个 Definition 显式声明 ResourceLifecycle、DefenseBehavior、RecoveryRules、SignatureMechanic 与 selected developer module IDs。Resolver canonicalize 全部开放 stable IDs，验证 worldProfileVersion、四个基础 WorldType 恰好各一份、module ID/version/facet/兼容世界，并将 resolved profile 字段保持私有，只暴露只读查询。
+
+World-specific channel support 与 primary mitigation 的唯一事实源是 `DefenseBehavior.allowedDamageChannels + primaryMitigationByChannel`。Resolver 要求两者一一对应、canonical、无重复，且所有 Channel 必须来自传入的 M3 DamageChannelCatalog；缺失、额外或未知 mapping 全部拒绝。Resolved Profile 实现 M3 已预留的 `DamageDefenseProfile` trait，因此 mitigation pipeline 查询 Profile，不按 WorldType 分支，DamageChannelCatalog 也不复制映射。
+
+### 影响与边界
+
+- Resolver 构造要求完整四世界集合；M5-T02～T05 分别提供冻结的具体 definitions/rule behavior，M5-T06 才组装并关闭四世界 Gate。
+- M5-T01 只冻结 composition/validation/ownership，不以空实现冒充 Mana、Heat、神识或 Focus 行为；这些真实生命周期按后续独立任务实现。
+- Profile wire shape 不包含 Theme、layout、asset 或 presentation key；M9 Theme Resolver 可选择视觉包，但不能回写规则。
+- Developer Rule Module 是版本化、静态组合 metadata，不是 runtime callback、通用 capability bag 或动态 plugin registry。

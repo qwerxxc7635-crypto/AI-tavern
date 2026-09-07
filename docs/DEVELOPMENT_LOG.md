@@ -5772,3 +5772,18 @@
 - `cargo test -p ember-combat-core`：240/240 PASS，其中 Reaction 20 项；M4-T08 新增 7 项覆盖 multi-select deterministic continuation、Skip/conflict/clear 后 replay、ReactionCharges>1、Auto+Ask shared queue、Ask overflow、pending tamper 与 snapshot unknown field。
 - strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 396 PASS、1 credential-only ignore，archive interop 双向通过。
 - M4-T01..T08 与 M4 Runtime Gate PASS；覆盖 Status merge/clock/immediate runtime semantics、HARD_CC DR、typed Trigger、Reaction ownership/order/charges 与 pending memory exactly-once resume。按任务 SOT，本项不接 SQLite；durable crash-resume 明确由 M10-T02 接入、M11-T03 最终关闭，当前不将其误报为已验收。用户 `.gitignore` diff SHA-256 保持不变且未纳入提交；无 SPEC BLOCKER。下一项严格为 M5-T01。
+
+## 2026-09-07 — M5-T01 完成 WorldCombatProfile Resolver / Composition
+
+### 单一 Profile 组合入口与 world-specific mitigation owner
+
+- 从 M4-T08 提交 `1791041` 创建 `task/M5-T01-world-combat-profile-resolver`。新增唯一 `WorldCombatProfileResolver`，将既有 closed `WorldCombatProfileId` 复用为 `WorldType`，避免第二个等价 enum；resolver 一次性接收完整 developer-owned definitions/modules，没有增量注册、runtime plugin 或 AI composition API。
+- Profile 明确持有 `ResourceLifecycle`、`DefenseBehavior`、`RecoveryRules`、`SignatureMechanic` 与已选 developer rule modules。Resolved Profile 字段私有且只由 resolver 构造；输入按 WorldType/module/resource/channel canonicalize，四个基础 WorldType 必须各恰好一份，重复/缺失、未知/incompatible module 与错误版本 fail closed。
+- `DefenseBehavior.allowedDamageChannels + primaryMitigationByChannel` 强制一一完整、canonical、无重复且必须存在于 M3 `DamageChannelCatalog`；额外 mapping 与缺失 mapping 均拒绝。`WorldCombatProfile` 直接实现既有 `DamageDefenseProfile`，Core mitigation 无需新增 world switch，Catalog 仍不保存 world-specific mitigation。
+- Theme、layout、asset 与 runtime code 不存在于 Definition/Resolved Profile wire shape，unknown field 拒绝；AI/UI 只能接收 resolver 输出，不能自行装配模块或改变规则。具体 Fantasy/Sci-Fi/Cultivation/Urban 生命周期与特色机制仍严格归 M5-T02～T05。新增 `DEC-201`。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core`：246/246 PASS，其中新增 6 项覆盖四 WorldType 单路径解析、Profile mitigation ownership、输入顺序无关 canonical serialization、缺失/重复 Profile、未知/不兼容 module、mapping 完整性，以及 Theme/runtime-code wire rejection。
+- strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 402 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §4.5.5/§5.1/§5.6 与 M3 Gate/M4 Gate DependsOn 已复核；Profile 与 Theme 已结构性解耦，无 SPEC BLOCKER。用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交。M5-T01 PASS；下一项严格为 M5-T02 Fantasy Profile。

@@ -54,7 +54,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M4-T07 — Reaction Core | PASS | 2026-09-05 | Auto/Ask/AI_EVALUATE/Disabled；Player/UtilityAI ownership；ReactionCharges + atomic reservation；single Ask suspension legality |
 | M4-T08 — Multi-Reaction / Pending Snapshot Contract | PASS | 2026-09-05 | contiguous Ask prefix；selected Trigger/whole-window Skip；exactly-once command；typed memory snapshot + deterministic continuation |
 | M4 Gate | PASS | 2026-09-05 | M4-T01..T08 独立验收；Gate C Runtime：Status/clock/HARD_CC/Trigger/Reaction/pending memory resume 闭环；durable 子项按 SOT 留 M10/M11-T03 |
-| M5-T01 — WorldCombatProfile Resolver / Composition | IN_PROGRESS | 2026-09-05 | 下一项；四个基础 Profile 的显式 composition 与集中 resolver |
+| M5-T01 — WorldCombatProfile Resolver / Composition | PASS | 2026-09-07 | 单一 immutable resolver；四类显式 facet；developer module compatibility；Profile 独占 channel→mitigation；无 Theme 字段 |
+| M5-T02 — Fantasy Profile | IN_PROGRESS | 2026-09-07 | 下一项；Mana/Stamina 双循环、五 Channel 与 Fantasy 真实规则场景 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

@@ -37,6 +37,7 @@ mod terminal;
 mod trigger;
 mod turn;
 mod version;
+mod world_profile;
 
 pub use attack::{
     AttackClassification, AttackRuleError, AttackRuleErrorCode, BasicAttackBalanceConfig,
@@ -210,4 +211,10 @@ pub use turn::{
 pub use version::{
     CURRENT_COMBAT_VERSIONS, CombatVersion, CombatVersionField, CombatVersionSet,
     UnsupportedCombatVersion,
+};
+pub use world_profile::{
+    ChannelMitigationRule, DefenseBehavior, DeveloperRuleModule, RecoveryRules, ResourceLifecycle,
+    SignatureMechanic, WorldCombatProfile, WorldCombatProfileDefinition,
+    WorldCombatProfileResolver, WorldProfileError, WorldProfileErrorCode, WorldRuleFacet,
+    WorldType,
 };
