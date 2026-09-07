@@ -5787,3 +5787,17 @@
 - `cargo test -p ember-combat-core`：246/246 PASS，其中新增 6 项覆盖四 WorldType 单路径解析、Profile mitigation ownership、输入顺序无关 canonical serialization、缺失/重复 Profile、未知/不兼容 module、mapping 完整性，以及 Theme/runtime-code wire rejection。
 - strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 402 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §4.5.5/§5.1/§5.6 与 M3 Gate/M4 Gate DependsOn 已复核；Profile 与 Theme 已结构性解耦，无 SPEC BLOCKER。用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交。M5-T01 PASS；下一项严格为 M5-T02 Fantasy Profile。
+
+## 2026-09-07 — M5-T02 完成 Fantasy Profile
+
+### 固定资源生命周期、元素防御与真实双循环
+
+- 从 M5-T01 提交 `3ce1109` 创建 `task/M5-T02-fantasy-profile`。将 Profile 的资源清单收紧为 typed `ResourceLifecycleRule`，显式区分 HitPoints/Shield/ResourcePool storage 以及 Normal Owner Turn Start 的不变/按 balance 恢复/按 balance降低策略；resource ID 与唯一 HP/Shield storage 经 M5-T01 resolver canonical validation。
+- 新增固定 `FantasyProfile`，继续复用唯一 definition validation/composition path。Profile 明确 HP/Mana/Stamina，Physical/Fire/Ice/Lightning/Arcane，以及 Physical→Armor、四元素→Resistance；Mana 与 HP 无隐式 turn recovery，Stamina 恢复额度只来自 `FantasyBalanceConfig`。
+- Fantasy 普通回合恢复使用 clone→checked add→max cap→全局 invariant→atomic commit，只允许 OWNER_TURN_START active actor；Extra Turn、非正 balance、缺失/重复 Stamina 与非法 state 均无部分写入，且不消耗 RNG。真实场景通过既有 CostReservationModel 提交 spell Mana cost 与 martial Stamina cost，再验证下个普通回合只有 Stamina 回流。新增 `DEC-202`。
+
+### 验证与结束状态
+
+- 定向测试 PASS：Fantasy 5/5、World Profile 6/6；覆盖完整 Profile、五 Channel mitigation、HP/Mana 不恢复、Stamina 定额封顶、真实成本双循环、Extra Turn 拒绝与错误原子性。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 407 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §5.2 与 M5-T01 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交。M5-T02 PASS；下一项严格为 M5-T03 Sci-Fi Profile。

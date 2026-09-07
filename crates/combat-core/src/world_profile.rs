@@ -38,7 +38,31 @@ pub struct DeveloperRuleModule {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ResourceLifecycle {
     pub policy_id: String,
-    pub resource_ids: Vec<String>,
+    pub resources: Vec<ResourceLifecycleRule>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum ResourceStorage {
+    HitPoints,
+    Shield,
+    ResourcePool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum NormalOwnerTurnResourcePolicy {
+    NoAutomaticChange,
+    RestoreFromBalance,
+    ReduceFromBalance,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ResourceLifecycleRule {
+    pub resource_id: String,
+    pub storage: ResourceStorage,
+    pub normal_owner_turn_start: NormalOwnerTurnResourcePolicy,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,32 +209,7 @@ impl WorldCombatProfileResolver {
                     world_subject(definition.world_type),
                 ));
             }
-            let mut selected_modules =
-                Vec::with_capacity(definition.selected_rule_module_ids.len());
-            for module_id in &definition.selected_rule_module_ids {
-                let module = module_by_id.get(module_id.as_str()).ok_or_else(|| {
-                    profile_error(WorldProfileErrorCode::UnknownRuleModule, module_id)
-                })?;
-                if !module
-                    .supported_world_types
-                    .contains(&definition.world_type)
-                {
-                    return Err(profile_error(
-                        WorldProfileErrorCode::IncompatibleRuleModule,
-                        module_id,
-                    ));
-                }
-                selected_modules.push((*module).clone());
-            }
-            let profile = WorldCombatProfile {
-                world_type: definition.world_type,
-                world_profile_version: definition.world_profile_version,
-                resource_lifecycle: definition.resource_lifecycle,
-                defense_behavior: definition.defense_behavior,
-                recovery_rules: definition.recovery_rules,
-                signature_mechanic: definition.signature_mechanic,
-                rule_modules: selected_modules,
-            };
+            let profile = compose_definition(definition, &module_by_id)?;
             by_world_type.insert(profile.world_type, profiles.len());
             profiles.push(profile);
         }
@@ -239,6 +238,58 @@ impl WorldCombatProfileResolver {
     pub fn profiles(&self) -> &[WorldCombatProfile] {
         &self.profiles
     }
+}
+
+fn compose_definition(
+    definition: WorldCombatProfileDefinition,
+    module_by_id: &BTreeMap<&str, &DeveloperRuleModule>,
+) -> Result<WorldCombatProfile, WorldProfileError> {
+    let mut selected_modules = Vec::with_capacity(definition.selected_rule_module_ids.len());
+    for module_id in &definition.selected_rule_module_ids {
+        let module = module_by_id
+            .get(module_id.as_str())
+            .ok_or_else(|| profile_error(WorldProfileErrorCode::UnknownRuleModule, module_id))?;
+        if !module
+            .supported_world_types
+            .contains(&definition.world_type)
+        {
+            return Err(profile_error(
+                WorldProfileErrorCode::IncompatibleRuleModule,
+                module_id,
+            ));
+        }
+        selected_modules.push((*module).clone());
+    }
+    Ok(WorldCombatProfile {
+        world_type: definition.world_type,
+        world_profile_version: definition.world_profile_version,
+        resource_lifecycle: definition.resource_lifecycle,
+        defense_behavior: definition.defense_behavior,
+        recovery_rules: definition.recovery_rules,
+        signature_mechanic: definition.signature_mechanic,
+        rule_modules: selected_modules,
+    })
+}
+
+pub(crate) fn resolve_single_definition(
+    mut definition: WorldCombatProfileDefinition,
+    modules: &[DeveloperRuleModule],
+    channel_catalog: &DamageChannelCatalog,
+) -> Result<WorldCombatProfile, WorldProfileError> {
+    let mut modules = modules.to_vec();
+    for module in &mut modules {
+        canonicalize_module(module);
+        validate_module(module)?;
+    }
+    modules.sort_by(|left, right| left.module_id.cmp(&right.module_id));
+    reject_duplicate_modules(&modules)?;
+    canonicalize_definition(&mut definition);
+    validate_definition(&definition, channel_catalog)?;
+    let by_id = modules
+        .iter()
+        .map(|module| (module.module_id.as_str(), module))
+        .collect();
+    compose_definition(definition, &by_id)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -313,7 +364,10 @@ fn reject_duplicate_modules(modules: &[DeveloperRuleModule]) -> Result<(), World
 }
 
 fn canonicalize_definition(definition: &mut WorldCombatProfileDefinition) {
-    definition.resource_lifecycle.resource_ids.sort();
+    definition
+        .resource_lifecycle
+        .resources
+        .sort_by(|left, right| left.resource_id.cmp(&right.resource_id));
     definition.defense_behavior.allowed_damage_channels.sort();
     definition
         .defense_behavior
@@ -342,25 +396,45 @@ fn validate_definition(
             return Err(profile_error(WorldProfileErrorCode::InvalidStableId, id));
         }
     }
-    if definition.resource_lifecycle.resource_ids.is_empty() {
+    if definition.resource_lifecycle.resources.is_empty() {
         return Err(profile_error(
             WorldProfileErrorCode::EmptyResourceLifecycle,
             world_subject(definition.world_type),
         ));
     }
-    for resource_id in &definition.resource_lifecycle.resource_ids {
-        if !valid_stable_id(resource_id) {
+    for rule in &definition.resource_lifecycle.resources {
+        if !valid_stable_id(&rule.resource_id) {
             return Err(profile_error(
                 WorldProfileErrorCode::InvalidStableId,
-                resource_id,
+                &rule.resource_id,
             ));
         }
     }
-    if let Some(duplicate) = adjacent_duplicate(&definition.resource_lifecycle.resource_ids) {
+    if let Some(pair) = definition
+        .resource_lifecycle
+        .resources
+        .windows(2)
+        .find(|pair| pair[0].resource_id == pair[1].resource_id)
+    {
         return Err(profile_error(
             WorldProfileErrorCode::DuplicateResource,
-            duplicate,
+            &pair[0].resource_id,
         ));
+    }
+    for storage in [ResourceStorage::HitPoints, ResourceStorage::Shield] {
+        if definition
+            .resource_lifecycle
+            .resources
+            .iter()
+            .filter(|rule| rule.storage == storage)
+            .count()
+            > 1
+        {
+            return Err(profile_error(
+                WorldProfileErrorCode::DuplicateResource,
+                world_subject(definition.world_type),
+            ));
+        }
     }
 
     let defense = &definition.defense_behavior;
@@ -662,7 +736,19 @@ mod tests {
                     world_profile_version: CURRENT_COMBAT_VERSIONS.world_profile_version,
                     resource_lifecycle: ResourceLifecycle {
                         policy_id: format!("{}.resource", world_subject(world_type).to_lowercase()),
-                        resource_ids: vec!["health".into(), "resource".into()],
+                        resources: ["health", "resource"]
+                            .into_iter()
+                            .map(|resource_id| ResourceLifecycleRule {
+                                resource_id: resource_id.into(),
+                                storage: if resource_id == "health" {
+                                    ResourceStorage::HitPoints
+                                } else {
+                                    ResourceStorage::ResourcePool
+                                },
+                                normal_owner_turn_start:
+                                    NormalOwnerTurnResourcePolicy::NoAutomaticChange,
+                            })
+                            .collect(),
                     },
                     defense_behavior: DefenseBehavior {
                         policy_id: format!("{}.defense", world_subject(world_type).to_lowercase()),

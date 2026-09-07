@@ -14,6 +14,7 @@ mod damage_channel;
 mod effect;
 mod encounter;
 mod execution;
+mod fantasy;
 mod gameplay_tag;
 mod invariant;
 mod lethal;
@@ -94,6 +95,10 @@ pub use encounter::{
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
     ExecutionRevalidationRequest, ExecutionRevalidationService, OnceUsageCommit,
+};
+pub use fantasy::{
+    FantasyBalanceConfig, FantasyOwnerTurnRecovery, FantasyProfile, FantasyRuleError,
+    FantasyRuleErrorCode,
 };
 pub use gameplay_tag::{
     GameplayTagCatalog, GameplayTagCatalogError, GameplayTagCatalogErrorCode,
@@ -213,8 +218,8 @@ pub use version::{
     UnsupportedCombatVersion,
 };
 pub use world_profile::{
-    ChannelMitigationRule, DefenseBehavior, DeveloperRuleModule, RecoveryRules, ResourceLifecycle,
-    SignatureMechanic, WorldCombatProfile, WorldCombatProfileDefinition,
-    WorldCombatProfileResolver, WorldProfileError, WorldProfileErrorCode, WorldRuleFacet,
-    WorldType,
+    ChannelMitigationRule, DefenseBehavior, DeveloperRuleModule, NormalOwnerTurnResourcePolicy,
+    RecoveryRules, ResourceLifecycle, ResourceLifecycleRule, ResourceStorage, SignatureMechanic,
+    WorldCombatProfile, WorldCombatProfileDefinition, WorldCombatProfileResolver,
+    WorldProfileError, WorldProfileErrorCode, WorldRuleFacet, WorldType,
 };

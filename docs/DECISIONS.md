@@ -4432,3 +4432,23 @@ World-specific channel support 与 primary mitigation 的唯一事实源是 `Def
 - M5-T01 只冻结 composition/validation/ownership，不以空实现冒充 Mana、Heat、神识或 Focus 行为；这些真实生命周期按后续独立任务实现。
 - Profile wire shape 不包含 Theme、layout、asset 或 presentation key；M9 Theme Resolver 可选择视觉包，但不能回写规则。
 - Developer Rule Module 是版本化、静态组合 metadata，不是 runtime callback、通用 capability bag 或动态 plugin registry。
+
+## DEC-202：Fantasy 的 Stamina 恢复是普通 Owner Turn Start 的原子 Profile 规则
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §5.2，M5-T01/M5-T02
+
+### 决定
+
+Fantasy 固定 Profile 声明 HP、Mana、Stamina 三项资源生命周期。HP 映射权威 Combatant hit-points storage，Mana/Stamina 映射通用 resource pool；HP 与 Mana 的 `NormalOwnerTurnStart` 策略为 `NO_AUTOMATIC_CHANGE`，只有 Stamina 为 `RESTORE_FROM_BALANCE`。恢复额度来自版本绑定的 `FantasyBalanceConfig`，Profile 不写死平衡常数。
+
+`FantasyProfile` 通过 M5-T01 的同一 definition validation/composition pipeline 产生 resolved profile，不另造 engine 或 world switch。其普通 Owner Turn Start 规则只在 `OWNER_TURN_START` 且存在 active combatant 时运行，以 clone→checked arithmetic→全局 invariant→commit 原子更新 Stamina，并按 max cap；Extra Turn、非法 balance、缺失/重复资源与损坏 state 全部 fail closed，且不推进 RNG。
+
+Fantasy 的 damage channel 固定为 Physical、Fire、Ice、Lightning、Arcane。Physical 唯一 primary mitigation 为 Armor，四种 elemental channel 唯一 primary mitigation 为 Resistance；Defense 命中难度不进入该映射，避免物理伤害默认双重减伤。真实双循环验收通过既有 CostReservationModel 分别提交 Mana spell 与 Stamina martial cost，再进入普通 Owner Turn Start，证明只有 Stamina 回流而 Mana 保持消耗后数值。
+
+### 影响与边界
+
+- HP/Mana 战斗内显式 Heal/Ability/Status/Item/Rule Effect 继续复用既有 typed effect/cost pipeline，本任务不创建隐式恢复入口。
+- Profile 生命周期类型只描述资源 storage 与普通回合策略；Sci-Fi recharge window/Heat、Cultivation 神识与 Urban Focus 的差异行为留给 M5-T03～T05。
+- M5-T02 只实现 Core 规则与场景测试，不提前接 UI、Theme、SQLite persistence 或真实模型 API。
