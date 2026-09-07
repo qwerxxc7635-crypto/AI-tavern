@@ -173,6 +173,20 @@ pub struct WorldCombatProfileResolver {
 }
 
 impl WorldCombatProfileResolver {
+    /// Resolves the four frozen v0.4.1 base profiles through one complete registry.
+    pub fn v0_4_1(channel_catalog: &DamageChannelCatalog) -> Result<Self, WorldProfileError> {
+        let definitions = [
+            crate::fantasy::definition(),
+            crate::sci_fi::definition(),
+            crate::cultivation::definition(crate::CultivationSubProfile::Base),
+            crate::urban::definition(crate::UrbanSubProfile::Base),
+        ];
+        let modules = crate::cultivation::modules()
+            .into_iter()
+            .chain(crate::urban::modules());
+        Self::from_developer_definitions(definitions, modules, channel_catalog)
+    }
+
     /// Constructs one immutable, version-bound resolver from developer-owned data.
     ///
     /// There is deliberately no incremental registration API. AI and UI receive

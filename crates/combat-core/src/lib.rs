@@ -9,6 +9,7 @@ mod clock;
 mod command;
 mod control;
 mod cost;
+mod cross_world_profile;
 mod cultivation;
 mod damage_bundle;
 mod damage_channel;

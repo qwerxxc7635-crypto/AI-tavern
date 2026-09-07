@@ -233,7 +233,7 @@ impl UrbanProfile {
     }
 }
 
-fn definition(sub_profile: UrbanSubProfile) -> WorldCombatProfileDefinition {
+pub(crate) fn definition(sub_profile: UrbanSubProfile) -> WorldCombatProfileDefinition {
     let mut mappings = vec![
         ("physical", PrimaryMitigation::Armor),
         ("ballistic", PrimaryMitigation::Armor),
@@ -296,7 +296,7 @@ fn definition(sub_profile: UrbanSubProfile) -> WorldCombatProfileDefinition {
     }
 }
 
-fn modules() -> Vec<DeveloperRuleModule> {
+pub(crate) fn modules() -> Vec<DeveloperRuleModule> {
     [
         FIREARM_MODULE_ID,
         MELEE_MODULE_ID,

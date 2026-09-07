@@ -136,7 +136,7 @@ impl CultivationProfile {
     }
 }
 
-fn definition(sub_profile: CultivationSubProfile) -> WorldCombatProfileDefinition {
+pub(crate) fn definition(sub_profile: CultivationSubProfile) -> WorldCombatProfileDefinition {
     let mut selected_rule_module_ids = vec![QI_MODULE_ID.into(), SOUL_MODULE_ID.into()];
     match sub_profile {
         CultivationSubProfile::Base => {}
@@ -184,7 +184,7 @@ fn definition(sub_profile: CultivationSubProfile) -> WorldCombatProfileDefinitio
     }
 }
 
-fn modules() -> Vec<DeveloperRuleModule> {
+pub(crate) fn modules() -> Vec<DeveloperRuleModule> {
     [
         (QI_MODULE_ID, vec![WorldRuleFacet::ResourceLifecycle]),
         (

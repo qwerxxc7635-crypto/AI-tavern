@@ -288,7 +288,7 @@ impl SciFiProfile {
     }
 }
 
-fn definition() -> WorldCombatProfileDefinition {
+pub(crate) fn definition() -> WorldCombatProfileDefinition {
     let mappings = [
         ("kinetic", PrimaryMitigation::Armor),
         ("thermal", PrimaryMitigation::Resistance),

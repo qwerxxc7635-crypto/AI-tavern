@@ -4516,3 +4516,23 @@ Base Profile 只允许 Physical/Ballistic，二者均以 Armor 为 primary mitig
 - Tactical Ability 的成本、每回合次数与 Tag mechanical mapping 由 M6 Definition/Compiler 接入；本任务实现 Profile 的真实资源 mutation，不重复 Ability execution pipeline。
 - FirstAid/Item/Ability 的内容数值继续走 typed Effect 与 balance；来源门禁不发明固定治疗量。
 - Ammo/Reload 仅在未来明确启用的固定 SubProfile 实现；M5-T05 不提前加入基础 Urban Profile。
+
+## DEC-206：四世界基础 Profile 由完整内建注册表闭合，Theme 永不进入规则组合
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §5.1～§5.6，M5-T01～M5-T06
+
+### 决定
+
+`WorldCombatProfileResolver::v0_4_1` 是 v0.4.1 四个基础世界的完整内建注册入口。它收集 Fantasy、Sci-Fi、Cultivation Base 与 Urban Base 的冻结 definition，并把 Cultivation/Urban 的开发者模块送入 M5-T01 的同一校验与 canonical composition pipeline；缺失、重复、未知或不兼容项仍由唯一 resolver fail closed。
+
+四个 Profile 的差异由 typed rule shape 和真实行为表达，而不是资源名称替换：Fantasy 只有 Stamina 普通回合恢复；Sci-Fi 同时具有 Shield storage、Energy 恢复和 Heat pressure/cooling；Cultivation 无普通回合自动资源变化且 Spirit Sense 参与攻防；Urban 只有 Stamina 普通回合恢复，Focus 依赖显式战术行为且没有 Shield。四个 signature mechanic ID 也必须唯一。
+
+Profile 只实现既有 `DamageDefenseProfile`，四世界代表性 Channel 均进入同一个 `MitigationPipeline`；不复制命中、伤害或防御 Core。Theme、layout、asset 等表现字段不属于 definition/resolved wire shape，改变表现标签不会改变 canonical Profile bytes 或 rule resolution。
+
+### 影响与边界
+
+- `v0_4_1` 固定基础 Profile 集合；SubProfile 仍只能通过各世界的封闭开发者入口选择，不开放 runtime plugin 或 AI module composition。
+- Gate D 在规则层证明四世界 resource lifecycle/defense/recovery/signature 差异；最终产品级四世界复验仍按任务表在 M11-T04 执行。
+- Theme 和资产接入留给 M9，AI Combat content mapping 留给 M6；两者都不能反向改变 Profile authority。

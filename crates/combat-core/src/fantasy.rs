@@ -140,7 +140,7 @@ impl FantasyProfile {
     }
 }
 
-fn definition() -> WorldCombatProfileDefinition {
+pub(crate) fn definition() -> WorldCombatProfileDefinition {
     let channel_mappings = [
         ("physical", PrimaryMitigation::Armor),
         ("fire", PrimaryMitigation::Resistance),

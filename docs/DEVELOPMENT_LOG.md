@@ -5843,3 +5843,17 @@
 - 定向测试 PASS：Urban 6/6；覆盖 Base resource/channel/no-Shield、Psychic/Occult 隔离、Stamina-only turn recovery、Aim/Brace/Observe Focus、真实 explicit heal 与 passive/auto-layer 拒绝、Extra Turn/malformed atomic failure。
 - strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 424 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §5.5 与 M5-T01 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M5-T05 PASS；下一项严格为 M5-T06 Cross-World Profile Gate。
+
+## 2026-09-07 — M5-T06 完成 Cross-World Profile Gate 与 M5 Gate
+
+### 完整四世界注册、真实差异与共享 Core
+
+- 从 M5-T05 提交 `b8e6ebd` 创建 `task/M5-T06-cross-world-profile-gate`。新增 `WorldCombatProfileResolver::v0_4_1`，一次性装配 Fantasy、Sci-Fi、Cultivation Base、Urban Base 与全部开发者静态 modules，继续使用 M5-T01 唯一的完整性、兼容性和 canonical composition 校验。
+- 跨世界 Gate 直接比较 typed lifecycle：Fantasy 自动变化仅 Stamina；Sci-Fi 有 Shield storage、Energy 恢复与 Heat pressure/cooling；Cultivation 无自动资源并声明 Spirit Sense；Urban 有 Stamina、Focus 且无 Shield。四个 signature mechanic 唯一，证明并非资源换名。
+- 四个 Profile 各选一个代表性 Channel，通过同一个 `MitigationPipeline` 完成 Armor/Resistance 选择与伤害结算；Profile 不复制 Core。canonical serialization 结构断言 Theme/layout/asset 不存在，改变表现标签不会改变规则 bytes。新增 `DEC-206`。
+
+### 验证与结束状态
+
+- 定向测试 PASS：Cross-World Profile 4/4；World Profile 相关 10/10。四个世界各自此前的真实规则场景继续由 Fantasy 5、Sci-Fi 5、Cultivation 5、Urban 6 项测试覆盖。
+- strict Clippy、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 428 PASS、1 credential-only ignore，archive interop 双向通过。
+- M5-T01..T06 与 M5 Gate / Gate D PASS；最终产品级 Gate D 仍按任务顺序在 M11-T04 复验。用户 `.gitignore` 保持未纳入提交；无 SPEC BLOCKER。下一项严格为 M6-T01 Existing Orchestrator Combat Task Integration。
