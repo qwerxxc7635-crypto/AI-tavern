@@ -9,6 +9,7 @@ mod clock;
 mod command;
 mod control;
 mod cost;
+mod cultivation;
 mod damage_bundle;
 mod damage_channel;
 mod effect;
@@ -76,6 +77,10 @@ pub use cost::{
     CostReservationErrorCode, CostReservationModel, CostReservationMutationStatus,
     CostReservationReceipt, CostReservationRecord, CostReservationRequest, CostReservationStatus,
     ReservedCombatCost,
+};
+pub use cultivation::{
+    CultivationBalanceConfig, CultivationProfile, CultivationRuleError, CultivationRuleErrorCode,
+    CultivationSoulOpposedInput, CultivationSubProfile,
 };
 pub use damage_bundle::{
     CommittedDamageEvent, DamageBundle, DamageBundleCommit, DamageBundleComponent,

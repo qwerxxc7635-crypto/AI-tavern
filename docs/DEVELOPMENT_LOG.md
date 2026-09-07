@@ -5815,3 +5815,17 @@
 - 定向测试 PASS：Sci-Fi 5/5，Invariant 12/12；覆盖固定 Profile、五 Channel mitigation、Energy/Heat owner-turn 变化、overheat gate、真实 Mitigation→CommittedDamage recharge reset、两轮 quiet recharge、Miss/NonHostile/NEVER、同 Round exactly-once 与错误原子性。
 - strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 413 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §5.3 与 M5-T01/M3-T08 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M5-T03 PASS；下一项严格为 M5-T04 Cultivation Profile。
+
+## 2026-09-07 — M5-T04 完成 Cultivation Profile
+
+### 神识真实攻防耦合与封闭 SubProfile 扩展
+
+- 从 M5-T03 提交 `13a7dc9` 创建 `task/M5-T04-cultivation-profile`。新增固定 `CultivationProfile`：Health/Qi/Spirit Sense，Physical/Qi/Soul，Physical→Armor、Qi/Soul→Resistance，三资源均无普通回合隐式恢复。
+- 神识 current value 经版本化 points-per-modifier balance 进入既有 M3 ResolutionRequest：Mental SavingThrow 使用防守方神识，Soul OpposedCheck 同时使用攻守双方神识；最终成败继续由唯一 ResolutionResolver 计算。checked modifier 合并、非法 balance、缺失/重复资源与损坏 state 全部 fail closed。
+- 真实规则场景通过 CostReservationModel 分别提交 Qi 与 Spirit Sense cost：Qi 消耗不改变 Soul 对抗，Spirit Sense 消耗则改变 Mental Save 和 Soul Opposed 的胜负，证明神识不是第二 Mana。closed Base/BodyRefining/SwordCultivation 选择只装配开发者固定 Qi/Soul/Body/Sword modules，不开放任意 ID 组合。新增 `DEC-204`。
+
+### 验证与结束状态
+
+- 定向测试 PASS：Cultivation 5/5；覆盖固定资源/Channel/mitigation、三种 deterministic SubProfile module composition、真实 Mental Save 翻转、Soul Opposed 攻防翻转、Qi 隔离与 malformed input。
+- strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 418 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §5.4 与 M5-T01 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M5-T04 PASS；下一项严格为 M5-T05 Urban Profile。

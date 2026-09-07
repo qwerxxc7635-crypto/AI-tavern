@@ -4474,3 +4474,25 @@ Sci-Fi damage channel 固定为 Kinetic、Thermal、Electromagnetic、Plasma、R
 - Recharge Delay/Amount、Energy 恢复与 Heat 冷却均为版本化 balance 输入，Profile 不冻结数值常数。
 - Ability Tag→Overheat Restricted 的 mechanical mapping 归 M6 内容编译；M5-T03 冻结 typed runtime decision，不接受 AI 自由解释 Tag。
 - SQLite migration/durable restore、Combat Log 中文投影与 Theme/UI 分别留给 M10、M8/M9，不在本任务提前实现。
+
+## DEC-204：Cultivation 神识是可消耗且参与 Soul/Mental Resolution 的攻防资源
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §5.4，M3-T02/M5-T01/M5-T04
+
+### 决定
+
+Cultivation 固定 Profile 声明 Health、Qi、Spirit Sense，三者均无 Normal Owner Turn 隐式恢复；战斗内恢复只能来自既有合法 Ability/Status/Item/Rule Effect。Damage channel 固定 Physical、Qi、Soul，分别使用 Armor、Resistance、Resistance 作为唯一 primary mitigation，Soul 不再叠加完整 physical Armor。
+
+神识不是第二条 Mana。`CultivationProfile` 从 authoritative ResourceState 读取当前 Spirit Sense，并使用版本化 balance 的 points-per-modifier 换算规则，构造既有 M3 `SavingThrow` 与 `OpposedCheck`：Mental Save 将防守方当前神识加入 save modifier；Soul Opposed 同时将攻守双方当前神识加入各自 modifier。所有骰点、tie rule 与最终成败仍由唯一 `ResolutionResolver` 处理，本 Profile 不复制 d20 算法。
+
+验收场景使用既有 CostReservationModel 真实提交神识消耗：同一 Mental Save 从成功变为失败，同一 Soul Opposed 从防守方胜变为攻击方胜；单独消耗 Qi 不改变神识 modifier，从而证明 Qi 主施法循环与神识攻防储备并非换名同构。
+
+开发者扩展通过 closed `CultivationSubProfile` 选择：Base 固定 QiResourceModule + SoulModule，BodyRefining 与 SwordCultivation 各只增加自己的静态 module。Module 仍走 M5-T01 compatibility/canonical composition；接口不接收任意 module ID 列表，AI 无法自由组合或创造底层模块。
+
+### 影响与边界
+
+- 神识阈值/换算常数属于 balance config；Profile 冻结“当前资源真实参与攻防”的语义，不硬编码平衡数值。
+- 五行 Channel 只有未来明确的固定 SubProfile 才能扩展；M5-T04 不抢先发明五行 cross-product 或动态元素系统。
+- Character/UI 中文名称、mechanical mapping、SQLite migration 与 Theme 分别留给 M6/M8/M9/M10。
