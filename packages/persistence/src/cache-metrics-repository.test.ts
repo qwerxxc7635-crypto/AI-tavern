@@ -27,7 +27,7 @@ describe('CacheMetricsRepository', () => {
     const { database, repository } = await setup();
     try {
       const saved = repository.record({
-        taskType: 'GENERATE_ADVENTURE_TURN',
+        taskType: 'COMBAT_CONTENT_GENERATION',
         promptCacheHitTokens: 750,
         promptCacheMissTokens: 250,
         prefixHash: 'a'.repeat(64),
@@ -40,7 +40,7 @@ describe('CacheMetricsRepository', () => {
         .prepare(`SELECT key, value_json FROM app_settings WHERE key = 'deepseek_cache_metrics_v1'`)
         .get() as { key: string; value_json: string };
       expect(row.key).toBe('deepseek_cache_metrics_v1');
-      expect(row.value_json).toContain('GENERATE_ADVENTURE_TURN');
+      expect(row.value_json).toContain('COMBAT_CONTENT_GENERATION');
       expect(row.value_json).not.toMatch(/messages|prompt text|system contract|player input/i);
       expect(Object.keys(JSON.parse(row.value_json)[0])).toEqual([
         'taskType',

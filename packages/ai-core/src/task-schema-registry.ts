@@ -16,6 +16,8 @@ import {
 import {
   CheckConsistencyInputSchema,
   CheckConsistencyOutputSchema,
+  CombatContentTaskInputSchema,
+  CombatContentTaskOutputSchema,
   EditCharacterDraftInputSchema,
   EditCharacterDraftOutputSchema,
   CompleteCharacterBackgroundInputSchema,
@@ -119,6 +121,10 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   SUMMARIZE_ADVENTURE: definition(SummarizeAdventureInputSchema, SummarizeAdventureOutputSchema, 2),
   EXTRACT_MEMORIES: definition(ExtractMemoriesInputSchema, ExtractMemoriesOutputSchema),
   CHECK_CONSISTENCY: definition(CheckConsistencyInputSchema, CheckConsistencyOutputSchema),
+  COMBAT_CONTENT_GENERATION: definition(
+    CombatContentTaskInputSchema,
+    CombatContentTaskOutputSchema,
+  ),
 } satisfies Readonly<Record<AITask, AITaskSchemaDefinition>>);
 
 export function taskSchemas(task: AITask): AITaskSchemaDefinition {

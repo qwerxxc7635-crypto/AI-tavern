@@ -5857,3 +5857,17 @@
 - 定向测试 PASS：Cross-World Profile 4/4；World Profile 相关 10/10。四个世界各自此前的真实规则场景继续由 Fantasy 5、Sci-Fi 5、Cultivation 5、Urban 6 项测试覆盖。
 - strict Clippy、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 428 PASS、1 credential-only ignore，archive interop 双向通过。
 - M5-T01..T06 与 M5 Gate / Gate D PASS；最终产品级 Gate D 仍按任务顺序在 M11-T04 复验。用户 `.gitignore` 保持未纳入提交；无 SPEC BLOCKER。下一项严格为 M6-T01 Existing Orchestrator Combat Task Integration。
+
+## 2026-09-07 — M6-T01 完成 Existing Orchestrator Combat Task Integration
+
+### 单一生产 Provider 路径与非权威 transport envelope
+
+- 从 M5-T06 提交 `4e06e90` 创建 `task/M6-T01-orchestrator-combat-integration`。新增唯一 `COMBAT_CONTENT_GENERATION` AITask，并接入既有 Schema registry、Context Budget、Task Prompt、Stable Prompt/Profile Manager 与 TypeScript/Rust cache metric allowlist；没有新增 Provider、凭据、retry/repair、cache、Candidate repository、transaction 或 SQLite table。
+- Windows 实际通过原 `DesktopAIOrchestrator` 和所选模型/Provider 执行 Combat task。定向测试覆盖正常生成和首次截断后的原结构修复，两次请求保持相同 task/provider；cache prefix 仍由稳定 Prompt bytes 计算，Native cache 继续只保存 token aggregate/hash，不保存 Prompt 或请求正文。
+- 当前严格输出只允许 `schemaVersion + authority=UNTRUSTED_PROPOSAL + proposalText`。额外 structured damage 等字段、伪造 Approved authority 与空输出全部 fail closed；没有任何服务把该 proposal 写成 Combat Definition 或 CombatState。正式 Concept/Intent 字段由下一任务 M6-T02 收紧。新增 `DEC-207`。
+
+### 验证与结束状态
+
+- 定向 Vitest PASS：AI protocol/schema/fake/context、Desktop Orchestrator、cache repository 共 133 项；新增 Combat schema/desktop/cache 聚焦集 89 项 PASS。Native cache 3/3 与 Prompt Manager 3/3 PASS。
+- strict TypeScript、Rustfmt、Native Bridge Clippy 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1124 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 428 PASS、1 credential-only ignore，archive interop 双向通过。
+- M0-T02 DependsOn 与 V5.2 §14/§14.1 已复核；既有 Provider path 仍是唯一生产路径，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T01 PASS；下一项严格为 M6-T02 Combat Concept Schema。

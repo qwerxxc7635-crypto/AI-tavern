@@ -30,6 +30,7 @@ const AI_TASKS: &[&str] = &[
     "SUMMARIZE_ADVENTURE",
     "EXTRACT_MEMORIES",
     "CHECK_CONSISTENCY",
+    "COMBAT_CONTENT_GENERATION",
 ];
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
@@ -169,7 +170,7 @@ mod tests {
         let store = CampaignStore::open(directory.path().join("cache.sqlite")).unwrap();
         let metric = store
             .record_deepseek_cache_metric(
-                "NPC_REPLY",
+                "COMBAT_CONTENT_GENERATION",
                 768,
                 256,
                 &"a".repeat(64),

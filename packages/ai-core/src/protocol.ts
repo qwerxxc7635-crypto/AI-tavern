@@ -25,6 +25,7 @@ export const AI_TASKS = [
   'SUMMARIZE_ADVENTURE',
   'EXTRACT_MEMORIES',
   'CHECK_CONSISTENCY',
+  'COMBAT_CONTENT_GENERATION',
 ] as const;
 
 export type AITask = (typeof AI_TASKS)[number];

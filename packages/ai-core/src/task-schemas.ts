@@ -1312,3 +1312,26 @@ export const CheckConsistencyOutputSchema = z
     message: 'consistent must match whether issues are empty',
     path: ['consistent'],
   });
+
+/**
+ * M6-T01 transport envelope for the existing AI pipeline. The proposal is
+ * deliberately untrusted narrative text: it cannot become a Candidate or a
+ * combat definition until the M6 concept and domain validators accept it.
+ */
+export const CombatContentTaskInputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    contentKind: z.enum(['ABILITY', 'EQUIPMENT', 'STATUS']),
+    submissionPolicy: z.enum(['USER_REQUESTED', 'BACKGROUND_WORLD_CONTENT']),
+    worldType: z.enum(['FANTASY', 'SCI_FI', 'CULTIVATION', 'URBAN']),
+    requestText: text,
+  })
+  .strict();
+
+export const CombatContentTaskOutputSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    authority: z.literal('UNTRUSTED_PROPOSAL'),
+    proposalText: text,
+  })
+  .strict();

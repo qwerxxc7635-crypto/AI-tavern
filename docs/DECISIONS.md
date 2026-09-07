@@ -4536,3 +4536,23 @@ Profile 只实现既有 `DamageDefenseProfile`，四世界代表性 Channel 均�
 - `v0_4_1` 固定基础 Profile 集合；SubProfile 仍只能通过各世界的封闭开发者入口选择，不开放 runtime plugin 或 AI module composition。
 - Gate D 在规则层证明四世界 resource lifecycle/defense/recovery/signature 差异；最终产品级四世界复验仍按任务表在 M11-T04 执行。
 - Theme 和资产接入留给 M9，AI Combat content mapping 留给 M6；两者都不能反向改变 Profile authority。
+
+## DEC-207：Combat Content 只新增既有 Orchestrator 的任务类型，首阶段输出保持非权威
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §14、§14.1、§38 第25项，M0-T02/M6-T01
+
+### 决定
+
+新增唯一任务标识 `COMBAT_CONTENT_GENERATION`，并把它注册到现有 `AITask`、Schema registry、Context Budget、Stable Prompt Profile、Prompt Manager 与缓存指标白名单。桌面端继续只调用 `DesktopAIOrchestrator.execute`，由原有模型设置解析、系统凭据引用、统一 Provider、fallback、Generator lifecycle、结构修复、稳定缓存前缀与安全审计处理；Rust 生产端继续只通过既有 `ai_generate` / `ai_generate_stream` 和 OpenAI-compatible Provider 发送请求。
+
+M6-T01 只定义运行既有管线所需的严格 transport envelope。输出必须声明 `authority=UNTRUSTED_PROPOSAL`，且只携带 narrative `proposalText`；unknown field 和伪造 `APPROVED_DEFINITION` 均被 Schema 拒绝。它没有 Candidate commit service、CombatState 写入口、数值 mapping 或 executable mechanic，因此通过 Provider 并不代表内容成为世界事实。
+
+既有 `AICandidateUseCases`、事务端口和 SQLite `ai_candidates` 继续作为后续 M6-T08 的唯一 Candidate/commit 基础设施；本任务不新增表、migration、credential store、Provider、重试器、repair runner、cache store 或 domain transaction。M6-T02 将在同一任务类型上用正式 Concept/Intent schema 取代 transport-only proposal，而不是增加第二个任务或旁路。
+
+### 影响与边界
+
+- M6-T01 证明生产 Provider path 唯一且可实际完成/修复 Combat task；不把 transport proposal 宣称为可用 Ability/Equipment/Status。
+- Concept 字段与禁止 authoritative numeric 属于 M6-T02；mechanical mapping、budget、validator、tooltip 和 commit policy 仍分别属于 M6-T03～T08。
+- Prompt 用户预设仍只是最低优先级 style guidance，不能越过稳定系统合同或改变本地 authority。

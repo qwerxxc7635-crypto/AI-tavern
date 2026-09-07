@@ -61,7 +61,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M5-T05 — Urban Profile | PASS | 2026-09-07 | Health/Stamina/Focus；Stamina turn recovery；Aim/Brace/Observe Focus；limited heal gate；optional Psychic/Occult |
 | M5-T06 — Cross-World Profile Gate | PASS | 2026-09-07 | 四 Profile 完整注册与真实生命周期差异；Theme 结构隔离；共享 Mitigation Core；M5 Gate / Gate D PASS |
 | M5 Gate — Gate D Four World Profiles | PASS | 2026-09-07 | M5-T01..T06 独立验收；四 Profile resource lifecycle/defense/recovery/signature 闭环 |
-| M6-T01 — Existing Orchestrator Combat Task Integration | IN_PROGRESS | 2026-09-07 | 下一项；复用唯一 Provider/Credentials/Retry/Repair/Cache/Candidate/Domain Transaction/SQLite 路径 |
+| M6-T01 — Existing Orchestrator Combat Task Integration | PASS | 2026-09-07 | `COMBAT_CONTENT_GENERATION` 进入既有 Orchestrator/Provider/repair/cache/prompt 路径；输出固定为非权威 proposal；无新 infra/表 |
+| M6-T02 — Combat Concept Schema | IN_PROGRESS | 2026-09-07 | 下一项；收紧 Concept/Intent schema，禁止 final authoritative numeric，非法输出走既有 repair/reject |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

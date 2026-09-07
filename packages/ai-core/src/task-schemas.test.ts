@@ -718,6 +718,16 @@ const fixtures: Readonly<Record<AITask, Readonly<{ input: unknown; output: unkno
     },
     output: { consistent: true, issues: [] },
   },
+  COMBAT_CONTENT_GENERATION: {
+    input: {
+      schemaVersion: 1,
+      contentKind: 'ABILITY',
+      submissionPolicy: 'USER_REQUESTED',
+      worldType: 'CULTIVATION',
+      requestText: '构思一道以雷鸣压制敌人的术法。',
+    },
+    output: FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
+  },
 };
 
 describe('versioned AI task schemas', () => {
@@ -760,6 +770,22 @@ describe('versioned AI task schemas', () => {
 
   it.each(AI_TASKS)('%s rejects an empty output', (task) => {
     expect(AI_TASK_SCHEMAS[task].output.safeParse({}).success).toBe(false);
+  });
+
+  it('keeps the M6-T01 combat transport output untrusted and non-authoritative', () => {
+    const schema = AI_TASK_SCHEMAS.COMBAT_CONTENT_GENERATION.output;
+    expect(
+      schema.safeParse({
+        ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
+        damage: 99,
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
+        authority: 'APPROVED_DEFINITION',
+      }).success,
+    ).toBe(false);
   });
 
   it('enforces representative structural rules before business validation', () => {

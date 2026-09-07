@@ -222,6 +222,63 @@ describe('DesktopAIOrchestrator', () => {
     });
   });
 
+  it('routes combat content through the same selected provider, repair, and cache-prefix pipeline', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const provider = new CapturingProvider();
+    const result = await new DesktopAIOrchestrator(settings, provider).execute(
+      'COMBAT_CONTENT_GENERATION',
+      {
+        schemaVersion: 1,
+        contentKind: 'ABILITY',
+        submissionPolicy: 'USER_REQUESTED',
+        worldType: 'CULTIVATION',
+        requestText: '构思一道以雷鸣压制敌人的术法。',
+      },
+      options('combat-content'),
+    );
+
+    expect(provider.calls).toHaveLength(1);
+    expect(provider.calls[0]).toMatchObject({
+      request: { task: 'COMBAT_CONTENT_GENERATION', modelName: 'deepseek-v4-flash' },
+      config: { id: 'provider-deepseek-profile' },
+    });
+    expect(result.validatedOutput).toEqual(FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION);
+    expect(result.cachePrefixHash).toMatch(/^[0-9a-f]{64}$/u);
+    expect(result.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'REPAIR', status: 'SKIPPED' }),
+    );
+  });
+
+  it('repairs an invalid combat proposal through the existing structured-output path', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const provider = new InvalidThenCapturingProvider();
+    const result = await new DesktopAIOrchestrator(settings, provider).execute(
+      'COMBAT_CONTENT_GENERATION',
+      {
+        schemaVersion: 1,
+        contentKind: 'STATUS',
+        submissionPolicy: 'BACKGROUND_WORLD_CONTENT',
+        worldType: 'SCI_FI',
+        requestText: '构思一种电磁干扰状态。',
+      },
+      options('combat-content-repair'),
+    );
+
+    expect(provider.calls).toHaveLength(2);
+    expect(provider.calls.map(({ request }) => request.task)).toEqual([
+      'COMBAT_CONTENT_GENERATION',
+      'COMBAT_CONTENT_GENERATION',
+    ]);
+    expect(result.validatedOutput).toEqual(FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION);
+    expect(result.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'REPAIR', status: 'SUCCEEDED' }),
+    );
+  });
+
   it('streams only through an optional capable provider and preserves the final validation path', async () => {
     const base = profile('stream-profile', 'deepseek', 'deepseek-v4-flash');
     if (base.capabilities === null) throw new Error('expected capabilities');

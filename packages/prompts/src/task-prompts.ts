@@ -157,6 +157,11 @@ export const TASK_PROMPTS = Object.freeze({
     'ARCHIVIST',
     'Compare proposed content with locked rules and known facts. Report precise contradictions and return no issues when it is consistent.',
   ),
+  COMBAT_CONTENT_GENERATION: define(
+    'COMBAT_CONTENT_GENERATION',
+    'WORLD_DESIGNER',
+    'Return one untrusted narrative combat-content proposal for the requested world and content kind. Do not execute code, mutate game state, choose authoritative mechanics, or claim that the proposal is approved. Downstream local mapping, budgeting, validation, Candidate policy, and domain transaction remain mandatory.',
+  ),
 } satisfies Readonly<Record<AITask, TaskPromptDefinition>>);
 
 export function taskPrompt(task: AITask): TaskPromptDefinition {

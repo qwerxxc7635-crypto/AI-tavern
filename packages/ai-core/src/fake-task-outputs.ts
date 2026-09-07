@@ -552,4 +552,9 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
     consistent: true,
     issues: [],
   },
+  COMBAT_CONTENT_GENERATION: {
+    schemaVersion: 1,
+    authority: 'UNTRUSTED_PROPOSAL',
+    proposalText: '一道以雷鸣压制敌人的修仙战斗内容构想。',
+  },
 } satisfies Readonly<Record<AITask, unknown>>);

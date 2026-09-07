@@ -34,6 +34,7 @@ const AI_TASKS = new Set([
   'SUMMARIZE_ADVENTURE',
   'EXTRACT_MEMORIES',
   'CHECK_CONSISTENCY',
+  'COMBAT_CONTENT_GENERATION',
 ]);
 
 export interface CacheMetricInput {

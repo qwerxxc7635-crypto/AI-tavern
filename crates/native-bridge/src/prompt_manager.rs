@@ -12,7 +12,7 @@ const PROMPT_MANAGER_KEY: &str = "prompt_manager_v1";
 const PROMPT_PRESET_FORMAT: &str = "EMBER_PROMPT_PRESET";
 const MAX_PRESETS: usize = 24;
 const MAX_BLOCKS: usize = 8;
-const MAX_TASKS: usize = 24;
+const MAX_TASKS: usize = 25;
 const AI_TASKS: &[&str] = &[
     "GENERATE_WORLD",
     "REFINE_WORLD",
@@ -38,6 +38,7 @@ const AI_TASKS: &[&str] = &[
     "SUMMARIZE_ADVENTURE",
     "EXTRACT_MEMORIES",
     "CHECK_CONSISTENCY",
+    "COMBAT_CONTENT_GENERATION",
 ];
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
