@@ -4452,3 +4452,25 @@ Fantasy 的 damage channel 固定为 Physical、Fire、Ice、Lightning、Arcane�
 - HP/Mana 战斗内显式 Heal/Ability/Status/Item/Rule Effect 继续复用既有 typed effect/cost pipeline，本任务不创建隐式恢复入口。
 - Profile 生命周期类型只描述资源 storage 与普通回合策略；Sci-Fi recharge window/Heat、Cultivation 神识与 Urban Focus 的差异行为留给 M5-T03～T05。
 - M5-T02 只实现 Core 规则与场景测试，不提前接 UI、Theme、SQLite persistence 或真实模型 API。
+
+## DEC-203：Sci-Fi Recharge 只消费 committed damage，Heat 使用 pressure resource 契约
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §5.3，M3-T08/M5-T01/M5-T03
+
+### 决定
+
+Sci-Fi 固定 Profile 声明 Health、Shield、Energy、Heat：Health/Shield 不在 Normal Owner Turn Start 隐式变化，Energy 按 balance 恢复，Heat 按 balance 冷却。Heat 使用 `PressureResourcePool`，`overheatThreshold + hardMaxValue` 必须成对存在；pressure resource 当前值允许高于常规 maxValue、但不得超过 hardMaxValue。带固定 Overheat Restricted 分类的 Ability 在 `current >= overheatThreshold` 时禁用，Standard Ability 不受此门禁影响。
+
+Shield recharge progress 进入 authoritative `CombatantRuntime`，保存连续完整无中断 Round 数、当前 Round 是否中断与最后处理的 Round number。只有 `CommittedDamageEvent::DamageResolved` 能经 M3 `RechargeInterruptionPolicy` 计算后重置 progress；默认策略要求 hostile 且最终 Shield/HP 实际伤害大于 0，Miss/Immune/0 Damage、NonHostile 与 NEVER 不重置。UI 估算、动画或 raw incoming damage 不能进入接口。
+
+RoundEnd 是本 Profile 的合法 recharge hook。中断 Round 只清中断标记、不累计；之后每个完整无中断 Round 累计，达到 balance delay 后按 balance amount 恢复并封顶。`lastProcessedRoundNumber` 防止同一 Round 重放 hook 造成双恢复；runtime global invariant 拒绝“已中断但仍有连续进度”以及 future round marker。Energy/Heat 与 Shield 更新均通过 clone→checked mutation→global invariant→atomic commit，且不消费 RNG。
+
+Sci-Fi damage channel 固定为 Kinetic、Thermal、Electromagnetic、Plasma、Radiation；Kinetic→Armor，其余→Resistance。Shield 仍复用 M3 在 primary mitigation 后运行的统一 `ShieldResolution`，包括 Standard/Bypass/Disabled 与 EMP multiplier，不复制处理公式。
+
+### 影响与边界
+
+- Recharge Delay/Amount、Energy 恢复与 Heat 冷却均为版本化 balance 输入，Profile 不冻结数值常数。
+- Ability Tag→Overheat Restricted 的 mechanical mapping 归 M6 内容编译；M5-T03 冻结 typed runtime decision，不接受 AI 自由解释 Tag。
+- SQLite migration/durable restore、Combat Log 中文投影与 Theme/UI 分别留给 M10、M8/M9，不在本任务提前实现。

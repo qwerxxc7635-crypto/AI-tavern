@@ -422,6 +422,7 @@ mod tests {
             once_usage_counters: vec![],
             normal_owner_turn_index: 1,
             hard_cc_dr: HardCcDrRuntime::default(),
+            shield_recharge: crate::ShieldRechargeRuntime::default(),
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: Some(0),

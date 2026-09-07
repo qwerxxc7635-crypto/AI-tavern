@@ -56,7 +56,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M4 Gate | PASS | 2026-09-05 | M4-T01..T08 独立验收；Gate C Runtime：Status/clock/HARD_CC/Trigger/Reaction/pending memory resume 闭环；durable 子项按 SOT 留 M10/M11-T03 |
 | M5-T01 — WorldCombatProfile Resolver / Composition | PASS | 2026-09-07 | 单一 immutable resolver；四类显式 facet；developer module compatibility；Profile 独占 channel→mitigation；无 Theme 字段 |
 | M5-T02 — Fantasy Profile | PASS | 2026-09-07 | HP/Mana/Stamina 生命周期；五 Channel 映射；普通回合 Stamina 定额封顶恢复；真实成本双循环场景 |
-| M5-T03 — Sci-Fi Profile | IN_PROGRESS | 2026-09-07 | 下一项；Shield recharge window、Energy/Heat 与五 Channel 真实规则场景 |
+| M5-T03 — Sci-Fi Profile | PASS | 2026-09-07 | Health/Shield/Energy/Heat；五 Channel；committed damage 驱动 recharge；Energy recovery、Heat cooling/overheat |
+| M5-T04 — Cultivation Profile | IN_PROGRESS | 2026-09-07 | 下一项；灵力/神识攻防耦合、Physical/Qi/Soul 与 SubProfile 扩展点 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

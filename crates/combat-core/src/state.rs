@@ -112,6 +112,14 @@ pub struct HardCcDrRuntime {
     pub applied_since_owner_turn_end: bool,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ShieldRechargeRuntime {
+    pub uninterrupted_completed_rounds: u32,
+    pub interrupted_this_round: bool,
+    pub last_processed_round_number: Option<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct CombatantRuntime {
@@ -134,6 +142,7 @@ pub struct CombatantRuntime {
     pub once_usage_counters: Vec<UsageCounterState>,
     pub normal_owner_turn_index: u64,
     pub hard_cc_dr: HardCcDrRuntime,
+    pub shield_recharge: ShieldRechargeRuntime,
     pub initiative_result: i64,
     pub initiative_base_stat: i64,
     pub last_committed_timeline_order: Option<u32>,
@@ -894,6 +903,7 @@ mod tests {
             once_usage_counters: vec![],
             normal_owner_turn_index: 0,
             hard_cc_dr: HardCcDrRuntime::default(),
+            shield_recharge: crate::ShieldRechargeRuntime::default(),
             initiative_result: 10,
             initiative_base_stat: 3,
             last_committed_timeline_order: None,

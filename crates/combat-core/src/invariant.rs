@@ -14,6 +14,7 @@ pub enum CombatStateInvariantCode {
     ReactionChargesOutOfRange,
     BasicAttackCounterInvalid,
     HardCcDrStateInvalid,
+    ShieldRechargeStateInvalid,
     UsageCounterInvalid,
     ResourceBoundsInvalid,
     ResourceOutOfRange,
@@ -59,6 +60,16 @@ impl CombatStateInvariantValidator {
     pub fn validate(state: &CombatState) -> Result<(), CombatStateInvariantError> {
         for combatant in &state.combatants {
             validate_combatant(combatant)?;
+            if combatant
+                .shield_recharge
+                .last_processed_round_number
+                .is_some_and(|round| round > state.round.round_number)
+            {
+                return Err(combatant_error(
+                    combatant,
+                    CombatStateInvariantCode::ShieldRechargeStateInvalid,
+                ));
+            }
         }
         validate_formal_party(state)?;
         validate_reinforcements(state)?;
@@ -246,6 +257,14 @@ fn validate_combatant(combatant: &CombatantRuntime) -> Result<(), CombatStateInv
             CombatStateInvariantCode::HardCcDrStateInvalid,
         ));
     }
+    if combatant.shield_recharge.interrupted_this_round
+        && combatant.shield_recharge.uninterrupted_completed_rounds != 0
+    {
+        return Err(combatant_error(
+            combatant,
+            CombatStateInvariantCode::ShieldRechargeStateInvalid,
+        ));
+    }
     for (index, counter) in combatant.once_usage_counters.iter().enumerate() {
         if !(0..=1).contains(&counter.uses)
             || combatant.once_usage_counters[..index]
@@ -323,7 +342,8 @@ fn validate_resource(
         }
     }
 
-    if resource.current < resource.min_value || resource.current > resource.max_value {
+    let current_upper_bound = resource.hard_max_value.unwrap_or(resource.max_value);
+    if resource.current < resource.min_value || resource.current > current_upper_bound {
         return Err(resource_error(
             combatant,
             resource,
@@ -491,6 +511,29 @@ mod tests {
     }
 
     #[test]
+    fn rejects_impossible_shield_recharge_runtime_state() {
+        let mut interrupted_with_progress = valid_state();
+        interrupted_with_progress.combatants[0].shield_recharge = crate::ShieldRechargeRuntime {
+            uninterrupted_completed_rounds: 1,
+            interrupted_this_round: true,
+            last_processed_round_number: None,
+        };
+        assert_eq!(
+            validation_error(&interrupted_with_progress).code,
+            CombatStateInvariantCode::ShieldRechargeStateInvalid
+        );
+
+        let mut future_round = valid_state();
+        future_round.combatants[0]
+            .shield_recharge
+            .last_processed_round_number = Some(future_round.round.round_number + 1);
+        assert_eq!(
+            validation_error(&future_round).code,
+            CombatStateInvariantCode::ShieldRechargeStateInvalid
+        );
+    }
+
+    #[test]
     fn formal_party_members_are_stable_sorted_unique_and_player_aligned() {
         let mut state = valid_state();
         state.formal_party_member_ids = vec!["combatant-player".into()];
@@ -651,6 +694,7 @@ mod tests {
                 once_usage_counters: Vec::new(),
                 normal_owner_turn_index: 0,
                 hard_cc_dr: crate::HardCcDrRuntime::default(),
+                shield_recharge: crate::ShieldRechargeRuntime::default(),
                 initiative_result: 12,
                 initiative_base_stat: 2,
                 last_committed_timeline_order: Some(0),

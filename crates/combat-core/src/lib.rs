@@ -29,6 +29,7 @@ mod resolution_context;
 mod rng;
 mod runtime_commit;
 mod scheduler;
+mod sci_fi;
 mod shield;
 mod state;
 mod status;
@@ -167,6 +168,10 @@ pub use scheduler::{
     CanonicalEventChainScheduler, EventSchedulerError, EventSchedulerErrorCode,
     NON_COMBATANT_INITIATIVE_ORDER, SchedulerCandidate, SchedulerExecutionGateOutcome,
 };
+pub use sci_fi::{
+    SciFiAbilityHeatClass, SciFiBalanceConfig, SciFiHeatDecision, SciFiOwnerTurnRecovery,
+    SciFiProfile, SciFiRechargeOutcome, SciFiRuleError, SciFiRuleErrorCode,
+};
 pub use shield::{
     DamageSourceRelation, RechargeInterruptionDecision, RechargeInterruptionPolicy,
     RechargeInterruptionReason, ShieldInteraction, ShieldRechargeEvaluator, ShieldResolution,
@@ -183,8 +188,8 @@ pub use state::{
     ObjectiveRuntimeState, PendingReactionItem, PendingReactionWindow, ProvisionalDeltaEntry,
     ProvisionalRuntimeDelta, ReactionWindowStatus, ReinforcementRuntime, ReinforcementRuntimeState,
     ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
-    SchedulerItem, SchedulerItemKind, StatusRuntime, TerminalPriorityPolicy, TerminalPriorityTier,
-    TimelineEntry, UsageCounterScope, UsageCounterState,
+    SchedulerItem, SchedulerItemKind, ShieldRechargeRuntime, StatusRuntime, TerminalPriorityPolicy,
+    TerminalPriorityTier, TimelineEntry, UsageCounterScope, UsageCounterState,
 };
 pub use status::{
     CURRENT_STATUS_SCHEMA_VERSION, ControlCategory, StatusActivationPolicy, StatusDefinition,

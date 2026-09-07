@@ -913,6 +913,7 @@ mod tests {
             once_usage_counters: vec![],
             normal_owner_turn_index: 0,
             hard_cc_dr: crate::HardCcDrRuntime::default(),
+            shield_recharge: crate::ShieldRechargeRuntime::default(),
             initiative_result: 10,
             initiative_base_stat: 2,
             last_committed_timeline_order: None,

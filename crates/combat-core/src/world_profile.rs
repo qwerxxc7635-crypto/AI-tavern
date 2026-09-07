@@ -47,6 +47,7 @@ pub enum ResourceStorage {
     HitPoints,
     Shield,
     ResourcePool,
+    PressureResourcePool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

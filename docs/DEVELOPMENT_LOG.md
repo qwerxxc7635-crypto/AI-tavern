@@ -5801,3 +5801,17 @@
 - 定向测试 PASS：Fantasy 5/5、World Profile 6/6；覆盖完整 Profile、五 Channel mitigation、HP/Mana 不恢复、Stamina 定额封顶、真实成本双循环、Extra Turn 拒绝与错误原子性。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 407 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §5.2 与 M5-T01 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` diff SHA-256 保持 `a719e877b15920df87f99b178ec152099c44f922c2b235ab008babd4641e0987` 且不纳入提交。M5-T02 PASS；下一项严格为 M5-T03 Sci-Fi Profile。
+
+## 2026-09-07 — M5-T03 完成 Sci-Fi Profile
+
+### Committed recharge window、Energy/Heat 循环与 overheat gate
+
+- 从 M5-T02 提交 `0e12d91` 创建 `task/M5-T03-sci-fi-profile`。新增固定 `SciFiProfile` 并复用 M5-T01 唯一 composition path：Health/Shield/Energy/Heat，Kinetic/Thermal/Electromagnetic/Plasma/Radiation，Kinetic→Armor、其余→Resistance。
+- Combatant authoritative state 新增 typed `ShieldRechargeRuntime`。Recharge reset 只接受 M3 `CommittedDamageEvent::DamageResolved` 的结构化 decision；默认 hostile applied damage 中断，Miss/0 damage、NonHostile、NEVER 不中断。RoundEnd 逐 Round 记录窗口，达到 balance delay 后恢复固定 amount 并封顶，同 Round hook 重放被稳定 marker 拒绝。
+- Energy 在 Normal Owner Turn Start 按 balance 封顶恢复，Heat 同时按 balance 冷却；Heat 使用 threshold/hard-max pressure contract，允许合法 overheat 区间并在 hard max fail closed。typed Ability heat class 在 threshold 处禁用高能能力，冷却后重新允许；Standard ability 不被误禁。所有写入原子且 RNG 不变。新增 `DEC-203`。
+
+### 验证与结束状态
+
+- 定向测试 PASS：Sci-Fi 5/5，Invariant 12/12；覆盖固定 Profile、五 Channel mitigation、Energy/Heat owner-turn 变化、overheat gate、真实 Mitigation→CommittedDamage recharge reset、两轮 quiet recharge、Miss/NonHostile/NEVER、同 Round exactly-once 与错误原子性。
+- strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 413 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §5.3 与 M5-T01/M3-T08 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M5-T03 PASS；下一项严格为 M5-T04 Cultivation Profile。
