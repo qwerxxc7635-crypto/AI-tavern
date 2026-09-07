@@ -58,7 +58,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M5-T02 — Fantasy Profile | PASS | 2026-09-07 | HP/Mana/Stamina 生命周期；五 Channel 映射；普通回合 Stamina 定额封顶恢复；真实成本双循环场景 |
 | M5-T03 — Sci-Fi Profile | PASS | 2026-09-07 | Health/Shield/Energy/Heat；五 Channel；committed damage 驱动 recharge；Energy recovery、Heat cooling/overheat |
 | M5-T04 — Cultivation Profile | PASS | 2026-09-07 | 生命/灵力/神识；Physical/Qi/Soul；神识真实参与 Mental Save/Soul Opposed；固定 SubProfile modules |
-| M5-T05 — Urban Profile | IN_PROGRESS | 2026-09-07 | 下一项；Stamina/Focus tactical recovery、limited healing 与 optional Psychic/Occult |
+| M5-T05 — Urban Profile | PASS | 2026-09-07 | Health/Stamina/Focus；Stamina turn recovery；Aim/Brace/Observe Focus；limited heal gate；optional Psychic/Occult |
+| M5-T06 — Cross-World Profile Gate | IN_PROGRESS | 2026-09-07 | 下一项；四 Profile 真实规则差异、Theme 隔离与单 Core composition Gate D |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

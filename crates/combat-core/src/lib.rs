@@ -39,6 +39,7 @@ mod submission;
 mod terminal;
 mod trigger;
 mod turn;
+mod urban;
 mod version;
 mod world_profile;
 
@@ -222,6 +223,11 @@ pub use trigger::{
 pub use turn::{
     NextTurnOutcome, OwnerTurnStartOutcome, TurnRoundStateMachine, TurnStateError,
     TurnStateErrorCode,
+};
+pub use urban::{
+    UrbanBalanceConfig, UrbanHealingDecision, UrbanHealingSource, UrbanOwnerTurnRecovery,
+    UrbanProfile, UrbanRuleError, UrbanRuleErrorCode, UrbanSubProfile, UrbanTacticalAction,
+    UrbanTacticalRecovery,
 };
 pub use version::{
     CURRENT_COMBAT_VERSIONS, CombatVersion, CombatVersionField, CombatVersionSet,

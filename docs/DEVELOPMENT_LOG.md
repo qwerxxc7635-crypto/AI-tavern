@@ -5829,3 +5829,17 @@
 - 定向测试 PASS：Cultivation 5/5；覆盖固定资源/Channel/mitigation、三种 deterministic SubProfile module composition、真实 Mental Save 翻转、Soul Opposed 攻防翻转、Qi 隔离与 malformed input。
 - strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 418 PASS、1 credential-only ignore，archive interop 双向通过。
 - Scope/DoD、V5.2 §5.4 与 M5-T01 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M5-T04 PASS；下一项严格为 M5-T05 Urban Profile。
+
+## 2026-09-07 — M5-T05 完成 Urban Profile
+
+### Stamina 持续循环、Focus 战术恢复与有限治疗门禁
+
+- 从 M5-T04 提交 `4326244` 创建 `task/M5-T05-urban-profile`。新增固定 `UrbanProfile`：Health/Stamina/Focus；Base 仅 Physical/Ballistic 且均→Armor，不声明 Shield storage 或默认 recharge。
+- Normal Owner Turn Start 只恢复 Stamina；Focus 仅由 Action phase 的 typed Aim/Brace/Observe 按独立 balance 数值恢复，HP/Shield/Stamina 不被战术恢复旁路修改。Extra Turn、wrong phase、非法 balance、缺失/重复资源与 overflow 原子拒绝，RNG 不变。
+- limited heal gate 只允许 FirstAid/MedicalItem/ExplicitAbility/SoloRecovery，并把合法请求交给既有 RecoveryEffectProcessor 真实提交；PassiveTurn/AutomaticLayerRecharge 在写入前拒绝。Psychic/Occult 只由对应 closed SubProfile 启用并→Resistance；Firearm/Melee 同样是开发者固定 module extension。新增 `DEC-205`。
+
+### 验证与结束状态
+
+- 定向测试 PASS：Urban 6/6；覆盖 Base resource/channel/no-Shield、Psychic/Occult 隔离、Stamina-only turn recovery、Aim/Brace/Observe Focus、真实 explicit heal 与 passive/auto-layer 拒绝、Extra Turn/malformed atomic failure。
+- strict Clippy、Rustfmt、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1118 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 424 PASS、1 credential-only ignore，archive interop 双向通过。
+- Scope/DoD、V5.2 §5.5 与 M5-T01 DependsOn 已复核；无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M5-T05 PASS；下一项严格为 M5-T06 Cross-World Profile Gate。

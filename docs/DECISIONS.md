@@ -4496,3 +4496,23 @@ Cultivation 固定 Profile 声明 Health、Qi、Spirit Sense，三者均无 Norm
 - 神识阈值/换算常数属于 balance config；Profile 冻结“当前资源真实参与攻防”的语义，不硬编码平衡数值。
 - 五行 Channel 只有未来明确的固定 SubProfile 才能扩展；M5-T04 不抢先发明五行 cross-product 或动态元素系统。
 - Character/UI 中文名称、mechanical mapping、SQLite migration 与 Theme 分别留给 M6/M8/M9/M10。
+
+## DEC-205：Urban Focus 仅由显式战术行为恢复，治疗必须经过来源门禁
+
+- 日期：2026-09-07
+- 状态：已采纳
+- 依据：V5.2 §5.5，M3-T10/M5-T01/M5-T05
+
+### 决定
+
+Urban 固定 Profile 声明 Health、Stamina、Focus。Normal Owner Turn Start 只按 balance 恢复 Stamina；Health 与 Focus 不自动变化。Focus 的恢复入口是 typed Aim/Brace/Observe 战术行为，并且只允许在当前 active actor 的 Action phase 运行；三种额度均来自版本化 `UrbanBalanceConfig`，通过 clone→checked mutation→global invariant→atomic commit 写入。
+
+Urban limited healing 不是描述性标记。`commitLimitedHeal` 在进入既有唯一 `RecoveryEffectProcessor` 前检查 typed source：FirstAid、MedicalItem、ExplicitAbility、SoloRecovery 可以提交；PassiveTurn 与 AutomaticLayerRecharge 在任何 State mutation 前拒绝。基础 Profile 不声明 Shield storage，也不调用 Sci-Fi recharge runtime，因此不存在默认自动生命层充能。
+
+Base Profile 只允许 Physical/Ballistic，二者均以 Armor 为 primary mitigation。Psychic/Occult channel 只在相应 closed developer SubProfile 启用，并以 Resistance 为 primary mitigation；Firearm/Melee/Psychic/Occult 模块均经 M5-T01 的静态 compatibility/composition path，AI 不接收任意模块组合入口。
+
+### 影响与边界
+
+- Tactical Ability 的成本、每回合次数与 Tag mechanical mapping 由 M6 Definition/Compiler 接入；本任务实现 Profile 的真实资源 mutation，不重复 Ability execution pipeline。
+- FirstAid/Item/Ability 的内容数值继续走 typed Effect 与 balance；来源门禁不发明固定治疗量。
+- Ammo/Reload 仅在未来明确启用的固定 SubProfile 实现；M5-T05 不提前加入基础 Urban Profile。
