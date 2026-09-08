@@ -793,6 +793,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ember-combat-presentation"
+version = "0.3.0"
+dependencies = [
+ "ember-combat-core",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "ember-native-bridge"
 version = "0.3.0"
 dependencies = [

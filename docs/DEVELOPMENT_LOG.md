@@ -5941,3 +5941,18 @@
 - 定向 Rust 测试 6/6 PASS，覆盖合法限次 build、单 Status 递归与四类 economy/heal 永动、跨 Status 顺序无关 cycle、永久/超限 CC 与无敌、免费可重复+guaranteed crit refund 组合，以及 rejected build gate。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 452 PASS、1 credential-only ignore，archive interop 双向通过。
 - M6-T05 DependsOn 与 V5.2 §4.4/§8.1/§9.2/§15.1/§15.3 已复核；没有跳过 Budget/Schema、没有创建第二个 Scheduler/DSL/Capability Registry，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T06 PASS；下一项严格为 M6-T07 Mechanical Tooltip / AI Flavor Separation。
+
+## 2026-09-09 — M6-T07 完成 Mechanical Tooltip / AI Flavor Separation
+
+### 单向 Presentation 投影与 AI Flavor 边界
+
+- 从 M6-T06 提交 `5339c5d` 创建 `task/M6-T07-mechanical-tooltip-flavor-separation`。新增 `ember-combat-presentation` crate，依赖方向固定为 Presentation→Core；Effect Core Handler 未增加 tooltip、文案或 AI 职责。新增 `DEC-213`。
+- `MechanicalTooltipProjector` 从上游 Approved `BuildAbilityDefinition` 的 authoritative mechanics/numbers 投影固定顺序中文机械行，完整覆盖 AP、Resource（SPEND/GAIN_PRESSURE）、Resolution、Damage channel/amount、Healing、Shield、Critical eligibility、Save/DC、Status chance/duration、Cooldown、Target、stable PrimitiveId 与 GameplayTagId。stable ID 只作为机器 metadata，玩家 text 不回显英文 Enum。
+- `CombatPresentationCatalog` 为 open vocabulary 提供纯数据中文映射；Resolution/Target/19 个 Primitive 在 presentation owner 内 exhaustive 映射。缺失 localization、Profile 漂移与非法 ForceCritical/非 AttackRoll 组合 fail closed，不用自然语言重新推导规则。
+- `AiCombatFlavor` 严格只允许 `displayName/flavorDescription/lore`；三项要求有界中文且拒绝 unknown mechanics 字段。校验拒绝 AP/伤害骰/DC/冷却/概率等自然语言机械副本，并按 Approved Definition 拒绝免费、必中、无冷却和目标范围等明显矛盾；组合对象仍保留 flavor/mechanics 双层，Flavor 无法覆盖 mechanics。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 6/6 PASS，覆盖完整机械家族与精确中文顺序、Flavor/Mechanics 分层组合、unknown mechanics 字段、非中文/机械副本、明显冲突不改 mechanics，以及 localization/Profile/critical fail-closed。
+- `cargo clippy -p ember-combat-presentation --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 458 PASS、1 credential-only ignore，archive interop 双向通过。
+- M6-T05 DependsOn 与 V5.2 §14/§14.0.1/§15.2 已复核；没有实现 M8 UI/cost preview，没有接 SQLite 或提前决定 Candidate policy，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T07 PASS；下一项严格为 M6-T08 Candidate / Commit Policy。

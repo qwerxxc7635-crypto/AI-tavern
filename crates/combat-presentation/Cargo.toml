@@ -1,0 +1,15 @@
+[package]
+name = "ember-combat-presentation"
+version.workspace = true
+edition = "2024"
+publish = false
+
+[dependencies]
+ember-combat-core = { path = "../combat-core" }
+serde = { version = "1.0.229", features = ["derive"] }
+
+[dev-dependencies]
+serde_json = "1.0.149"
+
+[lints]
+workspace = true

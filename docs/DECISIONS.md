@@ -4656,3 +4656,23 @@ Hard rules 还拒绝：无 AP/resource/cooldown/use limit 的可重复 AP/Reacti
 - 检查是 build-level：输入顺序不会改变报告，跨 Status trigger cycle 与 Ability+Status critical synergy 均可被发现；不是只验证单个物品。
 - Loop Guard 仍处理运行时最大 depth/event count 并触发 EngineFailure rollback；静态 Validator 不替代 Scheduler，也不能把发现的 cycle“截断后继续”。
 - 当前规则是保守安全门；新增合法例外必须有 V5.2/Ruleset 明确语义、typed owner 与测试，不能靠忽略 issue 或自然语言白名单放行。
+
+## DEC-213：Mechanical Tooltip 由单向 Presentation 投影生成，AI Flavor 不承载机械事实
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §14/§14.0.1/§15.2，M3-T04/M6-T05/M6-T07
+
+### 决定
+
+新增独立 `ember-combat-presentation` crate，并保持唯一依赖方向 `combat-presentation → combat-core`。`MechanicalTooltipProjector` 读取已经过上游验证的 `BuildAbilityDefinition`（Approved Definition 的当前 typed shape），直接从程序拥有的 AP/resource cost、`ResolutionType`、damage channel/amount、DC、status probability/duration、cooldown、`MechanicalTarget`、stable `EffectPrimitiveId` 与 `GameplayTagId` 生成固定顺序的简体中文机械行。机械行字段私有，只能由 projector 构造；stable ID 作为机器元数据保留，不进入玩家文案。
+
+可扩展资源、伤害通道与 Tag 的中文名称由无执行能力的 `CombatPresentationCatalog` 提供；封闭的 Resolution/Target/Primitive 使用 presentation 模块内部的 exhaustive match。Presentation 不推导命中、目标合法性或 Effect 执行语义，也不反向进入 Effect Handler。
+
+AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore }`。三项必须是有界、无控制字符且不含拉丁字母的中文文本；unknown mechanics 字段在反序列化时拒绝。Flavor 不允许行动点、伤害骰、DC、冷却回合、概率等自然语言机械副本，并根据 Approved Definition 拒绝“免费/必中/无冷却/目标范围”等明显矛盾。组合结果仍保留 `flavor` 与 `mechanics` 两个独立字段，冲突不会改写机械定义。
+
+### 影响与边界
+
+- UI 后续只消费 projector 输出，不再自行拼接第二份机械说明；完整 Combat UI 接线和 hover/focus cost preview 仍归 M8。
+- 本任务不决定 Candidate 接受或持久化策略；USER_REQUESTED/BACKGROUND_WORLD_CONTENT 的 Confirm/Auto Accept/Domain Commit 归 M6-T08。
+- 后续新增 catalog ID 必须同时提供中文 presentation entry；缺失 ID、Profile 漂移或非法 critical policy 一律 fail closed，不回退显示原始英文 Enum/ID。
