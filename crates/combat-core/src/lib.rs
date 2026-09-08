@@ -3,6 +3,7 @@
 //! This crate must remain independent of persistence, UI, providers, system time,
 //! and platform services. Runtime behavior is added only by the owning milestone.
 
+mod ai_mechanical_exposure;
 mod attack;
 mod attribute;
 mod clock;
@@ -45,6 +46,10 @@ mod urban;
 mod version;
 mod world_profile;
 
+pub use ai_mechanical_exposure::{
+    AiMechanicalExposure, AiMechanicalExposureError, AiMechanicalExposureErrorCode,
+    AiMechanicalExposurePolicy,
+};
 pub use attack::{
     AttackClassification, AttackRuleError, AttackRuleErrorCode, BasicAttackBalanceConfig,
     BasicAttackRules, BasicAttackUsageDecision, CriticalDamageOverride, CriticalDamagePlan,

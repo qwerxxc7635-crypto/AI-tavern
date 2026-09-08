@@ -5899,3 +5899,17 @@
 - 定向 Rust 测试 7/7 PASS，覆盖输入顺序无关 canonical bytes、Primitive/Tag/Channel/Profile resource/Resolution 映射、三个已有 local typed override owner、未知 intent/primitive/resolution/channel/tag/target、安全拒绝跨 Profile channel/resource、不完整与重复组合、不兼容 override、unknown-field/code 注入拒绝。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 435 PASS、1 credential-only ignore，archive interop 双向通过。
 - M3-T03/M3-T06/M4-T01/M5-T01 DependsOn、V5.2 §14 与 M0 extensibility/version ownership contract 已复核；无新 Primitive/Resolution/Handler/DSL/Registry，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T03 PASS；下一项严格为 M6-T04 AI Mechanical Exposure Policy。
+
+## 2026-09-08 — M6-T04 完成 AI Mechanical Exposure Policy
+
+### 单一 default-deny Policy 与 canonical projection
+
+- 从 M6-T03 提交 `f3c5dfe` 创建 `task/M6-T04-ai-mechanical-exposure-policy`。新增唯一 `AiMechanicalExposurePolicy`：Primitive 从 `EffectPrimitiveId::ALL`、Tag 从 `GameplayTagCatalog`、Channel/Resource 从 resolved WorldProfile、Target 从 closed identity 投影；没有新增 supported primitive/tag/channel 数组、可变 Registry 或 generic capability enum。
+- V5.2 普通 Ability 的五类 Resolution 只在此 Policy 暴露，command-owned `AttemptEscape` 拒绝。Resource exposure 仅允许 Profile 的 ResourcePool/PressureResourcePool，Health/Shield 不得通过 Resource primitive 绕过专用 typed pipeline；跨 ruleset/profile、未知 membership 与非 canonical 输入均 fail closed。
+- M6-T03 可识别的 Multiple Attack/Critical DoT/Opposed Tie local typed override 对 ordinary AI Candidate 全部拒绝。受信任 developer/encounter definition 不伪装成普通 AI 权限等级，而是继续走所属 subsystem 的 code-owned definition/validator path。Policy 可输出稳定 exposure snapshot 供后续 Prompt/repair 引用，保证允许面只有一个事实源。新增 `DEC-210`。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 5/5 PASS，覆盖 canonical owner/Profile projection、真实 M6-T03 mapped Candidate、全部 local override owner 拒绝、AttemptEscape 与 Health resource bypass 拒绝、profile identity drift 与 duplicate/noncanonical input。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 440 PASS、1 credential-only ignore，archive interop 双向通过。
+- M0-T05/M6-T03 DependsOn 与 V5.2 §4.3/§6.2/§14 已复核；普通 AI 无 developer-only override 路径，不存在第二份 Primitive/Tag/Channel 漂移清单，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T04 PASS；下一项严格为 M6-T05 Power Budget + Programmatic Numbers。

@@ -4596,3 +4596,23 @@ Mechanical Mapping/Catalog/Handler 的语义变化继续由现有 `rulesetVersio
 - M6-T03 只完成 Concept→canonical mechanical skeleton；Power Budget 与最终程序数值仍归 M6-T05，不能把 skeleton 直接当作可执行 `EffectDefinition`。
 - ordinary AI 是否可请求某项已存在机制不是 Handler/Catalog 的职责；M6-T04 必须引用这些 canonical IDs/types，并拒绝 developer/encounter-only override。
 - 新机制不能通过新增自然语言别名或 fallback 进入 Runtime；必须先由其 owner 实现、版本化，再经 mapping 与 exposure policy 显式开放。
+
+## DEC-210：普通 AI 机制暴露由单一 Core Policy 从权威 owner 投影
+
+- 日期：2026-09-08
+- 状态：已采纳
+- 依据：V5.2 §4.3/§6.2/§14，M0-T05/M6-T03/M6-T04
+
+### 决定
+
+`AiMechanicalExposurePolicy` 是普通 AI Combat Candidate 的唯一机制暴露边界。Policy 不维护一份平行的 `SUPPORTED_EFFECT_TYPES[]`：Primitive 直接读取 `EffectPrimitiveId::ALL`，Tag 读取 `GameplayTagCatalog`，Damage Channel 与 Resource 读取当前 resolved `WorldCombatProfile`，Target 读取 closed `MechanicalTarget` identity。Resolution 只在该 Policy 内声明 V5.2 普通 Ability 的 AttackRoll/SavingThrow/OpposedCheck/AutoHit/ConditionalCheck；command-owned `AttemptEscape` default deny。
+
+Profile resource exposure只包含 `ResourcePool` / `PressureResourcePool`。Health 与 Shield 虽属于 Profile lifecycle identity，但普通 AI 不得通过 `GainResource/LoseResource` 绕过 Heal/Revive/DealDamage/Shield 的 typed pipeline。所有 canonical local override（Multiple Attack、Critical DoT、Opposed Tie）对普通 AI Candidate 一律拒绝；Developer/Encounter 定义继续由其既有受信任 code-owned 路径构造，不通过普通 AI Policy，也不新增 `NORMAL_AI/ADVANCED/DEVELOPER_ONLY` capability enum/registry。
+
+Policy 可生成确定性的 `AiMechanicalExposure` snapshot 供 Prompt/repair/inspection 使用，并在 Candidate 边界重新核对 ruleset/profile identity、canonical ordering、catalog/profile membership 与 exposed Resolution/Target。Snapshot 是现有 owner 的只读投影，不是可变 Registry；更改 exposure 语义由 `rulesetVersion` 管理。
+
+### 影响与边界
+
+- M6-T04 只决定已存在机制是否能进入普通 AI Candidate，不拥有 Effect 执行、Tag/Channel membership、Profile composition 或数值平衡。
+- Local override 即使能被 M6-T03 解析成真实 typed owner，也不能穿过 ordinary Candidate policy；只有受信任开发者内容路径可使用，并仍需其 owner validator。
+- Prompt 若需列出可用机制必须消费 Policy snapshot，不能手写另一份清单；实际 Orchestrator context wiring 随后续 Candidate pipeline 接入，不创建第二套 AI infra。

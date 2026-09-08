@@ -64,7 +64,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M6-T01 — Existing Orchestrator Combat Task Integration | PASS | 2026-09-07 | `COMBAT_CONTENT_GENERATION` 进入既有 Orchestrator/Provider/repair/cache/prompt 路径；输出固定为非权威 proposal；无新 infra/表 |
 | M6-T02 — Combat Concept Schema | PASS | 2026-09-08 | 八类 Concept/Intent 字段严格校验；非权威 authority；结构与文本层禁止 final numeric；非法输出走既有 repair/reject |
 | M6-T03 — Mechanical Intent Mapper → Canonical Mechanics | PASS | 2026-09-08 | Core-owned exact Intent grammar 映射并 canonicalize；引用现有 Primitive/Tag/Channel/Profile/Resolution/local override；未知、重复、跨 Profile 与不完整组合 fail closed；mapping version 归 rulesetVersion |
-| M6-T04 — AI Mechanical Exposure Policy | IN_PROGRESS | 2026-09-08 | 下一项；建立单一 default-deny AI exposure policy，普通 Candidate 禁止 developer/encounter-only override |
+| M6-T04 — AI Mechanical Exposure Policy | PASS | 2026-09-08 | 单一 Core policy 从 canonical enum/catalog/resolved Profile 投影 exposure；普通 Candidate default-deny，拒绝全部 local override、AttemptEscape 与 HP/Shield resource bypass |
+| M6-T05 — Power Budget + Programmatic Numbers | IN_PROGRESS | 2026-09-08 | 下一项；按 level/rarity/AP/resource/profile 计算可复验 Budget，并程序化生成最终数值 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

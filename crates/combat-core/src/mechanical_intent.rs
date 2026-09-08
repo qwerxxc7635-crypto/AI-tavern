@@ -292,6 +292,15 @@ impl<'a> MechanicalIntentMapper<'a> {
     }
 }
 
+impl MechanicalTarget {
+    pub const ALL: [Self; 4] = [
+        Self::SelfTarget,
+        Self::SingleAlly,
+        Self::SingleEnemy,
+        Self::SingleAny,
+    ];
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MechanicalIntentErrorCode {
     UnsupportedRulesetVersion,
