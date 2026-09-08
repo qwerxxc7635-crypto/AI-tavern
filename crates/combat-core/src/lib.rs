@@ -25,6 +25,7 @@ mod mechanical_intent;
 mod mitigation;
 mod numeric;
 mod objective;
+mod power_budget;
 mod precondition;
 mod reaction;
 mod recovery;
@@ -143,6 +144,12 @@ pub use numeric::{
 pub use objective::{
     CombatObjectiveRuntime, ObjectiveEvaluation, ObjectiveEvaluationPoint, ObjectiveRuntimeError,
     ObjectiveRuntimeErrorCode,
+};
+pub use power_budget::{
+    BudgetedMechanicalCandidate, CostIntensity, PowerBudgetBalanceConfig, PowerBudgetBasis,
+    PowerBudgetEngine, PowerBudgetError, PowerBudgetErrorCode, PowerBudgetReceipt,
+    ProgrammaticCombatNumbers, ProgrammaticNumberRequest, ProgrammaticResourceCost,
+    ResourceCostIntent, ResourceCostOperation,
 };
 pub use precondition::{
     EntityTagFacts, PreconditionDefinitionError, PreconditionDefinitionErrorCode,

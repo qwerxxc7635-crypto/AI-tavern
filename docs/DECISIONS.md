@@ -4616,3 +4616,23 @@ Policy 可生成确定性的 `AiMechanicalExposure` snapshot 供 Prompt/repair/i
 - M6-T04 只决定已存在机制是否能进入普通 AI Candidate，不拥有 Effect 执行、Tag/Channel membership、Profile composition 或数值平衡。
 - Local override 即使能被 M6-T03 解析成真实 typed owner，也不能穿过 ordinary Candidate policy；只有受信任开发者内容路径可使用，并仍需其 owner validator。
 - Prompt 若需列出可用机制必须消费 Policy snapshot，不能手写另一份清单；实际 Orchestrator context wiring 随后续 Candidate pipeline 接入，不创建第二套 AI infra。
+
+## DEC-211：Power Budget 由版本化 Balance Config 先授额、后生成、再独立重算
+
+- 日期：2026-09-08
+- 状态：已采纳
+- 依据：V5.2 §14/§15.2，M3-T06/M6-T03/M6-T05
+
+### 决定
+
+新增独立 Balance 层 `PowerBudgetEngine`。调用方只提交程序信任的 level、rarity rank 与定性 AP/resource/cooldown intensity；`PowerBudgetBalanceConfig(balanceVersion)` 将这些 intent 映射为精确 AP、Profile resource cost 与 Owner Normal Turn cooldown，再按 level/rarity/AP/resource/cooldown/resolved WorldProfile 计算生成前 allowance。普通 ResourcePool cost 映射为 `SPEND`，PressureResourcePool（如 Heat）映射为 `GAIN_PRESSURE`，避免把不同世界资源循环当作同一种扣减。AI Concept 没有任何最终 numeric slot，也不能直接提交 receipt。
+
+Effect 成本由 Balance 层对 stable `EffectPrimitiveId` 做 exhaustive projection；Multiple Attack、Critical Damage、Opposed Tie 的额外成本直接 match 其 owner-local typed override。Effect Handler 不读取 Budget、rarity 或 level，也不承担 balance projection。当前具体权重全部是可注入 `PowerBudgetBalanceConfig` 数据，机制与重算合同由 `balanceVersion` 标识；测试配置只是初始校准证据，不冻结为不可调产品常数。
+
+固定 mechanic spend 扣除后，Engine 按固定 slot 顺序将剩余预算分配给适用字段，程序生成 damage/healing/shield、SavingThrow/ConditionalCheck DC、status basis-point probability、Owner Turn duration，以及前述 AP/resource/cooldown cost。结果携带完整 `PowerBudgetReceipt`；`verify` 不信任 receipt，而是从 mechanics、numbers、basis、Profile 与同版 config 重算 allowance/primitive/local override/numeric spend，要求逐字段完全相等且 `spentTotal <= allowedTotal`。
+
+### 影响与边界
+
+- Resource cost 只允许 resolved Profile 的 ResourcePool/PressureResourcePool；Health/Shield 不能作为费用绕过专用机制。AP 精确值受 v0.4 的 0/1/2/3 合法集合约束，普通主动技能的额外限制由 M6-T06 hard rules 负责。
+- AttackRoll/OpposedCheck 不伪造 DC；只有 SavingThrow/ConditionalCheck 生成 difficultyClass。ApplyStatus 才生成 probability/duration，数值 shape 与 primitive/resolution 必须精确对应。
+- M6-T05 证明单 Candidate 预算生成与重算，不替代 M6-T06 的 hard constraint、loop/synergy/build-level exploit validation，也不持久化 Approved Definition。

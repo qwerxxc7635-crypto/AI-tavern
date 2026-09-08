@@ -5913,3 +5913,17 @@
 - 定向 Rust 测试 5/5 PASS，覆盖 canonical owner/Profile projection、真实 M6-T03 mapped Candidate、全部 local override owner 拒绝、AttemptEscape 与 Health resource bypass 拒绝、profile identity drift 与 duplicate/noncanonical input。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 440 PASS、1 credential-only ignore，archive interop 双向通过。
 - M0-T05/M6-T03 DependsOn 与 V5.2 §4.3/§6.2/§14 已复核；普通 AI 无 developer-only override 路径，不存在第二份 Primitive/Tag/Channel 漂移清单，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T04 PASS；下一项严格为 M6-T05 Power Budget + Programmatic Numbers。
+
+## 2026-09-08 — M6-T05 完成 Power Budget + Programmatic Numbers
+
+### 生成前 allowance、Balance-owned projection 与独立重算
+
+- 从 M6-T04 提交 `291098d` 创建 `task/M6-T05-power-budget-programmatic-numbers`。新增 `PowerBudgetEngine` 与显式 `PowerBudgetBalanceConfig(balanceVersion)`；程序先把定性 AP/resource/cooldown intensity 映射为精确 cost，再按 level、rarity rank、AP、Profile resource cost、cooldown 与 resolved WorldProfile 算生成前 allowance，AI 不提供任何 final numeric。
+- Balance 层对全部 stable `EffectPrimitiveId` exhaustive projection，并直接匹配既有 Multiple Attack/Critical/Opposed Tie typed override 计算 contribution；Effect Handler 未加入 budget/balance 分支。固定 spend 后按稳定 slot 顺序分配 damage/heal/shield、SavingThrow/ConditionalCheck DC、Status probability basis points/duration；不适用字段必须为 None，Profile Health/Shield 不可充当 resource cost，普通资源生成 SPEND、Heat 等 pressure resource 生成 GAIN_PRESSURE。
+- Candidate 保存完整 basis/allowance/spend/remaining receipt。`verify` 忽略 receipt 声称，从 mechanics、program numbers、profile 与同版 config 重算全部字段，篡改数值、allowed total、版本或 cost 均 fail closed；相同输入无需 RNG 即 byte-identical。具体权重仍是可替换的 balance data，不冒充 V5.2 冻结常数。新增 `DEC-211`。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 6/6 PASS，覆盖 damage+status+DC+AP+Qi+cooldown 完整生成/复验、heal/shield deterministic bytes、Qi SPEND 与 Heat GAIN_PRESSURE、数值膨胀与 receipt 伪造、Health/跨 Profile cost、Primitive/local override contribution、非法 config/level/rarity/intent。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 446 PASS、1 credential-only ignore，archive interop 双向通过。
+- M6-T03 DependsOn 与 V5.2 §14/§15.2 已复核；没有把 Balance 逻辑塞入 Effect Handler，没有 AI final numeric 或 persistence 写入，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T05 PASS；下一项严格为 M6-T06 Hard Rules / Exploit / Synergy Validator。
