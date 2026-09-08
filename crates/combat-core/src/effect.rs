@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{CombatFixed, CombatNumeric, DamageChannelId};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum EffectPrimitiveId {
     DealDamage,

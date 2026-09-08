@@ -5885,3 +5885,17 @@
 - 定向 Vitest 150/150 PASS，覆盖 AI schema/output/fake provider、Prompt 版本与 Desktop Orchestrator；八个必填字段逐一缺失、伪造 authority、额外 numeric 字段和文本 numeric 均 fail closed。
 - TypeScript strict、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 428 PASS、1 credential-only ignore，archive interop 双向通过。
 - M6-T01 DependsOn 与 V5.2 §14/§14.0.1 已复核；没有把 Concept 误报为 Canonical Mechanics，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T02 PASS；下一项严格为 M6-T03 Mechanical Intent Mapper → Canonical Mechanics。
+
+## 2026-09-08 — M6-T03 完成 Mechanical Intent Mapper → Canonical Mechanics
+
+### Core-owned exact mapping 与 Profile compatibility
+
+- 从 M6-T02 提交 `697f55b` 创建 `task/M6-T03-mechanical-intent-mapper`。新增纯 Rust `MechanicalIntentMapper` 与 strict `CombatMechanicalConcept` wire boundary；exact Intent token 只能解析成现有 `EffectPrimitiveId`、`ResolutionType`、`GameplayTagId`、`DamageChannelId`、resolved Profile resource 以及已有 attack/resolution local typed override，未知 token/字段不做模糊匹配或 Runtime 猜测。
+- Mapper 直接调用唯一 GameplayTagCatalog/DamageChannelCatalog 的 membership facts，并使用 resolved `WorldCombatProfile` 检查 allowed channel/resource；AI 层没有复制 supported primitive/tag/channel 清单。Damage/Resource intent 必须同时具备 canonical primitive 与 qualifier，缺项、重复、跨世界项目、多个 Resolution 与 incompatible local override 全部 fail closed。
+- 输出按 canonical primitive/tag/channel/resource 与 override owner 排序，绑定 `rulesetVersion + worldType + worldProfileVersion`；同一 Concept 即使输入集合顺序不同也得到相同 typed definition 与 byte-identical JSON。Mapping 语义由既有 `rulesetVersion` 管理，不新增独立 mapping version。输出仍是无最终数值的 mechanical skeleton，不可直接执行；Power Budget 留给 M6-T05。新增 `DEC-209`。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 7/7 PASS，覆盖输入顺序无关 canonical bytes、Primitive/Tag/Channel/Profile resource/Resolution 映射、三个已有 local typed override owner、未知 intent/primitive/resolution/channel/tag/target、安全拒绝跨 Profile channel/resource、不完整与重复组合、不兼容 override、unknown-field/code 注入拒绝。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 435 PASS、1 credential-only ignore，archive interop 双向通过。
+- M3-T03/M3-T06/M4-T01/M5-T01 DependsOn、V5.2 §14 与 M0 extensibility/version ownership contract 已复核；无新 Primitive/Resolution/Handler/DSL/Registry，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T03 PASS；下一项严格为 M6-T04 AI Mechanical Exposure Policy。

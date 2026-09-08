@@ -4576,3 +4576,23 @@ Schema 错误继续由 M6-T01 的同一 `DesktopAIOrchestrator` / `GeneratorRunn
 - `candidateTags`、target/rarity/level intent 此时仍是不受信任的候选词，不证明对应机制存在；M6-T03 必须引用 canonical catalogs/profile 并对未知项 fail closed。
 - 本任务不定义 Primitive mapping、Exposure Policy、Power Budget 或 commit policy，也不持久化 Concept。
 - AI 后续可以基于 Approved Definition 生成中文 flavor，但机械 Tooltip 仍完全由程序投影；该职责留给 M6-T07。
+
+## DEC-209：Mechanical Intent 只在 Combat Core 中编译为现有权威类型
+
+- 日期：2026-09-08
+- 状态：已采纳
+- 依据：V5.2 §14，M0-T05/M3-T03/M3-T06/M4-T01/M5-T01/M6-T03
+
+### 决定
+
+`MechanicalIntentMapper` 位于纯 Rust `ember-combat-core`，接受非权威 Concept 的机械切片与已解析 `WorldCombatProfile`。Intent 使用 exact、无数值 token grammar；Primitive 与 Resolution 直接通过既有 closed enum 的 serde identity 解析，candidate tag 交给唯一 `GameplayTagCatalog`，damage channel 交给唯一 `DamageChannelCatalog` 后再检查 Profile support，resource 只允许 resolved Profile 的 `ResourceLifecycle` 成员。AI/Prompt/Mapper 不维护第二份 Primitive、Tag、Channel 或 Resolution 存在清单。
+
+Mapper 输出 `CanonicalMechanicalDefinition`，只包含 canonical primitive/tag/channel/resource、closed resolution/target 与已有子系统的 local typed override；不生成伤害、治疗、DC、概率、持续、冷却、AP 或资源数值。输入先排序并拒绝重复，再检查 damage/resource qualifier 完整性、Profile 兼容性与 local override owner compatibility，因此输入顺序不影响 canonical JSON bytes。未知 token/ID、缺少 resolution/primitive、跨世界 channel/resource、重复或不完整组合全部 fail closed，Runtime 不从名称、描述或相似文本猜测。
+
+Mechanical Mapping/Catalog/Handler 的语义变化继续由现有 `rulesetVersion` 唯一标识；输出同时绑定 resolved `worldType + worldProfileVersion`。不新增 `mappingVersion`，避免 version explosion。Local override 保留实际的 `MultipleAttackPenaltyOverride`、`CriticalDamageOverride`、`OpposedTieRule` 类型，不创建 capability bag/registry；其普通 AI 可见性由紧随其后的 M6-T04 单一 default-deny Exposure Policy 决定。
+
+### 影响与边界
+
+- M6-T03 只完成 Concept→canonical mechanical skeleton；Power Budget 与最终程序数值仍归 M6-T05，不能把 skeleton 直接当作可执行 `EffectDefinition`。
+- ordinary AI 是否可请求某项已存在机制不是 Handler/Catalog 的职责；M6-T04 必须引用这些 canonical IDs/types，并拒绝 developer/encounter-only override。
+- 新机制不能通过新增自然语言别名或 fallback 进入 Runtime；必须先由其 owner 实现、版本化，再经 mapping 与 exposure policy 显式开放。

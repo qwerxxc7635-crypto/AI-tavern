@@ -20,6 +20,7 @@ mod fantasy;
 mod gameplay_tag;
 mod invariant;
 mod lethal;
+mod mechanical_intent;
 mod mitigation;
 mod numeric;
 mod objective;
@@ -121,6 +122,10 @@ pub use lethal::{
     HealthTransitionRequest, LethalOutcomeResolver, LethalResolutionCore, LethalResolutionError,
     LethalResolutionErrorCode, PendingLethalOutcome, PendingLethalOutcomeKind, TargetDefeatedFact,
     lethal_error,
+};
+pub use mechanical_intent::{
+    CanonicalLocalOverride, CanonicalMechanicalDefinition, CombatMechanicalConcept,
+    MechanicalIntentError, MechanicalIntentErrorCode, MechanicalIntentMapper, MechanicalTarget,
 };
 pub use mitigation::{
     DamageDefenseProfile, DamageImmunity, DamageMitigationRequest, DamageMitigationResult,
