@@ -4636,3 +4636,23 @@ Effect 成本由 Balance 层对 stable `EffectPrimitiveId` 做 exhaustive projec
 - Resource cost 只允许 resolved Profile 的 ResourcePool/PressureResourcePool；Health/Shield 不能作为费用绕过专用机制。AP 精确值受 v0.4 的 0/1/2/3 合法集合约束，普通主动技能的额外限制由 M6-T06 hard rules 负责。
 - AttackRoll/OpposedCheck 不伪造 DC；只有 SavingThrow/ConditionalCheck 生成 difficultyClass。ApplyStatus 才生成 probability/duration，数值 shape 与 primitive/resolution 必须精确对应。
 - M6-T05 证明单 Candidate 预算生成与重算，不替代 M6-T06 的 hard constraint、loop/synergy/build-level exploit validation，也不持久化 Approved Definition。
+
+## DEC-212：Exploit Validator 对 typed build 建立 Hook→Effect 因果图并 fail closed
+
+- 日期：2026-09-08
+- 状态：已采纳
+- 依据：V5.2 §4.4/§8.1/§9.2/§15.1/§15.3，M4-T01/M4-T06/M6-T05/M6-T06
+
+### 决定
+
+`CombatBuildValidator` 接受完整 build 的 `BuildAbilityDefinition[] + BuildStatusDefinition[]`，先对每个 Ability 重新执行 M6-T05 `PowerBudgetEngine::verify`，要求其真实 `EffectDefinition` primitive set 与 budgeted canonical mechanics 完全一致；Status 继续经过 M4 `StatusSchemaValidator`。Validator 返回稳定排序、去重的结构化 issues，`require_valid` 是进入后续 Approved/Canonical 流程的 fail-closed gate。
+
+Trigger exploit 不通过字符串或“危险标签”猜测。Validator 从 typed `StatusTriggerHook` 与 EffectDefinition 建立即时因果边：DealDamage 产生 committed DamageApplied/TargetDefeated/OnKill，ApplyStatus/RemoveStatus 分别产生 committed StatusApplied/StatusRemoved；随后对整个 build 图检测跨 Status/self recursive cycle。任何 cycle 同时报 InfiniteLoop/RecursiveTriggerLoop，并按 cycle 内真实 GainAP/GainReactionCharge/GainResource/Heal primitive 报对应永动问题。此静态拒绝位于运行时 Scheduler loop guard 之前，二者职责互补。
+
+Hard rules 还拒绝：无 AP/resource/cooldown/use limit 的可重复 AP/Reaction/Resource/Heal；Permanent HARD_CC/RESTRICTION 与超过配置上限的 HARD_CC；永久 DamageImmunity 或超过 reduction cap 的防御状态；ForceCritical Ability 与 CriticalConfirmed action-economy refund trigger 形成的保证暴击循环。防御审计使用窄 `StatusDefenseProjection` tagged union，不创建通用 capability bag/表达式 DSL。
+
+### 影响与边界
+
+- 检查是 build-level：输入顺序不会改变报告，跨 Status trigger cycle 与 Ability+Status critical synergy 均可被发现；不是只验证单个物品。
+- Loop Guard 仍处理运行时最大 depth/event count 并触发 EngineFailure rollback；静态 Validator 不替代 Scheduler，也不能把发现的 cycle“截断后继续”。
+- 当前规则是保守安全门；新增合法例外必须有 V5.2/Ruleset 明确语义、typed owner 与测试，不能靠忽略 issue 或自然语言白名单放行。

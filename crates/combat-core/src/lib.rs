@@ -17,6 +17,7 @@ mod damage_channel;
 mod effect;
 mod encounter;
 mod execution;
+mod exploit_validator;
 mod fantasy;
 mod gameplay_tag;
 mod invariant;
@@ -110,6 +111,11 @@ pub use encounter::{
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
     ExecutionRevalidationRequest, ExecutionRevalidationService, OnceUsageCommit,
+};
+pub use exploit_validator::{
+    AbilityCriticalPolicy, BuildAbilityDefinition, BuildStatusDefinition, CombatBuildDefinition,
+    CombatBuildValidationError, CombatBuildValidationErrorCode, CombatBuildValidator, ExploitIssue,
+    ExploitIssueCode, ExploitValidationReport, ExploitValidatorConfig, StatusDefenseProjection,
 };
 pub use fantasy::{
     FantasyBalanceConfig, FantasyOwnerTurnRecovery, FantasyProfile, FantasyRuleError,

@@ -5927,3 +5927,17 @@
 - 定向 Rust 测试 6/6 PASS，覆盖 damage+status+DC+AP+Qi+cooldown 完整生成/复验、heal/shield deterministic bytes、Qi SPEND 与 Heat GAIN_PRESSURE、数值膨胀与 receipt 伪造、Health/跨 Profile cost、Primitive/local override contribution、非法 config/level/rarity/intent。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 446 PASS、1 credential-only ignore，archive interop 双向通过。
 - M6-T03 DependsOn 与 V5.2 §14/§15.2 已复核；没有把 Balance 逻辑塞入 Effect Handler，没有 AI final numeric 或 persistence 写入，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T05 PASS；下一项严格为 M6-T06 Hard Rules / Exploit / Synergy Validator。
+
+## 2026-09-08 — M6-T06 完成 Hard Rules / Exploit / Synergy Validator
+
+### Build-level 因果图、永动检测与 hard constraints
+
+- 从 M6-T05 提交 `39cb47f` 创建 `task/M6-T06-hard-rules-exploit-synergy-validator`。新增 `CombatBuildValidator`，一次验证完整 Ability/Status build；逐 Ability 重算 M6-T05 Budget receipt、核对真实 EffectDefinition primitive set，逐 Status 复用 M4 schema validator，重复/非法 ID、size/trigger 上限与伪造 Definition 均形成稳定 issue。
+- Trigger graph 由 typed Hook 与 Effect 因果构建：DealDamage→committed DamageApplied/TargetDefeated/OnKill，ApplyStatus/RemoveStatus→committed StatusApplied/StatusRemoved。self/cross-status cycle 一律拒绝，并从 cycle 的真实 Effect primitive 报 Infinite AP/Reaction/Resource/Healing；运行时 Scheduler loop guard 保持最后防线，不作为静态放行理由。
+- Hard rules 同时覆盖免费无限次/零冷却的 AP、Reaction、Resource、Healing；Permanent/超上限 CC；永久 DamageImmunity/超 reduction cap；ForceCritical Ability 与 CriticalConfirmed economy refund 的 guaranteed crit loop。`StatusDefenseProjection` 只表达此审计所需的窄 typed 防御语义，没有 capability string、脚本或 generic Rule Engine。`require_valid` 保证有 issue 的 build 不能进入后续 Canonical World。新增 `DEC-212`。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 6/6 PASS，覆盖合法限次 build、单 Status 递归与四类 economy/heal 永动、跨 Status 顺序无关 cycle、永久/超限 CC 与无敌、免费可重复+guaranteed crit refund 组合，以及 rejected build gate。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 452 PASS、1 credential-only ignore，archive interop 双向通过。
+- M6-T05 DependsOn 与 V5.2 §4.4/§8.1/§9.2/§15.1/§15.3 已复核；没有跳过 Budget/Schema、没有创建第二个 Scheduler/DSL/Capability Registry，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T06 PASS；下一项严格为 M6-T07 Mechanical Tooltip / AI Flavor Separation。
