@@ -554,7 +554,16 @@ export const FAKE_TASK_OUTPUTS = Object.freeze({
   },
   COMBAT_CONTENT_GENERATION: {
     schemaVersion: 1,
-    authority: 'UNTRUSTED_PROPOSAL',
-    proposalText: '一道以雷鸣压制敌人的修仙战斗内容构想。',
+    authority: 'UNTRUSTED_CONCEPT',
+    concept: {
+      theme: '雷法',
+      role: '爆发与轻度控制',
+      flavor: '引动雷息震慑敌人的修仙术法。',
+      mechanicalIntent: ['高伤害', '高灵力消耗', '小概率造成神识紊乱'],
+      candidateTags: ['spell', 'lightning', 'control'],
+      targetIntent: '选择单个敌人',
+      rarityIntent: '稀有',
+      levelIntent: '中期成长阶段',
+    },
   },
 } satisfies Readonly<Record<AITask, unknown>>);

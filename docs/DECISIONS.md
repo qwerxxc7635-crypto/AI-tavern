@@ -4556,3 +4556,23 @@ M6-T01 只定义运行既有管线所需的严格 transport envelope。输出必
 - M6-T01 证明生产 Provider path 唯一且可实际完成/修复 Combat task；不把 transport proposal 宣称为可用 Ability/Equipment/Status。
 - Concept 字段与禁止 authoritative numeric 属于 M6-T02；mechanical mapping、budget、validator、tooltip 和 commit policy 仍分别属于 M6-T03～T08。
 - Prompt 用户预设仍只是最低优先级 style guidance，不能越过稳定系统合同或改变本地 authority。
+
+## DEC-208：Combat Concept 只表达定性意图，任何最终机械数值在 AI 边界拒绝
+
+- 日期：2026-09-08
+- 状态：已采纳
+- 依据：V5.2 §14、§14.0.1，M6-T01/M6-T02
+
+### 决定
+
+`COMBAT_CONTENT_GENERATION` schema version 2 将 M6-T01 的 transport-only 文本替换为严格 `UNTRUSTED_CONCEPT`。Concept 必须完整包含 `theme`、`role`、`flavor`、`mechanicalIntent`、`candidateTags`、`targetIntent`、`rarityIntent` 与 `levelIntent`；这些字段只表达内容方向，不能成为 Ability/Equipment/Status Definition 或运行时规则。
+
+输出结构没有 damage、healing、DC、probability、duration、cooldown、AP cost、resource cost 等 numeric slot，strict object 拒绝所有额外字段。为避免把最终数值藏在规则意图中，mechanical/target/rarity/level intent 文本递归拒绝阿拉伯/全角数字、百分号，以及与点数、回合、轮、层、次数、行动点、生命、伤害、治疗、冷却、消耗单位绑定的中文数词；theme/flavor 仍可正常表达如年代等非机械叙事。正式数值必须等 M6-T05 在 Power Budget 后由程序生成。
+
+Schema 错误继续由 M6-T01 的同一 `DesktopAIOrchestrator` / `GeneratorRunner` 进入一次结构修复；修复后仍不合法则沿既有 validation failure 拒绝。Prompt version 2 明确禁止 executable code、state mutation、authoritative mechanics 与 approved-definition 声称。
+
+### 影响与边界
+
+- `candidateTags`、target/rarity/level intent 此时仍是不受信任的候选词，不证明对应机制存在；M6-T03 必须引用 canonical catalogs/profile 并对未知项 fail closed。
+- 本任务不定义 Primitive mapping、Exposure Policy、Power Budget 或 commit policy，也不持久化 Concept。
+- AI 后续可以基于 Approved Definition 生成中文 flavor，但机械 Tooltip 仍完全由程序投影；该职责留给 M6-T07。

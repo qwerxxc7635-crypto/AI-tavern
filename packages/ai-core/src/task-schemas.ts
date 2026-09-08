@@ -1313,11 +1313,6 @@ export const CheckConsistencyOutputSchema = z
     path: ['consistent'],
   });
 
-/**
- * M6-T01 transport envelope for the existing AI pipeline. The proposal is
- * deliberately untrusted narrative text: it cannot become a Candidate or a
- * combat definition until the M6 concept and domain validators accept it.
- */
 export const CombatContentTaskInputSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -1331,7 +1326,60 @@ export const CombatContentTaskInputSchema = z
 export const CombatContentTaskOutputSchema = z
   .object({
     schemaVersion: z.literal(1),
-    authority: z.literal('UNTRUSTED_PROPOSAL'),
-    proposalText: text,
+    authority: z.literal('UNTRUSTED_CONCEPT'),
+    concept: z
+      .object({
+        theme: text,
+        role: text,
+        flavor: text,
+        mechanicalIntent: z.array(text).min(1).max(12),
+        candidateTags: z.array(identifier).max(24),
+        targetIntent: text,
+        rarityIntent: text,
+        levelIntent: text,
+      })
+      .strict(),
   })
-  .strict();
+  .strict()
+  .superRefine((output, context) => {
+    visitCombatConceptText(
+      output.concept.mechanicalIntent,
+      ['concept', 'mechanicalIntent'],
+      context,
+    );
+    for (const field of ['targetIntent', 'rarityIntent', 'levelIntent'] as const) {
+      visitCombatConceptText(output.concept[field], ['concept', field], context);
+    }
+  });
+
+export type CombatContentTaskInput = z.infer<typeof CombatContentTaskInputSchema>;
+export type CombatContentTaskOutput = z.infer<typeof CombatContentTaskOutputSchema>;
+
+const forbiddenAuthoritativeNumeric =
+  /(?:[0-9０-９%％]|[零一二两三四五六七八九十百千]+(?:点|回合|轮|层|次|行动点|生命|伤害|治疗|冷却|消耗))/u;
+
+function visitCombatConceptText(
+  value: unknown,
+  path: readonly (string | number)[],
+  context: z.RefinementCtx,
+): void {
+  if (typeof value === 'string') {
+    if (forbiddenAuthoritativeNumeric.test(value)) {
+      context.addIssue({
+        code: 'custom',
+        path: [...path],
+        message: 'Combat Concept cannot contain authoritative numeric text',
+      });
+    }
+    return;
+  }
+  if (Array.isArray(value)) {
+    value.forEach((entry, index) => visitCombatConceptText(entry, [...path, index], context));
+    return;
+  }
+  if (typeof value === 'object' && value !== null) {
+    Object.entries(value).forEach(([key, entry]) =>
+      visitCombatConceptText(entry, [...path, key], context),
+    );
+  }
+}

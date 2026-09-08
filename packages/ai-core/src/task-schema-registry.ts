@@ -124,6 +124,7 @@ export const AI_TASK_SCHEMAS = Object.freeze({
   COMBAT_CONTENT_GENERATION: definition(
     CombatContentTaskInputSchema,
     CombatContentTaskOutputSchema,
+    2,
   ),
 } satisfies Readonly<Record<AITask, AITaskSchemaDefinition>>);
 

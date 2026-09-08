@@ -279,6 +279,33 @@ describe('DesktopAIOrchestrator', () => {
     );
   });
 
+  it('repairs a Combat Concept that attempts to supply final numeric mechanics', async () => {
+    const settings = new MutableSettings(
+      profile('deepseek-profile', 'deepseek', 'deepseek-v4-flash'),
+    );
+    const provider = new NumericCombatThenCapturingProvider();
+    const result = await new DesktopAIOrchestrator(settings, provider).execute(
+      'COMBAT_CONTENT_GENERATION',
+      {
+        schemaVersion: 1,
+        contentKind: 'ABILITY',
+        submissionPolicy: 'USER_REQUESTED',
+        worldType: 'FANTASY',
+        requestText: '构思一项火焰术法。',
+      },
+      options('combat-concept-numeric-repair'),
+    );
+
+    expect(provider.calls).toHaveLength(2);
+    expect(result.validatedOutput).toEqual(FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION);
+    expect(result.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'VALIDATE', status: 'FAILED' }),
+    );
+    expect(result.lifecycle).toContainEqual(
+      expect.objectContaining({ stage: 'REPAIR', status: 'SUCCEEDED' }),
+    );
+  });
+
   it('streams only through an optional capable provider and preserves the final validation path', async () => {
     const base = profile('stream-profile', 'deepseek', 'deepseek-v4-flash');
     if (base.capabilities === null) throw new Error('expected capabilities');
@@ -692,6 +719,29 @@ class SchemaInvalidThenTimeoutProvider extends SchemaInvalidThenCapturingProvide
     this.attempts += 1;
     if (this.attempts === 2) throw Object.freeze({ code: 'TIMEOUT' });
     return super.generate(request, config);
+  }
+}
+
+class NumericCombatThenCapturingProvider extends CapturingProvider {
+  private invalidRemaining = 1;
+
+  public override async generate(request: NormalizedAIRequest, config: ProviderConfig) {
+    if (this.invalidRemaining <= 0) return super.generate(request, config);
+    this.invalidRemaining -= 1;
+    this.calls.push({ request, config });
+    const valid = FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION;
+    return {
+      requestId: request.requestId,
+      providerRequestId: 'numeric-combat-request',
+      modelName: request.modelName,
+      content: JSON.stringify({
+        ...valid,
+        concept: { ...valid.concept, mechanicalIntent: ['造成 30 点伤害'] },
+      }),
+      finishReason: 'STOP' as const,
+      usage: { inputTokens: null, outputTokens: null, totalTokens: null },
+      receivedAt: isoTimestamp('2026-08-01T00:00:00.000Z'),
+    };
   }
 }
 

@@ -760,6 +760,7 @@ describe('versioned AI task schemas', () => {
                     'GENERATE_WORLD_EVENT',
                     'SUMMARIZE_ADVENTURE',
                     'RESOLVE_DICE_RESULT',
+                    'COMBAT_CONTENT_GENERATION',
                   ].includes(task)
                 ? 2
                 : 1;
@@ -772,18 +773,62 @@ describe('versioned AI task schemas', () => {
     expect(AI_TASK_SCHEMAS[task].output.safeParse({}).success).toBe(false);
   });
 
-  it('keeps the M6-T01 combat transport output untrusted and non-authoritative', () => {
+  it('keeps Combat Concept structured, untrusted, and free of final numeric mechanics', () => {
     const schema = AI_TASK_SCHEMAS.COMBAT_CONTENT_GENERATION.output;
     expect(
       schema.safeParse({
         ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
-        damage: 99,
+        concept: {
+          ...(FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION.concept as object),
+          mechanicalIntent: ['造成三十点伤害', '消耗 2 AP'],
+        },
       }).success,
     ).toBe(false);
     expect(
       schema.safeParse({
         ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
         authority: 'APPROVED_DEFINITION',
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
+        concept: {
+          ...(FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION.concept as object),
+          damage: 30,
+        },
+      }).success,
+    ).toBe(false);
+    expect(
+      schema.safeParse({
+        ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
+        concept: {
+          ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION.concept,
+          theme: '八十年代霓虹黑色电影',
+        },
+      }).success,
+    ).toBe(true);
+  });
+
+  it.each([
+    'theme',
+    'role',
+    'flavor',
+    'mechanicalIntent',
+    'candidateTags',
+    'targetIntent',
+    'rarityIntent',
+    'levelIntent',
+  ] as const)('requires Combat Concept field %s', (field) => {
+    const concept = Object.fromEntries(
+      Object.entries(FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION.concept).filter(
+        ([key]) => key !== field,
+      ),
+    );
+    expect(
+      AI_TASK_SCHEMAS.COMBAT_CONTENT_GENERATION.output.safeParse({
+        ...FAKE_TASK_OUTPUTS.COMBAT_CONTENT_GENERATION,
+        concept,
       }).success,
     ).toBe(false);
   });

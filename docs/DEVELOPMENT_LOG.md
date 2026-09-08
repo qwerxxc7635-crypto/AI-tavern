@@ -5871,3 +5871,17 @@
 - 定向 Vitest PASS：AI protocol/schema/fake/context、Desktop Orchestrator、cache repository 共 133 项；新增 Combat schema/desktop/cache 聚焦集 89 项 PASS。Native cache 3/3 与 Prompt Manager 3/3 PASS。
 - strict TypeScript、Rustfmt、Native Bridge Clippy 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1124 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 428 PASS、1 credential-only ignore，archive interop 双向通过。
 - M0-T02 DependsOn 与 V5.2 §14/§14.1 已复核；既有 Provider path 仍是唯一生产路径，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T01 PASS；下一项严格为 M6-T02 Combat Concept Schema。
+
+## 2026-09-08 — M6-T02 完成 Combat Concept Schema
+
+### 八类定性 Concept/Intent 与 final numeric 禁止边界
+
+- 从 M6-T01 提交 `89e6cdd` 创建 `task/M6-T02-combat-concept-schema`。将 `COMBAT_CONTENT_GENERATION` 升级为 schema/prompt version 2：输出固定为 `UNTRUSTED_CONCEPT`，并要求 theme、role、flavor、mechanicalIntent、candidateTags、targetIntent、rarityIntent、levelIntent 八类字段全部存在。
+- strict schema 不提供任何最终机械数值 slot，未知字段直接拒绝；mechanical/target/rarity/level intent 的递归文本 guard 同时拒绝阿拉伯/全角数字、百分比与带机械单位的中文数词，防止通过“30 点伤害”“三回合”等规则意图旁路，同时不误伤 theme/flavor 中的非机械年代叙事。rarity/level 只能给定性意图，最终 level band、AP、资源、骰式、DC、概率、持续、冷却等仍由后续程序映射与预算生成。
+- Task Prompt 与 Prompt History 同步升级；Fake Provider fixture 只给定性雷法 Concept。Desktop 定向场景证明包含最终伤害数字的结构完整响应会先失败，再走 M6-T01 既有 repair 路径取得合法 Concept。新增 `DEC-208`。
+
+### 验证与结束状态
+
+- 定向 Vitest 150/150 PASS，覆盖 AI schema/output/fake provider、Prompt 版本与 Desktop Orchestrator；八个必填字段逐一缺失、伪造 authority、额外 numeric 字段和文本 numeric 均 fail closed。
+- TypeScript strict、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 428 PASS、1 credential-only ignore，archive interop 双向通过。
+- M6-T01 DependsOn 与 V5.2 §14/§14.0.1 已复核；没有把 Concept 误报为 Canonical Mechanics，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T02 PASS；下一项严格为 M6-T03 Mechanical Intent Mapper → Canonical Mechanics。

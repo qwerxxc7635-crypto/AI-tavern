@@ -119,4 +119,10 @@ export const PROMPT_HISTORY: readonly PromptHistoryEntry[] = Object.freeze([
     change:
       'Ground dynamic sources in locked Constitution, visible facts, local provenance and adapter budget.',
   }),
+  Object.freeze({
+    task: 'COMBAT_CONTENT_GENERATION',
+    version: promptVersion(2),
+    change:
+      'Replace the transport proposal with a structured non-authoritative Combat Concept and reject final numeric mechanics.',
+  }),
 ]);

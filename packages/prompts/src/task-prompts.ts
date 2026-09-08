@@ -160,7 +160,8 @@ export const TASK_PROMPTS = Object.freeze({
   COMBAT_CONTENT_GENERATION: define(
     'COMBAT_CONTENT_GENERATION',
     'WORLD_DESIGNER',
-    'Return one untrusted narrative combat-content proposal for the requested world and content kind. Do not execute code, mutate game state, choose authoritative mechanics, or claim that the proposal is approved. Downstream local mapping, budgeting, validation, Candidate policy, and domain transaction remain mandatory.',
+    'Return one structured, untrusted Combat Concept for the requested world and content kind. Include only theme, role, flavor, qualitative mechanical intents, candidate tags, target intent, rarity intent, and level intent. Never provide final numeric values, executable code, authoritative mechanics, state mutations, or an approved definition. Downstream local mapping, budgeting, validation, Candidate policy, and domain transaction remain mandatory.',
+    2,
   ),
 } satisfies Readonly<Record<AITask, TaskPromptDefinition>>);
 

@@ -62,6 +62,7 @@ describe('central prompt catalog', () => {
         'GENERATE_WORLD_EVENT',
         'SUMMARIZE_ADVENTURE',
         'RESOLVE_DICE_RESULT',
+        'COMBAT_CONTENT_GENERATION',
       ].includes(task)
         ? 2
         : 1;
