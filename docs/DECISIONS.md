@@ -4848,3 +4848,23 @@ Rules snapshot 提供 action legality、legal target IDs 与结构化 preconditi
 - 依赖方向固定为 UI/Bridge→Combat Presentation→Combat Core；Core `Cargo.toml` 不得依赖 presentation，编译与 manifest test 共同守住反向依赖。
 - ViewModel 是可丢弃投影而非权威状态；UI 修改副本不产生规则效果，所有实际行为仍必须提交 Combat Command。
 - M8-T01 只建立边界与完整基础数据形状，不提前实现 CombatScreen 布局、交互状态、Tooltip、Reaction、Log 或 Theme。
+
+## DEC-223：四 Theme 共用一个语义化 CombatScreen，布局只消费 ViewModel 与 semantic tokens
+
+- 日期：2026-09-10
+- 状态：已采纳
+- 依据：V5.2 §18.2/§18.3/§19/§20.1，M8-T01/M8-T02，DEC-222
+
+### 决定
+
+Windows 纵向切片新增唯一 `CombatScreen`，由可独立测试的 `TurnTimeline`、`BattleStage`、`CombatantView` 组成。组件只接收 M8-T01 serialized ViewModel 的只读子集；无 Core import、State setter、规则判断或 Command 按钮。Timeline 直接按 `viewModel.timeline[]` 顺序渲染并以 `aria-current=step` 标记当前 slot，不按 initiative、名称或 DOM 顺序再次排序。
+
+BattleStage 只按 ViewModel 新增的 typed `CombatantSideView` 分成 Player/Companion、Hostile 与可选 Neutral 展示组；不从中文名称、CSS class 或位置反推阵营。CombatantView 当前只呈现角色名、阵营、运行态与 active marker，HUD 数值、Action、Intent 与交互留给后续 owner。替换整个 ViewModel 时组件无本地缓存，Timeline 与 active state 随新 revision 直接更新。
+
+屏幕使用 semantic design tokens、响应式 grid、可横向滚动 Timeline 和 reduced-motion fallback。四个 World Theme 后续只需替换 token/asset/layout package，不复制 React 逻辑。`main/nav/ol/section/article`、中文 aria labels、live phase region 与 current marker 形成基础无障碍结构；空壳不引入假按钮或硬编码战斗数据。
+
+### 影响与边界
+
+- M8-T02 只交付 shell/stage/timeline；Character HUD、资源、Status、Ability、Target、Reaction、Log 与 Theme Resolver 均不提前实现。
+- `CombatantSideView` 是 Presentation metadata，不是新的规则阵营；它由 Core `CombatSide` exhaustive 投影，UI 只消费。
+- CombatScreen 暂不增加独立演示路由或伪后端；产品接线必须等待真实 Combat runtime/bridge，避免写死 fixture 冒充可玩流程。

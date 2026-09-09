@@ -31,6 +31,15 @@ pub enum CombatActionViewKind {
     Reaction,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CombatantSideView {
+    Player,
+    Companion,
+    Hostile,
+    Neutral,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CombatActionRuleProjection {
     pub action_id: String,
@@ -92,6 +101,7 @@ pub struct CombatStatusViewModel {
 pub struct CombatantViewModel {
     pub combatant_id: String,
     pub display_name_zh_cn: String,
+    pub side: CombatantSideView,
     pub side_label_zh_cn: String,
     pub state_label_zh_cn: String,
     pub is_active_turn: bool,
@@ -299,6 +309,7 @@ impl<'a> CombatViewModelProjector<'a> {
                     combatant_id: combatant.combatant_id.clone(),
                     display_name_zh_cn: require_name(&combatant_names, &combatant.combatant_id)?
                         .to_owned(),
+                    side: side_view(combatant.side),
                     side_label_zh_cn: side_label(combatant.side).to_owned(),
                     state_label_zh_cn: state_label(combatant.state).to_owned(),
                     is_active_turn: request.state.round.active_combatant_id.as_deref()
@@ -520,6 +531,15 @@ const fn side_label(side: CombatSide) -> &'static str {
         CombatSide::Companion => "我方队友",
         CombatSide::Hostile => "敌方",
         CombatSide::Neutral => "中立",
+    }
+}
+
+const fn side_view(side: CombatSide) -> CombatantSideView {
+    match side {
+        CombatSide::Player => CombatantSideView::Player,
+        CombatSide::Companion => CombatantSideView::Companion,
+        CombatSide::Hostile => CombatantSideView::Hostile,
+        CombatSide::Neutral => CombatantSideView::Neutral,
     }
 }
 

@@ -1,0 +1,275 @@
+.combat-screen {
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(24rem, 1fr);
+  gap: var(--space-4);
+  padding: clamp(var(--space-4), 2vw, var(--space-8));
+  overflow: auto;
+  color: var(--color-text-primary);
+  background:
+    radial-gradient(circle at 50% 42%, var(--et-alpha-copper-13), transparent 35%),
+    linear-gradient(160deg, var(--color-canvas-deep), var(--color-canvas));
+}
+
+.combat-screen__header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.combat-screen__header h1,
+.combatant-group h2,
+.combat-screen__eyebrow {
+  margin: 0;
+}
+
+.combat-screen__header h1 {
+  font-family: var(--font-family-display);
+  font-size: clamp(var(--font-size-xl), 3vw, var(--font-size-3xl));
+  letter-spacing: var(--letter-spacing-tight);
+}
+
+.combat-screen__eyebrow {
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.combat-screen__phase {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+}
+
+.combat-screen__phase strong {
+  color: var(--color-text-primary);
+}
+
+.combat-timeline {
+  min-width: 0;
+  overflow-x: auto;
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-translucent);
+  scrollbar-width: thin;
+}
+
+.combat-timeline ol {
+  min-width: max-content;
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  margin: 0;
+  list-style: none;
+}
+
+.combat-timeline__entry {
+  min-width: 8.5rem;
+  min-height: 3.4rem;
+  display: grid;
+  grid-template-columns: 1.65rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.combat-timeline__entry.is-current {
+  border-color: var(--color-accent);
+  color: var(--color-text-primary);
+  box-shadow:
+    0 0 0 var(--border-width-thin) var(--color-accent),
+    var(--et-shadow-sm);
+}
+
+.combat-timeline__order {
+  grid-row: 1 / span 2;
+  width: 1.65rem;
+  height: 1.65rem;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-round);
+  color: var(--color-canvas-deep);
+  background: var(--color-accent);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+}
+
+.combat-timeline__name {
+  font-weight: var(--font-weight-medium);
+}
+
+.combat-timeline__entry small {
+  color: var(--color-accent);
+  font-size: var(--font-size-xs);
+}
+
+.battle-stage {
+  position: relative;
+  min-height: 24rem;
+  display: grid;
+  grid-template-columns: minmax(13rem, 1fr) minmax(8rem, 0.55fr) minmax(13rem, 1fr);
+  align-items: center;
+  gap: clamp(var(--space-3), 2vw, var(--space-8));
+  padding: clamp(var(--space-4), 3vw, var(--space-10));
+  overflow: hidden;
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(
+      90deg,
+      var(--et-alpha-moss-09),
+      transparent 32%,
+      transparent 68%,
+      var(--et-alpha-blood-18)
+    ),
+    var(--color-surface-translucent);
+  box-shadow: inset 0 0 4rem var(--et-alpha-night-42);
+}
+
+.combatant-group {
+  min-width: 0;
+}
+
+.combatant-group h2 {
+  margin-bottom: var(--space-3);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.battle-stage__hostiles h2 {
+  text-align: right;
+}
+
+.combatant-group__roster {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.combatant-view {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: var(--et-shadow-sm);
+}
+
+.combatant-view.is-active {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 var(--border-width-medium) var(--et-alpha-copper-24),
+    var(--et-shadow-md);
+}
+
+.combatant-view__portrait {
+  width: 3.4rem;
+  height: 3.4rem;
+  display: grid;
+  place-items: center;
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-round);
+  color: var(--color-accent);
+  background: var(--color-canvas-deep);
+  font-family: var(--font-family-display);
+  font-size: var(--font-size-xl);
+}
+
+.combatant-view--hostile .combatant-view__portrait {
+  color: var(--color-danger);
+}
+
+.combatant-view__identity {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+}
+
+.combatant-view__identity strong,
+.combatant-view__identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combatant-view__identity span,
+.combatant-view__state {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.combatant-view__state {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface-translucent);
+  white-space: nowrap;
+}
+
+.battle-stage__focus {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
+.battle-stage__focus span {
+  height: var(--border-width-thin);
+  background: linear-gradient(90deg, transparent, var(--color-border-strong));
+}
+
+.battle-stage__focus span:last-child {
+  background: linear-gradient(90deg, var(--color-border-strong), transparent);
+}
+
+.battle-stage__neutral {
+  grid-column: 1 / -1;
+}
+
+.battle-stage__neutral .combatant-group__roster {
+  grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr));
+}
+
+@media (max-width: 800px) {
+  .combat-screen__header {
+    align-items: start;
+  }
+
+  .battle-stage {
+    grid-template-columns: 1fr;
+    align-content: start;
+  }
+
+  .battle-stage__focus {
+    padding-block: var(--space-2);
+  }
+
+  .battle-stage__hostiles h2 {
+    text-align: left;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .combat-screen *,
+  .combat-screen *::before,
+  .combat-screen *::after {
+    scroll-behavior: auto !important;
+    transition-duration: var(--et-duration-instant) !important;
+    animation-duration: var(--et-duration-instant) !important;
+  }
+}

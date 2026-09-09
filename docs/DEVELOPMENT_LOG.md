@@ -6092,3 +6092,18 @@
 - ViewModel 专项 5/5、Presentation crate 全套 11/11 PASS，覆盖权威 Timeline/active/resources/Intent/action target projection、State 零修改、name 输入反序 byte-identical、stale/self-inconsistent/unknown target Rules 拒绝、非法 State/中文目录拒绝与 manifest 依赖方向。
 - `cargo clippy -p ember-combat-presentation --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
 - M3/M4/M7 Gate 与 V5.2 §18.1/§18.4/§19 已复核；没有提前实现 M8-T02 Screen shell、布局或交互，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M8-T01 PASS；下一项严格为 M8-T02 CombatScreen Shell / Stage / Timeline。
+
+## 2026-09-10 — M8-T02 完成 CombatScreen Shell / Stage / Timeline
+
+### 单一屏幕骨架、Runtime Timeline 与语义化 Stage
+
+- 从 M8-T01 提交 `c2bcb04` 创建 `task/M8-T02-combat-screen-shell`。新增单一 React `CombatScreen` 及独立 `TurnTimeline`、`BattleStage`、`CombatantView`；新增 `DEC-223`。组件只接收 M8-T01 ViewModel typed readonly props，不 import Core、不持有权威 State、不修改 HP/AP/Status，也未添加 Command/按钮。
+- Presentation ViewModel 增加由 Core CombatSide exhaustive 投影的 `CombatantSideView`。Stage 仅使用该 typed metadata 划分我方（Player+Companion）、敌方与可选中立组，不解析中文 label 或自行推断阵营；CombatantView 仅呈现身份、阵营、运行态和 active marker，没有提前实现 HUD/Status/Intent/Action。
+- Timeline 使用 ViewModel 提供的原始顺序，支持同一 combatant 的 extra-turn slot，以序号+slot identity 保持 DOM key；当前 slot 使用 `aria-current=step`。组件 rerender 不保留本地排序/active 状态，新 revision 完整替换展示。
+- CSS 只消费现有 semantic/primitive design tokens，桌面三段战场与 800px 以下单列响应式布局共用同一 DOM；包含 overflow-safe 名称、横向 Timeline、reduced-motion fallback。语义结构使用 main/nav/ordered list/section/article、中文 aria labels 与 polite phase live region，可由后续四 Theme 替换 tokens/assets 而不复制 CombatScreen。
+
+### 验证与结束状态
+
+- CombatScreen jsdom 专项 5/5 PASS，覆盖 Timeline 顺序/current/extra turn、typed side 分组、可选 Neutral、零假按钮、替换 revision 无 local stale state，以及三个基础组件独立复用。ViewModel 5/5 与 Presentation crate 11/11 回归通过。
+- TypeScript noEmit、ESLint、Prettier、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1143 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T01 DependsOn 与 V5.2 §18.2/§18.3/§19/§20.1 已复核；同一组件可由四 Theme semantic tokens 承载，没有提前实现 M8-T03 HUD 或 M9 Theme package，无 SPEC BLOCKER。UI styling skill 用于语义结构、focus/current 可感知性、响应式布局与 reduced-motion 校准；用户 `.gitignore` 保持未纳入提交。M8-T02 PASS；下一项严格为 M8-T03 HUD / AP / Resources / Status。

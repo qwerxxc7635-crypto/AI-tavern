@@ -13,8 +13,8 @@ pub use view_model::{
     CombatActionViewModel, CombatMeterViewModel, CombatResourceViewModel,
     CombatRulesPresentationSnapshot, CombatStatusViewModel, CombatViewModel, CombatViewModelError,
     CombatViewModelErrorCode, CombatViewModelProjector, CombatViewModelRequest,
-    CombatantPresentationEntry, CombatantViewModel, EnemyIntentViewModel, StatusPresentationEntry,
-    TimelineEntryViewModel,
+    CombatantPresentationEntry, CombatantSideView, CombatantViewModel, EnemyIntentViewModel,
+    StatusPresentationEntry, TimelineEntryViewModel,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
