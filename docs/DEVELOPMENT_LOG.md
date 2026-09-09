@@ -6016,3 +6016,18 @@
 - Companion 专项 4/4 PASS：personality 差异、strategy 差异、formal/summon strategy contract、Player/Hostile route 拒绝；Submission 专项 8/8 与 Enemy AI 5/5 PASS，新增主角↔UtilityAI、队友↔Player 双向接管拒绝并保持原子性。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 474 PASS、1 credential-only ignore，archive interop 双向通过。
 - M7-T01 DependsOn 与 V5.2 §12.1 已复核；没有提前实现五策略/偏好 Command、External Input Barrier、Enemy Intent 或 Simulator，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T03 PASS；下一项严格为 M7-T04 Tactical Strategy / Preference。
+
+## 2026-09-09 — M7-T04 完成 Tactical Strategy / Preference
+
+### 五策略、受控偏好与 accepted history projection
+
+- 从 M7-T03 提交 `7257492` 创建 `task/M7-T04-tactical-strategy-preference`。新增 `TacticalStrategyPreset` 五项固定目录及 typed Utility weight layers；Balanced 为零调整，Aggressive/Defensive/Support/Conservative 分别保留不同的 Damage/Kill/Control/Heal/Defense/Resource/Risk 权重形状。新增 `DEC-218`。
+- 新增受控 `TacticalPreferenceSet`：Healing Threshold 仅 30/50/70，Ultimate Policy 仅 Free Use/Elite-Boss Priority/Hold，Consumable Policy 仅 Allow/Emergency Only/Disabled，Protect Main Character 仅 Low/Normal/High；key、wire value 类型或值域错误 fail closed。
+- `TacticalCommandService` 只接收 SetTacticalStrategy/SetTacticalPreference，验证目标为正式 Companion 后，通过既有 Player source、side-bound control assignment、stable-input precondition 与统一 Command Boundary 接受；非法 preset/preference/target/payload 或关闭的输入点零写入。
+- `TacticalSettingsProjection` 从默认设置按 accepted ledger 顺序重放，重复 commandId 幂等得到相同 projection。新策略只追加自己的 acceptedSequence；此前已接受或已进入处理的 Utility command 内容/sequence 不被删除、重写或重新评分。
+
+### 验证与结束状态
+
+- Tactical 专项 5/5 PASS：五预设权重互异、四类偏好结构化接受、历史 Utility command 不追溯、非法/非正式/关闭输入点原子拒绝、duplicate commandId 与 replay-derived projection 幂等。Core 全套 317/317 PASS。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 479 PASS、1 credential-only ignore，archive interop 双向通过。
+- M7-T03 DependsOn 与 V5.2 §12.1/§17.1 已复核；没有提前实现完整 Stable Barrier、Enemy Intent、Combat UI 或 Simulator，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T04 PASS；下一项严格为 M7-T05 External Input Stable Barrier。

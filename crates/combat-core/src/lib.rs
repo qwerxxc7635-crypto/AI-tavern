@@ -43,6 +43,7 @@ mod state;
 mod status;
 mod status_merge;
 mod submission;
+mod tactical;
 mod terminal;
 mod trigger;
 mod turn;
@@ -245,6 +246,11 @@ pub use status_merge::{
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,
     CombatSubmissionError, CombatSubmissionRequest, CombatSubmissionService,
+};
+pub use tactical::{
+    CompanionTacticalSettings, ConsumablePolicy, ProtectMainCharacterPriority,
+    TacticalCommandAccepted, TacticalCommandError, TacticalCommandRequest, TacticalCommandService,
+    TacticalPreferenceSet, TacticalSettingsProjection, TacticalStrategyPreset, UltimatePolicy,
 };
 pub use terminal::{
     TerminalArbitrationError, TerminalArbitrationErrorCode, TerminalArbitrationOutcome,

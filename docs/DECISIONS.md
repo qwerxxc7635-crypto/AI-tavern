@@ -4752,3 +4752,21 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - Personality 与 Strategy 保持两个独立整数 weight layer，策略覆盖不会替换个性；同一 Base/CombatState 下两者的差异可从 scored breakdown 与最终命令测试。
 - M7-T03 不实现五种策略目录、偏好 schema 或设置命令；这些归 M7-T04。既有 Summon 支持不新增 Spawn/Summon primitive、技能、数量、持续时间或 UI。
 - Companion/ExistingSummon 成功动作仍记录为统一 `AcceptedCommandSource::UtilityAi`，不增加 Companion 专用 accepted history。
+
+## DEC-218：Tactical Settings 是 acceptedCommands 的确定性投影
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §12.1、§17.1，M7-T04，DEC-043、DEC-215、DEC-217
+
+### 决定
+
+冻结 `Balanced/Aggressive/Defensive/Support/Conservative` 五个 `TacticalStrategyPreset`，每个映射为独立、typed `UtilityWeightAdjustments`，并冻结 Healing Threshold（30/50/70）、Ultimate Policy、Consumable Policy、Protect Main Character 四组受控偏好值。开放字符串或 Boolean/Integer/StableId 类型错配一律拒绝，不把偏好扩展成 Gambit/脚本语言。
+
+`TacticalCommandService` 只接受 Player source 的结构化 `SetTacticalStrategy/SetTacticalPreference` payload，并复用统一 `CombatSubmissionService` 获得稳定 `commandId + acceptedSequence`。`TacticalSettingsProjection` 从初始默认值按 `acceptedSequence ASC` 重放 `AcceptedCommandLedger`，因此 acceptedCommands 是可持久化的权威输入历史，Projection 是可重建缓存而非第二套事实源。
+
+### 影响与边界
+
+- 新设置只改变 Projection 的未来读者；既有 UtilityAI `AcceptedCombatCommand`、acceptedSequence、payload 与 Replay envelope 不重写、不删除、不重新评分。
+- 正式队友默认 Balanced/50%/Elite-Boss Priority/Emergency Only/Normal；非正式 Summon 不出现在玩家 Tactical Projection 中。
+- M7-T04 使用既有 `stableInputPoint` precondition，但完整 EventChain/Resolution/PendingReaction/Utility-evaluation quiescent 判定归 M7-T05；本任务不提前实现 UI。
