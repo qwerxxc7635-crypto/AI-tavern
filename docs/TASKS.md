@@ -68,7 +68,9 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M6-T05 — Power Budget + Programmatic Numbers | PASS | 2026-09-08 | versioned Balance Config 先映射定性 cost/cooldown，再按 level/rarity/AP/resource/Profile 算 allowance；程序生成 damage/heal/shield/DC/probability/duration/cost 并可独立重算 receipt |
 | M6-T06 — Hard Rules / Exploit / Synergy Validator | PASS | 2026-09-08 | build-level typed validator 复验 Budget/definitions，按 Hook→Effect 因果图拒绝递归链及无限 AP/Reaction/Resource/Healing，并拒绝永久无敌/CC、必暴击退款循环 |
 | M6-T07 — Mechanical Tooltip / AI Flavor Separation | PASS | 2026-09-09 | 独立 presentation crate 从 Approved Definition/stable IDs 投影全部机械行；AI 仅能提供中文 displayName/flavorDescription/lore，机械宣称与明显冲突 fail closed |
-| M6-T08 — Candidate / Commit Policy | IN_PROGRESS | 2026-09-09 | 下一项；复用既有 Candidate/事务基础设施实现 USER_REQUESTED 预览确认与 BACKGROUND 自动接受 |
+| M6-T08 — Candidate / Commit Policy | PASS | 2026-09-09 | Combat policy 强制完整 Gate E validation receipt；USER_REQUESTED 预览/修订/确认，BACKGROUND 同一 SQLite 事务自动接受+Domain Commit，重试幂等 |
+| M6 Gate — Gate E AI Content Pipeline | PASS | 2026-09-09 | M6-T01..T08 独立验收；既有 Orchestrator→Concept→Mapper/Exposure/Budget/Exploit→Tooltip/Flavor→Candidate/Domain Transaction 闭环 |
+| M7-T01 — Shared Utility Evaluator | IN_PROGRESS | 2026-09-09 | 下一项；按 CombatState/legal commands/profile/personality/strategy/intent constraints 做确定性评分 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

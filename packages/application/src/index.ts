@@ -17,10 +17,25 @@ export type {
 export { AIRequestRecoveryUseCases } from './ai-request-recovery-use-cases.js';
 export { AICandidateUseCases } from './ai-candidate-use-cases.js';
 export type {
+  AutoAcceptAICandidate,
   ConfirmAICandidate,
   ProposeAICandidate,
   ReviseAICandidate,
 } from './ai-candidate-use-cases.js';
+export {
+  COMBAT_CANDIDATE_REQUIRED_CHECKS,
+  CombatCandidatePolicyError,
+  CombatContentCandidatePolicy,
+} from './combat-content-candidate-policy.js';
+export type {
+  CombatCandidateProvenance,
+  CombatCandidateValidationResult,
+  CombatCandidateValidator,
+  CombatContentSubmissionPolicy,
+  CombatDomainCommit,
+  GeneratedCombatCandidate,
+  ReviseUserCombatCandidate,
+} from './combat-content-candidate-policy.js';
 export type { RecoverAITurnCommand } from './ai-request-recovery-use-cases.js';
 export { StructuredOutputRepairUseCases } from './structured-output-repair-use-cases.js';
 export type { RepairStructuredTurnOutputCommand } from './structured-output-repair-use-cases.js';

@@ -5956,3 +5956,18 @@
 - 定向 Rust 测试 6/6 PASS，覆盖完整机械家族与精确中文顺序、Flavor/Mechanics 分层组合、unknown mechanics 字段、非中文/机械副本、明显冲突不改 mechanics，以及 localization/Profile/critical fail-closed。
 - `cargo clippy -p ember-combat-presentation --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 191 files / 1133 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 458 PASS、1 credential-only ignore，archive interop 双向通过。
 - M6-T05 DependsOn 与 V5.2 §14/§14.0.1/§15.2 已复核；没有实现 M8 UI/cost preview，没有接 SQLite 或提前决定 Candidate policy，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6-T07 PASS；下一项严格为 M6-T08 Candidate / Commit Policy。
+
+## 2026-09-09 — M6-T08 完成 Candidate / Commit Policy；M6 Gate / Gate E PASS
+
+### 共享 Candidate 状态机与两类提交时机
+
+- 从 M6-T07 提交 `ee46c5e` 创建 `task/M6-T08-candidate-commit-policy`。新增 `CombatContentCandidatePolicy`，继续使用既有 `AICandidateUseCases`、SQLite `ai_candidates`、Generation provenance 与调用方 Domain Commit；没有新增 Provider/credential/retry/repair/cache/Candidate/transaction 基础设施。新增 `DEC-214`。
+- 战斗候选在持久化前必须经注入的本地 validator 生成 canonical payload，并提供 schema/mechanical-intent/AI-exposure/power-budget/build-exploit/tooltip-flavor 六项完整、无重复、规范排序的 Gate E checks；缺项候选不进入 SQLite。Candidate envelope 固定 schemaVersion、submissionPolicy、approvedDefinition，提交事务内重新执行 validator，不能信任落库 receipt 或篡改 payload。
+- USER_REQUESTED 只建立 PROPOSED，Preview 零 Domain 写入；EDIT 与 REGENERATE 创建新 Candidate 并原子 supersede 旧版本；Confirm 使用 expectedRevision guard，在同一 `BEGIN IMMEDIATE` 内执行 Domain Commit+ACCEPTED，重复 Confirm 不重复 Domain Commit。
+- BACKGROUND_WORLD_CONTENT 必须提供 Domain Commit，并通过新增通用 `autoAccept` 在单一 `BEGIN IMMEDIATE` 内 create→commit→ACCEPTED；失败时 Candidate 与 Domain 写入一起回滚。相同 identity 重试即使 validation timestamp 改变也直接返回 ACCEPTED；payload/provenance/revision 漂移则 fail closed。
+
+### 验证与结束状态
+
+- 定向 Vitest 2 files / 9 tests PASS，其中新增 5 项覆盖完整 user flow、后台原子自动接受与时间变化重试、Gate E 缺项零写入、Domain failure rollback、policy 隔离及 stored envelope 篡改拒绝；既有 generic Candidate 回归同时通过。
+- TypeScript noEmit、ESLint、Prettier 与 `git diff --check` PASS。未修改的完整 `pnpm check` 最终 PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 458 PASS、1 credential-only ignore，archive interop 双向通过。此前两次默认并发尝试分别出现既有测试超时/worker 启动饥饿；相关单测独立复跑通过，未放宽测试超时或门禁配置，最终全量以原命令明确 exit 0。
+- M6-T06/M6-T07 DependsOn 与 V5.2 §14.1/Phase E 已复核；M6-T01..T08 的 Existing Orchestrator→Concept→Mapping/Exposure/Budget/Validation→Tooltip/Flavor→Candidate/Domain Transaction 合同闭环，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6 Gate / Gate E PASS；下一项严格为 M7-T01 Shared Utility Evaluator。

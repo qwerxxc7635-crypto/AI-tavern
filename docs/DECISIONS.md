@@ -4676,3 +4676,23 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - UI 后续只消费 projector 输出，不再自行拼接第二份机械说明；完整 Combat UI 接线和 hover/focus cost preview 仍归 M8。
 - 本任务不决定 Candidate 接受或持久化策略；USER_REQUESTED/BACKGROUND_WORLD_CONTENT 的 Confirm/Auto Accept/Domain Commit 归 M6-T08。
 - 后续新增 catalog ID 必须同时提供中文 presentation entry；缺失 ID、Profile 漂移或非法 critical policy 一律 fail closed，不回退显示原始英文 Enum/ID。
+
+## DEC-214：两类 Combat Candidate 共享同一 SQLite 状态机，仅提交时机不同
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §14.1/Phase E，M6-T01/M6-T06/M6-T07/M6-T08
+
+### 决定
+
+`CombatContentCandidatePolicy` 复用现有 `AICandidateUseCases`、`AICandidateRepository`、`ai_candidates` 与调用方 Domain Commit，不新增 Provider、重试、修复、Candidate 表或事务框架。写入候选前必须由注入的本地 `CombatCandidateValidator` 返回 canonical payload，并携带 M6 Schema、Mechanical Intent、AI Exposure、Power Budget、Build Exploit、Tooltip/Flavor 六项完整 Gate E check；缺项、重复或非规范 check 均不允许建立候选。最终 Commit 在同一事务内重新验证存储 payload，持久化 validation evidence 不能替代真实 validator。
+
+`USER_REQUESTED` 只创建 `PROPOSED`，允许 `EDIT/REGENERATE` 以新 Candidate supersede 旧 Candidate；Preview 不写 Domain，只有显式 Confirm 才在现有 `BEGIN IMMEDIATE` 内执行 Domain Commit 并把 Candidate 置为 `ACCEPTED`。重复 Confirm 返回 `ALREADY_COMMITTED`，不再次执行 Domain Commit。
+
+`BACKGROUND_WORLD_CONTENT` 要求提交回调，并由通用候选用例新增的 `autoAccept` 在同一个 `BEGIN IMMEDIATE` 内完成 create→Domain Commit→ACCEPTED。任一步失败整批回滚；成功后相同 Candidate identity 的重试直接返回已接受记录，不重复 Domain Commit，不依赖 validation timestamp。相同 ID 但 payload/provenance/revision 不同的重放拒绝。
+
+### 影响与边界
+
+- Candidate payload 使用严格版本化 envelope 保存 submission policy 与 approved definition；用户 API 不能对后台候选执行 Preview/Edit/Confirm，也不能让用户候选绕过显式 Confirm。
+- SQLite 仍是 Candidate 与 Domain 事实的唯一持久真相；内存 Preview 状态不参与提交权限。
+- 本任务关闭 Gate E 的 Candidate/Commit policy，但不提前实现 M7 Utility AI、M8 Combat UI 或 M10 Active Combat persistence。

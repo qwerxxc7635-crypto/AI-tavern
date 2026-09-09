@@ -44,6 +44,11 @@ export interface ConfirmAICandidate {
   readonly commit: (payload: JsonValue, expectedRevision: number) => void;
 }
 
+export interface AutoAcceptAICandidate {
+  readonly candidate: ProposeAICandidate;
+  readonly commit: ConfirmAICandidate['commit'];
+}
+
 export class AICandidateUseCases {
   private readonly candidates: AICandidateRepository;
 
@@ -129,4 +134,77 @@ export class AICandidateUseCases {
       throw error;
     }
   }
+
+  public autoAccept(command: AutoAcceptAICandidate): AICandidate {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const existing = this.candidates.get(command.candidate.id);
+      if (existing !== null) {
+        requireSameAutoAcceptCandidate(existing, command.candidate);
+        if (existing.status !== 'ACCEPTED') {
+          throw new AICandidateTransitionError(
+            'A replayed automatic candidate must already be accepted',
+          );
+        }
+        this.database.exec('COMMIT');
+        return existing;
+      }
+
+      const candidate = this.propose(command.candidate);
+      command.commit(candidate.payload, candidate.expectedRevision);
+      const accepted = this.candidates.transition(candidate.id, 'ACCEPTED', this.now());
+      this.database.exec('COMMIT');
+      return accepted;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+}
+
+function requireSameAutoAcceptCandidate(existing: AICandidate, replay: ProposeAICandidate): void {
+  const expected = {
+    id: replay.id,
+    campaignId: replay.campaignId,
+    operationId: replay.operationId,
+    task: replay.task,
+    generationRecordId: replay.generationRecordId,
+    payload: replay.payload,
+    validation: {
+      schemaValid: replay.validation.schemaValid,
+      domainValid: replay.validation.domainValid,
+      checks: replay.validation.checks,
+    },
+    provenance: replay.provenance,
+    expectedRevision: replay.expectedRevision,
+  };
+  const actual = {
+    id: existing.id,
+    campaignId: existing.campaignId,
+    operationId: existing.operationId,
+    task: existing.task,
+    generationRecordId: existing.generationRecordId,
+    payload: existing.payload,
+    validation: {
+      schemaValid: existing.validation.schemaValid,
+      domainValid: existing.validation.domainValid,
+      checks: existing.validation.checks,
+    },
+    provenance: existing.provenance,
+    expectedRevision: existing.expectedRevision,
+  };
+  if (stableJson(actual) !== stableJson(expected)) {
+    throw new AICandidateTransitionError('Automatic candidate replay identity does not match');
+  }
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if (value !== null && typeof value === 'object') {
+    return `{${Object.entries(value)
+      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${stableJson(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
