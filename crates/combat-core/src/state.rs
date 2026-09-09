@@ -6,6 +6,7 @@ use sha2::{Digest, Sha256};
 use crate::{
     CombatInventoryItemState, CombatRngSnapshot, CombatStateInvariantError,
     CombatStateInvariantValidator, CombatVersionSet, CostReservationRecord, ResolutionContext,
+    UtilityActionCategory,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -459,6 +460,75 @@ pub struct PendingReactionWindow {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EnemyIntentCategory {
+    Attack,
+    Charge,
+    Control,
+    Defend,
+    Heal,
+    Ritual,
+    Special,
+}
+
+impl EnemyIntentCategory {
+    #[must_use]
+    pub const fn label_zh_cn(self) -> &'static str {
+        match self {
+            Self::Attack => "攻击",
+            Self::Charge => "蓄力",
+            Self::Control => "控制",
+            Self::Defend => "防御",
+            Self::Heal => "治疗",
+            Self::Ritual => "仪式",
+            Self::Special => "特殊行动",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EnemyIntentTelegraphLevel {
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum EnemyIntentReplanReason {
+    NoMatchingLegalCommand,
+    TargetLegalityChanged,
+    ExplicitTrigger,
+    BossPhaseTransition,
+    EncounterScript,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EnemyIntentReplanRecord {
+    pub sequence: u64,
+    pub reason: EnemyIntentReplanReason,
+    pub previous_category: EnemyIntentCategory,
+    pub next_category: EnemyIntentCategory,
+    pub debug_message_zh_cn: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct EnemyIntentPlan {
+    pub enemy_id: String,
+    pub intent_category: EnemyIntentCategory,
+    pub preferred_utility_category: UtilityActionCategory,
+    pub display_label_zh_cn: String,
+    pub target_hint: Option<String>,
+    pub telegraph_level: EnemyIntentTelegraphLevel,
+    pub created_sequence: u64,
+    pub created_round: u64,
+    pub replan_records: Vec<EnemyIntentReplanRecord>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CombatResultType {
     Victory,
     Defeat,
@@ -534,6 +604,7 @@ pub struct CombatState {
     pub provisional_delta: ProvisionalRuntimeDelta,
     pub scheduler: Option<EventSchedulerCheckpoint>,
     pub pending_reaction: Option<PendingReactionWindow>,
+    pub enemy_intents: Vec<EnemyIntentPlan>,
     pub result_candidates: Vec<ResultCandidate>,
     pub terminal_priority_policy: TerminalPriorityPolicy,
     pub confirmed_result_candidate_id: Option<String>,
@@ -833,6 +904,7 @@ mod tests {
                 max_event_count: 256,
             }),
             pending_reaction: None,
+            enemy_intents: vec![],
             result_candidates: vec![ResultCandidate {
                 candidate_id: "candidate-escape".to_owned(),
                 result_type: CombatResultType::Escape,

@@ -6047,3 +6047,19 @@
 - 新增 Barrier/FIFO 5 项与跨关闭 Barrier idempotent submission 1 项：覆盖 quiescent/utility scoring、EventChain/Resolution、Pending Reaction exact window、FIFO arrival→accepted 顺序、阻塞零接受及 exact retry；Reaction 20/20、Tactical 5/5 回归通过。Core 全套 323/323 PASS。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 485 PASS、1 credential-only ignore，archive interop 双向通过。
 - M2-T05/M7-T04 DependsOn 与 V5.2 §17.1.1 已复核；没有提前实现 Enemy Intent、Simulator、UI 或 Active Save，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T05 PASS；下一项严格为 M7-T06 Enemy Intent。
+
+## 2026-09-09 — M7-T06 完成 Enemy Intent
+
+### RoundStart 确定性计划、中文投影与受控 Replan
+
+- 从 M7-T05 提交 `be54b28` 创建 `task/M7-T06-enemy-intent`。新增 Core-owned `EnemyIntentPlanner` 与 CombatState `enemyIntents`；默认只在 RoundStart stable point 为全部 active Hostile 建立计划，按 committed Timeline、再按 StableID 排序。生成不调用 LLM、不读取系统时间、不消费规则 RNG。新增 `DEC-220`。
+- 固定 Attack/Charge/Control/Defend/Heal/Ritual/Special 七类及“攻击/蓄力/控制/防御/治疗/仪式/特殊行动”中文标签；Attack/Charge/Control/Defend/Heal 与 Damage/Resource/Control/Defense/Heal 建立严格 typed 映射，Ritual/Special 允许包装合法 Utility 类别。第一 Round 直接由当前合法候选生成，不读取不存在的 previous turn。
+- 计划继续使用 M7-T01 Shared Utility Evaluator 选择候选，并把结果投影为高权重 `UtilityIntentConstraints`；真实 M7-T02 EnemyAiController 测试证明最终 accepted/replayable Utility command 与公开 Intent 的 preferred category 一致，且仍经过统一 legality/cost/submission boundary。
+- Replan 仅允许 RoundStart/Stable quiescent point，原因固定为无匹配合法命令、目标合法性变化、显式触发、Boss 阶段变化或 Encounter Script；每次保存前后类别、单调 sequence 与固定中文 debug 文案。下一 Round 默认刷新保留旧 replan history，并以更新的 created sequence 分段。
+- CombatState invariant 新增 Enemy Intent 检查：敌人/目标存在、敌对身份、唯一 enemy/sequence、类别映射、中文标签、round/sequence 与 replan chain 均 fail closed；刷新和 Replan 使用 working clone，输入不完整、生命周期错误、非法映射、非法重复或 invariant 失败均保持原 State 原子不变。
+
+### 验证与结束状态
+
+- Enemy Intent 专项 6/6 PASS，覆盖 Timeline/StableID 顺序、七类中文、第一 Round、零 RNG、输入/Candidate 反序 byte-identical、真实 Utility/accepted replay 一致、受控 Replan/跨 Round 历史、生命周期/缺项/映射原子失败及可见元数据篡改拒绝。Core 全套 329/329 PASS。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 491 PASS、1 credential-only ignore，archive interop 双向通过。
+- M7-T02 DependsOn 与 V5.2 §12/§17.1.1 已复核；没有提前实现 Simulator、Combat UI/Log 或 Active Save，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T06 PASS；下一项严格为 M7-T07 Lightweight Simulator（SHOULD）。

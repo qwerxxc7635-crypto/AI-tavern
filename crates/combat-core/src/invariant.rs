@@ -28,6 +28,7 @@ pub enum CombatStateInvariantCode {
     ReactionWindowInvalid,
     TurnRoundStateInvalid,
     ObjectiveRuntimeInvalid,
+    EnemyIntentRuntimeInvalid,
     ReinforcementRegistryInvalid,
     StatusRuntimeInvalid,
     TerminalOutcomeInvalid,
@@ -72,6 +73,7 @@ impl CombatStateInvariantValidator {
             }
         }
         validate_formal_party(state)?;
+        validate_enemy_intents(state)?;
         validate_reinforcements(state)?;
         CostReservationModel::validate_state(state).map_err(|error| CombatStateInvariantError {
             code: CombatStateInvariantCode::CostReservationLedgerInvalid,
@@ -122,6 +124,84 @@ impl CombatStateInvariantValidator {
         })?;
         Ok(())
     }
+}
+
+fn validate_enemy_intents(state: &CombatState) -> Result<(), CombatStateInvariantError> {
+    let mut enemy_ids = std::collections::BTreeSet::new();
+    let mut created_sequences = std::collections::BTreeSet::new();
+    for plan in &state.enemy_intents {
+        let actor_is_hostile = state.combatants.iter().any(|combatant| {
+            combatant.combatant_id == plan.enemy_id && combatant.side == crate::CombatSide::Hostile
+        });
+        let target_exists = plan.target_hint.as_ref().is_none_or(|target_id| {
+            state
+                .combatants
+                .iter()
+                .any(|combatant| combatant.combatant_id == *target_id)
+        });
+        let mapping_is_valid = matches!(
+            (plan.intent_category, plan.preferred_utility_category),
+            (
+                crate::EnemyIntentCategory::Attack,
+                crate::UtilityActionCategory::Damage
+            ) | (
+                crate::EnemyIntentCategory::Charge,
+                crate::UtilityActionCategory::Resource
+            ) | (
+                crate::EnemyIntentCategory::Control,
+                crate::UtilityActionCategory::Control
+            ) | (
+                crate::EnemyIntentCategory::Defend,
+                crate::UtilityActionCategory::Defense
+            ) | (
+                crate::EnemyIntentCategory::Heal,
+                crate::UtilityActionCategory::Heal
+            ) | (
+                crate::EnemyIntentCategory::Ritual | crate::EnemyIntentCategory::Special,
+                _
+            )
+        );
+        let mut previous_sequence = 0;
+        let mut previous_category = plan
+            .replan_records
+            .first()
+            .map_or(plan.intent_category, |record| record.previous_category);
+        let records_valid = plan.replan_records.iter().all(|record| {
+            let expected_message = format!(
+                "敌人调整了行动意图：{} → {}",
+                record.previous_category.label_zh_cn(),
+                record.next_category.label_zh_cn()
+            );
+            let valid = record.sequence > previous_sequence
+                && record.previous_category == previous_category
+                && record.debug_message_zh_cn == expected_message;
+            previous_sequence = record.sequence;
+            previous_category = record.next_category;
+            valid
+        }) && plan.replan_records.last().is_none_or(|record| {
+            record.sequence < plan.created_sequence
+                || (record.sequence == plan.created_sequence
+                    && record.next_category == plan.intent_category)
+        });
+        if !enemy_ids.insert(plan.enemy_id.as_str())
+            || !created_sequences.insert(plan.created_sequence)
+            || !actor_is_hostile
+            || !target_exists
+            || !mapping_is_valid
+            || plan.display_label_zh_cn != plan.intent_category.label_zh_cn()
+            || plan.created_sequence == 0
+            || plan.created_round == 0
+            || plan.created_round > state.round.round_number
+            || !records_valid
+        {
+            return Err(CombatStateInvariantError {
+                code: CombatStateInvariantCode::EnemyIntentRuntimeInvalid,
+                combatant_id: plan.enemy_id.clone(),
+                resource_id: None,
+            });
+        }
+    }
+    Ok(())
 }
 
 fn validate_reinforcements(state: &CombatState) -> Result<(), CombatStateInvariantError> {
@@ -729,6 +809,7 @@ mod tests {
             },
             scheduler: None,
             pending_reaction: None,
+            enemy_intents: Vec::new(),
             result_candidates: Vec::new(),
             terminal_priority_policy: crate::TerminalPriorityPolicy::default(),
             confirmed_result_candidate_id: None,

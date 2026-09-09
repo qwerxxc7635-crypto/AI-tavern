@@ -539,6 +539,7 @@ mod tests {
             },
             scheduler: None,
             pending_reaction: None,
+            enemy_intents: vec![],
             result_candidates: vec![],
             terminal_priority_policy: crate::TerminalPriorityPolicy::default(),
             confirmed_result_candidate_id: None,

@@ -4788,3 +4788,23 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - `CombatSubmissionService` 与 Ask Reaction 决定复用同一 Barrier。调用方 `stableInputPoint` 仍承担 actor/turn-specific 输入资格，但不能覆盖权威 EventChain/Resolution/PendingReaction 状态。
 - 已经接受的完全相同 commandId 重试可跨关闭的 Barrier 返回 `AlreadyAccepted`，不重新跑随时间变化的 precondition，也不新增 sequence/成本；identity 冲突仍由 Command Boundary fail closed。
 - Pending FIFO 尚未成为权威事实且不进入 Replay；M10 只需持久化 acceptedCommands 与执行态，不把未接受的鼠标/UI 请求当作战斗历史。
+
+## DEC-220：Enemy Intent 是 CombatState 中的确定性计划且只约束 Utility 偏好
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §12、§17.1.1，M7-T02/M7-T05/M7-T06，DEC-215、DEC-216、DEC-219
+
+### 决定
+
+`EnemyIntentPlanner` 仅在 `RoundStart` 的 stable point 执行默认刷新，并从当前 active Hostile 集合建立恰好一份 `EnemyIntentPlan`。处理顺序先服从 committed Timeline，未进入 Timeline 的敌人再按 StableID；输入顺序和 Candidate 顺序不改变计划。计划类别固定为 Attack/Charge/Control/Defend/Heal/Ritual/Special，玩家可见标签由 Core 固定投影为中文。生成不调用 LLM、不读取系统时间且不消费任何规则 RNG。
+
+每份计划保存 enemy、类别、对应 `UtilityActionCategory`、target hint、telegraph level、round 与单调 sequence。Attack/Charge/Control/Defend/Heal 分别只能映射 Damage/Resource/Control/Defense/Heal；Ritual/Special 可包装任一合法 Utility 类别。计划通过 `utility_constraints()` 生成 typed preference，实际 `EnemyAiController` 仍在当前 legal commands 上执行共享 Utility 评分和统一 Submission，因此 Intent 只提高计划类别优先级，不绕过 legality、cost、control authority 或 accepted command boundary。
+
+Replan 只允许 RoundStart/Stable 的 quiescent point，并要求固定原因：无匹配合法命令、目标合法性变化、显式触发、Boss 阶段变化或 Encounter Script。每次调整记录前后类别、单调 sequence 与固定中文 debug message；下一 Round 默认刷新可保留旧记录，但以新的 created sequence 明确分段。CombatState invariant 验证敌人/目标存在、唯一身份、类别映射、中文标签、round/sequence 与完整 replan chain，篡改一律 fail closed。
+
+### 影响与边界
+
+- 第一 Round 直接从当前合法候选生成，没有 previous-turn 特例，也不需要虚构历史 Intent。
+- Intent history 是权威运行态的一部分；M10 Active Save 需要随 CombatState 保存，M8 只能投影，不能在 UI 内重新推断或重规划。
+- M7-T06 不实现动画、Combat Log、Simulator 或 UI；这些分别属于 M8 与 M7-T07。

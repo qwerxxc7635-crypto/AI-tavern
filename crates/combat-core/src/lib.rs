@@ -18,6 +18,7 @@ mod damage_channel;
 mod effect;
 mod encounter;
 mod enemy_ai;
+mod enemy_intent;
 mod execution;
 mod exploit_validator;
 mod external_input;
@@ -120,6 +121,10 @@ pub use encounter::{
 pub use enemy_ai::{
     EnemyAiController, EnemyAiDecision, EnemyAiDecisionError, EnemyAiDecisionRequest,
     EnemyAiLegalCommand, EnemyAiSubmissionFacts,
+};
+pub use enemy_intent::{
+    EnemyIntentCandidate, EnemyIntentError, EnemyIntentErrorCode, EnemyIntentPlanner,
+    EnemyIntentProfileInput, EnemyIntentReplanRequest, EnemyIntentRoundStartRequest,
 };
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
@@ -228,15 +233,17 @@ pub use shield::{
 pub use state::{
     AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,
     CombatStateHashError, CombatStateRestoreError, CombatantRuntime, CombatantState,
-    CostCommitState, DurationClock, EventSchedulerCheckpoint, EventSchedulerStatus,
-    HardCcDrRuntime, HookPhase, LoopGuardEngineFailure, LoopGuardFailureReason,
-    LoopGuardRollbackPolicy, ObjectiveCommittedOutcome, ObjectiveCommittedSignal,
-    ObjectiveFailureReason, ObjectiveFailureRecord, ObjectiveKind, ObjectiveRuntime,
-    ObjectiveRuntimeState, PendingReactionItem, PendingReactionWindow, ProvisionalDeltaEntry,
-    ProvisionalRuntimeDelta, ReactionWindowStatus, ReinforcementRuntime, ReinforcementRuntimeState,
-    ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
-    SchedulerItem, SchedulerItemKind, ShieldRechargeRuntime, StatusRuntime, TerminalPriorityPolicy,
-    TerminalPriorityTier, TimelineEntry, UsageCounterScope, UsageCounterState,
+    CostCommitState, DurationClock, EnemyIntentCategory, EnemyIntentPlan, EnemyIntentReplanReason,
+    EnemyIntentReplanRecord, EnemyIntentTelegraphLevel, EventSchedulerCheckpoint,
+    EventSchedulerStatus, HardCcDrRuntime, HookPhase, LoopGuardEngineFailure,
+    LoopGuardFailureReason, LoopGuardRollbackPolicy, ObjectiveCommittedOutcome,
+    ObjectiveCommittedSignal, ObjectiveFailureReason, ObjectiveFailureRecord, ObjectiveKind,
+    ObjectiveRuntime, ObjectiveRuntimeState, PendingReactionItem, PendingReactionWindow,
+    ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReactionWindowStatus, ReinforcementRuntime,
+    ReinforcementRuntimeState, ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus,
+    RoundRuntimeState, SchedulerItem, SchedulerItemKind, ShieldRechargeRuntime, StatusRuntime,
+    TerminalPriorityPolicy, TerminalPriorityTier, TimelineEntry, UsageCounterScope,
+    UsageCounterState,
 };
 pub use status::{
     CURRENT_STATUS_SCHEMA_VERSION, ControlCategory, StatusActivationPolicy, StatusDefinition,
