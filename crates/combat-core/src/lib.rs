@@ -41,6 +41,7 @@ mod runtime_commit;
 mod scheduler;
 mod sci_fi;
 mod shield;
+mod simulator;
 mod state;
 mod status;
 mod status_merge;
@@ -229,6 +230,12 @@ pub use shield::{
     RechargeInterruptionReason, ShieldInteraction, ShieldRechargeEvaluator, ShieldResolution,
     ShieldResolutionError, ShieldResolutionErrorCode, ShieldResolutionRequest,
     ShieldResolutionResult,
+};
+pub use simulator::{
+    CombatSimulationConfig, CombatSimulationDecisionCount, CombatSimulationError,
+    CombatSimulationErrorCode, CombatSimulationMetrics, CombatSimulationObservation,
+    CombatSimulationOutcomeCounts, CombatSimulationReport, CombatSimulationRunContext,
+    CombatSimulationRunSummary, CombatSimulationRunTrace, LightweightCombatSimulator,
 };
 pub use state::{
     AbilityUsageState, CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateEnvelope,

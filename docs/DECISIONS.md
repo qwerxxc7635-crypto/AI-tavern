@@ -4808,3 +4808,23 @@ Replan 只允许 RoundStart/Stable 的 quiescent point，并要求固定原因�
 - 第一 Round 直接从当前合法候选生成，没有 previous-turn 特例，也不需要虚构历史 Intent。
 - Intent history 是权威运行态的一部分；M10 Active Save 需要随 CombatState 保存，M8 只能投影，不能在 UI 内重新推断或重规划。
 - M7-T06 不实现动画、Combat Log、Simulator 或 UI；这些分别属于 M8 与 M7-T07。
+
+## DEC-221：Lightweight Simulator 只编排隔离 Combat Run 并汇总 committed observations
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §1.1、§11、§36 Phase F、验收 20/23/48/89，M7-T01..T07
+
+### 决定
+
+`LightweightCombatSimulator` 是同步、顺序、纯程序 batch harness。配置固定 simulation ID、32 位十六进制 base seed、run count 与每 run 最大 rounds；每个 run 使用独立 `combatInstanceId` 初始化既有 Combat RNG 三 channel 的零游标 snapshot，并把 context 交给注入的真实规则执行适配器。Harness 不含 UI、动画、LLM、系统时间或系统随机，也不直接修改 CombatState；实际命令、Resolution、Effect 与 State Commit 继续由既有 owners 执行。
+
+执行适配器返回 terminal result、completed rounds、initial party size、最终 RNG snapshot 和结构化 committed observations。Observation 只表达 DamageApplied、HealingApplied、ResourceCommitted、ControlOpportunity、CombatantDefeated 与 UtilityDecision telemetry；Simulator 校验非负数值、ID、轮数上限、RNG snapshot、死亡唯一性与 party size 后再汇总。单个 run 失败或 trace 非法时整个 batch 返回带 run index 的结构化错误，不输出伪成功报告。
+
+所有率与均值使用 `COMBAT_FIXED_SCALE=1_000_000` 的整数 floor：胜率含 Victory/ScriptedVictory；DPR/治疗按完整 rounds；资源效率为 effective output/resource committed；CC uptime 为 hostile controlled opportunities/all hostile opportunities；同时报告 party death incidence 与 casualty rate。决策多样性定义为稳定的 distinct actor-side/actor/ability/target identity 数除以 total decisions，并附按固定 side/StableID 顺序的 counts，便于解释而不依赖输入容器顺序。
+
+### 影响与边界
+
+- Simulator 输出是开发/平衡 telemetry，不是 SQLite 战斗状态、BattleRecord 或玩家奖励事实，不得回写产品 Domain。
+- 每 run 的 RNG 隔离使用既有 Combat RNG contract，没有第四条 simulation RNG stream；Harness 自身不抽取规则随机数。
+- 当前为 Lightweight SHOULD 能力，不实现并行分布式仿真、AI 自动调参、动画或 Replay UI；M8 不依赖 Simulator 才能渲染战斗。

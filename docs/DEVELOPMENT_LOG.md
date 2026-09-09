@@ -6063,3 +6063,17 @@
 - Enemy Intent 专项 6/6 PASS，覆盖 Timeline/StableID 顺序、七类中文、第一 Round、零 RNG、输入/Candidate 反序 byte-identical、真实 Utility/accepted replay 一致、受控 Replan/跨 Round 历史、生命周期/缺项/映射原子失败及可见元数据篡改拒绝。Core 全套 329/329 PASS。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 491 PASS、1 credential-only ignore，archive interop 双向通过。
 - M7-T02 DependsOn 与 V5.2 §12/§17.1.1 已复核；没有提前实现 Simulator、Combat UI/Log 或 Active Save，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T06 PASS；下一项严格为 M7-T07 Lightweight Simulator（SHOULD）。
+
+## 2026-09-09 — M7-T07 完成 Lightweight Simulator；M7 Gate PASS
+
+### 隔离 Run harness 与固定点平衡指标
+
+- 从 M7-T06 提交 `cd132f1` 创建 `task/M7-T07-lightweight-simulator`。新增 Core-owned `LightweightCombatSimulator`：同步顺序批量执行 1..100000 runs，每次从同一 base seed + 独立 combatInstanceId 初始化既有三 channel Combat RNG 零游标 snapshot，并由注入的真实规则执行适配器消费；Harness 无 UI、动画、LLM、系统时间/随机或 CombatState 直接写路径。新增 `DEC-221`。
+- 每 run 返回 terminal result、completed rounds、initial party size、final RNG 与结构化 observations：DamageApplied、HealingApplied、ResourceCommitted、ControlOpportunity、CombatantDefeated、UtilityDecision。非法 config、超 round、负值、无 party、重复死亡、非法 ID/final RNG、过量 observation、执行器失败或算术溢出均带 run index fail closed，不形成部分成功报告。
+- 汇总完整 outcome counts，并以 `COMBAT_FIXED_SCALE=1_000_000` 整数 floor 计算 win rate、average rounds、party DPR、healing/round、resource efficiency、hostile CC uptime、party death incidence/casualty rate 与 decision variety；decision counts 按 side→actor→ability→target 稳定顺序输出。零分母显式为 0，不使用浮点或容器偶然顺序。
+
+### 验证与结束状态
+
+- Simulator 专项 6/6 PASS，覆盖全部要求指标精确值、3-run byte-identical 与 observation reorder、4-run RNG identity/零 cursor 隔离、配置/trace/负值/重复死亡拒绝，以及执行器第 N run 失败归因并立即停止。Core 全套 335/335 PASS。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 497 PASS、1 credential-only ignore，archive interop 双向通过。
+- M7-T01..T06 DependsOn 与 V5.2 §1.1/§11/§36 已复核；没有复制战斗规则、让 telemetry 回写 Domain 或提前实现 M8 UI，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T07 PASS；M7 Gate PASS；下一项严格为 M8-T01 Combat ViewModel / Presentation Boundary。

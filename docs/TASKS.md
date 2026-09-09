@@ -76,8 +76,9 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M7-T04 — Tactical Strategy / Preference | PASS | 2026-09-09 | 五种 typed 权重预设与四类受控偏好；Player 设置经统一 Command Boundary，projection 只按 acceptedSequence 影响未来决策且保留既有 Utility command |
 | M7-T05 — External Input Stable Barrier | PASS | 2026-09-09 | FIFO arrival queue；EventChain/Resolution/Utility evaluation 关闭相应输入；Pending Reaction 仅匹配 Resolve；阻塞项无 acceptedSequence，exact retry 跨关闭 barrier 幂等 |
 | M7-T06 — Enemy Intent | PASS | 2026-09-09 | RoundStart stable point 按 Timeline/StableID 生成中文确定性 Intent；无 LLM/RNG；受控 Replan 留痕并投影为实际 Utility 优先类别 |
-| M7-T07 — Lightweight Simulator（SHOULD） | IN_PROGRESS | 2026-09-09 | 下一项；纯程序、无动画/LLM，观测胜率、回合、DPR、治疗、资源效率、CC uptime、死亡率与决策多样性 |
-| M7 Gate — Gate F Utility AI / Simulator | NOT_STARTED | 2026-09-09 | 等待 M7-T07 完成后独立验收 |
+| M7-T07 — Lightweight Simulator（SHOULD） | PASS | 2026-09-09 | 隔离 RNG 的纯程序批量 harness；结构化 committed observations；固定点汇总胜率/回合/DPR/治疗/资源效率/CC/死亡/决策多样性 |
+| M7 Gate — Utility AI / Tactical / Simulator | PASS | 2026-09-09 | M7-T01..T07 独立验收；共享评分→统一命令→Stable Barrier→Intent→无 UI/LLM Simulator 闭环 |
+| M8-T01 — Combat ViewModel / Presentation Boundary | IN_PROGRESS | 2026-09-09 | 下一项；建立 CombatState/Rules→ViewModel→UI 单向边界，Core 无 presentation 反向依赖 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
