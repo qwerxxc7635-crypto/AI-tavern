@@ -72,7 +72,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M6 Gate — Gate E AI Content Pipeline | PASS | 2026-09-09 | M6-T01..T08 独立验收；既有 Orchestrator→Concept→Mapper/Exposure/Budget/Exploit→Tooltip/Flavor→Candidate/Domain Transaction 闭环 |
 | M7-T01 — Shared Utility Evaluator | PASS | 2026-09-09 | integer-only 八类 score breakdown；组合 profile/personality/strategy/preferences/intent；按 total/tactical/ability/target 稳定排序且不消费 RNG |
 | M7-T02 — Enemy AI | PASS | 2026-09-09 | M7-T01 稳定排序驱动 UtilityAi Command；统一 Submission Boundary 复验并写 acceptedCommands/replay；显式同分随机仅提交 utilityTieBreak 游标 |
-| M7-T03 — Companion AI | IN_PROGRESS | 2026-09-09 | 下一项；组合 Base Profile、Character Personality 与 Player Tactical Strategy，正式队友/既有 Summon 维持 Utility AI 控制 |
+| M7-T03 — Companion AI | PASS | 2026-09-09 | 正式队友组合 Base+Personality+Player Strategy；既有非正式 Summon 不接玩家 Strategy；Player/UtilityAi source 在统一 Submission Boundary 按阵营隔离 |
+| M7-T04 — Tactical Strategy / Preference | IN_PROGRESS | 2026-09-09 | 下一项；提供均衡/进攻/防守/支援/保守与结构化 Strategy/Preference Command，且不追溯已提交动作 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

@@ -6001,3 +6001,18 @@
 - 定向 Rust 测试 5/5 PASS，覆盖默认 stable ID tie-break 与 replay、显式同分随机及输入顺序无关、非同分 RNG 零消费、提交复验失败的 State/Ledger/RNG 回滚、Intent 过滤为空零接受。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 469 PASS、1 credential-only ignore，archive interop 双向通过。
 - M7-T01/M1-T06 DependsOn 与 V5.2 §12 已复核；没有提前实现 Companion AI、玩家五策略 Command、Enemy Intent 或 Simulator，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T02 PASS；下一项严格为 M7-T03 Companion AI。
+
+## 2026-09-09 — M7-T03 完成 Companion AI
+
+### 正式队友权重组合与控制权冻结
+
+- 从 M7-T02 提交 `c7a531e` 创建 `task/M7-T03-companion-ai`。新增 `CompanionAiController`，复用同一 Utility Evaluator、稳定排序、Utility tie-break 与 Submission 内核；没有复制 Enemy 评分器或 accepted ledger。新增 `DEC-217`，并把 `DEC-215` 中 Enemy Intent 后续任务编号按 SOT 修正为 M7-T06。
+- 正式队友必须是 `CombatSide::Companion + formalPartyMemberIds` 成员并提供 Base Profile、Character Personality、Player Tactical Strategy 三层；同一 State/candidates 下 personality 与 strategy 的 damage/heal 调整分别产生可测试的 Attack/Heal 选择差异，策略不会替换 personality。
+- 既有 Summon 路由仅接受已在 CombatState 中存在、Companion side 且非正式成员的 actor，并禁止附加 Player Tactical Strategy；这不新增普通 Spawn/Summon Ability、primitive 或生态。
+- 统一 `CombatSubmissionService` 现在把 live source/assignment 与 committed actor side 绑定：Player combatant 仅 Player source，Companion/Hostile/Neutral 仅 UtilityAI source；Test source 仍需精确 test-case assignment。错误接管在 precondition 阶段原子失败，State/ledger/RNG 不变。
+
+### 验证与结束状态
+
+- Companion 专项 4/4 PASS：personality 差异、strategy 差异、formal/summon strategy contract、Player/Hostile route 拒绝；Submission 专项 8/8 与 Enemy AI 5/5 PASS，新增主角↔UtilityAI、队友↔Player 双向接管拒绝并保持原子性。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 474 PASS、1 credential-only ignore，archive interop 双向通过。
+- M7-T01 DependsOn 与 V5.2 §12.1 已复核；没有提前实现五策略/偏好 Command、External Input Barrier、Enemy Intent 或 Simulator，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T03 PASS；下一项严格为 M7-T04 Tactical Strategy / Preference。

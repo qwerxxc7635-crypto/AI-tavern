@@ -51,6 +51,7 @@ pub struct EnemyAiDecision {
 #[derive(Debug)]
 pub enum EnemyAiDecisionError {
     InvalidLegalCommands { subject: String },
+    InvalidControlledActor { actor_id: String },
     NoLegalCommand,
     Utility(UtilityEvaluationError),
     Rng(CombatRngError),
@@ -69,6 +70,22 @@ pub struct EnemyAiController;
 
 impl EnemyAiController {
     pub fn decide_and_submit(
+        state: &mut CombatState,
+        accepted_commands: &mut AcceptedCommandLedger,
+        request: EnemyAiDecisionRequest<'_>,
+    ) -> Result<EnemyAiDecision, EnemyAiDecisionError> {
+        if !state.combatants.iter().any(|combatant| {
+            combatant.combatant_id == request.actor_id
+                && combatant.side == crate::CombatSide::Hostile
+        }) {
+            return Err(EnemyAiDecisionError::InvalidControlledActor {
+                actor_id: request.actor_id.to_owned(),
+            });
+        }
+        Self::decide_utility_and_submit(state, accepted_commands, request)
+    }
+
+    pub(crate) fn decide_utility_and_submit(
         state: &mut CombatState,
         accepted_commands: &mut AcceptedCommandLedger,
         request: EnemyAiDecisionRequest<'_>,

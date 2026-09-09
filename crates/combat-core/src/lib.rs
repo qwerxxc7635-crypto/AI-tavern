@@ -8,6 +8,7 @@ mod attack;
 mod attribute;
 mod clock;
 mod command;
+mod companion_ai;
 mod control;
 mod cost;
 mod cross_world_profile;
@@ -77,6 +78,10 @@ pub use command::{
     CombatCommandBoundaryError, CombatCommandBoundaryErrorCode, CombatCommandEnvelope,
     CombatCommandPayload, CombatCommandSource, CommandAcceptanceStatus, InternalCombatCommand,
     ReactionDecisionChoice, TacticalPreferenceValue,
+};
+pub use companion_ai::{
+    CompanionAiActorKind, CompanionAiController, CompanionAiDecisionError,
+    CompanionAiDecisionRequest,
 };
 pub use control::{
     ControlApplicationDecision, ControlApplicationEngine, ControlApplicationRejection,

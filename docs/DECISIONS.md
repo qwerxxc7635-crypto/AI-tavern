@@ -4715,7 +4715,7 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 
 - M7-T01 只拥有共享评分和排序，不调用 LLM，不决定 Enemy/Companion 控制权，也不写 acceptedCommands；这些分别归 M7-T02/M7-T03。
 - Strategy/Preference 的五种产品预设与 accepted input barrier 归 M7-T04；当前 evaluator 只消费已经解析的 typed weight layer。
-- Intent plan 的 RoundStart 生成、replan 与可见状态归 M7-T05，不在 evaluator 内引入特殊时点。
+- Intent plan 的 RoundStart 生成、replan 与可见状态归 M7-T06，不在 evaluator 内引入特殊时点。
 
 ## DEC-216：Enemy AI 通过统一 Submission Boundary 原子提交 Utility 决策
 
@@ -4734,3 +4734,21 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - Controller 没有 LLM/provider 接口，不接受系统时间、系统随机或未版本化随机源。
 - M7-T02 只实现 Enemy 的实时 Ability Command 决策；Companion/Summon profile 组合与玩家策略属于 M7-T03/M7-T04，Enemy Intent lifecycle 属于 M7-T06。
 - `EnemyAiSubmissionFacts` 是当次 legality 枚举的随附证据，不形成第二套命令边界或持久真相；SQLite/后续 BattleRecord 仍保存统一 accepted command history。
+
+## DEC-217：Companion 与既有 Summon 复用 Utility 内核但冻结控制权边界
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §12.1，M7-T03，DEC-064、DEC-215、DEC-216
+
+### 决定
+
+`CompanionAiController` 不建立另一套评分或提交实现，而是复用 M7-T01 Utility Evaluator 与 M7-T02 的 Utility 决策/Submission 内核。正式队友输入必须同时包含 `BaseUtilityProfile + Character Personality + Player Tactical Strategy`；`ExistingSummon` 仅代表 CombatState 中已经存在、`CombatSide::Companion` 且不在 `formalPartyMemberIds` 的单位，使用 Base+Personality，不接收玩家 Tactical Strategy。
+
+控制权在统一 `CombatSubmissionService` 内绑定到 committed actor side：`CombatSide::Player` 只接受匹配的 Player source/assignment，非 Player combatant 只接受 UtilityAI source/assignment；Test source 继续保留显式测试权限。错误 assignment 作为共享 precondition failure 原子拒绝，不能仅靠 UI 隐藏来防止玩家直接接管正式队友，也不能把主角静默切给 Utility AI。
+
+### 影响与边界
+
+- Personality 与 Strategy 保持两个独立整数 weight layer，策略覆盖不会替换个性；同一 Base/CombatState 下两者的差异可从 scored breakdown 与最终命令测试。
+- M7-T03 不实现五种策略目录、偏好 schema 或设置命令；这些归 M7-T04。既有 Summon 支持不新增 Spawn/Summon primitive、技能、数量、持续时间或 UI。
+- Companion/ExistingSummon 成功动作仍记录为统一 `AcceptedCommandSource::UtilityAi`，不增加 Companion 专用 accepted history。

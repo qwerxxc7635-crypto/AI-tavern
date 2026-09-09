@@ -86,6 +86,7 @@ impl CombatSubmissionService {
             .accept_external(request.envelope.clone())
             .map_err(CombatSubmissionError::CommandBoundary)?;
         let source_controls_actor = source_controls_actor(
+            &working_state,
             &request.envelope.source,
             &request.envelope.actor_id,
             &request.control_assignments,
@@ -230,35 +231,47 @@ fn selected_target_id(envelope: &CombatCommandEnvelope) -> Option<&str> {
 }
 
 fn source_controls_actor(
+    state: &CombatState,
     source: &CombatCommandSource,
     actor_id: &str,
     assignments: &[CombatControlAssignment],
 ) -> bool {
+    let Some(actor) = state
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == actor_id)
+    else {
+        return false;
+    };
     let Some(assignment) = assignments
         .iter()
         .find(|assignment| assignment.combatant_id == actor_id)
     else {
         return false;
     };
-    matches!(
-        (source, &assignment.authority),
-        (
-            CombatCommandSource::Player { controller_id: left },
-            CombatControlAuthority::Player { controller_id: right }
-        ) if left == right
-    ) || matches!(
-        (source, &assignment.authority),
-        (
-            CombatCommandSource::UtilityAi,
-            CombatControlAuthority::UtilityAi
+    (actor.side == crate::CombatSide::Player
+        && matches!(
+            (source, &assignment.authority),
+            (
+                CombatCommandSource::Player { controller_id: left },
+                CombatControlAuthority::Player { controller_id: right }
+            ) if left == right
+        ))
+        || (actor.side != crate::CombatSide::Player
+            && matches!(
+                (source, &assignment.authority),
+                (
+                    CombatCommandSource::UtilityAi,
+                    CombatControlAuthority::UtilityAi
+                )
+            ))
+        || matches!(
+            (source, &assignment.authority),
+            (
+                CombatCommandSource::Test { test_case_id: left },
+                CombatControlAuthority::Test { test_case_id: right }
+            ) if left == right
         )
-    ) || matches!(
-        (source, &assignment.authority),
-        (
-            CombatCommandSource::Test { test_case_id: left },
-            CombatControlAuthority::Test { test_case_id: right }
-        ) if left == right
-    )
 }
 
 fn validate_submission_facts(
@@ -423,6 +436,7 @@ mod tests {
     #[test]
     fn utility_ai_requires_utility_control_and_zero_cost_commands_share_the_boundary() {
         let mut state = fixture_state();
+        state.combatants[0].side = CombatSide::Companion;
         let mut ledger = AcceptedCommandLedger::new();
         let mut utility = request();
         utility.envelope.command_id = "command-ai".to_owned();
@@ -439,6 +453,33 @@ mod tests {
             ledger.commands()[0].source,
             AcceptedCommandSource::UtilityAi
         );
+    }
+
+    #[test]
+    fn player_and_utility_sources_cannot_take_over_each_others_combatants() {
+        let mut companion_state = fixture_state();
+        companion_state.combatants[0].side = CombatSide::Companion;
+        let companion_before = companion_state.clone();
+        let mut companion_ledger = AcceptedCommandLedger::new();
+        assert!(matches!(
+            CombatSubmissionService::submit(&mut companion_state, &mut companion_ledger, request(),),
+            Err(CombatSubmissionError::PreconditionsFailed(_))
+        ));
+        assert_eq!(companion_state, companion_before);
+        assert!(companion_ledger.commands().is_empty());
+
+        let mut player_state = fixture_state();
+        let player_before = player_state.clone();
+        let mut player_ledger = AcceptedCommandLedger::new();
+        let mut utility_request = request();
+        utility_request.envelope.source = CombatCommandSource::UtilityAi;
+        utility_request.control_assignments[0].authority = CombatControlAuthority::UtilityAi;
+        assert!(matches!(
+            CombatSubmissionService::submit(&mut player_state, &mut player_ledger, utility_request,),
+            Err(CombatSubmissionError::PreconditionsFailed(_))
+        ));
+        assert_eq!(player_state, player_before);
+        assert!(player_ledger.commands().is_empty());
     }
 
     #[test]
