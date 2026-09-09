@@ -475,6 +475,23 @@ impl CanonicalReactionCore {
     ) -> Result<ReactionDecisionOutcome, ReactionRuleError> {
         validate_bindings(state, bindings)?;
         Self::validate_state(state)?;
+        if !accepted_commands
+            .commands()
+            .iter()
+            .any(|command| command.command_id == envelope.command_id)
+        {
+            crate::ExternalInputBarrier::validate(
+                state,
+                &envelope,
+                crate::ExternalInputActivity::default(),
+            )
+            .map_err(|error| {
+                rule_error(
+                    ReactionRuleErrorCode::CommandFailure,
+                    format!("{:?}:{}", error.code, error.subject),
+                )
+            })?;
+        }
         let mut working_commands = accepted_commands.clone();
         let receipt = working_commands
             .accept_external(envelope.clone())

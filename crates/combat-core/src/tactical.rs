@@ -207,6 +207,7 @@ pub struct TacticalCommandRequest {
     pub actor_id: String,
     pub payload: CombatCommandPayload,
     pub stable_input_point: bool,
+    pub utility_ai_evaluation_in_progress: bool,
 }
 
 #[derive(Debug)]
@@ -261,6 +262,7 @@ impl TacticalCommandService {
                     },
                 }],
                 stable_input_point: request.stable_input_point,
+                utility_ai_evaluation_in_progress: request.utility_ai_evaluation_in_progress,
                 known_ability_ids: vec![],
                 disabled_ability_ids: vec![],
                 legal_target_ids: vec![],
@@ -550,6 +552,15 @@ mod tests {
 
     #[test]
     fn invalid_values_non_formal_targets_and_closed_input_point_are_atomic() {
+        let mut utility_busy = request(
+            "utility-busy",
+            CombatCommandPayload::SetTacticalStrategy {
+                companion_id: "companion".to_owned(),
+                strategy_id: "BALANCED".to_owned(),
+            },
+            true,
+        );
+        utility_busy.utility_ai_evaluation_in_progress = true;
         let cases = vec![
             request(
                 "bad-strategy",
@@ -580,6 +591,7 @@ mod tests {
                 },
                 false,
             ),
+            utility_busy,
         ];
         for request in cases {
             let mut state = state();
@@ -637,6 +649,7 @@ mod tests {
             actor_id: "hero".to_owned(),
             payload,
             stable_input_point,
+            utility_ai_evaluation_in_progress: false,
         }
     }
 

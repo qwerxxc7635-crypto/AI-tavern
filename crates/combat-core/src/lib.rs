@@ -20,6 +20,7 @@ mod encounter;
 mod enemy_ai;
 mod execution;
 mod exploit_validator;
+mod external_input;
 mod fantasy;
 mod gameplay_tag;
 mod invariant;
@@ -128,6 +129,10 @@ pub use exploit_validator::{
     AbilityCriticalPolicy, BuildAbilityDefinition, BuildStatusDefinition, CombatBuildDefinition,
     CombatBuildValidationError, CombatBuildValidationErrorCode, CombatBuildValidator, ExploitIssue,
     ExploitIssueCode, ExploitValidationReport, ExploitValidatorConfig, StatusDefenseProjection,
+};
+pub use external_input::{
+    ExternalInputActivity, ExternalInputBarrier, ExternalInputBarrierError,
+    ExternalInputBarrierErrorCode, ExternalInputQueue, QueuedExternalInput,
 };
 pub use fantasy::{
     FantasyBalanceConfig, FantasyOwnerTurnRecovery, FantasyProfile, FantasyRuleError,

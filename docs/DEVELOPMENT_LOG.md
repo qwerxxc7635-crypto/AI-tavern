@@ -6031,3 +6031,19 @@
 - Tactical 专项 5/5 PASS：五预设权重互异、四类偏好结构化接受、历史 Utility command 不追溯、非法/非正式/关闭输入点原子拒绝、duplicate commandId 与 replay-derived projection 幂等。Core 全套 317/317 PASS。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 479 PASS、1 credential-only ignore，archive interop 双向通过。
 - M7-T03 DependsOn 与 V5.2 §12.1/§17.1 已复核；没有提前实现完整 Stable Barrier、Enemy Intent、Combat UI 或 Simulator，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T04 PASS；下一项严格为 M7-T05 External Input Stable Barrier。
+
+## 2026-09-09 — M7-T05 完成 External Input Stable Barrier
+
+### Quiescent gate、Pending Reaction 特例与 FIFO
+
+- 从 M7-T04 提交 `f0bbaa7` 创建 `task/M7-T05-external-input-barrier`。新增 Core-owned `ExternalInputBarrier` 与 `ExternalInputQueue`；Barrier 从 committed Scheduler/Resolution/PendingReaction 状态计算，不以 UI/动画/系统时间作为规则输入。新增 `DEC-219`。
+- 正常输入要求 Event Scheduler 为不存在或 Active+queue empty+current item none，并且无 ResolutionContext。Utility AI evaluation activity 期间 Tactical Strategy/Preference 延后；实际已完成评分的 Utility action 仍可进入统一 Submission。
+- unresolved PendingReactionWindow 只放行 windowId 精确匹配的 ResolveReaction；其他 Ability/Tactical/错误 window 均阻塞。Reaction exactly-once 路径接入共享 Barrier，同时保留 resolved/cleared 后相同 decision command 的幂等返回和冲突检测。
+- FIFO queue 使用单调 arrivalSequence，仅队首可检查/提交；Barrier 关闭时请求留队且 ledger 为空。相同 pending command identity 幂等，不同 envelope 冲突。acceptedSequence 仍只由 AcceptedCommandLedger 分配，Replay 不读取 arrivalSequence。
+- CombatSubmissionService 先在 working ledger 判断 command identity；新命令必须通过 Barrier，已接受的 exact retry 即使 Scheduler/Resolution 后续关闭 Barrier 仍返回 AlreadyAccepted、复用既有成本 reservation、不给新 sequence，也不以变化后的 State 重新解释原命令。
+
+### 验证与结束状态
+
+- 新增 Barrier/FIFO 5 项与跨关闭 Barrier idempotent submission 1 项：覆盖 quiescent/utility scoring、EventChain/Resolution、Pending Reaction exact window、FIFO arrival→accepted 顺序、阻塞零接受及 exact retry；Reaction 20/20、Tactical 5/5 回归通过。Core 全套 323/323 PASS。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 485 PASS、1 credential-only ignore，archive interop 双向通过。
+- M2-T05/M7-T04 DependsOn 与 V5.2 §17.1.1 已复核；没有提前实现 Enemy Intent、Simulator、UI 或 Active Save，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T05 PASS；下一项严格为 M7-T06 Enemy Intent。

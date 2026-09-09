@@ -4770,3 +4770,21 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - 新设置只改变 Projection 的未来读者；既有 UtilityAI `AcceptedCombatCommand`、acceptedSequence、payload 与 Replay envelope 不重写、不删除、不重新评分。
 - 正式队友默认 Balanced/50%/Elite-Boss Priority/Emergency Only/Normal；非正式 Summon 不出现在玩家 Tactical Projection 中。
 - M7-T04 使用既有 `stableInputPoint` precondition，但完整 EventChain/Resolution/PendingReaction/Utility-evaluation quiescent 判定归 M7-T05；本任务不提前实现 UI。
+
+## DEC-219：External Input Barrier 由权威运行时状态计算并以 FIFO 分配接受顺序
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §17.1.1，M7-T05，DEC-043、DEC-052、DEC-218
+
+### 决定
+
+新增单一 `ExternalInputBarrier`，直接读取 committed `CombatState` 的 Event Scheduler、ResolutionContext 与 PendingReactionWindow，并接收 Engine-owned `utilityAiEvaluationInProgress` activity。正常外部输入仅在 Scheduler 无活动 item/queue、无 ResolutionContext 时通过；Utility scoring 期间额外阻止 Tactical Strategy/Preference。存在 unresolved Pending Reaction 时，只放行 windowId 精确匹配的 ResolveReaction；resolved window 的冲突/幂等仍交由既有 Reaction exactly-once owner 判断。
+
+`ExternalInputQueue` 为非权威待处理请求分配单调 `arrivalSequence` 并严格 FIFO 暴露队首；Barrier 拒绝时不弹出请求、不进入 `AcceptedCommandLedger`、不获得 `acceptedSequence`。队内相同 commandId+envelope 幂等，相同 ID 不同 envelope 拒绝。真正的确定性 Replay 顺序仍唯一来自 Command Boundary 分配的 acceptedSequence，而不是 UI 到达时间。
+
+### 影响与边界
+
+- `CombatSubmissionService` 与 Ask Reaction 决定复用同一 Barrier。调用方 `stableInputPoint` 仍承担 actor/turn-specific 输入资格，但不能覆盖权威 EventChain/Resolution/PendingReaction 状态。
+- 已经接受的完全相同 commandId 重试可跨关闭的 Barrier 返回 `AlreadyAccepted`，不重新跑随时间变化的 precondition，也不新增 sequence/成本；identity 冲突仍由 Command Boundary fail closed。
+- Pending FIFO 尚未成为权威事实且不进入 Replay；M10 只需持久化 acceptedCommands 与执行态，不把未接受的鼠标/UI 请求当作战斗历史。

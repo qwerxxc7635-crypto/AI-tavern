@@ -165,6 +165,7 @@ impl EnemyAiController {
                     authority: crate::CombatControlAuthority::UtilityAi,
                 }],
                 stable_input_point: true,
+                utility_ai_evaluation_in_progress: true,
                 known_ability_ids: legal.submission.known_ability_ids.clone(),
                 disabled_ability_ids: legal.submission.disabled_ability_ids.clone(),
                 legal_target_ids: legal.submission.legal_target_ids.clone(),

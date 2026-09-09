@@ -7,6 +7,7 @@ use crate::{
     CombatCommandEnvelope, CombatCommandPayload, CombatCommandSource, CombatCostAsset,
     CombatCostRequestLine, CombatState, CommandAcceptanceStatus, CostReservationError,
     CostReservationModel, CostReservationReceipt, CostReservationRequest, EntityTagFacts,
+    ExternalInputActivity, ExternalInputBarrier, ExternalInputBarrierError,
     PreconditionDefinitionError, PreconditionEvaluation, PreconditionEvaluationContext,
     PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem, PreconditionTiming,
 };
@@ -36,6 +37,7 @@ pub struct CombatSubmissionRequest {
     pub envelope: CombatCommandEnvelope,
     pub control_assignments: Vec<CombatControlAssignment>,
     pub stable_input_point: bool,
+    pub utility_ai_evaluation_in_progress: bool,
     pub known_ability_ids: Vec<String>,
     pub disabled_ability_ids: Vec<String>,
     pub legal_target_ids: Vec<String>,
@@ -55,6 +57,7 @@ pub struct CombatSubmissionAccepted {
 #[derive(Debug)]
 pub enum CombatSubmissionError {
     CommandBoundary(CombatCommandBoundaryError),
+    ExternalInputBarrier(ExternalInputBarrierError),
     PreconditionDefinition(PreconditionDefinitionError),
     PreconditionsFailed(PreconditionEvaluation),
     CostReservation(CostReservationError),
@@ -81,10 +84,53 @@ impl CombatSubmissionService {
         validate_submission_facts(&request)?;
         let mut working_state = state.clone();
         let mut working_commands = accepted_commands.clone();
-
         let command = working_commands
             .accept_external(request.envelope.clone())
             .map_err(CombatSubmissionError::CommandBoundary)?;
+        if command.status == CommandAcceptanceStatus::AlreadyAccepted {
+            let existing_reservation = working_state
+                .cost_reservations
+                .iter()
+                .find(|record| record.command_id == request.envelope.command_id);
+            if request.costs.is_empty() != existing_reservation.is_none() {
+                return Err(CombatSubmissionError::InconsistentIdempotentRetry {
+                    command_id: request.envelope.command_id,
+                });
+            }
+            let reservation = if request.costs.is_empty() {
+                None
+            } else {
+                Some(
+                    CostReservationModel::reserve(
+                        &mut working_state,
+                        CostReservationRequest {
+                            reservation_id: request.envelope.command_id.clone(),
+                            command_id: request.envelope.command_id.clone(),
+                            parent_reservation_id: request.parent_reservation_id,
+                            costs: request.costs,
+                        },
+                    )
+                    .map_err(CombatSubmissionError::CostReservation)?,
+                )
+            };
+            return Ok(CombatSubmissionAccepted {
+                command,
+                preconditions: PreconditionEvaluation {
+                    timing: PreconditionTiming::Submission,
+                    evaluated_rule_ids: vec![],
+                    failures: vec![],
+                },
+                reservation,
+            });
+        }
+        ExternalInputBarrier::validate(
+            state,
+            &request.envelope,
+            ExternalInputActivity {
+                utility_ai_evaluation_in_progress: request.utility_ai_evaluation_in_progress,
+            },
+        )
+        .map_err(CombatSubmissionError::ExternalInputBarrier)?;
         let source_controls_actor = source_controls_actor(
             &working_state,
             &request.envelope.source,
@@ -116,10 +162,7 @@ impl CombatSubmissionService {
             .cost_reservations
             .iter()
             .find(|record| record.command_id == request.envelope.command_id);
-        if (command.status == CommandAcceptanceStatus::Accepted && existing_reservation.is_some())
-            || (command.status == CommandAcceptanceStatus::AlreadyAccepted
-                && (request.costs.is_empty() != existing_reservation.is_none()))
-        {
+        if existing_reservation.is_some() {
             return Err(CombatSubmissionError::InconsistentIdempotentRetry {
                 command_id: request.envelope.command_id,
             });
@@ -318,8 +361,9 @@ mod tests {
     use crate::{
         AbilityUsageState, AcceptedCommandSource, CURRENT_COMBAT_VERSIONS,
         CombatInventoryItemState, CombatPhase, CombatRng, CombatSide, CombatantRuntime,
-        CombatantState, ObjectiveRuntimeState, ProvisionalRuntimeDelta, ReinforcementRuntimeState,
-        ResourceState, RoundRuntimeState,
+        CombatantState, EventSchedulerCheckpoint, EventSchedulerStatus, ObjectiveRuntimeState,
+        ProvisionalRuntimeDelta, ReinforcementRuntimeState, ResourceState, RoundRuntimeState,
+        SchedulerItem, SchedulerItemKind,
     };
 
     const SEED: &str = "0123456789abcdef0123456789abcdef";
@@ -434,6 +478,24 @@ mod tests {
     }
 
     #[test]
+    fn exact_retry_remains_idempotent_after_the_external_barrier_closes() {
+        let mut state = fixture_state();
+        let mut ledger = AcceptedCommandLedger::new();
+        let first = CombatSubmissionService::submit(&mut state, &mut ledger, request()).unwrap();
+        state.scheduler = Some(active_scheduler());
+        let state_before_retry = state.clone();
+        let retry = CombatSubmissionService::submit(&mut state, &mut ledger, request()).unwrap();
+        assert_eq!(
+            retry.command.status,
+            CommandAcceptanceStatus::AlreadyAccepted
+        );
+        assert_eq!(retry.command.command, first.command.command);
+        assert!(retry.preconditions.evaluated_rule_ids.is_empty());
+        assert_eq!(state, state_before_retry);
+        assert_eq!(ledger.commands().len(), 1);
+    }
+
+    #[test]
     fn utility_ai_requires_utility_control_and_zero_cost_commands_share_the_boundary() {
         let mut state = fixture_state();
         state.combatants[0].side = CombatSide::Companion;
@@ -526,6 +588,7 @@ mod tests {
                 },
             }],
             stable_input_point: true,
+            utility_ai_evaluation_in_progress: false,
             known_ability_ids: vec!["ability-strike".to_owned()],
             disabled_ability_ids: vec![],
             legal_target_ids: vec!["enemy-1".to_owned()],
@@ -547,6 +610,31 @@ mod tests {
     fn ap() -> CombatCostAsset {
         CombatCostAsset::ActionPoints {
             combatant_id: "actor-1".to_owned(),
+        }
+    }
+
+    fn active_scheduler() -> EventSchedulerCheckpoint {
+        EventSchedulerCheckpoint {
+            event_chain_id: "event-chain-active".to_owned(),
+            status: EventSchedulerStatus::Active,
+            engine_failure: None,
+            executed_event_count: 0,
+            queue: vec![],
+            current_item: Some(SchedulerItem {
+                kind: SchedulerItemKind::Trigger,
+                event_chain_id: "event-chain-active".to_owned(),
+                depth: 1,
+                phase_priority: 0,
+                explicit_priority: 0,
+                source_initiative_order: 0,
+                source_stable_id: "actor-1".to_owned(),
+                effect_stable_id: "effect-active".to_owned(),
+                sequence: 1,
+                execution_counted: false,
+            }),
+            next_sequence: 2,
+            max_trigger_depth: 8,
+            max_event_count: 64,
         }
     }
 

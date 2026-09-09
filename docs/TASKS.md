@@ -74,7 +74,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M7-T02 — Enemy AI | PASS | 2026-09-09 | M7-T01 稳定排序驱动 UtilityAi Command；统一 Submission Boundary 复验并写 acceptedCommands/replay；显式同分随机仅提交 utilityTieBreak 游标 |
 | M7-T03 — Companion AI | PASS | 2026-09-09 | 正式队友组合 Base+Personality+Player Strategy；既有非正式 Summon 不接玩家 Strategy；Player/UtilityAi source 在统一 Submission Boundary 按阵营隔离 |
 | M7-T04 — Tactical Strategy / Preference | PASS | 2026-09-09 | 五种 typed 权重预设与四类受控偏好；Player 设置经统一 Command Boundary，projection 只按 acceptedSequence 影响未来决策且保留既有 Utility command |
-| M7-T05 — External Input Stable Barrier | IN_PROGRESS | 2026-09-09 | 下一项；仅在 quiescent barrier 接受外部输入，Pending Reaction 期间只允许 ResolveReaction，保持 commandId 幂等与唯一 replay history |
+| M7-T05 — External Input Stable Barrier | PASS | 2026-09-09 | FIFO arrival queue；EventChain/Resolution/Utility evaluation 关闭相应输入；Pending Reaction 仅匹配 Resolve；阻塞项无 acceptedSequence，exact retry 跨关闭 barrier 幂等 |
+| M7-T06 — Enemy Intent | IN_PROGRESS | 2026-09-09 | 下一项；RoundStart stable point 生成中文确定性 Intent，受控 Replan 并与实际 Utility 优先类别一致 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
