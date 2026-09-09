@@ -6077,3 +6077,18 @@
 - Simulator 专项 6/6 PASS，覆盖全部要求指标精确值、3-run byte-identical 与 observation reorder、4-run RNG identity/零 cursor 隔离、配置/trace/负值/重复死亡拒绝，以及执行器第 N run 失败归因并立即停止。Core 全套 335/335 PASS。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 497 PASS、1 credential-only ignore，archive interop 双向通过。
 - M7-T01..T06 DependsOn 与 V5.2 §1.1/§11/§36 已复核；没有复制战斗规则、让 telemetry 回写 Domain 或提前实现 M8 UI，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T07 PASS；M7 Gate PASS；下一项严格为 M8-T01 Combat ViewModel / Presentation Boundary。
+
+## 2026-09-09 — M8-T01 完成 Combat ViewModel / Presentation Boundary
+
+### 只读 State/Rules 投影与单向依赖
+
+- 从 M7-T07 提交 `e333508` 创建 `task/M8-T01-combat-viewmodel-boundary`。在既有 `ember-combat-presentation` 新增 schema v1 `CombatViewModelProjector`，输入只读 CombatState、同 revision Rules snapshot 与中文展示目录，输出纯 serializable ViewModel；没有 mut State、Command submission、SQLite 或 Provider 能力。新增 `DEC-222`。
+- ViewModel 投影 phase/round/active actor、Runtime Timeline、combatants 的生命/护盾/AP/Reaction/resources/statuses、Enemy Intent 与 terminal result。Timeline 是展示顺序首要来源，State 中未列入 Timeline 的对象仅按 StableID 补齐；projection 前统一执行 CombatState invariant，过程不改变 canonical State bytes。
+- Action Rules projection 由规则层提供 legality、exact legal target IDs 与 Precondition failures；ViewModel 只验证 revision、自洽性、唯一性和引用存在后原样透传，不按敌我、Ability tag 或内容名称复制 `GetLegalTargets()`。全部 25 类 precondition failure 在 Presentation 层 exhaustive 映射为中文安全原因，ruleId/error enum 不成为玩家文案。
+- Combatant/status/action 中文展示条目与资源 catalog 缺失、重复、无中文或含控制字符均 fail closed。Core manifest 反向依赖专项确认 `combat-core` 不引用 `combat-presentation`，依赖仍固定 Presentation→Core。
+
+### 验证与结束状态
+
+- ViewModel 专项 5/5、Presentation crate 全套 11/11 PASS，覆盖权威 Timeline/active/resources/Intent/action target projection、State 零修改、name 输入反序 byte-identical、stale/self-inconsistent/unknown target Rules 拒绝、非法 State/中文目录拒绝与 manifest 依赖方向。
+- `cargo clippy -p ember-combat-presentation --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
+- M3/M4/M7 Gate 与 V5.2 §18.1/§18.4/§19 已复核；没有提前实现 M8-T02 Screen shell、布局或交互，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M8-T01 PASS；下一项严格为 M8-T02 CombatScreen Shell / Stage / Timeline。

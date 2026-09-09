@@ -6,6 +6,17 @@ use ember_combat_core::{
 };
 use serde::{Deserialize, Serialize};
 
+mod view_model;
+
+pub use view_model::{
+    COMBAT_VIEW_MODEL_SCHEMA_VERSION, CombatActionRuleProjection, CombatActionViewKind,
+    CombatActionViewModel, CombatMeterViewModel, CombatResourceViewModel,
+    CombatRulesPresentationSnapshot, CombatStatusViewModel, CombatViewModel, CombatViewModelError,
+    CombatViewModelErrorCode, CombatViewModelProjector, CombatViewModelRequest,
+    CombatantPresentationEntry, CombatantViewModel, EnemyIntentViewModel, StatusPresentationEntry,
+    TimelineEntryViewModel,
+};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum TooltipLineKind {

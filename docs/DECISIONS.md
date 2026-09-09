@@ -4828,3 +4828,23 @@ Replan 只允许 RoundStart/Stable 的 quiescent point，并要求固定原因�
 - Simulator 输出是开发/平衡 telemetry，不是 SQLite 战斗状态、BattleRecord 或玩家奖励事实，不得回写产品 Domain。
 - 每 run 的 RNG 隔离使用既有 Combat RNG contract，没有第四条 simulation RNG stream；Harness 自身不抽取规则随机数。
 - 当前为 Lightweight SHOULD 能力，不实现并行分布式仿真、AI 自动调参、动画或 Replay UI；M8 不依赖 Simulator 才能渲染战斗。
+
+## DEC-222：Combat ViewModel 是 Rules/State 与 UI 之间唯一只读投影边界
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §4.5.1.1、§18.1、§18.4、§19，M3 Gate/M4 Gate/M7 Gate/M8-T01，DEC-213
+
+### 决定
+
+扩展既有 `ember-combat-presentation`，新增版本化 `CombatViewModelProjector`。输入唯一为通过 invariant 的只读 `CombatState`、与 State revision 精确匹配的 `CombatRulesPresentationSnapshot`，以及 combatant/status 中文展示目录；输出为可序列化的纯数据 `CombatViewModel`。Projection 不持有 Core 引用，不提供 HP/AP/Status 写接口，不能提交 Command，也不写 SQLite。
+
+ViewModel 从 State 投影 phase/round/active actor、权威 Timeline 顺序、combatant HP/Shield/AP/Reaction/resources/statuses、Enemy Intent 与 terminal result，并输出固定中文标签。Combatant 的展示顺序先服从 Runtime Timeline，剩余对象仅以 StableID 补齐；不会用 UI 容器顺序改写权威 Timeline。资源名只来自 presentation catalog，combatant/status 名缺失或非中文时 fail closed。
+
+Rules snapshot 提供 action legality、legal target IDs 与结构化 precondition failures。Projector 要求 `isLegal` 与 failure set 自洽，验证 target 真实存在后原样透传；不根据 Ability tag、敌我阵营、亡灵/治疗等 UI 假设重新计算合法目标。内部 failure code 仅映射为固定中文安全原因，不进入玩家文案。Rules revision 过期、重复 action/target 或未知引用均拒绝整份 ViewModel，防止 State 与按钮状态撕裂。
+
+### 影响与边界
+
+- 依赖方向固定为 UI/Bridge→Combat Presentation→Combat Core；Core `Cargo.toml` 不得依赖 presentation，编译与 manifest test 共同守住反向依赖。
+- ViewModel 是可丢弃投影而非权威状态；UI 修改副本不产生规则效果，所有实际行为仍必须提交 Combat Command。
+- M8-T01 只建立边界与完整基础数据形状，不提前实现 CombatScreen 布局、交互状态、Tooltip、Reaction、Log 或 Theme。
