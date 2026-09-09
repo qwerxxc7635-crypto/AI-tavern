@@ -4868,3 +4868,23 @@ BattleStage 只按 ViewModel 新增的 typed `CombatantSideView` 分成 Player/C
 - M8-T02 只交付 shell/stage/timeline；Character HUD、资源、Status、Ability、Target、Reaction、Log 与 Theme Resolver 均不提前实现。
 - `CombatantSideView` 是 Presentation metadata，不是新的规则阵营；它由 Core `CombatSide` exhaustive 投影，UI 只消费。
 - CombatScreen 暂不增加独立演示路由或伪后端；产品接线必须等待真实 Combat runtime/bridge，避免写死 fixture 冒充可玩流程。
+
+## DEC-224：Combat HUD 只渲染 ViewModel 数值并保持世界资源 open vocabulary
+
+- 日期：2026-09-10
+- 状态：已采纳
+- 依据：V5.2 §3、§5、§18.3、M5 Gate/M8-T01/M8-T03，DEC-222、DEC-223
+
+### 决定
+
+`CharacterHUD` 始终从当前 `activeCombatantId` 对应的 immutable Combatant ViewModel 渲染生命、可选护盾、行动点、Reaction、世界资源与 StatusStrip。Meter 使用 ViewModel 的 current/min/max 和已生成中文文本；CSS 百分比只用于视觉宽度，不写回状态或参与规则判断。AP 保留精确文本和 aria 数值，视觉点数最多绘制 12 个后以中文显示剩余数量，避免异常大但合法的规则上限制造无界 DOM。
+
+`ResourceHUD` 不枚举或按 Theme 硬编码资源槽，而是按 ViewModel 的 ordered resources open vocabulary 渲染。Fantasy 的 Mana/Stamina、Sci-Fi 的 Energy/Heat、Cultivation 的 Qi/Spirit Sense、Urban 的 Stamina/Focus 均由 WorldProfile→State→Presentation catalog 得到中文 label；Heat 的 threshold 与 `isOverheated` 同样由 ViewModel 提供，React 不重算 recharge/overheat lifecycle。
+
+`StatusStrip` 只显示 projected status display name、stack count 与通用 remaining clock count；不从名字推断 Control、Tick 或 duration semantics。空资源/空状态有中文安全占位。所有 HUD 组件为无按钮的 presentation components，不持有编辑回调或 Core mutation capability。
+
+### 影响与边界
+
+- M8-T03 不实现 Cost Preview、Ability disabled logic、Target Selection、Reaction Prompt 或 Tooltip；这些保留给 M8-T04..T07。
+- Shield 仅在 maximum>0 时占用 HUD 行，但数值仍来自 ViewModel；没有为四 Profile 复制 HUD 组件。
+- 四 Profile 的差异资源通过同一 ResourceHUD 参数化测试，后续 Theme 只改变外观而不改变资源语义或顺序。

@@ -6107,3 +6107,18 @@
 - CombatScreen jsdom 专项 5/5 PASS，覆盖 Timeline 顺序/current/extra turn、typed side 分组、可选 Neutral、零假按钮、替换 revision 无 local stale state，以及三个基础组件独立复用。ViewModel 5/5 与 Presentation crate 11/11 回归通过。
 - TypeScript noEmit、ESLint、Prettier、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1143 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T01 DependsOn 与 V5.2 §18.2/§18.3/§19/§20.1 已复核；同一组件可由四 Theme semantic tokens 承载，没有提前实现 M8-T03 HUD 或 M9 Theme package，无 SPEC BLOCKER。UI styling skill 用于语义结构、focus/current 可感知性、响应式布局与 reduced-motion 校准；用户 `.gitignore` 保持未纳入提交。M8-T02 PASS；下一项严格为 M8-T03 HUD / AP / Resources / Status。
+
+## 2026-09-10 — M8-T03 完成 HUD / AP / Resources / Status
+
+### Active CharacterHUD 与四 Profile 差异资源
+
+- 从 M8-T02 提交 `874bcba` 创建 `task/M8-T03-combat-hud`。在同一 CombatScreen 底部新增可独立复用的 `CharacterHUD`、`ResourceHUD`、`StatusStrip`，全部只消费 M8-T01 serialized ViewModel；新增 `DEC-224`。当前 active combatant 变化时随整个 ViewModel replacement 更新，不建立 UI local combat state。
+- CharacterHUD 显示中文身份/状态、生命、可选护盾、精确 AP 与 Reaction。Meter 暴露 role/value aria；视觉 AP 点最多 12 个并对更大合法上限显示“另有 N 点”，避免无界 DOM，同时精确 `current/maximum` 文本不丢失。
+- ResourceHUD 按 ViewModel ordered open resource list 输出 label/current/max，不根据 Theme 复制组件。专项覆盖 Fantasy Mana/Stamina、Sci-Fi Energy/Heat、Cultivation Qi/Spirit Sense、Urban Stamina/Focus 中文映射；Heat 显示 projected overheat threshold 与 `isOverheated`，React 不计算 lifecycle。
+- StatusStrip 显示中文状态名、stack count 和 remaining clock count，Permanent 使用“持续生效”，空集合显示“无状态”。没有依据名称推断 control/tick/expiry，也没有状态编辑或规则写入入口。
+
+### 验证与结束状态
+
+- CombatScreen/HUD jsdom 专项扩展至 12/12 PASS，新增 active HUD 全字段、四 Profile 资源参数化、Heat threshold/overheat、空 Status 与独立组件零按钮测试；原 Timeline/Stage 5 项全部回归通过。
+- TypeScript noEmit、ESLint、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1150 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T01/M5 Gate 与 V5.2 §3/§5/§18.3 已复核；没有提前实现 Ability/Target/Cost Preview/Reaction/Tooltip 或 Theme package，无 SPEC BLOCKER。UI styling skill 用于 meter/status 语义、可读层级、响应式 HUD 与有界 DOM；用户 `.gitignore` 保持未纳入提交。M8-T03 PASS；下一项严格为 M8-T04 ActionBar / AbilitySlot / EndTurn。

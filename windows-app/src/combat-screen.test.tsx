@@ -3,8 +3,20 @@
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { BattleStage, CombatScreen, CombatantView, TurnTimeline } from './combat-screen.js';
-import type { CombatScreenShellViewModel, CombatantStageViewModel } from './combat-screen.js';
+import {
+  BattleStage,
+  CharacterHUD,
+  CombatScreen,
+  CombatantView,
+  ResourceHUD,
+  StatusStrip,
+  TurnTimeline,
+} from './combat-screen.js';
+import type {
+  CombatResourceViewModel,
+  CombatScreenShellViewModel,
+  CombatantStageViewModel,
+} from './combat-screen.js';
 
 afterEach(cleanup);
 
@@ -45,6 +57,7 @@ describe('CombatScreen shell', () => {
       sideLabelZhCn: '中立',
       stateLabelZhCn: '可行动',
       isActiveTurn: false,
+      ...hud(),
     };
     const model = viewModel();
     render(<CombatScreen viewModel={{ ...model, combatants: [...model.combatants, neutral] }} />);
@@ -93,6 +106,57 @@ describe('CombatScreen shell', () => {
     view.rerender(<CombatantView combatant={hero} />);
     expect(screen.getByRole('article', { name: '旅者，我方主角，可行动' })).toBeTruthy();
   });
+
+  it('renders exact active-character meters, AP, reaction, resources, and statuses', () => {
+    render(<CombatScreen viewModel={viewModel()} />);
+
+    const panel = screen.getByRole('region', { name: '旅者的战斗状态' });
+    expect(
+      within(panel).getByRole('meter', { name: '生命：30/40' }).getAttribute('aria-valuenow'),
+    ).toBe('30');
+    expect(within(panel).getByRole('meter', { name: '护盾：4/10' })).toBeTruthy();
+    expect(within(panel).getByLabelText('行动点：2/3').getAttribute('data-current')).toBe('2');
+    expect(within(panel).getByLabelText('反应次数：1/1')).toBeTruthy();
+    expect(within(panel).getByText('法力：6/10')).toBeTruthy();
+    expect(within(panel).getByText('燃烧')).toBeTruthy();
+    expect(within(panel).getByText('2 层')).toBeTruthy();
+    expect(within(panel).getByText('剩余 1 次计时')).toBeTruthy();
+  });
+
+  it.each([
+    ['西幻', ['法力', '体力']],
+    ['科幻', ['能量', '热量']],
+    ['修仙', ['灵力', '神识']],
+    ['都市', ['体力', '专注']],
+  ])('uses ViewModel-provided labels for the %s resource profile', (_profile, labels) => {
+    const resources = labels.map((label, index) => resource(`resource-${String(index)}`, label));
+    render(<ResourceHUD resources={resources} />);
+
+    for (const label of labels) expect(screen.getByText(label)).toBeTruthy();
+  });
+
+  it('marks projected pressure state and handles an empty status strip', () => {
+    const heat = {
+      ...resource('heat', '热量'),
+      current: 80,
+      isOverheated: true,
+      textZhCn: '热量：80/100',
+    };
+    const view = render(<ResourceHUD resources={[heat]} />);
+    expect(screen.getByText('已过热')).toBeTruthy();
+    expect(screen.getByText('过热阈值：80')).toBeTruthy();
+    expect(screen.getByText('热量').closest('li')?.getAttribute('data-overheated')).toBe('true');
+
+    view.rerender(<StatusStrip statuses={[]} />);
+    expect(screen.getByText('无状态')).toBeTruthy();
+  });
+
+  it('keeps HUD components presentational and independently reusable', () => {
+    const hero = requiredAt(viewModel().combatants, 1);
+    render(<CharacterHUD combatant={hero} />);
+    expect(screen.getByRole('region', { name: '世界资源' })).toBeTruthy();
+    expect(screen.queryAllByRole('button')).toHaveLength(0);
+  });
 });
 
 function viewModel(): CombatScreenShellViewModel {
@@ -130,6 +194,7 @@ function viewModel(): CombatScreenShellViewModel {
         sideLabelZhCn: '敌方',
         stateLabelZhCn: '可行动',
         isActiveTurn: false,
+        ...hud(),
       },
       {
         combatantId: 'hero',
@@ -138,6 +203,7 @@ function viewModel(): CombatScreenShellViewModel {
         sideLabelZhCn: '我方主角',
         stateLabelZhCn: '可行动',
         isActiveTurn: true,
+        ...hud(),
       },
       {
         combatantId: 'enemy-a',
@@ -146,6 +212,7 @@ function viewModel(): CombatScreenShellViewModel {
         sideLabelZhCn: '敌方',
         stateLabelZhCn: '倒地',
         isActiveTurn: false,
+        ...hud(),
       },
     ],
   };
@@ -155,4 +222,36 @@ function requiredAt<T>(values: readonly T[], index: number): T {
   const value = values[index];
   if (value === undefined) throw new Error(`Missing fixture index ${String(index)}`);
   return value;
+}
+
+function hud() {
+  return {
+    health: { current: 30, maximum: 40, textZhCn: '生命：30/40' },
+    shield: { current: 4, maximum: 10, textZhCn: '护盾：4/10' },
+    actionPoints: { current: 2, maximum: 3, textZhCn: '行动点：2/3' },
+    reactionCharges: { current: 1, maximum: 1, textZhCn: '反应次数：1/1' },
+    resources: [resource('mana', '法力')],
+    statuses: [
+      {
+        statusInstanceId: 'status-burning-1',
+        statusDefinitionId: 'status.burning',
+        displayNameZhCn: '燃烧',
+        stackCount: 2,
+        remainingDuration: 1,
+      },
+    ],
+  } as const;
+}
+
+function resource(resourceId: string, labelZhCn: string): CombatResourceViewModel {
+  return {
+    resourceId,
+    labelZhCn,
+    current: resourceId === 'mana' ? 6 : 5,
+    minimum: 0,
+    maximum: resourceId === 'heat' ? 100 : 10,
+    overheatThreshold: resourceId === 'heat' ? 80 : null,
+    isOverheated: false,
+    textZhCn: `${labelZhCn}：${resourceId === 'mana' ? '6' : '5'}/${resourceId === 'heat' ? '100' : '10'}`,
+  };
 }
