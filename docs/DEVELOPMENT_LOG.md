@@ -5986,3 +5986,18 @@
 - 定向 Rust 测试 6/6 PASS，覆盖输入顺序无关的结果/序列化字节、CombatState/RNG 零变更、HP/Shield 缺口、八项 breakdown 精确值、四类输入 layer/intent filter、稳定四键 tie-break，以及 malformed layer/candidate/state 拒绝。
 - `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 464 PASS、1 credential-only ignore，archive interop 双向通过。
 - M4 Gate/M5 Gate DependsOn 与 V5.2 §12 已复核；没有提前实现 Enemy Command、Companion control、五策略 accepted command 或 Enemy Intent lifecycle，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T01 PASS；下一项严格为 M7-T02 Enemy AI。
+
+## 2026-09-09 — M7-T02 完成 Enemy AI
+
+### Utility 决策到 accepted command
+
+- 从 M7-T01 提交 `a6eb79c` 创建 `task/M7-T02-enemy-ai`。新增 Core-owned `EnemyAiController`：只消费 CombatState、上游 legal command facts 与 M7-T01 typed profile layers，没有 LLM/provider、系统时间或系统随机入口；新增 `DEC-216`。
+- M7-T01 的稳定候选首项转换为 `UtilityAi + UseAbility` envelope，并唯一经过既有 `CombatSubmissionService`。控制权、稳定输入点、actor、ability、target、precondition 与 cost 均在接受前重验；成功命令进入 `AcceptedCommandLedger`，可由原命令生成并校验 Replay envelope。
+- 默认同分严格服从 `totalScore DESC → tacticalPriority DESC → abilityId ASC → targetId ASC` 且 RNG 零消费。只有 profile 显式允许且顶部 `totalScore + tacticalPriority` 完全同分时，才从稳定顶部组消费 `utilityTieBreak`；输入 Vec 反序不改变选项或 cursor，initiative/resolution streams 不变。
+- RNG 从 `CombatState.rng` 本地恢复并延后提交；Submission 失败不写新 snapshot。既有 Submission 自身使用 working State/Ledger，因此评分、命令复验或成本失败均保持 CombatState、acceptedCommands 与所有 RNG cursor 原子不变。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 5/5 PASS，覆盖默认 stable ID tie-break 与 replay、显式同分随机及输入顺序无关、非同分 RNG 零消费、提交复验失败的 State/Ledger/RNG 回滚、Intent 过滤为空零接受。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 469 PASS、1 credential-only ignore，archive interop 双向通过。
+- M7-T01/M1-T06 DependsOn 与 V5.2 §12 已复核；没有提前实现 Companion AI、玩家五策略 Command、Enemy Intent 或 Simulator，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T02 PASS；下一项严格为 M7-T03 Companion AI。

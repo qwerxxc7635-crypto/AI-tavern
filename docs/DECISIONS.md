@@ -4716,3 +4716,21 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - M7-T01 只拥有共享评分和排序，不调用 LLM，不决定 Enemy/Companion 控制权，也不写 acceptedCommands；这些分别归 M7-T02/M7-T03。
 - Strategy/Preference 的五种产品预设与 accepted input barrier 归 M7-T04；当前 evaluator 只消费已经解析的 typed weight layer。
 - Intent plan 的 RoundStart 生成、replan 与可见状态归 M7-T05，不在 evaluator 内引入特殊时点。
+
+## DEC-216：Enemy AI 通过统一 Submission Boundary 原子提交 Utility 决策
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §12、§17.1，M7-T02，DEC-025、DEC-033、DEC-215
+
+### 决定
+
+`EnemyAiController` 只接收上游枚举出的 `EnemyAiLegalCommand[]`，调用共享 `SharedUtilityEvaluator` 建立稳定候选序列，再把选中项转换为 `CombatCommandSource::UtilityAi + UseAbility` envelope。实际接受仍唯一经过既有 `CombatSubmissionService`，由同一 Command Boundary 重验版本、控制权、稳定输入点、actor、ability、target、preconditions 与 costs；成功项进入 `AcceptedCommandLedger`，并使用 ledger 既有 `replay_envelope()` 合同重放。
+
+默认取稳定排序首项且不消费 RNG。只有开发者 profile 显式设置 `randomEqualScoreTieBreak`、且最高候选的 `totalScore + tacticalPriority` 完全相同时，才在已经稳定排序的顶部同分组使用 `utilityTieBreak`。RNG 从 `CombatState.rng` 恢复；只有 Submission 成功后才把新 snapshot 写回 State，任何输入、评分或提交失败都保持 State、acceptedCommands 与所有 RNG cursor 不变。
+
+### 影响与边界
+
+- Controller 没有 LLM/provider 接口，不接受系统时间、系统随机或未版本化随机源。
+- M7-T02 只实现 Enemy 的实时 Ability Command 决策；Companion/Summon profile 组合与玩家策略属于 M7-T03/M7-T04，Enemy Intent lifecycle 属于 M7-T06。
+- `EnemyAiSubmissionFacts` 是当次 legality 枚举的随附证据，不形成第二套命令边界或持久真相；SQLite/后续 BattleRecord 仍保存统一 accepted command history。

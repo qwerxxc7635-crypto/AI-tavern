@@ -16,6 +16,7 @@ mod damage_bundle;
 mod damage_channel;
 mod effect;
 mod encounter;
+mod enemy_ai;
 mod execution;
 mod exploit_validator;
 mod fantasy;
@@ -108,6 +109,10 @@ pub use effect::{
 pub use encounter::{
     CommittedEncounterEvent, EncounterDamageRule, EncounterDamageServices, EncounterRuleError,
     EncounterRuleErrorCode, EncounterRuleExecutor, ReinforcementActivationCommit,
+};
+pub use enemy_ai::{
+    EnemyAiController, EnemyAiDecision, EnemyAiDecisionError, EnemyAiDecisionRequest,
+    EnemyAiLegalCommand, EnemyAiSubmissionFacts,
 };
 pub use execution::{
     AbilityUsageCommitPlan, ExecutionRevalidationError, ExecutionRevalidationOutcome,
