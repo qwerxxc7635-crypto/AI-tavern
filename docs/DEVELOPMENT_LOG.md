@@ -5971,3 +5971,18 @@
 - 定向 Vitest 2 files / 9 tests PASS，其中新增 5 项覆盖完整 user flow、后台原子自动接受与时间变化重试、Gate E 缺项零写入、Domain failure rollback、policy 隔离及 stored envelope 篡改拒绝；既有 generic Candidate 回归同时通过。
 - TypeScript noEmit、ESLint、Prettier 与 `git diff --check` PASS。未修改的完整 `pnpm check` 最终 PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 458 PASS、1 credential-only ignore，archive interop 双向通过。此前两次默认并发尝试分别出现既有测试超时/worker 启动饥饿；相关单测独立复跑通过，未放宽测试超时或门禁配置，最终全量以原命令明确 exit 0。
 - M6-T06/M6-T07 DependsOn 与 V5.2 §14.1/Phase E 已复核；M6-T01..T08 的 Existing Orchestrator→Concept→Mapping/Exposure/Budget/Validation→Tooltip/Flavor→Candidate/Domain Transaction 合同闭环，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M6 Gate / Gate E PASS；下一项严格为 M7-T01 Shared Utility Evaluator。
+
+## 2026-09-09 — M7-T01 完成 Shared Utility Evaluator
+
+### Integer score breakdown 与确定性排序
+
+- 从 M6-T08 提交 `10e3ffd` 创建 `task/M7-T01-shared-utility-evaluator`。新增 Core-owned `SharedUtilityEvaluator`，输入只读 CombatState、legal commands、Base Utility Profile、personality、可选 strategy、受控 preferences 与 intent constraints；没有 LLM、系统时间、浮点或 RNG 入口。新增 `DEC-215`。
+- 每个候选输出 Damage/Kill/Control/Heal/Defense/Resource/Risk/Intent 八项整数 breakdown 与 checked total。Damage/Heal/Defense/Resource 按当前 HP/Shield/resource 缺口限制有效收益，Kill 从 committed current HP 与 projected damage 计算；basis-points control/risk、tag preference 与 intent category 均有 typed owner。
+- Base+Personality+Strategy 以 scale 100 的有界整数权重组合。非法/重复 Candidate、未知或非 Active actor、未知 target、非 canonical tags/category constraints、非法权重与 invariant-invalid CombatState 全部 fail closed；allowed intent category 可在同一评分入口过滤已合法候选。
+- 排序严格固定 `UtilityScore DESC → TacticalPriority DESC → AbilityStableID ASC → TargetStableID ASC`，不依赖输入 Vec 顺序。Evaluator 只返回稳定 scored commands，不提前提交 Enemy/Companion Command，也不实现 utilityTieBreak random。
+
+### 验证与结束状态
+
+- 定向 Rust 测试 6/6 PASS，覆盖输入顺序无关的结果/序列化字节、CombatState/RNG 零变更、HP/Shield 缺口、八项 breakdown 精确值、四类输入 layer/intent filter、稳定四键 tie-break，以及 malformed layer/candidate/state 拒绝。
+- `cargo clippy -p ember-combat-core --all-targets -- -D warnings`、Rustfmt 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 192 files / 1138 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 464 PASS、1 credential-only ignore，archive interop 双向通过。
+- M4 Gate/M5 Gate DependsOn 与 V5.2 §12 已复核；没有提前实现 Enemy Command、Companion control、五策略 accepted command 或 Enemy Intent lifecycle，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M7-T01 PASS；下一项严格为 M7-T02 Enemy AI。

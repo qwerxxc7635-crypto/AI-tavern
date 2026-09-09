@@ -4696,3 +4696,23 @@ AI 层只接受严格的 `AiCombatFlavor { displayName, flavorDescription, lore 
 - Candidate payload 使用严格版本化 envelope 保存 submission policy 与 approved definition；用户 API 不能对后台候选执行 Preview/Edit/Confirm，也不能让用户候选绕过显式 Confirm。
 - SQLite 仍是 Candidate 与 Domain 事实的唯一持久真相；内存 Preview 状态不参与提交权限。
 - 本任务关闭 Gate E 的 Candidate/Commit policy，但不提前实现 M7 Utility AI、M8 Combat UI 或 M10 Active Combat persistence。
+
+## DEC-215：Shared Utility Evaluator 使用整数分项与稳定四键排序
+
+- 日期：2026-09-09
+- 状态：已采纳
+- 依据：V5.2 §12，M4 Gate/M5 Gate/M7-T01
+
+### 决定
+
+`SharedUtilityEvaluator` 是 Enemy/Companion/Summon 共用的纯规则评分入口。输入固定为已通过上游 legality 的 `LegalUtilityCommand[]`、只读 `CombatState`、`BaseUtilityProfile`、`UtilityPersonality`、可选 `UtilityStrategy`、受控 tag preferences 与 `UtilityIntentConstraints`。权重采用整数 scale 100，personality 与 strategy 只做有界加法调整并 clamp 到非负上限；禁止浮点、系统时间和 RNG。
+
+每个候选产生显式 `DamageScore/KillScore/ControlScore/HealScore/DefenseScore/ResourceScore/RiskScore/IntentScore`。Damage/Heal/Defense/Resource 先按当前目标的 HP、Shield 或资源缺口截断有效收益；Kill 只由当前 HP 与 projected damage 确定；Control/Risk 使用 basis points；preferences 与 intent category 只进入 IntentScore。所有乘加 checked，溢出、非法 CombatState、重复 identity、未知 combatant、非 canonical tags/layers 一律拒绝。
+
+输出排序唯一为 `totalScore DESC → tacticalPriority DESC → abilityId ASC → targetId ASC`。输入容器顺序不参与结果；Evaluator 不接收 RNG，也不产生/提交 Command。开发者若在后续 Profile 明确启用随机同分，只能在这份稳定排序建立后由 M7-T02 使用 `utilityTieBreak` channel。
+
+### 影响与边界
+
+- M7-T01 只拥有共享评分和排序，不调用 LLM，不决定 Enemy/Companion 控制权，也不写 acceptedCommands；这些分别归 M7-T02/M7-T03。
+- Strategy/Preference 的五种产品预设与 accepted input barrier 归 M7-T04；当前 evaluator 只消费已经解析的 typed weight layer。
+- Intent plan 的 RoundStart 生成、replan 与可见状态归 M7-T05，不在 evaluator 内引入特殊时点。

@@ -70,7 +70,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M6-T07 — Mechanical Tooltip / AI Flavor Separation | PASS | 2026-09-09 | 独立 presentation crate 从 Approved Definition/stable IDs 投影全部机械行；AI 仅能提供中文 displayName/flavorDescription/lore，机械宣称与明显冲突 fail closed |
 | M6-T08 — Candidate / Commit Policy | PASS | 2026-09-09 | Combat policy 强制完整 Gate E validation receipt；USER_REQUESTED 预览/修订/确认，BACKGROUND 同一 SQLite 事务自动接受+Domain Commit，重试幂等 |
 | M6 Gate — Gate E AI Content Pipeline | PASS | 2026-09-09 | M6-T01..T08 独立验收；既有 Orchestrator→Concept→Mapper/Exposure/Budget/Exploit→Tooltip/Flavor→Candidate/Domain Transaction 闭环 |
-| M7-T01 — Shared Utility Evaluator | IN_PROGRESS | 2026-09-09 | 下一项；按 CombatState/legal commands/profile/personality/strategy/intent constraints 做确定性评分 |
+| M7-T01 — Shared Utility Evaluator | PASS | 2026-09-09 | integer-only 八类 score breakdown；组合 profile/personality/strategy/preferences/intent；按 total/tactical/ability/target 稳定排序且不消费 RNG |
+| M7-T02 — Enemy AI | IN_PROGRESS | 2026-09-09 | 下一项；不调用回合内 LLM，只把合法 Utility 选择提交统一 Command Boundary 并支持 replay |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

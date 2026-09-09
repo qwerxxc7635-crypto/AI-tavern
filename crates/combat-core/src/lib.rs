@@ -45,6 +45,7 @@ mod terminal;
 mod trigger;
 mod turn;
 mod urban;
+mod utility;
 mod version;
 mod world_profile;
 
@@ -252,6 +253,13 @@ pub use urban::{
     UrbanBalanceConfig, UrbanHealingDecision, UrbanHealingSource, UrbanOwnerTurnRecovery,
     UrbanProfile, UrbanRuleError, UrbanRuleErrorCode, UrbanSubProfile, UrbanTacticalAction,
     UrbanTacticalRecovery,
+};
+pub use utility::{
+    BaseUtilityProfile, LegalUtilityCommand, SharedUtilityEvaluator, UtilityActionCategory,
+    UtilityCandidateProjection, UtilityEvaluationError, UtilityEvaluationErrorCode,
+    UtilityEvaluationRequest, UtilityEvaluationResult, UtilityIntentConstraints,
+    UtilityPersonality, UtilityPreferences, UtilityScoreBreakdown, UtilityScoredCommand,
+    UtilityStrategy, UtilityWeightAdjustments, UtilityWeights,
 };
 pub use version::{
     CURRENT_COMBAT_VERSIONS, CombatVersion, CombatVersionField, CombatVersionSet,
