@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, error::Error, fmt};
 
 use ember_combat_core::{
     CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateInvariantValidator,
-    CombatantState, PreconditionFailure, PreconditionFailureCode,
+    CombatVersionSet, CombatantState, PreconditionFailure, PreconditionFailureCode,
 };
 use serde::{Deserialize, Serialize};
 
@@ -49,6 +49,7 @@ pub struct CombatActionRuleProjection {
     pub is_legal: bool,
     pub legal_target_ids: Vec<String>,
     pub failures: Vec<PreconditionFailure>,
+    pub ability_usage: Option<CombatAbilityUsageViewModel>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,6 +142,17 @@ pub struct CombatActionViewModel {
     pub enabled: bool,
     pub legal_target_ids: Vec<String>,
     pub disabled_reasons_zh_cn: Vec<String>,
+    pub ability_usage: Option<CombatAbilityUsageViewModel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatAbilityUsageViewModel {
+    pub cooldown_remaining: i64,
+    pub uses_this_normal_owner_turn: i64,
+    pub max_uses_per_normal_owner_turn: Option<i64>,
+    pub uses_this_battle: i64,
+    pub max_uses_per_battle: Option<i64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,6 +160,7 @@ pub struct CombatActionViewModel {
 pub struct CombatViewModel {
     pub schema_version: u32,
     pub combat_instance_id: String,
+    pub versions: CombatVersionSet,
     pub state_revision: u64,
     pub phase_label_zh_cn: String,
     pub round_number: u64,
@@ -355,6 +368,7 @@ impl<'a> CombatViewModelProjector<'a> {
         Ok(CombatViewModel {
             schema_version: COMBAT_VIEW_MODEL_SCHEMA_VERSION,
             combat_instance_id: request.state.combat_instance_id.clone(),
+            versions: request.state.versions,
             state_revision: request.state.revision,
             phase_label_zh_cn: phase_label(request.state.phase).to_owned(),
             round_number: request.state.round.round_number,
@@ -393,6 +407,7 @@ fn project_actions(
                 || action.is_legal != action.failures.is_empty()
                 || (action.is_legal && action.requires_target && action.legal_target_ids.is_empty())
                 || (!action.is_legal && !action.legal_target_ids.is_empty())
+                || !valid_ability_usage(action.kind, action.ability_usage.as_ref())
             {
                 return Err(view_error(
                     CombatViewModelErrorCode::InvalidRulesProjection,
@@ -424,9 +439,42 @@ fn project_actions(
                 enabled: action.is_legal,
                 legal_target_ids: action.legal_target_ids.clone(),
                 disabled_reasons_zh_cn: reasons,
+                ability_usage: action.ability_usage.clone(),
             })
         })
         .collect()
+}
+
+fn valid_ability_usage(
+    kind: CombatActionViewKind,
+    usage: Option<&CombatAbilityUsageViewModel>,
+) -> bool {
+    match (kind, usage) {
+        (CombatActionViewKind::Ability, Some(usage)) => {
+            usage.cooldown_remaining >= 0
+                && usage.uses_this_normal_owner_turn >= 0
+                && usage.uses_this_battle >= 0
+                && usage
+                    .max_uses_per_normal_owner_turn
+                    .is_none_or(|maximum| maximum >= usage.uses_this_normal_owner_turn)
+                && usage
+                    .max_uses_per_battle
+                    .is_none_or(|maximum| maximum >= usage.uses_this_battle)
+        }
+        (CombatActionViewKind::Ability, None) => false,
+        (
+            CombatActionViewKind::EndTurn
+            | CombatActionViewKind::Escape
+            | CombatActionViewKind::Reaction,
+            None,
+        ) => true,
+        (
+            CombatActionViewKind::EndTurn
+            | CombatActionViewKind::Escape
+            | CombatActionViewKind::Reaction,
+            Some(_),
+        ) => false,
+    }
 }
 
 fn presentation_combatant_order(state: &CombatState) -> Vec<String> {
@@ -639,6 +687,14 @@ mod tests {
         assert_eq!(view.actions[0].legal_target_ids, ["hero", "enemy"]);
         assert!(view.actions[0].enabled);
         assert_eq!(view.actions[1].disabled_reasons_zh_cn, ["技能仍在冷却"]);
+        assert_eq!(
+            view.actions[1]
+                .ability_usage
+                .as_ref()
+                .expect("ability usage is projected")
+                .cooldown_remaining,
+            2
+        );
         assert_eq!(state.canonical_json_bytes().unwrap(), state_before);
     }
 
@@ -698,6 +754,25 @@ mod tests {
                 .unwrap_err()
                 .code,
             CombatViewModelErrorCode::UnknownRulesReference
+        );
+
+        let mut invalid_usage = rules(state.revision);
+        invalid_usage.actions[0]
+            .ability_usage
+            .as_mut()
+            .expect("ability usage fixture exists")
+            .uses_this_normal_owner_turn = 1;
+        invalid_usage.actions[0]
+            .ability_usage
+            .as_mut()
+            .expect("ability usage fixture exists")
+            .max_uses_per_normal_owner_turn = Some(0);
+        assert_eq!(
+            projector
+                .project(&request(&state, &invalid_usage, &names))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
         );
     }
 
@@ -785,6 +860,13 @@ mod tests {
                     is_legal: true,
                     legal_target_ids: vec!["hero".to_owned(), "enemy".to_owned()],
                     failures: vec![],
+                    ability_usage: Some(CombatAbilityUsageViewModel {
+                        cooldown_remaining: 0,
+                        uses_this_normal_owner_turn: 0,
+                        max_uses_per_normal_owner_turn: Some(2),
+                        uses_this_battle: 1,
+                        max_uses_per_battle: None,
+                    }),
                 },
                 CombatActionRuleProjection {
                     action_id: "ability.cooldown".to_owned(),
@@ -798,6 +880,13 @@ mod tests {
                         code: PreconditionFailureCode::CooldownActive,
                         subject_id: Some("ability.cooldown".to_owned()),
                     }],
+                    ability_usage: Some(CombatAbilityUsageViewModel {
+                        cooldown_remaining: 2,
+                        uses_this_normal_owner_turn: 1,
+                        max_uses_per_normal_owner_turn: Some(1),
+                        uses_this_battle: 1,
+                        max_uses_per_battle: Some(3),
+                    }),
                 },
             ],
         }

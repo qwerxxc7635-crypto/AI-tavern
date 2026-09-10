@@ -1,3 +1,11 @@
+import { useId } from 'react';
+
+import type {
+  CombatCommandEnvelope,
+  CombatCommandPayload,
+  CombatVersionSet,
+} from '@ember-tavern/contracts';
+
 import './combat-screen.css';
 
 export type CombatantSideView = 'PLAYER' | 'COMPANION' | 'HOSTILE' | 'NEUTRAL';
@@ -49,17 +57,51 @@ export interface CombatStatusViewModel {
   readonly remainingDuration: number | null;
 }
 
+export type CombatActionViewKind = 'ABILITY' | 'END_TURN' | 'ESCAPE' | 'REACTION';
+
+export interface CombatAbilityUsageViewModel {
+  readonly cooldownRemaining: number;
+  readonly usesThisNormalOwnerTurn: number;
+  readonly maxUsesPerNormalOwnerTurn: number | null;
+  readonly usesThisBattle: number;
+  readonly maxUsesPerBattle: number | null;
+}
+
+export interface CombatActionViewModel {
+  readonly actionId: string;
+  readonly displayNameZhCn: string;
+  readonly kind: CombatActionViewKind;
+  readonly enabled: boolean;
+  readonly legalTargetIds: readonly string[];
+  readonly disabledReasonsZhCn: readonly string[];
+  readonly abilityUsage: CombatAbilityUsageViewModel | null;
+}
+
 export interface CombatScreenShellViewModel {
   readonly combatInstanceId: string;
+  readonly versions: CombatVersionSet;
   readonly stateRevision: number;
   readonly phaseLabelZhCn: string;
   readonly roundLabelZhCn: string;
   readonly activeCombatantId: string | null;
   readonly timeline: readonly CombatTimelineEntryViewModel[];
   readonly combatants: readonly CombatantStageViewModel[];
+  readonly actions: readonly CombatActionViewModel[];
 }
 
-export function CombatScreen({ viewModel }: { readonly viewModel: CombatScreenShellViewModel }) {
+export interface CombatCommandPort {
+  readonly createCommand: (payload: CombatCommandPayload) => CombatCommandEnvelope;
+  readonly submitCommand: (command: CombatCommandEnvelope) => void;
+  readonly onAbilitySelected: (actionId: string) => void;
+}
+
+export function CombatScreen({
+  viewModel,
+  commandPort,
+}: {
+  readonly viewModel: CombatScreenShellViewModel;
+  readonly commandPort: CombatCommandPort;
+}) {
   const party = viewModel.combatants.filter(
     (combatant) => combatant.side === 'PLAYER' || combatant.side === 'COMPANION',
   );
@@ -96,6 +138,8 @@ export function CombatScreen({ viewModel }: { readonly viewModel: CombatScreenSh
           combatant={requiredCombatant(viewModel.combatants, viewModel.activeCombatantId)}
         />
       )}
+
+      <ActionBar actions={viewModel.actions} commandPort={commandPort} />
     </main>
   );
 }
@@ -217,6 +261,98 @@ export function CharacterHUD({ combatant }: { readonly combatant: CombatantStage
       <StatusStrip statuses={combatant.statuses} />
     </section>
   );
+}
+
+export function ActionBar({
+  actions,
+  commandPort,
+}: {
+  readonly actions: readonly CombatActionViewModel[];
+  readonly commandPort: CombatCommandPort;
+}) {
+  const abilities = actions.filter((action) => action.kind === 'ABILITY');
+  const endTurn = actions.find((action) => action.kind === 'END_TURN');
+  return (
+    <section className="action-bar" aria-label="战斗行动">
+      <div className="action-bar__abilities" role="group" aria-label="技能">
+        {abilities.map((action) => (
+          <AbilitySlot
+            key={action.actionId}
+            action={action}
+            onSelected={commandPort.onAbilitySelected}
+          />
+        ))}
+      </div>
+      {endTurn === undefined ? null : (
+        <button
+          type="button"
+          className="action-bar__end-turn"
+          disabled={!endTurn.enabled}
+          aria-label={endTurn.displayNameZhCn}
+          onClick={() => {
+            commandPort.submitCommand(commandPort.createCommand({ kind: 'END_TURN' }));
+          }}
+        >
+          <strong>{endTurn.displayNameZhCn}</strong>
+          <span>{endTurn.enabled ? '结束当前回合' : endTurn.disabledReasonsZhCn.join('；')}</span>
+        </button>
+      )}
+    </section>
+  );
+}
+
+export function AbilitySlot({
+  action,
+  onSelected,
+}: {
+  readonly action: CombatActionViewModel;
+  readonly onSelected: (actionId: string) => void;
+}) {
+  const reasonId = useId();
+  if (action.kind !== 'ABILITY' || action.abilityUsage === null) {
+    throw new Error('AbilitySlot requires an ability action');
+  }
+  const usage = action.abilityUsage;
+  const usageLines = abilityUsageLines(usage);
+  return (
+    <div className="ability-slot" data-action-id={action.actionId}>
+      <button
+        type="button"
+        disabled={!action.enabled}
+        aria-label={action.displayNameZhCn}
+        aria-describedby={action.enabled ? undefined : reasonId}
+        onClick={() => {
+          onSelected(action.actionId);
+        }}
+      >
+        <strong>{action.displayNameZhCn}</strong>
+        <span>{usage.cooldownRemaining > 0 ? `冷却 ${usage.cooldownRemaining}` : '可以使用'}</span>
+      </button>
+      <div className="ability-slot__usage" aria-label={`${action.displayNameZhCn}使用情况`}>
+        {usageLines.map((line) => (
+          <small key={line}>{line}</small>
+        ))}
+      </div>
+      {action.enabled ? null : (
+        <ul id={reasonId} className="ability-slot__reasons">
+          {action.disabledReasonsZhCn.map((reason) => (
+            <li key={reason}>{reason}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function abilityUsageLines(usage: CombatAbilityUsageViewModel): string[] {
+  const lines: string[] = [];
+  if (usage.maxUsesPerNormalOwnerTurn !== null) {
+    lines.push(`本回合 ${usage.usesThisNormalOwnerTurn}/${usage.maxUsesPerNormalOwnerTurn}`);
+  }
+  if (usage.maxUsesPerBattle !== null) {
+    lines.push(`本场 ${usage.usesThisBattle}/${usage.maxUsesPerBattle}`);
+  }
+  return lines;
 }
 
 export function ResourceHUD({

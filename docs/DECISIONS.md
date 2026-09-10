@@ -4888,3 +4888,23 @@ BattleStage 只按 ViewModel 新增的 typed `CombatantSideView` 分成 Player/C
 - M8-T03 不实现 Cost Preview、Ability disabled logic、Target Selection、Reaction Prompt 或 Tooltip；这些保留给 M8-T04..T07。
 - Shield 仅在 maximum>0 时占用 HUD 行，但数值仍来自 ViewModel；没有为四 Profile 复制 HUD 组件。
 - 四 Profile 的差异资源通过同一 ResourceHUD 参数化测试，后续 Theme 只改变外观而不改变资源语义或顺序。
+
+## DEC-225：ActionBar 只消费同 revision 行动投影并通过 Command Port 输出意图
+
+- 日期：2026-09-10
+- 状态：已采纳
+- 依据：V5.2 §17.1、§18.3、M1 Gate/M8-T01/M8-T04，DEC-222 至 DEC-224
+
+### 决定
+
+`ActionBar` 从同 revision Combat ViewModel 渲染 ability legality、cooldown、normal owner turn/battle usage 与规则层提供的 disabled reasons。Presentation projector 对 ability usage 的非负值和可选上限执行结构校验；Ability 必须携带 usage，EndTurn/Escape/Reaction 不得伪装 ability usage。UI 不根据资源、阵营、状态名称或 cooldown 自行决定 legality。
+
+AbilitySlot 点击只向注入的 `CombatCommandPort` 报告已选择的 stable action ID，不直接修改 CombatState，也不在 M8-T04 提交缺少目标选择的 UseAbility。完整 Target Selection、取消以及 UseAbility command 组装由 M8-T05 负责。disabled AbilitySlot 由原生 button disabled 语义阻止选择，并仍显示规则层中文原因。
+
+EndTurn 作为 AbilitySlot 列表外的独立操作，通过 application boundary 注入的 command factory 构造既有 `CombatCommandEnvelope`，再经同一 port 提交；UI 不生成权威 command identity、source 或 version，也没有 State setter。测试以 contracts parser 复验实际提交 envelope，防止局部伪对象冒充 Command。
+
+### 影响与边界
+
+- Combat ViewModel 携带 State 的 CombatVersionSet，使后续 application command factory 可绑定当前协议版本；该字段仍是只读 projection。
+- M8-T04 不实现 target highlight、cost preview、tooltip、reaction 或 combat log；选择 Ability 后不会绕开 M8-T05/M1-T07 的 GetLegalTargets 边界。
+- ActionBar 使用同一 semantic-token UI，与四 World Theme 解耦；滚动和响应式布局不改变 action 顺序或合法性。

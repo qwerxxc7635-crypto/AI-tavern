@@ -6122,3 +6122,18 @@
 - CombatScreen/HUD jsdom 专项扩展至 12/12 PASS，新增 active HUD 全字段、四 Profile 资源参数化、Heat threshold/overheat、空 Status 与独立组件零按钮测试；原 Timeline/Stage 5 项全部回归通过。
 - TypeScript noEmit、ESLint、Prettier 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1150 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T01/M5 Gate 与 V5.2 §3/§5/§18.3 已复核；没有提前实现 Ability/Target/Cost Preview/Reaction/Tooltip 或 Theme package，无 SPEC BLOCKER。UI styling skill 用于 meter/status 语义、可读层级、响应式 HUD 与有界 DOM；用户 `.gitignore` 保持未纳入提交。M8-T03 PASS；下一项严格为 M8-T04 ActionBar / AbilitySlot / EndTurn。
+
+## 2026-09-10 — M8-T04 完成 ActionBar / AbilitySlot / EndTurn
+
+### 同 revision 行动投影与 Command-only UI
+
+- 从 M8-T03 提交 `ccaa50c` 创建 `task/M8-T04-action-bar`。在同一 CombatScreen 新增 `ActionBar` 与可独立测试的 `AbilitySlot`；新增 `DEC-225`。ActionBar 按 ViewModel 顺序显示 action，不持有 CombatState 副本或 State setter。
+- Combat Presentation 的 action projection 新增 ability cooldown、normal owner turn/battle usage 结构，并投影 CombatVersionSet。Projector 要求 Ability 必须携带 usage、其他 action 不得携带，且所有计数非负、当前次数不得超过可选上限；错误数据以 `InvalidRulesProjection` fail closed。
+- AbilitySlot 显示 cooldown、回合/整场次数和 Rules 提供的中文 disabled reasons。disabled 使用原生 button 语义；可用 ability 点击只把 stable action ID 交给注入的 selection callback，不提前构造或提交无目标 UseAbility，也不自行判断资源、阵营、亡灵或隐身。
+- EndTurn 位于 AbilitySlot 列表外，由 application boundary 注入的 command factory 创建既有 `CombatCommandEnvelope` 后交给 submission port。UI 不自行发明 commandId/source/version；测试用 contracts parser 复验提交 envelope，并证明 ability selection 不触发提交。
+
+### 验证与结束状态
+
+- CombatScreen/ActionBar jsdom 专项 14/14 PASS，覆盖 ability selection 零提交、cooldown/usage/reason、disabled 零选择与独立 EndTurn 单次真实 Command 提交；Presentation crate 11/11 PASS，含非法 usage projection 拒绝。
+- TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1152 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T01 DependsOn 与 V5.2 §17.1/§18.3 已复核；没有提前实现 Target Selection、Cost Preview、Reaction、Log 或 Theme package，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M8-T04 PASS；下一项严格为 M8-T05 Target Selection。

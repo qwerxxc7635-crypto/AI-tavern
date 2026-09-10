@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+import { CURRENT_COMBAT_VERSION_SET, parseCombatCommandEnvelope } from '@ember-tavern/contracts';
+import type { CombatCommandPayload } from '@ember-tavern/contracts';
 
 import {
   BattleStage,
@@ -22,7 +25,7 @@ afterEach(cleanup);
 
 describe('CombatScreen shell', () => {
   it('renders the authoritative timeline in supplied order and marks exactly the current slot', () => {
-    render(<CombatScreen viewModel={viewModel()} />);
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
 
     const timeline = screen.getByRole('navigation', { name: '行动顺序' });
     const entries = within(timeline).getAllByRole('listitem');
@@ -39,7 +42,7 @@ describe('CombatScreen shell', () => {
   });
 
   it('groups stage cards only by the projected side and exposes semantic team regions', () => {
-    render(<CombatScreen viewModel={viewModel()} />);
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
 
     const party = screen.getByRole('region', { name: '我方队伍' });
     const hostiles = screen.getByRole('region', { name: '敌方队伍' });
@@ -60,17 +63,25 @@ describe('CombatScreen shell', () => {
       ...hud(),
     };
     const model = viewModel();
-    render(<CombatScreen viewModel={{ ...model, combatants: [...model.combatants, neutral] }} />);
+    render(
+      <CombatScreen
+        viewModel={{ ...model, combatants: [...model.combatants, neutral] }}
+        commandPort={commandPort()}
+      />,
+    );
 
     expect(
       within(screen.getByRole('region', { name: '中立单位' })).getByText('见证者'),
     ).toBeTruthy();
-    expect(screen.queryAllByRole('button')).toHaveLength(0);
+    expect(
+      within(screen.getByRole('region', { name: '中立单位' })).queryAllByRole('button'),
+    ).toHaveLength(0);
   });
 
   it('updates from a replacement view model without retaining local timeline or active state', () => {
     const first = viewModel();
-    const rendered = render(<CombatScreen viewModel={first} />);
+    const port = commandPort();
+    const rendered = render(<CombatScreen viewModel={first} commandPort={port} />);
     const next: CombatScreenShellViewModel = {
       ...first,
       stateRevision: 9,
@@ -84,7 +95,7 @@ describe('CombatScreen shell', () => {
         isActiveTurn: combatant.combatantId === 'enemy-a',
       })),
     };
-    rendered.rerender(<CombatScreen viewModel={next} />);
+    rendered.rerender(<CombatScreen viewModel={next} commandPort={port} />);
 
     const timeline = screen.getByRole('navigation', { name: '行动顺序' });
     expect(
@@ -108,7 +119,7 @@ describe('CombatScreen shell', () => {
   });
 
   it('renders exact active-character meters, AP, reaction, resources, and statuses', () => {
-    render(<CombatScreen viewModel={viewModel()} />);
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
 
     const panel = screen.getByRole('region', { name: '旅者的战斗状态' });
     expect(
@@ -157,11 +168,46 @@ describe('CombatScreen shell', () => {
     expect(screen.getByRole('region', { name: '世界资源' })).toBeTruthy();
     expect(screen.queryAllByRole('button')).toHaveLength(0);
   });
+
+  it('renders ability cooldown, usage, and disabled reasons without submitting a command', () => {
+    const port = commandPort();
+    render(<CombatScreen viewModel={viewModel()} commandPort={port} />);
+
+    const ready = screen.getByRole('button', { name: '余烬斩' });
+    fireEvent.click(ready);
+    expect(port.onAbilitySelected).toHaveBeenCalledWith('ability.ember-slash');
+    expect(port.submitCommand).not.toHaveBeenCalled();
+    expect(screen.getByText('本回合 1/3')).toBeTruthy();
+    expect(screen.getByText('本场 2/6')).toBeTruthy();
+
+    const cooling = screen.getByRole('button', { name: '星火震荡' });
+    expect(cooling.hasAttribute('disabled')).toBe(true);
+    expect(within(cooling).getByText('冷却 2')).toBeTruthy();
+    expect(screen.getByText('技能仍在冷却')).toBeTruthy();
+    fireEvent.click(cooling);
+    expect(port.onAbilitySelected).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps EndTurn outside ability slots and submits one structured existing command envelope', () => {
+    const port = commandPort();
+    render(<CombatScreen viewModel={viewModel()} commandPort={port} />);
+
+    const endTurn = screen.getByRole('button', { name: '结束回合' });
+    expect(endTurn.closest('.ability-slot')).toBeNull();
+    fireEvent.click(endTurn);
+
+    expect(port.createCommand).toHaveBeenCalledWith({ kind: 'END_TURN' });
+    expect(port.submitCommand).toHaveBeenCalledTimes(1);
+    const submitted = port.submitCommand.mock.calls[0]?.[0];
+    expect(submitted?.payload).toEqual({ kind: 'END_TURN' });
+    expect(submitted?.actorId).toBe('hero');
+  });
 });
 
 function viewModel(): CombatScreenShellViewModel {
   return {
     combatInstanceId: 'combat-ui-shell',
+    versions: CURRENT_COMBAT_VERSION_SET,
     stateRevision: 8,
     phaseLabelZhCn: '行动阶段',
     roundLabelZhCn: '第 2 轮',
@@ -215,6 +261,47 @@ function viewModel(): CombatScreenShellViewModel {
         ...hud(),
       },
     ],
+    actions: [
+      {
+        actionId: 'ability.ember-slash',
+        displayNameZhCn: '余烬斩',
+        kind: 'ABILITY',
+        enabled: true,
+        legalTargetIds: ['enemy-b'],
+        disabledReasonsZhCn: [],
+        abilityUsage: {
+          cooldownRemaining: 0,
+          usesThisNormalOwnerTurn: 1,
+          maxUsesPerNormalOwnerTurn: 3,
+          usesThisBattle: 2,
+          maxUsesPerBattle: 6,
+        },
+      },
+      {
+        actionId: 'ability.spark-shock',
+        displayNameZhCn: '星火震荡',
+        kind: 'ABILITY',
+        enabled: false,
+        legalTargetIds: [],
+        disabledReasonsZhCn: ['技能仍在冷却'],
+        abilityUsage: {
+          cooldownRemaining: 2,
+          usesThisNormalOwnerTurn: 0,
+          maxUsesPerNormalOwnerTurn: null,
+          usesThisBattle: 1,
+          maxUsesPerBattle: null,
+        },
+      },
+      {
+        actionId: 'command.end-turn',
+        displayNameZhCn: '结束回合',
+        kind: 'END_TURN',
+        enabled: true,
+        legalTargetIds: [],
+        disabledReasonsZhCn: [],
+        abilityUsage: null,
+      },
+    ],
   };
 }
 
@@ -253,5 +340,23 @@ function resource(resourceId: string, labelZhCn: string): CombatResourceViewMode
     overheatThreshold: resourceId === 'heat' ? 80 : null,
     isOverheated: false,
     textZhCn: `${labelZhCn}：${resourceId === 'mana' ? '6' : '5'}/${resourceId === 'heat' ? '100' : '10'}`,
+  };
+}
+
+function commandPort() {
+  let sequence = 0;
+  return {
+    createCommand: vi.fn((payload: CombatCommandPayload) => {
+      sequence += 1;
+      return parseCombatCommandEnvelope({
+        commandId: `ui-command-${String(sequence)}`,
+        source: { kind: 'PLAYER', controllerId: 'player-local' },
+        actorId: 'hero',
+        versions: CURRENT_COMBAT_VERSION_SET,
+        payload,
+      });
+    }),
+    submitCommand: vi.fn(),
+    onAbilitySelected: vi.fn(),
   };
 }
