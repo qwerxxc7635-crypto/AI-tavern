@@ -6212,3 +6212,18 @@
 - CombatScreen jsdom 专项 36/36 PASS，覆盖六类安全结果、Aborted 样式/无内部泄漏及四主题语义与 Command 一致；Presentation crate 16/16 PASS，覆盖六类 Core enum 穷举映射；player-language Node 专项 5/5 PASS。
 - TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1174 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T02..T08 DependsOn 与外部 M8-T09 Scope/DoD 已复核，无 SPEC BLOCKER。UI styling skill 用于轻量状态区域、语义色、动态文本 wrapping 与主题无关可访问结构；用户 `.gitignore` 保持未纳入提交。M8-T09 与 M8 Gate PASS；下一项严格为 M9-T01 Theme Manifest Schema。
+
+## 2026-09-12 — M9-T01 完成 Theme Manifest Schema
+
+### 固定视觉 Slot 与无规则 Manifest
+
+- 从 M8-T09 提交 `0e11e8a` 创建 `task/M9-T01-theme-manifest`。新增共享 `CombatThemeManifest` contract 与 `DEC-231`：version、stable lowercase kebab-case themeId、base/cultivation/fantasy/scifi/urban layout preset、nullable fallbackThemeId、assets 五类字段 exact-key validation。
+- 直接对照 FINAL Runtime Assets 的 aggregate/per-theme manifests，冻结 59 个 stable Asset Slot IDs。每个映射只接受 canonical lowercase kebab-case 相对媒体路径，拒绝未知 Slot、绝对路径、目录穿越、空格/大写路径；输出 Manifest 与 assets map 均冻结。
+- Manifest 未包含 Damage/Target/AP/Status/Command 等规则字段；unknown top-level field fail closed。测试显式证明 damageMultiplier/legalTargetIds 无法进入 schema，Theme 不成为 Combat Rule 语义来源。
+- version 结构解析与 runtime compatibility 分离：positive future version 可读，但当前 compatibility gate 只接受 version 1；base theme 可用 null fallback 与空 assets，self-fallback 在结构层直接拒绝。
+
+### 验证与结束状态
+
+- Combat Theme contract 专项 13/13 PASS，覆盖合法 manifest、59 slot 固定数量、深层冻结、规则字段、非法/纯数字 ID、self fallback、未知 layout/slot、绝对/穿越/非规范路径、future version 与 asset-free base。
+- Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 194 files / 1187 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T01 DependsOn 与 V5.2 §25.1..§25.4、FINAL asset manifests 已复核，无 SPEC BLOCKER。没有提前复制素材、实现 Resolver/Fallback 或主题 UI。用户 `.gitignore` 保持未纳入提交。M9-T01 PASS；下一项严格为 M9-T02 Theme Loader / Resolver。

@@ -19,6 +19,20 @@ export type {
   CombatVersionSet,
 } from './combat.js';
 export {
+  COMBAT_LAYOUT_PRESET_IDS,
+  COMBAT_THEME_ASSET_SLOTS,
+  CURRENT_COMBAT_THEME_MANIFEST_VERSION,
+  CombatThemeManifestError,
+  assertSupportedCombatThemeManifest,
+  parseCombatThemeManifest,
+} from './combat-theme.js';
+export type {
+  CombatLayoutPresetId,
+  CombatThemeAssetSlot,
+  CombatThemeManifest,
+  CombatThemeManifestErrorCode,
+} from './combat-theme.js';
+export {
   CombatCommandContractError,
   parseAcceptedCombatCommand,
   parseCombatCommandEnvelope,

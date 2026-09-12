@@ -5008,3 +5008,23 @@ M8 Gate 将同一 Combat ViewModel 与 Command Port 放入 fantasy/science-ficti
 - Rust Result 映射是封闭穷举；新增 Core result kind 时编译即要求补齐安全文案。
 - 四 Theme 的 Manifest、resolver、fallback 和 Runtime assets 严格留给 M9；M8 只建立不可改变 Combat API 语义的验收基线。
 - 本任务不为终局添加继续、重试或存档 mutation；这些必须由后续正式 application flow 定义。
+
+## DEC-231：Theme Manifest 是固定视觉 Slot 契约，不承载 Combat Rule
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §25.1 至 §25.4、M9-T01、FINAL Runtime Assets manifest，DEC-230
+
+### 决定
+
+共享 contracts 定义 `CombatThemeManifest` exact-key wire schema，字段仅包含独立正整数 `version`、lowercase kebab-case `themeId`、封闭 `layoutPreset`、nullable `fallbackThemeId` 与 `assets`。layout preset 固定为 base/cultivation/fantasy/scifi/urban；fallback 不得直接指向自身，完整 chain/cycle resolution 留给 M9-T02/M9-T03。
+
+Asset Slot 目录直接冻结 FINAL Runtime Assets 的 59 个 stable IDs，覆盖 10 个 common VFX 及四主题共享/专属 visual slots。Manifest 只允许这些 Slot 映射到 canonical lowercase kebab-case 相对媒体路径；绝对路径、目录穿越、空格、中文/大写路径、未知 Slot 全部 fail closed。parser 返回浅层及 asset map 冻结的结构，positive future version 可结构解析，但当前 runtime compatibility gate 明确拒绝非 version 1。
+
+Manifest exact-key allowlist 不包含伤害、合法目标、AP 消耗、状态规则、Command 或任意 executable payload；出现 `damageMultiplier`、`legalTargetIds` 等规则字段会作为未知顶层字段拒绝。Theme Package 因此只能选择资源与布局表现，不能成为第二个 Combat Rules 数据源。
+
+### 影响与边界
+
+- `base` Manifest 可以使用 null fallback 与空 asset map，为后续 CSS/Vector fallback 提供合法根节点。
+- M9-T01 不复制或加载 FINAL 素材，不实现 WorldType mapping、override、missing-slot fallback 或 performance；这些严格按 M9-T02 至 M9-T08 顺序完成。
+- Slot 目录的变更是显式契约变更，必须同步 manifest version/兼容策略，而不能靠运行时注册扩展。
