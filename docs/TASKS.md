@@ -85,7 +85,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M8-T05 — Target Selection | PASS | 2026-09-12 | requiresTarget 与唯一 legalTargetIds 来自 Rules projection；只将返回对象变成目标按钮，支持 select/显式取消/Esc/空白取消并提交标准 UseAbility Command |
 | M8-T06 — Cost Preview / Tooltip | PASS | 2026-09-12 | Rules projection 校验 active actor AP/resource before→after 与 Heat 阈值；Hover/Focus/Selected 展示既有 Programmatic Mechanical Tooltip + validated AI flavor，零 RNG |
 | M8-T07 — Reaction / Tactical Strategy UI | PASS | 2026-09-12 | Auto/Ask/Disabled 中文模式、轻量 Pending Reaction Trigger/Skip 与恢复；正式队友五策略/四偏好均提交 Command，零乐观权威改写 |
-| M8-T08 — Combat Log / Enemy Intent | IN_PROGRESS | 2026-09-12 | 下一项；Log 只消费 Event Log 并解释 D20/Hit/Crit/damage/mitigation/shield/status/reaction/objective/result，Intent 对齐 Runtime IntentPlan，零 RNG |
+| M8-T08 — Combat Log / Enemy Intent | PASS | 2026-09-12 | same-revision typed Event Log 程序化解释 D20/outcome/damage/mitigation/shield/status/reaction/objective/result；Intent 直投 Runtime Plan；默认折叠且零 RNG |
+| M8-T09 — CombatResult + zh-CN Leakage Gate | IN_PROGRESS | 2026-09-12 | 下一项；Victory/Defeat/Escape/Scripted/Aborted 安全提示，自动阻止 raw Enum/error code/stack trace/英文战斗术语泄漏并完成 M8 Gate |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

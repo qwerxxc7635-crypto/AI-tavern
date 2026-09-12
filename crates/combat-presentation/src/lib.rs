@@ -11,7 +11,10 @@ mod view_model;
 pub use view_model::{
     COMBAT_VIEW_MODEL_SCHEMA_VERSION, CombatAbilityUsageViewModel, CombatActionRuleProjection,
     CombatActionViewKind, CombatActionViewModel, CombatCostPreviewRuleProjection,
-    CombatCostPreviewViewModel, CombatMeterViewModel, CombatReactionModeSettingViewModel,
+    CombatCostPreviewViewModel, CombatD20LogRecord, CombatEventLogEntry, CombatEventLogPayload,
+    CombatEventLogSnapshot, CombatLogEntryKind, CombatLogEntryViewModel, CombatLogObjectiveOutcome,
+    CombatLogPresentationEntry, CombatLogReactionOutcome, CombatLogResolutionOutcome,
+    CombatLogStatusChange, CombatMeterViewModel, CombatReactionModeSettingViewModel,
     CombatReactionModeView, CombatReactionOptionViewModel, CombatReactionPromptViewModel,
     CombatReactionRuleProjection, CombatResourceTransitionRuleProjection,
     CombatResourceTransitionViewModel, CombatResourceViewModel, CombatRulesPresentationSnapshot,

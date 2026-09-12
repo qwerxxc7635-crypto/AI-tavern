@@ -101,6 +101,96 @@ pub struct CombatViewModelRequest<'a> {
     pub rules: &'a CombatRulesPresentationSnapshot,
     pub combatant_presentations: &'a [CombatantPresentationEntry],
     pub status_presentations: &'a [StatusPresentationEntry],
+    pub combat_log: &'a CombatEventLogSnapshot,
+    pub combat_log_presentations: &'a [CombatLogPresentationEntry],
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatLogPresentationEntry {
+    pub subject_id: String,
+    pub display_name_zh_cn: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatEventLogSnapshot {
+    pub state_revision: u64,
+    pub entries: Vec<CombatEventLogEntry>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatLogResolutionOutcome {
+    Hit,
+    Miss,
+    Critical,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatLogStatusChange {
+    Applied,
+    Removed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatLogReactionOutcome {
+    Triggered,
+    Skipped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CombatLogObjectiveOutcome {
+    Completed,
+    Failed,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatD20LogRecord {
+    pub natural_roll: i64,
+    pub modifier: i64,
+    pub total: i64,
+    pub target_number: i64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CombatEventLogPayload {
+    AbilityResolution {
+        actor_id: String,
+        target_id: String,
+        ability_id: String,
+        d20: Option<CombatD20LogRecord>,
+        outcome: CombatLogResolutionOutcome,
+    },
+    Damage {
+        source_id: String,
+        target_id: String,
+        raw_damage: i64,
+        mitigation: i64,
+        shield_absorbed: i64,
+        hit_point_damage: i64,
+    },
+    Status {
+        target_id: String,
+        status_id: String,
+        change: CombatLogStatusChange,
+    },
+    Reaction {
+        actor_id: String,
+        reaction_id: String,
+        outcome: CombatLogReactionOutcome,
+    },
+    Objective {
+        objective_id: String,
+        outcome: CombatLogObjectiveOutcome,
+    },
+    Result {
+        result: CombatResultType,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatEventLogEntry {
+    pub event_id: String,
+    pub sequence: u64,
+    pub payload: CombatEventLogPayload,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -241,7 +331,29 @@ pub struct CombatViewModel {
     pub reaction_modes: Vec<CombatReactionModeSettingViewModel>,
     pub pending_reaction: Option<CombatReactionPromptViewModel>,
     pub tactical_settings: Vec<CompanionTacticalViewModel>,
+    pub combat_log: Vec<CombatLogEntryViewModel>,
     pub result_label_zh_cn: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CombatLogEntryKind {
+    Resolution,
+    Damage,
+    Status,
+    Reaction,
+    Objective,
+    Result,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatLogEntryViewModel {
+    pub event_id: String,
+    pub sequence: u64,
+    pub kind: CombatLogEntryKind,
+    pub title_zh_cn: String,
+    pub detail_zh_cn: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -341,6 +453,12 @@ impl<'a> CombatViewModelProjector<'a> {
                 "stateRevision",
             ));
         }
+        if request.combat_log.state_revision != request.state.revision {
+            return Err(view_error(
+                CombatViewModelErrorCode::StaleRulesProjection,
+                "combatLog.stateRevision",
+            ));
+        }
         let combatant_names = presentation_map(
             request
                 .combatant_presentations
@@ -354,6 +472,13 @@ impl<'a> CombatViewModelProjector<'a> {
                 .iter()
                 .map(|entry| (&entry.status_definition_id, &entry.display_name_zh_cn)),
             "statusPresentation",
+        )?;
+        let combat_log_names = presentation_map(
+            request
+                .combat_log_presentations
+                .iter()
+                .map(|entry| (&entry.subject_id, &entry.display_name_zh_cn)),
+            "combatLogPresentation",
         )?;
         for combatant in &request.state.combatants {
             require_name(&combatant_names, &combatant.combatant_id)?;
@@ -488,6 +613,12 @@ impl<'a> CombatViewModelProjector<'a> {
             &request.rules.tactical_settings,
             &combatant_names,
         )?;
+        let combat_log = project_combat_log(
+            request.state,
+            request.combat_log,
+            &combatant_names,
+            &combat_log_names,
+        )?;
 
         Ok(CombatViewModel {
             schema_version: COMBAT_VIEW_MODEL_SCHEMA_VERSION,
@@ -505,6 +636,7 @@ impl<'a> CombatViewModelProjector<'a> {
             reaction_modes,
             pending_reaction,
             tactical_settings,
+            combat_log,
             result_label_zh_cn: request
                 .state
                 .confirmed_result
@@ -684,6 +816,180 @@ fn project_tactical_settings(
             })
         })
         .collect()
+}
+
+fn project_combat_log(
+    state: &CombatState,
+    snapshot: &CombatEventLogSnapshot,
+    combatant_names: &BTreeMap<&str, &str>,
+    subject_names: &BTreeMap<&str, &str>,
+) -> Result<Vec<CombatLogEntryViewModel>, CombatViewModelError> {
+    let mut event_ids = BTreeMap::new();
+    let mut previous_sequence = 0;
+    snapshot
+        .entries
+        .iter()
+        .map(|entry| {
+            if !valid_id(&entry.event_id)
+                || entry.sequence <= previous_sequence
+                || event_ids.insert(entry.event_id.as_str(), ()).is_some()
+            {
+                return Err(view_error(
+                    CombatViewModelErrorCode::InvalidRulesProjection,
+                    &entry.event_id,
+                ));
+            }
+            previous_sequence = entry.sequence;
+            let (kind, title, detail) = match &entry.payload {
+                CombatEventLogPayload::AbilityResolution {
+                    actor_id,
+                    target_id,
+                    ability_id,
+                    d20,
+                    outcome,
+                } => {
+                    let actor = require_name(combatant_names, actor_id)?;
+                    let target = require_name(combatant_names, target_id)?;
+                    let ability = require_name(subject_names, ability_id)?;
+                    let outcome_text = resolution_outcome_label(*outcome);
+                    let detail = if let Some(roll) = d20 {
+                        if !(1..=20).contains(&roll.natural_roll)
+                            || roll.natural_roll.checked_add(roll.modifier) != Some(roll.total)
+                        {
+                            return Err(view_error(
+                                CombatViewModelErrorCode::InvalidRulesProjection,
+                                &entry.event_id,
+                            ));
+                        }
+                        format!(
+                            "{actor}对{target}使用{ability}：d20 {} {:+} = {}，对抗 {}，{outcome_text}",
+                            roll.natural_roll, roll.modifier, roll.total, roll.target_number
+                        )
+                    } else {
+                        format!("{actor}对{target}使用{ability}：{outcome_text}")
+                    };
+                    (CombatLogEntryKind::Resolution, "行动判定".to_owned(), detail)
+                }
+                CombatEventLogPayload::Damage {
+                    source_id,
+                    target_id,
+                    raw_damage,
+                    mitigation,
+                    shield_absorbed,
+                    hit_point_damage,
+                } => {
+                    if [*raw_damage, *mitigation, *shield_absorbed, *hit_point_damage]
+                        .iter()
+                        .any(|value| *value < 0)
+                        || mitigation
+                            .checked_add(*shield_absorbed)
+                            .and_then(|value| value.checked_add(*hit_point_damage))
+                            != Some(*raw_damage)
+                    {
+                        return Err(view_error(
+                            CombatViewModelErrorCode::InvalidRulesProjection,
+                            &entry.event_id,
+                        ));
+                    }
+                    let source = require_name(combatant_names, source_id)?;
+                    let target = require_name(combatant_names, target_id)?;
+                    (
+                        CombatLogEntryKind::Damage,
+                        format!("{source} → {target}"),
+                        format!(
+                            "原始伤害 {raw_damage}，减伤 {mitigation}，护盾吸收 {shield_absorbed}，生命损失 {hit_point_damage}"
+                        ),
+                    )
+                }
+                CombatEventLogPayload::Status {
+                    target_id,
+                    status_id,
+                    change,
+                } => {
+                    let target = require_name(combatant_names, target_id)?;
+                    let status = require_name(subject_names, status_id)?;
+                    (
+                        CombatLogEntryKind::Status,
+                        "状态变化".to_owned(),
+                        format!("{target}{}状态：{status}", status_change_label(*change)),
+                    )
+                }
+                CombatEventLogPayload::Reaction {
+                    actor_id,
+                    reaction_id,
+                    outcome,
+                } => {
+                    let actor = require_name(combatant_names, actor_id)?;
+                    let reaction = require_name(subject_names, reaction_id)?;
+                    (
+                        CombatLogEntryKind::Reaction,
+                        "反应".to_owned(),
+                        format!("{actor}{}：{reaction}", reaction_outcome_label(*outcome)),
+                    )
+                }
+                CombatEventLogPayload::Objective {
+                    objective_id,
+                    outcome,
+                } => {
+                    let objective = require_name(subject_names, objective_id)?;
+                    (
+                        CombatLogEntryKind::Objective,
+                        "战斗目标".to_owned(),
+                        format!("{objective}：{}", objective_outcome_label(*outcome)),
+                    )
+                }
+                CombatEventLogPayload::Result { result } => {
+                    if state.confirmed_result != Some(*result) {
+                        return Err(view_error(
+                            CombatViewModelErrorCode::InvalidRulesProjection,
+                            &entry.event_id,
+                        ));
+                    }
+                    (
+                        CombatLogEntryKind::Result,
+                        "战斗结果".to_owned(),
+                        result_label(*result).to_owned(),
+                    )
+                }
+            };
+            Ok(CombatLogEntryViewModel {
+                event_id: entry.event_id.clone(),
+                sequence: entry.sequence,
+                kind,
+                title_zh_cn: title,
+                detail_zh_cn: detail,
+            })
+        })
+        .collect()
+}
+
+const fn resolution_outcome_label(outcome: CombatLogResolutionOutcome) -> &'static str {
+    match outcome {
+        CombatLogResolutionOutcome::Hit => "命中",
+        CombatLogResolutionOutcome::Miss => "未命中",
+        CombatLogResolutionOutcome::Critical => "暴击",
+    }
+}
+
+const fn status_change_label(change: CombatLogStatusChange) -> &'static str {
+    match change {
+        CombatLogStatusChange::Applied => "获得",
+        CombatLogStatusChange::Removed => "移除",
+    }
+}
+
+const fn reaction_outcome_label(outcome: CombatLogReactionOutcome) -> &'static str {
+    match outcome {
+        CombatLogReactionOutcome::Triggered => "发动反应",
+        CombatLogReactionOutcome::Skipped => "跳过反应",
+    }
+}
+
+const fn objective_outcome_label(outcome: CombatLogObjectiveOutcome) -> &'static str {
+    match outcome {
+        CombatLogObjectiveOutcome::Completed => "已完成",
+        CombatLogObjectiveOutcome::Failed => "已失败",
+    }
 }
 
 const fn reaction_mode_label(mode: CombatReactionModeView) -> &'static str {
@@ -1133,6 +1439,11 @@ mod tests {
     use super::*;
 
     const SEED: &str = "0123456789abcdef0123456789abcdef";
+    static EMPTY_COMBAT_LOG: CombatEventLogSnapshot = CombatEventLogSnapshot {
+        state_revision: 7,
+        entries: Vec::new(),
+    };
+    static EMPTY_LOG_PRESENTATIONS: [CombatLogPresentationEntry; 0] = [];
 
     #[test]
     fn projects_authoritative_state_and_exact_rules_targets_into_chinese_view_data() {
@@ -1371,6 +1682,64 @@ mod tests {
     }
 
     #[test]
+    fn combat_log_explains_typed_events_in_sequence_without_state_or_rng_mutation() {
+        let mut state = state();
+        state.confirmed_result = Some(CombatResultType::Victory);
+        let state_before = state.canonical_json_bytes().unwrap();
+        let names = names();
+        let combatant_names = presentation_map(
+            names
+                .iter()
+                .map(|entry| (&entry.combatant_id, &entry.display_name_zh_cn)),
+            "combatantPresentation",
+        )
+        .unwrap();
+        let log_names = [
+            log_name("ability.ember-slash", "余烬斩"),
+            log_name("status.burning", "燃烧"),
+            log_name("reaction.spirit-shield", "灵力护盾"),
+            log_name("objective.guard", "守住火种"),
+        ];
+        let log_names = presentation_map(
+            log_names
+                .iter()
+                .map(|entry| (&entry.subject_id, &entry.display_name_zh_cn)),
+            "combatLogPresentation",
+        )
+        .unwrap();
+        let snapshot = combat_event_log();
+        let projected =
+            project_combat_log(&state, &snapshot, &combatant_names, &log_names).unwrap();
+        assert_eq!(projected.len(), 6);
+        assert_eq!(
+            projected[0].detail_zh_cn,
+            "旅者对灰烬守卫使用余烬斩：d20 18 +5 = 23，对抗 16，暴击"
+        );
+        assert_eq!(
+            projected[1].detail_zh_cn,
+            "原始伤害 18，减伤 4，护盾吸收 6，生命损失 8"
+        );
+        assert_eq!(projected[2].detail_zh_cn, "灰烬守卫获得状态：燃烧");
+        assert_eq!(projected[3].detail_zh_cn, "旅者发动反应：灵力护盾");
+        assert_eq!(projected[4].detail_zh_cn, "守住火种：已完成");
+        assert_eq!(projected[5].detail_zh_cn, "胜利");
+        assert_eq!(state.canonical_json_bytes().unwrap(), state_before);
+
+        let mut invalid = snapshot;
+        let CombatEventLogPayload::Damage { mitigation, .. } = &mut invalid.entries[1].payload
+        else {
+            panic!("damage fixture exists")
+        };
+        *mitigation = 3;
+        assert_eq!(
+            project_combat_log(&state, &invalid, &combatant_names, &log_names)
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
+        );
+    }
+
+    #[test]
     fn stale_or_self_inconsistent_rules_projection_fails_closed() {
         let state = state();
         let names = names();
@@ -1532,6 +1901,8 @@ mod tests {
             rules,
             combatant_presentations: names,
             status_presentations: &[],
+            combat_log: &EMPTY_COMBAT_LOG,
+            combat_log_presentations: &EMPTY_LOG_PRESENTATIONS,
         }
     }
 
@@ -1652,6 +2023,82 @@ mod tests {
                 CombatReactionModeView::Disabled,
             ),
         ]
+    }
+
+    fn log_name(subject_id: &str, display_name: &str) -> CombatLogPresentationEntry {
+        CombatLogPresentationEntry {
+            subject_id: subject_id.to_owned(),
+            display_name_zh_cn: display_name.to_owned(),
+        }
+    }
+
+    fn combat_event_log() -> CombatEventLogSnapshot {
+        CombatEventLogSnapshot {
+            state_revision: 7,
+            entries: vec![
+                CombatEventLogEntry {
+                    event_id: "event-resolution-1".to_owned(),
+                    sequence: 1,
+                    payload: CombatEventLogPayload::AbilityResolution {
+                        actor_id: "hero".to_owned(),
+                        target_id: "enemy".to_owned(),
+                        ability_id: "ability.ember-slash".to_owned(),
+                        d20: Some(CombatD20LogRecord {
+                            natural_roll: 18,
+                            modifier: 5,
+                            total: 23,
+                            target_number: 16,
+                        }),
+                        outcome: CombatLogResolutionOutcome::Critical,
+                    },
+                },
+                CombatEventLogEntry {
+                    event_id: "event-damage-1".to_owned(),
+                    sequence: 2,
+                    payload: CombatEventLogPayload::Damage {
+                        source_id: "hero".to_owned(),
+                        target_id: "enemy".to_owned(),
+                        raw_damage: 18,
+                        mitigation: 4,
+                        shield_absorbed: 6,
+                        hit_point_damage: 8,
+                    },
+                },
+                CombatEventLogEntry {
+                    event_id: "event-status-1".to_owned(),
+                    sequence: 3,
+                    payload: CombatEventLogPayload::Status {
+                        target_id: "enemy".to_owned(),
+                        status_id: "status.burning".to_owned(),
+                        change: CombatLogStatusChange::Applied,
+                    },
+                },
+                CombatEventLogEntry {
+                    event_id: "event-reaction-1".to_owned(),
+                    sequence: 4,
+                    payload: CombatEventLogPayload::Reaction {
+                        actor_id: "hero".to_owned(),
+                        reaction_id: "reaction.spirit-shield".to_owned(),
+                        outcome: CombatLogReactionOutcome::Triggered,
+                    },
+                },
+                CombatEventLogEntry {
+                    event_id: "event-objective-1".to_owned(),
+                    sequence: 5,
+                    payload: CombatEventLogPayload::Objective {
+                        objective_id: "objective.guard".to_owned(),
+                        outcome: CombatLogObjectiveOutcome::Completed,
+                    },
+                },
+                CombatEventLogEntry {
+                    event_id: "event-result-1".to_owned(),
+                    sequence: 6,
+                    payload: CombatEventLogPayload::Result {
+                        result: CombatResultType::Victory,
+                    },
+                },
+            ],
+        }
     }
 
     fn reaction_projection(

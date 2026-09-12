@@ -6182,3 +6182,18 @@
 - CombatScreen/Reaction/Tactical jsdom 专项 26/26 PASS，覆盖三模式中文、Trigger 单次提交、Skip、resolved 不重开、unresolved UI 重开恢复、五项 Tactical Command payload 与零 optimistic mutation；Presentation crate 14/14 PASS，覆盖 Player/Utility ownership、resolved resume、正式 Companion 唯一投影与非法 60% threshold 拒绝。
 - TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1164 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 505 PASS、1 credential-only ignore，archive interop 双向通过。
 - M4-T08/M7-T04 DependsOn 与 V5.2 §10/§12.1/§17.1/§23 已复核；M7-T05 Barrier 仍是唯一 acceptedSequence 生效点；没有进入 Log/Intent/Theme，无 SPEC BLOCKER。UI styling skill 用于轻量非 Modal 卡片、keyboard/focus、live/busy 状态、表单 label 与响应式布局；用户 `.gitignore` 保持未纳入提交。M8-T07 PASS；下一项严格为 M8-T08 Combat Log / Enemy Intent。
+
+## 2026-09-12 — M8-T08 完成 Combat Log / Enemy Intent
+
+### Typed committed event projection 与 Runtime Intent 直投
+
+- 从 M8-T07 提交 `23918c6` 创建 `task/M8-T08-combat-log-enemy-intent`。Combat ViewModel request 新增 same-revision typed `CombatEventLogSnapshot` 与中文 subject catalog；新增 `DEC-229`。日志 payload 封闭为 AbilityResolution/Damage/Status/Reaction/Objective/Result，不接受自由文本规则或 UI 反推。
+- Presentation 校验 eventId 唯一、sequence 严格递增、d20+modifier=total、damage conservation、所有 stable references 与 confirmed CombatResult；再程序化输出 D20/命中/未命中/暴击、原始伤害/减伤/护盾吸收/生命损失、状态、反应、目标和结果中文行。
+- `CombatLog` 使用原生 details 默认收起，展开后保持 Event Log sequence 和 kind；新 ViewModel 全量替换，不合并旧 DOM history。`EnemyIntentPanel` 保持 M7-T06 Runtime IntentPlan 顺序、中文标签和可选 target hint，不重新运行 Utility 或类别判断。
+- Event Log/Intent 投影与 UI 均不调用 RNG；Rust 对比 projection 前后 canonical State bytes，覆盖 State 和全部 RNG cursor 不变。
+
+### 验证与结束状态
+
+- CombatScreen/Log/Intent jsdom 专项 29/29 PASS，覆盖 Runtime Intent 顺序/target hint、日志默认折叠、六类 event 顺序与逐字段文案、revision replacement 丢弃旧事件；Presentation crate 15/15 PASS，覆盖六类 typed event、算术/sequence/reference/result validation 与零 State/RNG mutation。
+- TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1167 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 506 PASS、1 credential-only ignore，archive interop 双向通过。
+- M7-T06/M3 Gate DependsOn 与 V5.2 §11/§19/§24 已复核；没有进入 CombatResult safety/zh-CN leakage gate 或 Theme，无 SPEC BLOCKER。UI styling skill 用于语义 details、focus、默认折叠、响应式 intent cards 与长日志 wrapping；用户 `.gitignore` 保持未纳入提交。M8-T08 PASS；下一项严格为 M8-T09 CombatResult + zh-CN Leakage Gate。

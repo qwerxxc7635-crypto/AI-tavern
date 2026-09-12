@@ -139,10 +139,31 @@ export interface CombatScreenShellViewModel {
   readonly activeCombatantId: string | null;
   readonly timeline: readonly CombatTimelineEntryViewModel[];
   readonly combatants: readonly CombatantStageViewModel[];
+  readonly enemyIntents: readonly EnemyIntentViewModel[];
   readonly actions: readonly CombatActionViewModel[];
   readonly reactionModes: readonly CombatReactionModeSettingViewModel[];
   readonly pendingReaction: CombatReactionPromptViewModel | null;
   readonly tacticalSettings: readonly CompanionTacticalViewModel[];
+  readonly combatLog: readonly CombatLogEntryViewModel[];
+}
+
+export interface EnemyIntentViewModel {
+  readonly enemyId: string;
+  readonly enemyDisplayNameZhCn: string;
+  readonly intentLabelZhCn: string;
+  readonly targetHintId: string | null;
+  readonly targetHintNameZhCn: string | null;
+}
+
+export type CombatLogEntryKind =
+  'RESOLUTION' | 'DAMAGE' | 'STATUS' | 'REACTION' | 'OBJECTIVE' | 'RESULT';
+
+export interface CombatLogEntryViewModel {
+  readonly eventId: string;
+  readonly sequence: number;
+  readonly kind: CombatLogEntryKind;
+  readonly titleZhCn: string;
+  readonly detailZhCn: string;
 }
 
 export type CombatReactionModeView = 'AUTO' | 'ASK' | 'DISABLED';
@@ -320,6 +341,8 @@ export function CombatScreen({
 
       <TurnTimeline entries={viewModel.timeline} />
 
+      <EnemyIntentPanel intents={viewModel.enemyIntents} />
+
       <BattleStage
         party={party}
         hostiles={hostiles}
@@ -341,6 +364,8 @@ export function CombatScreen({
       <ReactionModeStrip modes={viewModel.reactionModes} />
 
       <TacticalStrategyPanel settings={viewModel.tacticalSettings} onCommand={submitPayload} />
+
+      <CombatLog entries={viewModel.combatLog} />
 
       {activeName === undefined ? null : (
         <CharacterHUD
@@ -395,6 +420,59 @@ export function TurnTimeline({
         ))}
       </ol>
     </nav>
+  );
+}
+
+export function EnemyIntentPanel({
+  intents,
+}: {
+  readonly intents: readonly EnemyIntentViewModel[];
+}) {
+  if (intents.length === 0) return null;
+  return (
+    <section className="enemy-intent-panel" aria-label="敌方意图">
+      <h2>敌方意图</h2>
+      <ul>
+        {intents.map((intent) => (
+          <li key={intent.enemyId} data-enemy-id={intent.enemyId}>
+            <strong>{intent.enemyDisplayNameZhCn}</strong>
+            <span>{intent.intentLabelZhCn}</span>
+            {intent.targetHintNameZhCn === null ? null : (
+              <small data-target-id={intent.targetHintId ?? undefined}>
+                目标：{intent.targetHintNameZhCn}
+              </small>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function CombatLog({ entries }: { readonly entries: readonly CombatLogEntryViewModel[] }) {
+  return (
+    <details className="combat-log">
+      <summary>
+        战斗日志 <span>{entries.length}</span>
+      </summary>
+      {entries.length === 0 ? (
+        <p>暂无战斗记录</p>
+      ) : (
+        <ol aria-label="战斗事件">
+          {entries.map((entry) => (
+            <li
+              key={entry.eventId}
+              data-event-id={entry.eventId}
+              data-event-kind={entry.kind}
+              value={entry.sequence}
+            >
+              <strong>{entry.titleZhCn}</strong>
+              <p>{entry.detailZhCn}</p>
+            </li>
+          ))}
+        </ol>
+      )}
+    </details>
   );
 }
 

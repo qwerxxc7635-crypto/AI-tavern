@@ -4968,3 +4968,23 @@ TacticalStrategyPanel 只展示 `TacticalSettingsProjection` 中的正式 Compan
 - ReactionPrompt 是右下轻量、可滚动卡片，不是全屏 modal；原 ResolutionContext/RNG/cost resume 数据继续只存在 Core State。
 - Reaction mode 在本任务只展示当前 Rules 配置；v0.4 没有定义战斗中 SetReactionMode Command，因此 UI 不发明平行 mutation API。
 - M8-T07 不实现 Combat Log、Enemy Intent card 或 Theme assets；后续 UI 继续消费同一个 Combat ViewModel。
+
+## DEC-229：Combat Log 只投影同 revision typed Event Log，Enemy Intent 直读 Runtime Plan
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §11/§18.1/§19/§24，M3 Gate/M7-T06/M8-T01/M8-T08，DEC-199、DEC-220、DEC-222
+
+### 决定
+
+Combat ViewModel request 新增由 Combat Engine adapter 从 committed typed outputs 组装的 `CombatEventLogSnapshot`，必须与 State revision 相同。Entry 使用严格递增 sequence 与唯一 eventId，并以封闭 payload 区分 AbilityResolution、Damage、Status、Reaction、Objective、Result；Presentation 从 typed fields 与中文目录生成玩家文案，UI 不根据 HP 差值、CSS、动画或最终状态重新推算事件。
+
+AbilityResolution 显示已记录的 d20、modifier、total、target number 与 Hit/Miss/Critical outcome；只验证骰值和加总自洽，不重掷或根据 total 重判 natural 1/20。Damage 要求 raw = mitigation + shield absorbed + HP damage，并逐项显示。Status/Reaction/Objective 使用 stable ID 中文目录；Result 必须与 authoritative confirmedResult 一致。无效顺序、重复事件、未知引用、错误算术或 stale revision 均 fail closed。
+
+EnemyIntentPanel 只消费 M8-T01 从 CombatState `enemyIntents` 直投的 display label 与 target hint，保持 Runtime 顺序；不调用 Utility scorer、不刷新 Intent、不解析类别。Combat Log 使用原生 details 默认折叠，展开后按原 sequence 显示；ViewModel replacement 直接替换全部条目，不缓存或合并旧日志。
+
+### 影响与边界
+
+- Event Log snapshot 是只读 Presentation 输入，不成为第二个 CombatState，也不回写 State；durable Active Save/Replay 的正式归档仍按 M10 处理。
+- Log 与 Intent projection 比较前后 canonical State bytes，因而不会消费 initiative/resolution/utilityTieBreak；UI 无随机入口。
+- M8-T08 不实现终局安全提示或全局 zh-CN leakage gate；这些严格留给 M8-T09。

@@ -552,6 +552,89 @@ describe('CombatScreen shell', () => {
     expect((strategy as HTMLSelectElement).value).toBe('BALANCED');
     expect(screen.getByText('使用默认设置')).toBeTruthy();
   });
+
+  it('renders Enemy Intent exactly in Runtime projection order and preserves target hints', () => {
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
+    const intents = screen.getByRole('region', { name: '敌方意图' });
+    const entries = within(intents).getAllByRole('listitem');
+    expect(entries.map((entry) => entry.getAttribute('data-enemy-id'))).toEqual([
+      'enemy-b',
+      'enemy-a',
+    ]);
+    expect(within(entries[0] as HTMLElement).getByText('攻击')).toBeTruthy();
+    expect(
+      within(entries[0] as HTMLElement)
+        .getByText('目标：旅者')
+        .getAttribute('data-target-id'),
+    ).toBe('hero');
+    expect(within(entries[1] as HTMLElement).queryByText(/目标：/)).toBeNull();
+  });
+
+  it('keeps Combat Log collapsed by default and renders authoritative event sequence verbatim', () => {
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
+    const summary = screen.getByText('战斗日志', { exact: false });
+    const details = summary.closest('details');
+    expect(details?.hasAttribute('open')).toBe(false);
+    fireEvent.click(summary);
+    if (!(details instanceof HTMLDetailsElement)) throw new Error('Missing combat log');
+    expect(details.open).toBe(true);
+    const entries = within(details).getAllByRole('listitem');
+    expect(entries.map((entry) => entry.getAttribute('data-event-kind'))).toEqual([
+      'RESOLUTION',
+      'DAMAGE',
+      'STATUS',
+      'REACTION',
+      'OBJECTIVE',
+      'RESULT',
+    ]);
+    expect(entries.map((entry) => entry.getAttribute('value'))).toEqual([
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+    ]);
+    expect(within(details).getByText(/d20 18 \+5 = 23/)).toBeTruthy();
+    expect(within(details).getByText(/减伤 4，护盾吸收 6/)).toBeTruthy();
+    expect(within(details).getByText('守住火种：已完成')).toBeTruthy();
+  });
+
+  it('replaces Intent and Log from a new ViewModel without deriving or retaining old events', () => {
+    const model = viewModel();
+    const rendered = render(<CombatScreen viewModel={model} commandPort={commandPort()} />);
+    rendered.rerender(
+      <CombatScreen
+        viewModel={{
+          ...model,
+          stateRevision: model.stateRevision + 1,
+          enemyIntents: [
+            {
+              ...requiredAt(model.enemyIntents, 0),
+              intentLabelZhCn: '防御',
+              targetHintId: null,
+              targetHintNameZhCn: null,
+            },
+          ],
+          combatLog: [
+            {
+              eventId: 'event-reaction-skip-2',
+              sequence: 7,
+              kind: 'REACTION',
+              titleZhCn: '反应',
+              detailZhCn: '旅者跳过反应：灵力护盾',
+            },
+          ],
+        }}
+        commandPort={commandPort()}
+      />,
+    );
+
+    expect(screen.getByText('防御')).toBeTruthy();
+    expect(screen.queryByText('蓄力')).toBeNull();
+    expect(screen.queryByText(/原始伤害 18/)).toBeNull();
+    expect(screen.getByText('旅者跳过反应：灵力护盾')).toBeTruthy();
+  });
 });
 
 function viewModel(): CombatScreenShellViewModel {
@@ -609,6 +692,22 @@ function viewModel(): CombatScreenShellViewModel {
         stateLabelZhCn: '倒地',
         isActiveTurn: false,
         ...hud(),
+      },
+    ],
+    enemyIntents: [
+      {
+        enemyId: 'enemy-b',
+        enemyDisplayNameZhCn: '灰烬守卫',
+        intentLabelZhCn: '攻击',
+        targetHintId: 'hero',
+        targetHintNameZhCn: '旅者',
+      },
+      {
+        enemyId: 'enemy-a',
+        enemyDisplayNameZhCn: '暮影',
+        intentLabelZhCn: '蓄力',
+        targetHintId: null,
+        targetHintNameZhCn: null,
       },
     ],
     actions: [
@@ -683,6 +782,7 @@ function viewModel(): CombatScreenShellViewModel {
     ],
     pendingReaction: null,
     tacticalSettings: [],
+    combatLog: combatLog(),
   };
 }
 
@@ -755,6 +855,53 @@ function tacticalSettings() {
     protectMainCharacterLabelZhCn: '普通',
     lastAppliedSequence: 0,
   } as const;
+}
+
+function combatLog() {
+  return [
+    {
+      eventId: 'event-resolution-1',
+      sequence: 1,
+      kind: 'RESOLUTION',
+      titleZhCn: '行动判定',
+      detailZhCn: '旅者对灰烬守卫使用余烬斩：d20 18 +5 = 23，对抗 16，暴击',
+    },
+    {
+      eventId: 'event-damage-1',
+      sequence: 2,
+      kind: 'DAMAGE',
+      titleZhCn: '旅者 → 灰烬守卫',
+      detailZhCn: '原始伤害 18，减伤 4，护盾吸收 6，生命损失 8',
+    },
+    {
+      eventId: 'event-status-1',
+      sequence: 3,
+      kind: 'STATUS',
+      titleZhCn: '状态变化',
+      detailZhCn: '灰烬守卫获得状态：燃烧',
+    },
+    {
+      eventId: 'event-reaction-1',
+      sequence: 4,
+      kind: 'REACTION',
+      titleZhCn: '反应',
+      detailZhCn: '旅者发动反应：灵力护盾',
+    },
+    {
+      eventId: 'event-objective-1',
+      sequence: 5,
+      kind: 'OBJECTIVE',
+      titleZhCn: '战斗目标',
+      detailZhCn: '守住火种：已完成',
+    },
+    {
+      eventId: 'event-result-1',
+      sequence: 6,
+      kind: 'RESULT',
+      titleZhCn: '战斗结果',
+      detailZhCn: '胜利',
+    },
+  ] as const;
 }
 
 function requiredAt<T>(values: readonly T[], index: number): T {

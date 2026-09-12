@@ -112,6 +112,98 @@
   font-size: var(--font-size-xs);
 }
 
+.enemy-intent-panel,
+.combat-log {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-translucent);
+}
+
+.enemy-intent-panel h2 {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-sm);
+}
+
+.enemy-intent-panel ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.enemy-intent-panel li {
+  min-width: 10rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-raised);
+}
+
+.enemy-intent-panel li span {
+  color: var(--color-danger);
+  font-weight: var(--font-weight-bold);
+}
+
+.enemy-intent-panel li small {
+  grid-column: 1 / -1;
+  color: var(--color-text-secondary);
+}
+
+.combat-log {
+  width: min(32rem, 100%);
+  max-height: 20rem;
+  justify-self: end;
+  overflow: auto;
+}
+
+.combat-log summary {
+  cursor: pointer;
+  font-weight: var(--font-weight-bold);
+}
+
+.combat-log summary span {
+  min-width: 1.5rem;
+  display: inline-grid;
+  place-items: center;
+  margin-left: var(--space-1);
+  border-radius: var(--radius-pill);
+  color: var(--color-canvas-deep);
+  background: var(--color-accent);
+  font-size: var(--font-size-xs);
+}
+
+.combat-log summary:focus-visible {
+  outline: var(--border-width-medium) solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
+.combat-log ol {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-6);
+}
+
+.combat-log li {
+  padding: var(--space-2);
+  border-bottom: var(--border-width-thin) solid var(--color-border-subtle);
+}
+
+.combat-log li p,
+.combat-log > p {
+  margin: var(--space-1) 0 0;
+  color: var(--color-text-secondary);
+  overflow-wrap: anywhere;
+}
+
 .battle-stage {
   position: relative;
   min-height: 24rem;
