@@ -6347,3 +6347,17 @@
 - Combat persistence schema 专项 3/3 PASS：完整字段（含 pending reaction/scheduler/resolution/cost/result receipt）往返、版本漂移/损坏 checkpoint/孤立 result ID/identity rewrite 拒绝、schema 32→33 保留 campaign 并创建两表。Node migration/startup 联合 14/14 PASS。
 - Rust native schema 32→33 verified-copy migration 与 schema-zero migration 2/2 PASS；备份仍保留原 schema 32 且不含新表。Prettier、ESLint、TypeScript noEmit、rustfmt、native clippy、`git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M2/M3/M4 Gates 与 V5.2 §8.1.1/§11.2.2/§17 已复核，无 SPEC BLOCKER。Portable save v3 未提前变更，兼容性留给 M10-T07。用户 `.gitignore` 保持未纳入提交。M10-T01 PASS；下一项严格为 M10-T02 Stable Checkpoint / Save / Resume。
+
+## 2026-09-13 — M10-T02 完成 Stable Checkpoint / Save / Resume
+
+### Core typed checkpoint 与短事务恢复边界
+
+- 从 M10-T01 提交 `beabf87` 创建 `task/M10-T02-stable-checkpoint-resume`。新增原生 combat persistence module 与 `DEC-240`，通过 `CampaignStore` 将 BattleRecord 和 ActiveCombatSave 在单次短 `IMMEDIATE` transaction 中原子写入；API 返回前完成 commit，Ask Reaction 等待期间不保留 SQLite transaction。
+- Initial/Current CombatState 在写前与读后均执行 supported-version、Core invariant 与 CombatRng restore 校验。Objective、Reinforcement、EventScheduler、PendingReaction、ResolutionContext、Cost snapshots 全部从权威 Current CombatState 直接派生；完整 state、冗余分区与冻结 LoopGuard 合成 SHA-256 checkpoint hash，恢复时逐项交叉复验。
+- Scheduler 的 eventChainId、queue/current、depth、executedEventCount、nextSequence 与 max limits 原样恢复，不从 events 重算 counter。Pending Reaction 使用 Core continuation contract 固定 window、scheduler、ResolutionContext、RNG 和 cost reservations；Objective failure 单调、Reinforcement deployment 单调且 initiative 固定。
+- AcceptedCommands 通过 Core ledger restore 校验连续性和版本；battle events 要求 object shape 并保存 exact JSON digest。Active save persistence revision 每次只加一，InitialState/seed/versions 继续由 schema 33 immutable trigger 保护。
+
+### 验证与结束状态
+
+- Combat persistence Rust 专项 3/3 PASS：真实 Ask Reaction 在落盘后允许第二 SQLite writer、关闭并重开 store 后 state/RNG/scheduler counter+queue/depth/pending context/reservations 完全相等；同一 reaction decision 在 live/resumed 路径产生相同 outcome/state/accepted ledger。另覆盖连续 save revision、冗余 RNG tamper 拒绝，以及冻结 loop guard 与错误当前默认值冲突时拒绝。
+- Rustfmt、native clippy、Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 510 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T02 PASS；下一项严格为 M10-T03 Replay Runner / Deterministic Verification。

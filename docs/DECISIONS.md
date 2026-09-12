@@ -5190,3 +5190,23 @@ ActiveCombatSave 通过 `(combatInstanceId,campaignId)` 外键绑定 BattleRecor
 - Local database schema 从 32 升至 33，TypeScript 与 Rust 使用同一 SQL migration；原库仍先备份再升级，future schema 继续 fail closed。
 - Local schema version 与 portable save schema version 是两种契约；M10-T01 不擅自改变 portable v3 archive。旧存档映射、Active Combat reject/migration 与 portable table allowlist 严格留给 M10-T07。
 - M10-T01 只提供真实持久化结构与约束，不实现 save/resume、replay、result commit 或 Event Ledger 写入；这些按 M10-T02 至 M10-T06 顺序接入。
+
+## DEC-240：稳定检查点由 Combat Core 分区生成，恢复时交叉复验而非历史重算
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §8.1.1/§11.2.2/§17、M10-T02，DEC-239
+
+### 决定
+
+Windows 原生 `CampaignStore` 提供唯一的 combat checkpoint save/restore 边界。保存前先对 InitialState 与 Current CombatState 执行版本、Core invariant 和 RNG restore 校验，再从 Current CombatState 直接派生 Objective、Reinforcement、EventScheduler、PendingReaction、ResolutionContext 与 Cost snapshots；这些冗余分区与完整 state 一起进入确定性 checkpoint hash。恢复时逐项反序列化并重新派生、交叉比较，任一分区、hash、event digest、RNG cursor 或 sequence 不一致均 fail closed。
+
+EventScheduler 的 eventChainId、queue/current item、每项 depth、executedEventCount、nextSequence 和创建时冻结的 maxTriggerDepth/maxEventCount 全部直接保存与恢复，不从 events/history 推算。Ask Reaction 通过 Core `ReactionContinuationSnapshot` 保存 window、scheduler、ResolutionContext、RNG 与 Cost reservations；恢复后继续同一 Command 会与未崩溃路径得到完全相同 state/ledger/outcome。
+
+BattleRecord 与 ActiveCombatSave 在一次短 `IMMEDIATE` transaction 内原子更新，transaction 在 API 返回前提交。等待玩家反应只持有内存/SQLite 已提交数据，不持有长期 transaction。Active save revision 独立单调递增；Objective failure/failure record 不得消失，已部署 Reinforcement 不得退回未部署且预存 initiative 不得改变。
+
+### 影响与边界
+
+- SQLite 仍是唯一 durable truth；恢复不采用当前默认 loop guard 或版本替代存档值，unsupported version 显式拒绝。
+- Battle events 在本任务作为结构化 object list 与 digest 原子保存；正式 Event Ledger 边界仍按顺序留给 M10-T05。
+- Portable archive compatibility、active-combat 导入策略与迁移不在本任务实现，留给 M10-T07。
