@@ -139,6 +139,7 @@ pub struct CombatActionViewModel {
     pub action_id: String,
     pub display_name_zh_cn: String,
     pub kind: CombatActionViewKind,
+    pub requires_target: bool,
     pub enabled: bool,
     pub legal_target_ids: Vec<String>,
     pub disabled_reasons_zh_cn: Vec<String>,
@@ -406,6 +407,7 @@ fn project_actions(
                 || action_ids.insert(action.action_id.as_str(), ()).is_some()
                 || action.is_legal != action.failures.is_empty()
                 || (action.is_legal && action.requires_target && action.legal_target_ids.is_empty())
+                || (!action.requires_target && !action.legal_target_ids.is_empty())
                 || (!action.is_legal && !action.legal_target_ids.is_empty())
                 || !valid_ability_usage(action.kind, action.ability_usage.as_ref())
             {
@@ -416,11 +418,15 @@ fn project_actions(
             }
             let mut targets = BTreeMap::new();
             for target_id in &action.legal_target_ids {
-                if !state_ids.contains_key(target_id.as_str())
-                    || targets.insert(target_id.as_str(), ()).is_some()
-                {
+                if !state_ids.contains_key(target_id.as_str()) {
                     return Err(view_error(
                         CombatViewModelErrorCode::UnknownRulesReference,
+                        target_id,
+                    ));
+                }
+                if targets.insert(target_id.as_str(), ()).is_some() {
+                    return Err(view_error(
+                        CombatViewModelErrorCode::InvalidRulesProjection,
                         target_id,
                     ));
                 }
@@ -436,6 +442,7 @@ fn project_actions(
                 action_id: action.action_id.clone(),
                 display_name_zh_cn: action.display_name_zh_cn.clone(),
                 kind: action.kind,
+                requires_target: action.requires_target,
                 enabled: action.is_legal,
                 legal_target_ids: action.legal_target_ids.clone(),
                 disabled_reasons_zh_cn: reasons,
@@ -685,6 +692,7 @@ mod tests {
             Some("旅者")
         );
         assert_eq!(view.actions[0].legal_target_ids, ["hero", "enemy"]);
+        assert!(view.actions[0].requires_target);
         assert!(view.actions[0].enabled);
         assert_eq!(view.actions[1].disabled_reasons_zh_cn, ["技能仍在冷却"]);
         assert_eq!(
@@ -754,6 +762,28 @@ mod tests {
                 .unwrap_err()
                 .code,
             CombatViewModelErrorCode::UnknownRulesReference
+        );
+
+        let mut targetless_with_target = rules(state.revision);
+        targetless_with_target.actions[0].requires_target = false;
+        assert_eq!(
+            projector
+                .project(&request(&state, &targetless_with_target, &names))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
+        );
+
+        let mut duplicate_targets = rules(state.revision);
+        duplicate_targets.actions[0]
+            .legal_target_ids
+            .push("hero".to_owned());
+        assert_eq!(
+            projector
+                .project(&request(&state, &duplicate_targets, &names))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
         );
 
         let mut invalid_usage = rules(state.revision);

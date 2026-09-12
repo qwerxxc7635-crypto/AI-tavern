@@ -82,6 +82,8 @@ describe('CombatScreen shell', () => {
     const first = viewModel();
     const port = commandPort();
     const rendered = render(<CombatScreen viewModel={first} commandPort={port} />);
+    fireEvent.click(screen.getByRole('button', { name: '余烬斩' }));
+    expect(screen.getByRole('button', { name: '选择灰烬守卫作为余烬斩的目标' })).toBeTruthy();
     const next: CombatScreenShellViewModel = {
       ...first,
       stateRevision: 9,
@@ -105,6 +107,7 @@ describe('CombatScreen shell', () => {
     ).toEqual(['enemy-a', 'hero']);
     expect(screen.getByText('轮到：暮影')).toBeTruthy();
     expect(screen.getByRole('main').getAttribute('data-state-revision')).toBe('9');
+    expect(screen.queryByRole('button', { name: /作为余烬斩的目标/ })).toBeNull();
   });
 
   it('keeps timeline, stage, and combatant primitives independently reusable', () => {
@@ -202,6 +205,100 @@ describe('CombatScreen shell', () => {
     expect(submitted?.payload).toEqual({ kind: 'END_TURN' });
     expect(submitted?.actorId).toBe('hero');
   });
+
+  it('highlights only projected legal targets and submits the selected target as UseAbility', () => {
+    const port = commandPort();
+    render(<CombatScreen viewModel={viewModel()} commandPort={port} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '余烬斩' }));
+    const target = screen.getByRole('button', { name: '选择灰烬守卫作为余烬斩的目标' });
+    expect(screen.queryByRole('button', { name: /选择旅者作为余烬斩/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /选择暮影作为余烬斩/ })).toBeNull();
+    expect(target.closest('[data-combatant-id]')?.getAttribute('data-target-state')).toBe('legal');
+
+    fireEvent.click(target);
+    expect(port.createCommand).toHaveBeenCalledWith({
+      kind: 'USE_ABILITY',
+      abilityId: 'ability.ember-slash',
+      targetId: 'enemy-b',
+    });
+    expect(port.submitCommand.mock.calls[0]?.[0]?.payload).toEqual({
+      kind: 'USE_ABILITY',
+      abilityId: 'ability.ember-slash',
+      targetId: 'enemy-b',
+    });
+    expect(screen.queryByText('正在为“余烬斩”选择目标')).toBeNull();
+  });
+
+  it('uses projected target IDs without inferring side or defeated state in React', () => {
+    const model = viewModel();
+    const action = requiredAt(model.actions, 0);
+    render(
+      <CombatScreen
+        viewModel={{
+          ...model,
+          actions: [{ ...action, legalTargetIds: ['hero', 'enemy-a'] }, ...model.actions.slice(1)],
+        }}
+        commandPort={commandPort()}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '余烬斩' }));
+    expect(screen.getByRole('button', { name: '选择旅者作为余烬斩的目标' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '选择暮影作为余烬斩的目标' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /选择灰烬守卫作为余烬斩/ })).toBeNull();
+  });
+
+  it('cancels target selection explicitly, with Escape, and by clicking the empty stage', () => {
+    const port = commandPort();
+    render(<CombatScreen viewModel={viewModel()} commandPort={port} />);
+    const ability = screen.getByRole('button', { name: '余烬斩' });
+
+    fireEvent.click(ability);
+    fireEvent.click(screen.getByRole('button', { name: '取消选取' }));
+    expect(screen.queryByRole('button', { name: /作为余烬斩的目标/ })).toBeNull();
+
+    fireEvent.click(ability);
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.queryByRole('button', { name: /作为余烬斩的目标/ })).toBeNull();
+
+    fireEvent.click(ability);
+    fireEvent.click(screen.getByRole('region', { name: '战斗场景' }));
+    expect(screen.queryByRole('button', { name: /作为余烬斩的目标/ })).toBeNull();
+    expect(port.submitCommand).not.toHaveBeenCalled();
+  });
+
+  it('submits a targetless projected ability with a null target immediately', () => {
+    const model = viewModel();
+    const action = requiredAt(model.actions, 0);
+    const port = commandPort();
+    render(
+      <CombatScreen
+        viewModel={{
+          ...model,
+          actions: [
+            {
+              ...action,
+              actionId: 'ability.focus-self',
+              displayNameZhCn: '凝神',
+              requiresTarget: false,
+              legalTargetIds: [],
+            },
+            ...model.actions.slice(1),
+          ],
+        }}
+        commandPort={port}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '凝神' }));
+    expect(port.submitCommand.mock.calls[0]?.[0]?.payload).toEqual({
+      kind: 'USE_ABILITY',
+      abilityId: 'ability.focus-self',
+      targetId: null,
+    });
+    expect(screen.queryByRole('button', { name: /作为凝神的目标/ })).toBeNull();
+  });
 });
 
 function viewModel(): CombatScreenShellViewModel {
@@ -266,6 +363,7 @@ function viewModel(): CombatScreenShellViewModel {
         actionId: 'ability.ember-slash',
         displayNameZhCn: '余烬斩',
         kind: 'ABILITY',
+        requiresTarget: true,
         enabled: true,
         legalTargetIds: ['enemy-b'],
         disabledReasonsZhCn: [],
@@ -281,6 +379,7 @@ function viewModel(): CombatScreenShellViewModel {
         actionId: 'ability.spark-shock',
         displayNameZhCn: '星火震荡',
         kind: 'ABILITY',
+        requiresTarget: true,
         enabled: false,
         legalTargetIds: [],
         disabledReasonsZhCn: ['技能仍在冷却'],
@@ -296,6 +395,7 @@ function viewModel(): CombatScreenShellViewModel {
         actionId: 'command.end-turn',
         displayNameZhCn: '结束回合',
         kind: 'END_TURN',
+        requiresTarget: false,
         enabled: true,
         legalTargetIds: [],
         disabledReasonsZhCn: [],

@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useEffect, useId, useState } from 'react';
 
 import type {
   CombatCommandEnvelope,
@@ -71,6 +71,7 @@ export interface CombatActionViewModel {
   readonly actionId: string;
   readonly displayNameZhCn: string;
   readonly kind: CombatActionViewKind;
+  readonly requiresTarget: boolean;
   readonly enabled: boolean;
   readonly legalTargetIds: readonly string[];
   readonly disabledReasonsZhCn: readonly string[];
@@ -102,6 +103,11 @@ export function CombatScreen({
   readonly viewModel: CombatScreenShellViewModel;
   readonly commandPort: CombatCommandPort;
 }) {
+  const [targetSelection, setTargetSelection] = useState<{
+    readonly combatInstanceId: string;
+    readonly stateRevision: number;
+    readonly actionId: string;
+  } | null>(null);
   const party = viewModel.combatants.filter(
     (combatant) => combatant.side === 'PLAYER' || combatant.side === 'COMPANION',
   );
@@ -110,6 +116,60 @@ export function CombatScreen({
   const activeName = viewModel.combatants.find(
     (combatant) => combatant.combatantId === viewModel.activeCombatantId,
   )?.displayNameZhCn;
+  const selectedAction = viewModel.actions.find(
+    (action) =>
+      targetSelection?.combatInstanceId === viewModel.combatInstanceId &&
+      targetSelection.stateRevision === viewModel.stateRevision &&
+      action.actionId === targetSelection.actionId &&
+      action.kind === 'ABILITY' &&
+      action.enabled &&
+      action.requiresTarget,
+  );
+
+  useEffect(() => {
+    if (selectedAction === undefined) return undefined;
+    const cancelOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setTargetSelection(null);
+    };
+    window.addEventListener('keydown', cancelOnEscape);
+    return () => {
+      window.removeEventListener('keydown', cancelOnEscape);
+    };
+  }, [selectedAction]);
+
+  const submitAbility = (action: CombatActionViewModel, targetId: string | null) => {
+    commandPort.submitCommand(
+      commandPort.createCommand({
+        kind: 'USE_ABILITY',
+        abilityId: action.actionId,
+        targetId,
+      }),
+    );
+  };
+
+  const selectAbility = (actionId: string) => {
+    const action = viewModel.actions.find(
+      (candidate) => candidate.actionId === actionId && candidate.kind === 'ABILITY',
+    );
+    if (action === undefined || !action.enabled) return;
+    commandPort.onAbilitySelected(action.actionId);
+    if (!action.requiresTarget) {
+      setTargetSelection(null);
+      submitAbility(action, null);
+      return;
+    }
+    setTargetSelection({
+      combatInstanceId: viewModel.combatInstanceId,
+      stateRevision: viewModel.stateRevision,
+      actionId: action.actionId,
+    });
+  };
+
+  const selectTarget = (targetId: string) => {
+    if (selectedAction === undefined || !selectedAction.legalTargetIds.includes(targetId)) return;
+    submitAbility(selectedAction, targetId);
+    setTargetSelection(null);
+  };
 
   return (
     <main
@@ -131,7 +191,23 @@ export function CombatScreen({
 
       <TurnTimeline entries={viewModel.timeline} />
 
-      <BattleStage party={party} hostiles={hostiles} neutral={neutral} />
+      <BattleStage
+        party={party}
+        hostiles={hostiles}
+        neutral={neutral}
+        targetSelection={
+          selectedAction === undefined
+            ? null
+            : {
+                actionNameZhCn: selectedAction.displayNameZhCn,
+                legalTargetIds: selectedAction.legalTargetIds,
+                onTargetSelected: selectTarget,
+                onCancelled: () => {
+                  setTargetSelection(null);
+                },
+              }
+        }
+      />
 
       {activeName === undefined ? null : (
         <CharacterHUD
@@ -139,7 +215,15 @@ export function CombatScreen({
         />
       )}
 
-      <ActionBar actions={viewModel.actions} commandPort={commandPort} />
+      <ActionBar
+        actions={viewModel.actions}
+        commandPort={commandPort}
+        selectedActionId={selectedAction?.actionId ?? null}
+        onAbilitySelected={selectAbility}
+        onTargetSelectionCancelled={() => {
+          setTargetSelection(null);
+        }}
+      />
     </main>
   );
 }
@@ -177,56 +261,119 @@ export function BattleStage({
   party,
   hostiles,
   neutral,
+  targetSelection = null,
 }: {
   readonly party: readonly CombatantStageViewModel[];
   readonly hostiles: readonly CombatantStageViewModel[];
   readonly neutral: readonly CombatantStageViewModel[];
+  readonly targetSelection?: TargetSelectionViewModel | null;
 }) {
+  const targeting =
+    targetSelection === null
+      ? undefined
+      : {
+          actionNameZhCn: targetSelection.actionNameZhCn,
+          legalTargetIds: new Set(targetSelection.legalTargetIds),
+          onTargetSelected: targetSelection.onTargetSelected,
+        };
   return (
-    <section className="battle-stage" aria-label="战斗场景">
-      <CombatantGroup className="battle-stage__party" label="我方队伍" combatants={party} />
-      <div className="battle-stage__focus" aria-hidden="true">
+    <section
+      className={targetSelection === null ? 'battle-stage' : 'battle-stage is-targeting'}
+      aria-label="战斗场景"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) targetSelection?.onCancelled();
+      }}
+    >
+      <CombatantGroup
+        className="battle-stage__party"
+        label="我方队伍"
+        combatants={party}
+        targeting={targeting}
+      />
+      <div
+        className="battle-stage__focus"
+        aria-hidden="true"
+        onClick={() => {
+          targetSelection?.onCancelled();
+        }}
+      >
         <span />
         <strong>交战区域</strong>
         <span />
       </div>
-      <CombatantGroup className="battle-stage__hostiles" label="敌方队伍" combatants={hostiles} />
+      <CombatantGroup
+        className="battle-stage__hostiles"
+        label="敌方队伍"
+        combatants={hostiles}
+        targeting={targeting}
+      />
       {neutral.length > 0 ? (
-        <CombatantGroup className="battle-stage__neutral" label="中立单位" combatants={neutral} />
+        <CombatantGroup
+          className="battle-stage__neutral"
+          label="中立单位"
+          combatants={neutral}
+          targeting={targeting}
+        />
       ) : null}
     </section>
   );
+}
+
+export interface TargetSelectionViewModel {
+  readonly actionNameZhCn: string;
+  readonly legalTargetIds: readonly string[];
+  readonly onTargetSelected: (targetId: string) => void;
+  readonly onCancelled: () => void;
 }
 
 function CombatantGroup({
   className,
   label,
   combatants,
+  targeting,
 }: {
   readonly className: string;
   readonly label: string;
   readonly combatants: readonly CombatantStageViewModel[];
+  readonly targeting?:
+    | {
+        readonly actionNameZhCn: string;
+        readonly legalTargetIds: ReadonlySet<string>;
+        readonly onTargetSelected: (targetId: string) => void;
+      }
+    | undefined;
 }) {
   return (
     <section className={`combatant-group ${className}`} aria-label={label}>
       <h2>{label}</h2>
       <div className="combatant-group__roster">
         {combatants.map((combatant) => (
-          <CombatantView key={combatant.combatantId} combatant={combatant} />
+          <CombatantView
+            key={combatant.combatantId}
+            combatant={combatant}
+            targetActionNameZhCn={targeting?.actionNameZhCn}
+            isLegalTarget={targeting?.legalTargetIds.has(combatant.combatantId) ?? false}
+            onTargetSelected={targeting?.onTargetSelected}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-export function CombatantView({ combatant }: { readonly combatant: CombatantStageViewModel }) {
-  return (
-    <article
-      className={`combatant-view combatant-view--${combatant.side.toLowerCase()}${combatant.isActiveTurn ? ' is-active' : ''}`}
-      aria-label={`${combatant.displayNameZhCn}，${combatant.sideLabelZhCn}，${combatant.stateLabelZhCn}`}
-      aria-current={combatant.isActiveTurn ? 'true' : undefined}
-      data-combatant-id={combatant.combatantId}
-    >
+export function CombatantView({
+  combatant,
+  targetActionNameZhCn,
+  isLegalTarget = false,
+  onTargetSelected,
+}: {
+  readonly combatant: CombatantStageViewModel;
+  readonly targetActionNameZhCn?: string | undefined;
+  readonly isLegalTarget?: boolean;
+  readonly onTargetSelected?: ((targetId: string) => void) | undefined;
+}) {
+  const content = (
+    <>
       <div className="combatant-view__portrait" aria-hidden="true">
         {firstVisibleCharacter(combatant.displayNameZhCn)}
       </div>
@@ -235,6 +382,32 @@ export function CombatantView({ combatant }: { readonly combatant: CombatantStag
         <span>{combatant.sideLabelZhCn}</span>
       </div>
       <span className="combatant-view__state">{combatant.stateLabelZhCn}</span>
+    </>
+  );
+  return (
+    <article
+      className={`combatant-view combatant-view--${combatant.side.toLowerCase()}${combatant.isActiveTurn ? ' is-active' : ''}${isLegalTarget ? ' is-legal-target' : ''}`}
+      aria-label={`${combatant.displayNameZhCn}，${combatant.sideLabelZhCn}，${combatant.stateLabelZhCn}`}
+      aria-current={combatant.isActiveTurn ? 'true' : undefined}
+      data-combatant-id={combatant.combatantId}
+      data-target-state={
+        targetActionNameZhCn === undefined ? undefined : isLegalTarget ? 'legal' : 'unavailable'
+      }
+    >
+      {isLegalTarget && targetActionNameZhCn !== undefined && onTargetSelected !== undefined ? (
+        <button
+          type="button"
+          className="combatant-view__target"
+          aria-label={`选择${combatant.displayNameZhCn}作为${targetActionNameZhCn}的目标`}
+          onClick={() => {
+            onTargetSelected(combatant.combatantId);
+          }}
+        >
+          {content}
+        </button>
+      ) : (
+        content
+      )}
     </article>
   );
 }
@@ -266,20 +439,41 @@ export function CharacterHUD({ combatant }: { readonly combatant: CombatantStage
 export function ActionBar({
   actions,
   commandPort,
+  selectedActionId = null,
+  onAbilitySelected = commandPort.onAbilitySelected,
+  onTargetSelectionCancelled,
 }: {
   readonly actions: readonly CombatActionViewModel[];
   readonly commandPort: CombatCommandPort;
+  readonly selectedActionId?: string | null;
+  readonly onAbilitySelected?: (actionId: string) => void;
+  readonly onTargetSelectionCancelled?: () => void;
 }) {
   const abilities = actions.filter((action) => action.kind === 'ABILITY');
   const endTurn = actions.find((action) => action.kind === 'END_TURN');
+  const selectedAction = abilities.find((action) => action.actionId === selectedActionId);
   return (
     <section className="action-bar" aria-label="战斗行动">
+      {selectedAction === undefined ? null : (
+        <div className="target-selection-prompt" role="status" aria-live="polite">
+          <span>正在为“{selectedAction.displayNameZhCn}”选择目标</span>
+          <button
+            type="button"
+            onClick={() => {
+              onTargetSelectionCancelled?.();
+            }}
+          >
+            取消选取
+          </button>
+        </div>
+      )}
       <div className="action-bar__abilities" role="group" aria-label="技能">
         {abilities.map((action) => (
           <AbilitySlot
             key={action.actionId}
             action={action}
-            onSelected={commandPort.onAbilitySelected}
+            selected={action.actionId === selectedActionId}
+            onSelected={onAbilitySelected}
           />
         ))}
       </div>
@@ -303,9 +497,11 @@ export function ActionBar({
 
 export function AbilitySlot({
   action,
+  selected = false,
   onSelected,
 }: {
   readonly action: CombatActionViewModel;
+  readonly selected?: boolean;
   readonly onSelected: (actionId: string) => void;
 }) {
   const reasonId = useId();
@@ -315,11 +511,15 @@ export function AbilitySlot({
   const usage = action.abilityUsage;
   const usageLines = abilityUsageLines(usage);
   return (
-    <div className="ability-slot" data-action-id={action.actionId}>
+    <div
+      className={selected ? 'ability-slot is-selected' : 'ability-slot'}
+      data-action-id={action.actionId}
+    >
       <button
         type="button"
         disabled={!action.enabled}
         aria-label={action.displayNameZhCn}
+        aria-pressed={selected}
         aria-describedby={action.enabled ? undefined : reasonId}
         onClick={() => {
           onSelected(action.actionId);

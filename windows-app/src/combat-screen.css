@@ -175,6 +175,37 @@
     var(--et-shadow-md);
 }
 
+.battle-stage.is-targeting .combatant-view[data-target-state='unavailable'] {
+  opacity: 0.55;
+}
+
+.combatant-view.is-legal-target {
+  border-color: var(--color-accent);
+  box-shadow:
+    0 0 0 var(--border-width-medium) var(--et-alpha-copper-24),
+    var(--et-shadow-md);
+}
+
+.combatant-view__target {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 3.4rem minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  border: 0;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.combatant-view__target:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: var(--border-width-medium) solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
 .combatant-view__portrait {
   width: 3.4rem;
   height: 3.4rem;
@@ -424,6 +455,29 @@
   scrollbar-width: thin;
 }
 
+.target-selection-prompt {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: var(--border-width-thin) solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface-translucent);
+}
+
+.target-selection-prompt button {
+  min-height: 2.25rem;
+  padding-inline: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
 .ability-slot {
   position: relative;
   min-width: 9.5rem;
@@ -450,6 +504,18 @@
 .action-bar__end-turn:hover:not(:disabled) {
   border-color: var(--color-accent);
   background: var(--color-surface-translucent);
+}
+
+.ability-slot.is-selected > button {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 var(--border-width-medium) var(--et-alpha-copper-24);
+}
+
+.ability-slot button:focus-visible,
+.action-bar__end-turn:focus-visible,
+.target-selection-prompt button:focus-visible {
+  outline: var(--border-width-medium) solid var(--color-accent);
+  outline-offset: var(--space-1);
 }
 
 .ability-slot button:disabled,

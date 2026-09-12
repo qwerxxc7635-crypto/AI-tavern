@@ -82,7 +82,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M8-T02 — CombatScreen Shell / Stage / Timeline | PASS | 2026-09-10 | 单一语义化 CombatScreen；Timeline 精确按 ViewModel 顺序；Stage 按 typed side 排列 CombatantView；仅使用共享 semantic tokens |
 | M8-T03 — HUD / AP / Resources / Status | PASS | 2026-09-10 | Active CharacterHUD 显示生命/护盾、精确 AP、Reaction、ViewModel 差异资源/Heat 阈值与 StatusStrip；无规则写入 |
 | M8-T04 — ActionBar / AbilitySlot / EndTurn | PASS | 2026-09-10 | AbilitySlot 显示 Rules-projected cooldown/usage/disabled reason；选择 ability 不写状态，独立 EndTurn 经注入 command port 提交真实 CombatCommandEnvelope |
-| M8-T05 — Target Selection | IN_PROGRESS | 2026-09-10 | 下一项；唯一事实源 GetLegalTargets，支持 select/cancel/Esc/empty click，UI 不推断目标规则 |
+| M8-T05 — Target Selection | PASS | 2026-09-12 | requiresTarget 与唯一 legalTargetIds 来自 Rules projection；只将返回对象变成目标按钮，支持 select/显式取消/Esc/空白取消并提交标准 UseAbility Command |
+| M8-T06 — Cost Preview / Tooltip | IN_PROGRESS | 2026-09-12 | 下一项；Hover/Focus/Selected 显示 AP/resource/Heat before→after，组合程序机械层与 AI flavor，不消费规则 RNG |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

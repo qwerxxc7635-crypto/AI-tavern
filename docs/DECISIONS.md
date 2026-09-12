@@ -4908,3 +4908,23 @@ EndTurn 作为 AbilitySlot 列表外的独立操作，通过 application boundar
 - Combat ViewModel 携带 State 的 CombatVersionSet，使后续 application command factory 可绑定当前协议版本；该字段仍是只读 projection。
 - M8-T04 不实现 target highlight、cost preview、tooltip、reaction 或 combat log；选择 Ability 后不会绕开 M8-T05/M1-T07 的 GetLegalTargets 边界。
 - ActionBar 使用同一 semantic-token UI，与四 World Theme 解耦；滚动和响应式布局不改变 action 顺序或合法性。
+
+## DEC-226：Target Selection 精确消费 Rules legalTargetIds 并绑定当前 revision
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §18.4、M1-T07/M8-T04/M8-T05，DEC-222、DEC-225
+
+### 决定
+
+Combat Presentation 在 action ViewModel 中显式投影 `requiresTarget`，并 fail closed 拒绝 required target 的空合法集合、targetless action 的非空集合、未知或重复 target ID。React 不调用阵营、生命状态、Ability tag 或名称推断；进入选择态后只把 `legalTargetIds` 中的 Combatant 渲染为原生 button，其他对象明确保持 unavailable，即使 Rules 合法覆盖为友方、Downed 敌方或其他非常规组合也照单呈现。
+
+选择态绑定 `combatInstanceId + stateRevision + actionId`，ViewModel revision 或战斗实例变化时不再投影旧选择，避免 stale legal targets 在 effect 执行前短暂可点击。目标按钮提交既有 `USE_ABILITY` payload，application command factory 仍拥有 command identity/source/version；提交前再次检查 target 是否仍在当前 selected action 的 legalTargetIds 中。targetless ability 使用 `targetId=null`，不伪造自选目标。
+
+取消路径包括 ActionBar 的显式“取消选取”、全局 Escape 和 BattleStage 空白区域；三者只清除 ephemeral UI selection，不提交 Command、不修改 CombatState。目标使用语义 button、可见 focus ring、aria label 和 live selection prompt，鼠标与键盘共享同一合法目标集合。
+
+### 影响与边界
+
+- M8-T05 的 GetLegalTargets 输入是 M8-T01 same-revision Rules projection；UI 不维护第二份 target rule 或缓存跨 revision 结果。
+- Cost/Resource Preview 与 mechanical tooltip 仍由 M8-T06 注入；本任务不读取或消费任何 RNG，也不实现 Reaction、Log 或 Theme package。
+- Stage/CombatantView 继续可独立展示；只有存在 active target selection 时，合法对象才增加交互控件。

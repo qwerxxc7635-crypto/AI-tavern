@@ -6137,3 +6137,18 @@
 - CombatScreen/ActionBar jsdom 专项 14/14 PASS，覆盖 ability selection 零提交、cooldown/usage/reason、disabled 零选择与独立 EndTurn 单次真实 Command 提交；Presentation crate 11/11 PASS，含非法 usage projection 拒绝。
 - TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1152 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T01 DependsOn 与 V5.2 §17.1/§18.3 已复核；没有提前实现 Target Selection、Cost Preview、Reaction、Log 或 Theme package，无 SPEC BLOCKER。用户 `.gitignore` 保持未纳入提交。M8-T04 PASS；下一项严格为 M8-T05 Target Selection。
+
+## 2026-09-12 — M8-T05 完成 Target Selection
+
+### Rules-only legal targets 与 revision-bound ephemeral selection
+
+- 从 M8-T04 提交 `372b6bd` 创建 `task/M8-T05-target-selection`。Combat Presentation action ViewModel 增加 `requiresTarget`；Projector 拒绝 required target 空集合、targetless 非空集合、未知及重复 legal target，并继续只透传 M1-T07/Rules 的同 revision 结果。新增 `DEC-226`。
+- CombatScreen 的 ephemeral selection 绑定 combatInstanceId/stateRevision/actionId；revision 或战斗实例替换后旧目标立即不可交互。选择 Ability 只用 ViewModel 的 legalTargetIds 标记目标，没有敌我、Downed、亡灵、隐身、攻击或治疗推断。
+- 合法目标成为带中文 aria label 与可见 focus ring 的原生 button；选择后以既有 contracts command factory/submission port 提交 `USE_ABILITY`。targetless ability 提交 null target；handler 在提交前再次检查当前 target membership，UI 不直接改 State。
+- ActionBar 显示 live target prompt 和显式取消按钮；Escape、显式取消及 BattleStage 空白点击均只清除 selection、零 Command。测试用非常规“主角 + Downed 敌人”合法集合证明 UI 不复制默认阵营/状态规则。
+
+### 验证与结束状态
+
+- CombatScreen/Target Selection jsdom 专项 18/18 PASS，覆盖 exact legal highlight 与 UseAbility envelope、非常规 Rules target override、三类取消、targetless ability、disabled+reason，以及 ViewModel revision replacement 清除 stale selection；Presentation crate 11/11 PASS，含 target cardinality/唯一性拒绝。
+- TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1156 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T04/M1-T07 DependsOn 与 V5.2 §18.4 已复核；Cost Preview 按任务边界保留给 M8-T06，无 SPEC BLOCKER。UI styling skill 用于语义 button、focus、live prompt、键盘 Escape 与响应式目标态；用户 `.gitignore` 保持未纳入提交。M8-T05 PASS；下一项严格为 M8-T06 Cost Preview / Tooltip。
