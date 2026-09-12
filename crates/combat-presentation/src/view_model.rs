@@ -332,7 +332,27 @@ pub struct CombatViewModel {
     pub pending_reaction: Option<CombatReactionPromptViewModel>,
     pub tactical_settings: Vec<CompanionTacticalViewModel>,
     pub combat_log: Vec<CombatLogEntryViewModel>,
-    pub result_label_zh_cn: Option<String>,
+    pub result: Option<CombatResultViewModel>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CombatResultViewKind {
+    Victory,
+    Defeat,
+    Escape,
+    ScriptedVictory,
+    ScriptedDefeat,
+    Aborted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatResultViewModel {
+    pub kind: CombatResultViewKind,
+    pub title_zh_cn: String,
+    pub detail_zh_cn: String,
+    pub is_safe_abort: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -637,11 +657,7 @@ impl<'a> CombatViewModelProjector<'a> {
             pending_reaction,
             tactical_settings,
             combat_log,
-            result_label_zh_cn: request
-                .state
-                .confirmed_result
-                .map(result_label)
-                .map(str::to_owned),
+            result: request.state.confirmed_result.map(project_result),
         })
     }
 }
@@ -1386,6 +1402,39 @@ const fn result_label(result: CombatResultType) -> &'static str {
     }
 }
 
+fn project_result(result: CombatResultType) -> CombatResultViewModel {
+    let (kind, detail_zh_cn, is_safe_abort) = match result {
+        CombatResultType::Victory => (CombatResultViewKind::Victory, "你已赢得这场战斗。", false),
+        CombatResultType::Defeat => (
+            CombatResultViewKind::Defeat,
+            "队伍已败退，当前战斗已经结束。",
+            false,
+        ),
+        CombatResultType::Escape => (CombatResultViewKind::Escape, "队伍已安全脱离战斗。", false),
+        CombatResultType::ScriptedVictory => (
+            CombatResultViewKind::ScriptedVictory,
+            "剧情目标已经达成，战斗结束。",
+            false,
+        ),
+        CombatResultType::ScriptedDefeat => (
+            CombatResultViewKind::ScriptedDefeat,
+            "剧情战斗已经结束。",
+            false,
+        ),
+        CombatResultType::Aborted => (
+            CombatResultViewKind::Aborted,
+            "战斗已安全中止，存档状态未被继续推进。",
+            true,
+        ),
+    };
+    CombatResultViewModel {
+        kind,
+        title_zh_cn: result_label(result).to_owned(),
+        detail_zh_cn: detail_zh_cn.to_owned(),
+        is_safe_abort,
+    }
+}
+
 const fn precondition_failure_label(code: PreconditionFailureCode) -> &'static str {
     match code {
         PreconditionFailureCode::SourceNotAuthorized => "当前角色不受你控制",
@@ -1469,6 +1518,7 @@ mod tests {
             Some("旅者")
         );
         assert_eq!(view.actions[0].legal_target_ids, ["hero", "enemy"]);
+        assert_eq!(view.result, None);
         assert!(view.actions[0].requires_target);
         assert!(view.actions[0].enabled);
         assert_eq!(
@@ -1499,6 +1549,68 @@ mod tests {
             2
         );
         assert_eq!(state.canonical_json_bytes().unwrap(), state_before);
+    }
+
+    #[test]
+    fn projects_every_terminal_result_to_fixed_safe_chinese_copy() {
+        let cases = [
+            (
+                CombatResultType::Victory,
+                CombatResultViewKind::Victory,
+                "胜利",
+                "你已赢得这场战斗。",
+                false,
+            ),
+            (
+                CombatResultType::Defeat,
+                CombatResultViewKind::Defeat,
+                "战败",
+                "队伍已败退，当前战斗已经结束。",
+                false,
+            ),
+            (
+                CombatResultType::Escape,
+                CombatResultViewKind::Escape,
+                "撤退成功",
+                "队伍已安全脱离战斗。",
+                false,
+            ),
+            (
+                CombatResultType::ScriptedVictory,
+                CombatResultViewKind::ScriptedVictory,
+                "剧情胜利",
+                "剧情目标已经达成，战斗结束。",
+                false,
+            ),
+            (
+                CombatResultType::ScriptedDefeat,
+                CombatResultViewKind::ScriptedDefeat,
+                "剧情战败",
+                "剧情战斗已经结束。",
+                false,
+            ),
+            (
+                CombatResultType::Aborted,
+                CombatResultViewKind::Aborted,
+                "战斗已安全中止",
+                "战斗已安全中止，存档状态未被继续推进。",
+                true,
+            ),
+        ];
+
+        for (result, kind, title, detail, is_safe_abort) in cases {
+            let projected = project_result(result);
+            assert_eq!(projected.kind, kind);
+            assert_eq!(projected.title_zh_cn, title);
+            assert_eq!(projected.detail_zh_cn, detail);
+            assert_eq!(projected.is_safe_abort, is_safe_abort);
+            let visible = format!("{} {}", projected.title_zh_cn, projected.detail_zh_cn);
+            for forbidden in [
+                "MISS", "CRITICAL", "HIT", "Health", "Mana", "Error:", " at ",
+            ] {
+                assert!(!visible.contains(forbidden));
+            }
+        }
     }
 
     #[test]

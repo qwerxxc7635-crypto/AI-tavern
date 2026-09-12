@@ -6197,3 +6197,18 @@
 - CombatScreen/Log/Intent jsdom 专项 29/29 PASS，覆盖 Runtime Intent 顺序/target hint、日志默认折叠、六类 event 顺序与逐字段文案、revision replacement 丢弃旧事件；Presentation crate 15/15 PASS，覆盖六类 typed event、算术/sequence/reference/result validation 与零 State/RNG mutation。
 - TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1167 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 506 PASS、1 credential-only ignore，archive interop 双向通过。
 - M7-T06/M3 Gate DependsOn 与 V5.2 §11/§19/§24 已复核；没有进入 CombatResult safety/zh-CN leakage gate 或 Theme，无 SPEC BLOCKER。UI styling skill 用于语义 details、focus、默认折叠、响应式 intent cards 与长日志 wrapping；用户 `.gitignore` 保持未纳入提交。M8-T08 PASS；下一项严格为 M8-T09 CombatResult + zh-CN Leakage Gate。
+
+## 2026-09-12 — M8-T09 完成 CombatResult + zh-CN Leakage Gate
+
+### 封闭安全结算与主题无关语义
+
+- 从 M8-T08 提交 `b2cd04e` 创建 `task/M8-T09-result-zh-gate`。Combat Presentation 用结构化 `CombatResultViewModel` 穷举 Victory/Defeat/Escape/ScriptedVictory/ScriptedDefeat/Aborted；新增 `DEC-230`。title/detail 全为程序固定中文，Aborted 只说明安全中止与状态未继续推进，不存在接收 error code、subject 或 stack trace 的字段。
+- `CombatResultPanel` 只消费 confirmed result projection，以轻量 `role=status` 区域显示结算，不根据 HP、Event Log 或 Theme 推断结果。machine kind 仅在 data contract 中保留，普通玩家文本不渲染 raw enum。
+- 扩展既有 player-language AST gate，显式拦截 MISS/CRITICAL/HIT/Health/Mana、全大写下划线 raw enum/error code、常见 Error 与调用栈形态；反例测试同时证明 machine-only 常量不被误判。
+- M8 Gate 把同一 ViewModel/Command Port 放入 fantasy/science-fiction/cultivation/urban 四类主题容器，逐项比较 heading、button、timeline 与实际 `END_TURN` payload，确认 Theme 不分叉 Combat API 语义。Theme Manifest/Resolver/Asset package 仍留给 M9。
+
+### 验证与结束状态
+
+- CombatScreen jsdom 专项 36/36 PASS，覆盖六类安全结果、Aborted 样式/无内部泄漏及四主题语义与 Command 一致；Presentation crate 16/16 PASS，覆盖六类 Core enum 穷举映射；player-language Node 专项 5/5 PASS。
+- TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1174 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T02..T08 DependsOn 与外部 M8-T09 Scope/DoD 已复核，无 SPEC BLOCKER。UI styling skill 用于轻量状态区域、语义色、动态文本 wrapping 与主题无关可访问结构；用户 `.gitignore` 保持未纳入提交。M8-T09 与 M8 Gate PASS；下一项严格为 M9-T01 Theme Manifest Schema。

@@ -122,6 +122,34 @@
   background: var(--color-surface-translucent);
 }
 
+.combat-result {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border: var(--border-width-medium) solid var(--color-positive);
+  border-radius: var(--radius-md);
+  background: var(--color-positive-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.combat-result.is-safe-abort {
+  border-color: var(--color-danger);
+  background: var(--color-danger-surface);
+}
+
+.combat-result p,
+.combat-result h2 {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.combat-result > p:first-child {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-bold);
+  letter-spacing: var(--letter-spacing-wide);
+}
+
 .enemy-intent-panel h2 {
   margin: 0;
   color: var(--color-text-secondary);

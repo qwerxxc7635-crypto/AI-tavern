@@ -145,6 +145,17 @@ export interface CombatScreenShellViewModel {
   readonly pendingReaction: CombatReactionPromptViewModel | null;
   readonly tacticalSettings: readonly CompanionTacticalViewModel[];
   readonly combatLog: readonly CombatLogEntryViewModel[];
+  readonly result: CombatResultViewModel | null;
+}
+
+export type CombatResultViewKind =
+  'VICTORY' | 'DEFEAT' | 'ESCAPE' | 'SCRIPTED_VICTORY' | 'SCRIPTED_DEFEAT' | 'ABORTED';
+
+export interface CombatResultViewModel {
+  readonly kind: CombatResultViewKind;
+  readonly titleZhCn: string;
+  readonly detailZhCn: string;
+  readonly isSafeAbort: boolean;
 }
 
 export interface EnemyIntentViewModel {
@@ -367,6 +378,8 @@ export function CombatScreen({
 
       <CombatLog entries={viewModel.combatLog} />
 
+      {viewModel.result === null ? null : <CombatResultPanel result={viewModel.result} />}
+
       {activeName === undefined ? null : (
         <CharacterHUD
           combatant={requiredCombatant(viewModel.combatants, viewModel.activeCombatantId)}
@@ -391,6 +404,22 @@ export function CombatScreen({
         />
       )}
     </main>
+  );
+}
+
+export function CombatResultPanel({ result }: { readonly result: CombatResultViewModel }) {
+  return (
+    <section
+      className={result.isSafeAbort ? 'combat-result is-safe-abort' : 'combat-result'}
+      role="status"
+      aria-live="polite"
+      aria-atomic="true"
+      data-result-kind={result.kind}
+    >
+      <p>战斗结算</p>
+      <h2>{result.titleZhCn}</h2>
+      <p>{result.detailZhCn}</p>
+    </section>
   );
 }
 

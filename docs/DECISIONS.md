@@ -4988,3 +4988,23 @@ EnemyIntentPanel 只消费 M8-T01 从 CombatState `enemyIntents` 直投的 displ
 - Event Log snapshot 是只读 Presentation 输入，不成为第二个 CombatState，也不回写 State；durable Active Save/Replay 的正式归档仍按 M10 处理。
 - Log 与 Intent projection 比较前后 canonical State bytes，因而不会消费 initiative/resolution/utilityTieBreak；UI 无随机入口。
 - M8-T08 不实现终局安全提示或全局 zh-CN leakage gate；这些严格留给 M8-T09。
+
+## DEC-230：CombatResult 使用封闭安全文案，主题不得分叉 Combat API 语义
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §17.1/§18/M8-T09、M8 Gate，DEC-222 至 DEC-229
+
+### 决定
+
+Combat Presentation 从 authoritative `confirmedResult` 穷举投影 Victory、Defeat、Escape、ScriptedVictory、ScriptedDefeat、Aborted 六类 `CombatResultViewModel`。玩家可见 title/detail 是程序内固定中文文案；Aborted 只说明战斗安全中止及状态未继续推进，没有接收或拼接异常对象、错误码、内部 subject、stack trace 的字段。machine kind 仅作为结构化数据存在，不作为玩家文案渲染。
+
+CombatResultPanel 使用轻量 `role=status` 区域展示投影结果，不创建第二套结果判定，也不根据 log、HP 或主题推断胜负。玩家语言检查在既有 TSX/资源扫描上显式拒绝 MISS/CRITICAL/HIT/Health/Mana、全大写下划线 raw enum/error code，以及常见错误/调用栈形态；machine-only 常量不被当作玩家文案扫描。
+
+M8 Gate 将同一 Combat ViewModel 与 Command Port 放入 fantasy/science-fiction/cultivation/urban 四个 World Theme 容器，要求 heading、control、timeline 顺序及提交的 Command payload 完全一致。Theme 只能改变 semantic-token/asset/layout 呈现，不能分叉 State、Rules、Command 或 UI 行为。
+
+### 影响与边界
+
+- Rust Result 映射是封闭穷举；新增 Core result kind 时编译即要求补齐安全文案。
+- 四 Theme 的 Manifest、resolver、fallback 和 Runtime assets 严格留给 M9；M8 只建立不可改变 Combat API 语义的验收基线。
+- 本任务不为终局添加继续、重试或存档 mutation；这些必须由后续正式 application flow 定义。

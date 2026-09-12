@@ -145,8 +145,23 @@ export function unexpectedEnglishWords(text) {
     .filter((word) => word.length > 1 && !ALLOWED_WORDS.has(word.toLowerCase()));
 }
 
+export function unsafePlayerLeakageTokens(text) {
+  const findings = new Set();
+  for (const match of text.matchAll(/\b(?:MISS|CRITICAL|HIT|Health|Mana)\b/gu)) {
+    findings.add(match[0]);
+  }
+  for (const match of text.matchAll(/\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\b/gu)) {
+    findings.add(match[0]);
+  }
+  if (/\b(?:Error|TypeError|ReferenceError|RangeError):/gu.test(text)) {
+    findings.add('错误堆栈');
+  }
+  if (/(?:^|\n)\s*at\s+\S+/gu.test(text)) findings.add('调用堆栈');
+  return [...findings];
+}
+
 function findingForText(text, path, line) {
-  const words = [...new Set(unexpectedEnglishWords(text))];
+  const words = [...new Set([...unexpectedEnglishWords(text), ...unsafePlayerLeakageTokens(text)])];
   return words.length === 0 ? [] : [{ path, line, text: text.trim(), words }];
 }
 

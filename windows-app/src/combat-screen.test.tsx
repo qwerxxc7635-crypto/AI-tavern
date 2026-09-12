@@ -635,6 +635,69 @@ describe('CombatScreen shell', () => {
     expect(screen.queryByText(/原始伤害 18/)).toBeNull();
     expect(screen.getByText('旅者跳过反应：灵力护盾')).toBeTruthy();
   });
+
+  it.each([
+    ['VICTORY', '胜利', '你已赢得这场战斗。', false],
+    ['DEFEAT', '战败', '队伍已败退，当前战斗已经结束。', false],
+    ['ESCAPE', '撤退成功', '队伍已安全脱离战斗。', false],
+    ['SCRIPTED_VICTORY', '剧情胜利', '剧情目标已经达成，战斗结束。', false],
+    ['SCRIPTED_DEFEAT', '剧情战败', '剧情战斗已经结束。', false],
+    ['ABORTED', '战斗已安全中止', '战斗已安全中止，存档状态未被继续推进。', true],
+  ] as const)(
+    'renders the safe Chinese terminal prompt for %s without exposing its machine kind',
+    (kind, titleZhCn, detailZhCn, isSafeAbort) => {
+      const model = viewModel();
+      render(
+        <CombatScreen
+          viewModel={{
+            ...model,
+            result: { kind, titleZhCn, detailZhCn, isSafeAbort },
+          }}
+          commandPort={commandPort()}
+        />,
+      );
+
+      const result = screen.getByRole('status');
+      expect(within(result).getByRole('heading', { name: titleZhCn })).toBeTruthy();
+      expect(within(result).getByText(detailZhCn)).toBeTruthy();
+      expect(result.textContent).not.toMatch(
+        /MISS|CRITICAL|HIT|Health|Mana|[A-Z][A-Z0-9]+_[A-Z0-9_]+|\w+Error:|\n\s*at\s/u,
+      );
+      expect(result.textContent).not.toContain(kind);
+      expect(result.classList.contains('is-safe-abort')).toBe(isSafeAbort);
+    },
+  );
+
+  it('keeps the same Combat API semantics in all four future world-theme containers', () => {
+    const themes = ['fantasy', 'science-fiction', 'cultivation', 'urban'] as const;
+    const semantics = themes.map((theme) => {
+      const port = commandPort();
+      const rendered = render(
+        <div data-world-theme={theme}>
+          <CombatScreen viewModel={viewModel()} commandPort={port} />
+        </div>,
+      );
+      const main = screen.getByRole('main', { name: '战斗界面' });
+      const snapshot = {
+        headings: within(main)
+          .getAllByRole('heading')
+          .map((heading) => heading.textContent),
+        buttons: within(main)
+          .getAllByRole('button')
+          .map((button) => button.textContent),
+        timeline: within(screen.getByRole('navigation', { name: '行动顺序' }))
+          .getAllByRole('listitem')
+          .map((entry) => entry.getAttribute('data-combatant-id')),
+      };
+      fireEvent.click(screen.getByRole('button', { name: '结束回合' }));
+      expect(port.submitCommand).toHaveBeenCalledTimes(1);
+      expect(port.submitCommand.mock.calls[0]?.[0].payload).toEqual({ kind: 'END_TURN' });
+      rendered.unmount();
+      return snapshot;
+    });
+
+    expect(semantics.slice(1)).toEqual([semantics[0], semantics[0], semantics[0]]);
+  });
 });
 
 function viewModel(): CombatScreenShellViewModel {
@@ -783,6 +846,7 @@ function viewModel(): CombatScreenShellViewModel {
     pendingReaction: null,
     tacticalSettings: [],
     combatLog: combatLog(),
+    result: null,
   };
 }
 

@@ -5,6 +5,7 @@ import {
   inspectPlainText,
   inspectResource,
   inspectSource,
+  unsafePlayerLeakageTokens,
   unexpectedEnglishWords,
 } from './player-language.mjs';
 
@@ -44,4 +45,37 @@ test('scans resource values and changelog text without treating machine cases as
     2,
   );
   assert.equal(inspectPlainText('# 更新日志\n\n- Added settings').length, 1);
+});
+
+test('rejects combat outcome tokens, raw enums, error codes and stack traces in player copy', () => {
+  const findings = inspectSource(
+    `
+    function UnsafeResult() {
+      return <section aria-label="COMBAT_RESULT_ERROR">MISS CRITICAL HIT Health Mana{` +
+      '`TypeError: failed\n    at render (combat.tsx:4:2)`' +
+      `}</section>;
+    }
+  `,
+  );
+  const words = new Set(findings.flatMap(({ words: leaked }) => leaked));
+  for (const token of [
+    'MISS',
+    'CRITICAL',
+    'HIT',
+    'Health',
+    'Mana',
+    'COMBAT_RESULT_ERROR',
+    '错误堆栈',
+    '调用堆栈',
+  ]) {
+    assert.equal(words.has(token), true, `${token} should be rejected`);
+  }
+});
+
+test('does not mistake Chinese combat copy or machine-only values for player leakage', () => {
+  assert.deepEqual(unsafePlayerLeakageTokens('胜利 · 生命 · 法力 · 未命中 · 暴击'), []);
+  assert.equal(
+    inspectSource(`const kind = 'SCRIPTED_VICTORY'; const code = 'COMBAT_RESULT_ERROR';`).length,
+    0,
+  );
 });

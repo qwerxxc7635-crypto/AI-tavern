@@ -86,7 +86,9 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M8-T06 — Cost Preview / Tooltip | PASS | 2026-09-12 | Rules projection 校验 active actor AP/resource before→after 与 Heat 阈值；Hover/Focus/Selected 展示既有 Programmatic Mechanical Tooltip + validated AI flavor，零 RNG |
 | M8-T07 — Reaction / Tactical Strategy UI | PASS | 2026-09-12 | Auto/Ask/Disabled 中文模式、轻量 Pending Reaction Trigger/Skip 与恢复；正式队友五策略/四偏好均提交 Command，零乐观权威改写 |
 | M8-T08 — Combat Log / Enemy Intent | PASS | 2026-09-12 | same-revision typed Event Log 程序化解释 D20/outcome/damage/mitigation/shield/status/reaction/objective/result；Intent 直投 Runtime Plan；默认折叠且零 RNG |
-| M8-T09 — CombatResult + zh-CN Leakage Gate | IN_PROGRESS | 2026-09-12 | 下一项；Victory/Defeat/Escape/Scripted/Aborted 安全提示，自动阻止 raw Enum/error code/stack trace/英文战斗术语泄漏并完成 M8 Gate |
+| M8-T09 — CombatResult + zh-CN Leakage Gate | PASS | 2026-09-12 | 六类 confirmed result 穷举为固定中文安全提示；Aborted 不接收内部详情；静态门禁阻止英文战斗术语、raw enum/error code/stack trace；四主题容器 Combat API 语义一致 |
+| M8 Gate — Combat Presentation / zh-CN | PASS | 2026-09-12 | M8-T01..T09 独立验收；同一只读 ViewModel/Command Port 在四 World Theme 容器下保持 timeline、controls、command payload 与玩家中文语义一致 |
+| M9-T01 — Theme Manifest Schema | IN_PROGRESS | 2026-09-12 | 下一项；stable theme id、asset slot mapping、layout preset、fallback、version，且 Manifest 不携带 Combat Rule 语义 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
