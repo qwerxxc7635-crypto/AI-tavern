@@ -6302,3 +6302,18 @@
 - Sci-Fi/Fantasy/Cultivation/CombatScreen 联合专项 67/67 PASS；Sci-Fi 自身 11/11，含 28 slots、transparency、7 digest、AP Empty 双锁与三资源 binding。Prettier、TypeScript noEmit、ESLint、`git diff --check` PASS。
 - 最终工作树完整 `pnpm check` PASS：Vitest 199 files / 1231 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M9-T02 DependsOn 与 V5.2 §8.1/§14/§25.4、FINAL scifi manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于共享状态变体与 Shield/Heat 层级；未接入 Urban/common。用户 `.gitignore` 保持未纳入提交。M9-T06 PASS；下一项严格为 M9-T07 Urban Theme Integration。
+
+## 2026-09-12 — M9-T07 完成 Urban Theme Integration
+
+### FINAL 都市资产与扁平 Tactical 变体
+
+- 从 M9-T06 提交 `d055593` 创建 `task/M9-T07-urban-theme`。原样复制 FINAL Urban 27 PNG，排除 `.DS_Store`；新增 public/in-code urban-default manifests 与 `DEC-237`。
+- 27 slots 经 shared schema/resolver/binding 零 warning；Stamina/Focus 与 Urban results 使用 urban LayoutPreset，22 个共享 UI slots 继续复用单一 CombatScreen。
+- Tactical fieldset 仅调整圆角/阴影呈现，不改变表单控件、选项、Command 或 accepted-only 语义。Bullet Impact/Psychic 与 boss timeline 只绑定 visual variables，等待权威 presentation facts。
+- 全部文件逐一验证 PNG signature、正 dimensions、RGBA；Hover/Selected/Disabled、EndTurn Hover/Pressed、AP Empty、Bullet Impact digest 与 FINAL 匹配。
+
+### 验证与结束状态
+
+- Urban/Sci-Fi/Fantasy/Cultivation/CombatScreen 联合专项 77/77 PASS；Urban 自身 10/10，覆盖 manifest/27 slots/transparency/7 digest/Stamina+Focus binding。Prettier、TypeScript noEmit、ESLint、`git diff --check` PASS。
+- 最终工作树完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M9-T02 DependsOn 与 V5.2 §25.4、FINAL urban manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于扁平但可访问的 Tactical variant；common/aggregate/performance 未提前实现。用户 `.gitignore` 保持未纳入提交。M9-T07 PASS；下一项严格为 M9-T08 Final Runtime Asset Package / Performance Gate。

@@ -5130,3 +5130,23 @@ Sci-Fi 28 张 FINAL RGBA assets 原样进入 scifi-default package。与其他�
 - Sci-Fi LayoutPreset 只改变 Shield/Energy/Heat 与结果视觉，不改变 Shield damage pipeline、Heat lifecycle 或 AP 当前值。
 - M9-T06 不接入 Urban/common，也不添加像素分析或运行时图片解码；M9-T08 负责全包 integrity/performance。
 - 共享 accessibility/focus/disabled/reduced-motion 结构继续由单一 CombatScreen 保持。
+
+## DEC-237：Urban 扁平变体只改变资源与战术面板外观
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §25.4、M9-T07、FINAL Urban assets，DEC-234 至 DEC-236
+
+### 决定
+
+Urban 27 张 FINAL RGBA assets 原样进入 urban-default package，22 个共享 slots 继续使用单一 CombatScreen selectors；Stamina/Focus、Bullet Impact/Psychic 与 Urban results 由同一 manifest/resolver/binding 提供。
+
+Urban LayoutPreset 的局部差异限于 Stamina/Focus frame、result frames，以及 Tactical fieldset 更小圆角/无阴影的扁平表现。它不改变 Tactical controls、策略选项、acceptedSequence、Command payload 或队友决策。Scripted results 复用对应 Urban frame，Aborted 保持 Base 安全提示。
+
+全部 27 paths 校验存在且 RGBA，关键交互状态/AP Empty/FX 锁定 FINAL digest；public 与 in-code manifests 保持相等，binding 零 warning。
+
+### 影响与边界
+
+- 都市主题不复制 React component，也不添加按 WorldType 分支的 Command handler。
+- M9-T07 完成四个世界 package 接入；common VFX、全 119 integrity 与 performance 统一留给 M9-T08。
+- 视觉扁平化不降低 focus、disabled、responsive 或 reduced-motion 标准。

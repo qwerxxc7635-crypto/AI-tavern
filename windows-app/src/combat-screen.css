@@ -1123,6 +1123,41 @@
     var(--combat-asset-theme-scifi-combat-result-escape, none);
 }
 
+.combat-screen[data-layout-preset='urban'] .resource-hud__item[data-resource-id='stamina'] {
+  padding: var(--space-2);
+  background: var(--combat-asset-urban-resource-stamina-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-layout-preset='urban'] .resource-hud__item[data-resource-id='focus'] {
+  padding: var(--space-2);
+  background: var(--combat-asset-urban-resource-focus-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-layout-preset='urban'] .tactical-strategy-panel fieldset {
+  border-radius: var(--radius-xs);
+  box-shadow: none;
+}
+
+.combat-screen[data-layout-preset='urban'] .combat-result[data-result-kind='VICTORY'],
+.combat-screen[data-layout-preset='urban'] .combat-result[data-result-kind='SCRIPTED_VICTORY'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-urban-combat-result-victory, none);
+}
+
+.combat-screen[data-layout-preset='urban'] .combat-result[data-result-kind='DEFEAT'],
+.combat-screen[data-layout-preset='urban'] .combat-result[data-result-kind='SCRIPTED_DEFEAT'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-urban-combat-result-defeat, none);
+}
+
+.combat-screen[data-layout-preset='urban'] .combat-result[data-result-kind='ESCAPE'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-urban-combat-result-escape, none);
+}
+
 @media (max-width: 800px) {
   .combat-screen__header {
     align-items: start;
