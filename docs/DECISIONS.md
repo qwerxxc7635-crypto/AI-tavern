@@ -5048,3 +5048,23 @@ TypeScript 共享 Combat visual contract 补充与 Rust wire 一致的封闭 `Co
 - v0.4 不提供玩家任意主题切换器；override 仅是开发/QA 调用能力。
 - Loader source 的工程目录实现、base/CSS/Vector fallback 与 missing-slot warning 留给 M9-T03；本任务不读取文件系统或复制 FINAL assets。
 - Theme package 不持有 executable handler、State setter 或 Command factory，不能成为规则分支入口。
+
+## DEC-233：缺失 Theme Asset 逐级降级并返回结构化 Warning，不中断 CombatScreen
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §25.2/§25.4/§26.1、M9-T03，DEC-230 至 DEC-232
+
+### 决定
+
+`CombatThemeAssetResolver` 对单一 stable Slot 按 selected Theme asset → manifest fallback chain（内置默认指向 Base）→ CSS/Vector fallback 的固定顺序解析。找到当前 Theme asset 时零 warning；当前 Theme 缺失但 Base 提供资源时返回 FALLBACK_THEME_ASSET，并保留原 Theme 的 THEME_ASSET_MISSING warning。
+
+Base Theme 是 version 1、themeId=base、layoutPreset=base、fallback=null 的合法冻结 Manifest。Base 仍缺失时，不抛错或返回 undefined，而按 Slot 的纯视觉类别映射到 CSS_BACKGROUND/PANEL/TIMELINE/ABILITY_SLOT/BUTTON/RESOURCE/SELECTION/INTENT/RESULT 或 VECTOR_EFFECT。M8 的 semantic-token `combat-screen.css` 继续是无需 bitmap 即可操作的 Base CSS 呈现；Vector effect fallback 可以安全省略装饰效果，不阻断规则与 controls。
+
+每次缺失、fallback source failure、cycle 或超过 16 层都会产生冻结 typed warning，并以 CSS/Vector fallback 完成解析。循环由 visited theme IDs 检测，深度上限防止恶意或损坏 manifest 造成无界链。未知 Slot 不属于已验证 Manifest contract，仍 fail closed，而不是伪装为缺失素材。
+
+### 影响与边界
+
+- Missing asset 是可观察的 degraded presentation，不是 Crash，也不修改 Combat ViewModel/State/Command/rules。
+- M9-T03 不复制 FINAL images、不为具体世界绑定 CSS variables；四套主题资产按 M9-T04 至 M9-T07 分别接入。
+- Warning 作为 resolution receipt 返回，由上层 telemetry/QA 消费；普通玩家界面不渲染 machine code 或底层 source exception。

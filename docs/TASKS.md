@@ -90,7 +90,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M8 Gate — Combat Presentation / zh-CN | PASS | 2026-09-12 | M8-T01..T09 独立验收；同一只读 ViewModel/Command Port 在四 World Theme 容器下保持 timeline、controls、command payload 与玩家中文语义一致 |
 | M9-T01 — Theme Manifest Schema | PASS | 2026-09-12 | version/stable theme id/five layout presets/nullable fallback/59 个 FINAL slot→canonical relative path；exact-key schema 拒绝 Combat Rule 字段与未知 slot |
 | M9-T02 — Theme Loader / Resolver | PASS | 2026-09-12 | FANTASY/SCI_FI/CULTIVATION/URBAN→*-default；Loader 复验 schema/version/identity；QA override 显式留痕，切换不接收或改写 Engine/State/Command/rules |
-| M9-T03 — Base Theme / Fallback | IN_PROGRESS | 2026-09-12 | 下一项；Theme Asset→Base Theme→CSS/Vector fallback，missing slot 仅 Warning 且 CombatScreen 不 Crash |
+| M9-T03 — Base Theme / Fallback | PASS | 2026-09-12 | selected Theme→fallback/Base asset→10 类 CSS/Vector fallback；59 slots 全覆盖；missing/source failure/cycle 产出结构化 Warning 且不抛到 CombatScreen |
+| M9-T04 — Cultivation Theme Integration | IN_PROGRESS | 2026-09-12 | 下一项；接入修仙 background/panels/timeline/ability/button/resources/selection/intent/effects/results，验证 slot/透明/状态变体 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

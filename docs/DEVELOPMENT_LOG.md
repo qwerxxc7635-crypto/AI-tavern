@@ -6242,3 +6242,18 @@
 - Theme Manifest + Loader/Resolver 专项 21/21 PASS，覆盖四世界映射、QA override、结构/version/identity/source/unknown world failure，以及 Engine/State/Command/Rules 零修改。
 - Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 195 files / 1195 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M9-T01 DependsOn 与 V5.2 §25.1/§25.3/§25.4 已复核，无 SPEC BLOCKER。没有提前实现 fallback、复制素材或接入 Theme UI。用户 `.gitignore` 保持未纳入提交。M9-T02 PASS；下一项严格为 M9-T03 Base Theme / Fallback。
+
+## 2026-09-12 — M9-T03 完成 Base Theme / Fallback
+
+### 可观察且不中断的三级素材降级
+
+- 从 M9-T02 提交 `e0711e3` 创建 `task/M9-T03-base-theme-fallback`。新增合法冻结 `BASE_COMBAT_THEME_MANIFEST`、`CombatThemeAssetResolver` 与 `DEC-233`。
+- 单 Slot 按 selected Theme→manifest fallback/Base→CSS/Vector 顺序解析。当前 Theme 或 Base 命中时返回 ownerThemeId/path；完全缺失时按 background/panel/timeline/ability/button/resource/selection/intent/result/effect 十类返回可用 fallback descriptor，而不是 undefined/throw。
+- 每层 missing 均产生冻结 THEME_ASSET_MISSING warning；fallback source failure、cycle 和超过 16 层有独立 warning，并安全落到 Base CSS/Vector。visited IDs 与深度上限防止损坏 manifest hang。
+- 现有 semantic-token CombatScreen CSS 在零 bitmap 下仍是 Base 可操作界面；装饰性 effect 缺失可用 Vector fallback/安全省略，不影响 ViewModel、Command 或规则。
+
+### 验证与结束状态
+
+- Theme fallback 专项 5/5 PASS，覆盖当前 Theme 命中、Base asset 命中、FINAL 59 slots 全部 CSS/Vector fallback、missing Base source 与 cycle recovery；联合 Manifest/Loader/Resolver 专项 26/26 PASS。
+- Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 196 files / 1200 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M9-T02 DependsOn 与 V5.2 §25.2/§25.4/§26.1 已复核，无 SPEC BLOCKER。没有提前接入任一世界素材。用户 `.gitignore` 保持未纳入提交。M9-T03 PASS；下一项严格为 M9-T04 Cultivation Theme Integration。
