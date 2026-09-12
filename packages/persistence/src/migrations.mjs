@@ -177,6 +177,11 @@ const migrations = [
     name: 'save_schema',
     source: new URL('../../../database/migrations/0032_save_schema.sql', import.meta.url),
   },
+  {
+    version: 33,
+    name: 'combat_persistence',
+    source: new URL('../../../database/migrations/0033_combat_persistence.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

@@ -6332,3 +6332,18 @@
 - Headless Chrome 152 / 1440×900 记录：Cultivation load 195.2ms、frame p95 17.9ms；Fantasy 215.8ms / 18.4ms；Sci-Fi 198.3ms / 18.6ms；Urban 212.4ms / 17.0ms。每主题 frame median 16.6–16.7ms，30 samples；每次加载的 decoded RGBA memory 为 230,637,956–236,223,520 bytes（含 common）。V5.2 §34 未定义绝对阈值，因此只保留真实绝对值，不伪造 baseline/regression 判定。
 - FINAL package Node 专项 2/2 PASS，覆盖完整资产审计与 committed REAL_BROWSER receipt 反查；TypeScript noEmit、ESLint、Prettier、zh-CN player-language gate、`git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 37/37，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - Gate F Theme 部分通过既有与本任务联合证据：四 Theme 共享同一 CombatState/Command API、Manifest exact-key 禁止规则字段、missing asset fallback 不崩溃、玩家功能文案 zh-CN、UI 只提交 Command 不写 HP/AP/Status。用户 `.gitignore` 保持未纳入提交。M9-T08 与 M9 Gate PASS；下一项严格为 M10-T01 BattleRecord / ActiveCombatSave Schema。
+
+## 2026-09-13 — M10-T01 完成 BattleRecord / ActiveCombatSave Schema
+
+### Schema 33 双记录边界与版本锁定
+
+- 从 M9-T08 提交 `1231b36` 创建 `task/M10-T01-battle-save-schema`。新增 SQLite migration 0033 与 `DEC-239`；TypeScript migration runner、Rust native migration manifest 和 archive local-schema check 同步升级到 33，没有平台私有 schema。
+- `battle_records` 保存 combatInstanceId/campaign、全部七个 versions、randomSeed、InitialState/hash、AcceptedCommands、events/digest、lastCommittedSequence，以及 CombatResult/resultCommitId/canonicalDeltaHash/canonical commit evidence。确定性 identity/versions/seed/initial snapshot 由 trigger 锁定，hash/seed/stable ID/JSON/sequence/result coupling 由 CHECK/UNIQUE 约束 fail closed。
+- `active_combat_saves` 一对一引用 BattleRecord，重复七版本并在 INSERT 时逐字段匹配；checkpoint 覆盖 RNG streams、Current CombatState/hash、Objective/Reinforcement runtime、EventScheduler/LoopGuard、PendingReaction/ResolutionContext、Cost snapshot、last sequence 和 revision。PendingReaction 不允许缺 scheduler 或 resolution context。
+- 复杂 JSON 本任务只建立 durable container 与数据库级不变量；M10-T02 才将 Rust `EventSchedulerCheckpoint`、`PendingReactionSnapshot/ResolutionContextSnapshot/CostSnapshot` 的 typed validation 与原子 save/resume 接入，不提前实现 Replay/Result Commit/Event Ledger。
+
+### 验证与结束状态
+
+- Combat persistence schema 专项 3/3 PASS：完整字段（含 pending reaction/scheduler/resolution/cost/result receipt）往返、版本漂移/损坏 checkpoint/孤立 result ID/identity rewrite 拒绝、schema 32→33 保留 campaign 并创建两表。Node migration/startup 联合 14/14 PASS。
+- Rust native schema 32→33 verified-copy migration 与 schema-zero migration 2/2 PASS；备份仍保留原 schema 32 且不含新表。Prettier、ESLint、TypeScript noEmit、rustfmt、native clippy、`git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M2/M3/M4 Gates 与 V5.2 §8.1.1/§11.2.2/§17 已复核，无 SPEC BLOCKER。Portable save v3 未提前变更，兼容性留给 M10-T07。用户 `.gitignore` 保持未纳入提交。M10-T01 PASS；下一项严格为 M10-T02 Stable Checkpoint / Save / Resume。

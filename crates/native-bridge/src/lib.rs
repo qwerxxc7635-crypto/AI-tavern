@@ -148,7 +148,9 @@ const LAZY_WORLD_GENERATION_MIGRATION: &str =
 const PREFETCH_MIGRATION: &str = include_str!("../../../database/migrations/0031_prefetch.sql");
 const SAVE_SCHEMA_MIGRATION: &str =
     include_str!("../../../database/migrations/0032_save_schema.sql");
-const LATEST_SCHEMA_VERSION: i64 = 32;
+const COMBAT_PERSISTENCE_MIGRATION: &str =
+    include_str!("../../../database/migrations/0033_combat_persistence.sql");
+const LATEST_SCHEMA_VERSION: i64 = 33;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -767,6 +769,7 @@ fn apply_migrations_through(
         ),
         (31_i64, "prefetch", PREFETCH_MIGRATION),
         (32_i64, "save_schema", SAVE_SCHEMA_MIGRATION),
+        (33_i64, "combat_persistence", COMBAT_PERSISTENCE_MIGRATION),
     ];
     let history = {
         let mut statement = connection.prepare(
@@ -1175,11 +1178,11 @@ mod tests {
     }
 
     #[test]
-    fn native_startup_migrates_schema_31_on_a_verified_copy() {
+    fn native_startup_migrates_schema_32_on_a_verified_copy() {
         let directory = tempfile::tempdir().expect("temp directory");
-        let database_path = directory.path().join("schema-31.sqlite");
+        let database_path = directory.path().join("schema-32.sqlite");
         let mut old = Connection::open(&database_path).expect("open old database");
-        apply_migrations_through(&mut old, 31).expect("apply schema 31");
+        apply_migrations_through(&mut old, 32).expect("apply schema 32");
         old.execute(
             "INSERT INTO campaigns (id,schema_version,state,created_at,updated_at)
              VALUES ('campaign-migration',1,'TAVERN',?1,?1)",
@@ -1190,7 +1193,18 @@ mod tests {
 
         let store = CampaignStore::open(&database_path).expect("migrate database");
         let migrated = store.connect().expect("open migrated database");
-        assert_eq!(schema_version(&migrated).expect("schema version"), 32);
+        assert_eq!(schema_version(&migrated).expect("schema version"), 33);
+        assert_eq!(
+            migrated
+                .query_row(
+                    "SELECT COUNT(*) FROM sqlite_master
+                     WHERE type='table' AND name IN ('battle_records','active_combat_saves')",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("combat persistence tables"),
+            2
+        );
         assert_eq!(
             migrated
                 .query_row(
@@ -1212,16 +1226,16 @@ mod tests {
             .path();
         let backup = Connection::open_with_flags(backup, OpenFlags::SQLITE_OPEN_READ_ONLY)
             .expect("open backup");
-        assert_eq!(schema_version(&backup).expect("backup schema"), 31);
+        assert_eq!(schema_version(&backup).expect("backup schema"), 32);
         assert_eq!(
             backup
                 .query_row(
-                    "SELECT COUNT(*) FROM pragma_table_info('campaigns')
-                     WHERE name IN ('save_schema_version','world_schema_version')",
+                    "SELECT COUNT(*) FROM sqlite_master
+                     WHERE type='table' AND name IN ('battle_records','active_combat_saves')",
                     [],
                     |row| row.get::<_, i64>(0),
                 )
-                .expect("old columns"),
+                .expect("old combat persistence tables"),
             0
         );
     }
@@ -1240,7 +1254,7 @@ mod tests {
 
         let store = CampaignStore::open(&database_path).expect("migrate schema zero");
         let migrated = store.connect().expect("open migrated database");
-        assert_eq!(schema_version(&migrated).expect("schema version"), 32);
+        assert_eq!(schema_version(&migrated).expect("schema version"), 33);
         assert_eq!(
             migrated
                 .query_row(

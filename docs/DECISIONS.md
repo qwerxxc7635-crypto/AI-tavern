@@ -5170,3 +5170,23 @@ Windows Runtime 素材根以 `runtime-package.json` 显式标识 `Ember_Tavern_v
 - FINAL 总包共 119 张、194,484,582 source bytes、740,835,084 decoded RGBA bytes；浏览器按“单主题 + common”加载，不同时常驻四套解码 bitmap。
 - V5.2 §34 只要求 SHOULD record，没有绝对性能阈值；报告不得虚构 PASS budget 或 regression baseline。Gate F 的五项 MUST 继续由 M8/M9 API、fallback、中文与 Command-only UI 测试决定。
 - benchmark HTML 只作为工程测量入口，不加入玩家导航、不创建 Command、不加载或重建 Combat Engine；Theme 切换仍不改变 CombatState/Rules。
+
+## DEC-239：BattleRecord 固定确定性身份，ActiveCombatSave 只承载可替换 Checkpoint
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §8.1.1/§11.2.2/§17、M10-T01，DEC-166/DEC-172/DEC-177/DEC-190
+
+### 决定
+
+SQLite schema 33 新增一对一 `battle_records` 与 `active_combat_saves`。BattleRecord 是每场战斗的 durable identity/replay/result record：保存 combatInstanceId、campaign、全部七个 Combat versions、32 位 lowercase hex seed、InitialState/hash、AcceptedCommands、Combat events/digest、lastCommittedSequence，以及 nullable CombatResult/resultCommitId/canonicalDeltaHash/canonical commit evidence。combat identity、版本、seed 与 InitialState 一经插入不可改；resultCommitId 全库唯一，resultCommitId 与 canonicalDeltaHash 必须成对且必须已有 CombatResult。
+
+ActiveCombatSave 通过 `(combatInstanceId,campaignId)` 外键绑定 BattleRecord，并再次保存七个版本作为可直接检查的 checkpoint identity；插入时 SQLite trigger 要求全部版本与 BattleRecord 精确一致。它只承载可替换 runtime checkpoint：三 RNG streams、Current CombatState/checkpoint hash、Objective/Reinforcement runtime、EventScheduler checkpoint、创建战斗时冻结的 Loop Guard contract、PendingReaction/ResolutionContext、Cost snapshot、last sequence 与单调 revision。PendingReaction 存在时 scheduler 与 resolution checkpoint 必须同时存在。
+
+复杂 runtime payload 以 JSON container 存储，SQLite 负责 object/array shape、hash/seed/ID/sequence/version 与跨表 identity 等持久层不变量；M10-T02 必须在 transaction 写入前及读取后使用 Combat Core 的 typed serde/invariant/restore validation，不得把“json_valid”当成业务有效性。BattleRecord 与 ActiveCombatSave 的更新应在短事务中完成，等待 Ask Reaction 用户输入时不保持 transaction。
+
+### 影响与边界
+
+- Local database schema 从 32 升至 33，TypeScript 与 Rust 使用同一 SQL migration；原库仍先备份再升级，future schema 继续 fail closed。
+- Local schema version 与 portable save schema version 是两种契约；M10-T01 不擅自改变 portable v3 archive。旧存档映射、Active Combat reject/migration 与 portable table allowlist 严格留给 M10-T07。
+- M10-T01 只提供真实持久化结构与约束，不实现 save/resume、replay、result commit 或 Event Ledger 写入；这些按 M10-T02 至 M10-T06 顺序接入。

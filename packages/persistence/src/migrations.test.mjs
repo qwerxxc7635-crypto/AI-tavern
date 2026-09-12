@@ -9,12 +9,14 @@ import { DatabaseSync } from 'node:sqlite';
 import { applyMigrations, migrationCount } from './migrations.mjs';
 
 const coreTables = [
+  'active_combat_saves',
   'active_factions',
   'actor_knowledge',
   'adventure_turns',
   'adventures',
   'ai_candidates',
   'app_settings',
+  'battle_records',
   'campaign_location_states',
   'campaigns',
   'career_pools',
@@ -523,7 +525,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      32,
+      33,
     );
     const importedKnowledge = database
       .prepare(

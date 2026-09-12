@@ -13,3 +13,4 @@ Versioned SQLite migrations live in this directory and are applied in numeric or
 - `0029_world_info_retrieval.sql`: explainable World Lore trigger, priority, budget, revision, and cache-invalidation configuration.
 - `0030_lazy_world_generation.sql`: durable core-world materialization plans, idempotent execution state, artifact verification, and append-only transition audit.
 - `0031_prefetch.sql`: admitted Director predictions, provisional prefetch lifecycle, invalidation, and hit/miss metrics without cached-content persistence.
+- `0033_combat_persistence.sql`: version-pinned BattleRecord identity/result receipts plus one-to-one ActiveCombatSave checkpoints for RNG, objectives, reinforcements, scheduler/loop guard, reactions, and costs.
