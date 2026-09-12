@@ -1,6 +1,14 @@
 import { runPnpm, runProcess } from './process-runner.mjs';
 
-for (const script of ['format:check', 'release:check', 'i18n:check', 'lint', 'typecheck', 'test']) {
+for (const script of [
+  'format:check',
+  'release:check',
+  'i18n:check',
+  'assets:check',
+  'lint',
+  'typecheck',
+  'test',
+]) {
   runPnpm([script]);
 }
 

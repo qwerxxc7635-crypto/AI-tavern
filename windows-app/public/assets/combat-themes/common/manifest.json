@@ -1,0 +1,17 @@
+{
+  "themeId": "common",
+  "status": "FINAL",
+  "assetCount": 10,
+  "assets": {
+    "COMBAT_VFX_HIT_PHYSICAL": "effects/hit-physical.png",
+    "COMBAT_VFX_CRITICAL_HIT": "effects/critical-hit.png",
+    "COMBAT_VFX_SHIELD_HIT": "effects/shield-hit.png",
+    "COMBAT_VFX_SHIELD_BREAK": "effects/shield-break.png",
+    "COMBAT_VFX_HEAL": "effects/heal.png",
+    "COMBAT_VFX_REVIVE": "effects/revive.png",
+    "COMBAT_VFX_BUFF_APPLY": "effects/buff-apply.png",
+    "COMBAT_VFX_DEBUFF_APPLY": "effects/debuff-apply.png",
+    "COMBAT_VFX_DOWNED": "effects/downed.png",
+    "COMBAT_VFX_DEFEATED": "effects/defeated.png"
+  }
+}

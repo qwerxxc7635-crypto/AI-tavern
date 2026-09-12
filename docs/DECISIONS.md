@@ -5150,3 +5150,23 @@ Urban LayoutPreset 的局部差异限于 Stamina/Focus frame、result frames，�
 - 都市主题不复制 React component，也不添加按 WorldType 分支的 Command handler。
 - M9-T07 完成四个世界 package 接入；common VFX、全 119 integrity 与 performance 统一留给 M9-T08。
 - 视觉扁平化不降低 focus、disabled、responsive 或 reduced-motion 标准。
+
+## DEC-238：FINAL 聚合清单是唯一 Runtime 素材收据，性能 Gate 保留真实浏览器证据
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §25/§34/Gate F、M9-T08、`Ember_Tavern_v0.4.1_Combat_Runtime_Assets_FINAL.zip`，DEC-231 至 DEC-237
+
+### 决定
+
+Windows Runtime 素材根以 `runtime-package.json` 显式标识 `Ember_Tavern_v0.4.1_Combat_Runtime_Assets_FINAL.zip`，并保留 FINAL 原始 `asset-manifest.json`、slot map、checksum receipt 与 README。四个原始 source theme 仅作确定性目录映射：cultivation/fantasy/scifi/urban 分别映射到 cultivation-default/fantasy-default/scifi-default/urban-default；common 保持 common。运行时不得从预览图、Contact Sheet、旧返工目录或第二清单补素材。
+
+`assets:check` 进入 shared gate，并对 119 张 PNG 逐项复验 source-theme/slot 唯一性、runtime path 唯一性、theme/common manifest exact slot mapping、missing/extra file、FINAL SHA-256、PNG dimensions、RGBA transparency、slot-map receipt、分主题数量与整个包的 lowercase kebab-case/无中文/无空格路径。检查失败直接阻断，不以 fallback 掩盖损坏的正式包；M9-T03 fallback 仍只处理运行时可恢复的缺素材呈现。
+
+性能收据由独立 Vite benchmark entry 在真实 Headless Chrome 中生成：每个世界冷页面 fetch 并通过 `createImageBitmap` 解码该主题及 10 个 common VFX，记录实际 Blob bytes、FINAL dimensions 对应的 decoded RGBA bytes 与 load time；随后保留 bitmap，通过代表性 `CombatScreen` 做 30 次 React update→下一 `requestAnimationFrame` 采样。报告标记 REAL_BROWSER，且测试把每主题数量和内存值反查到资产审计结果。
+
+### 影响与边界
+
+- FINAL 总包共 119 张、194,484,582 source bytes、740,835,084 decoded RGBA bytes；浏览器按“单主题 + common”加载，不同时常驻四套解码 bitmap。
+- V5.2 §34 只要求 SHOULD record，没有绝对性能阈值；报告不得虚构 PASS budget 或 regression baseline。Gate F 的五项 MUST 继续由 M8/M9 API、fallback、中文与 Command-only UI 测试决定。
+- benchmark HTML 只作为工程测量入口，不加入玩家导航、不创建 Command、不加载或重建 Combat Engine；Theme 切换仍不改变 CombatState/Rules。

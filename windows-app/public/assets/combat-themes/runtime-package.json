@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "packageId": "Ember_Tavern_v0.4.1_Combat_Runtime_Assets_FINAL.zip",
+  "sourcePackage": "Ember Tavern v0.4 Combat Runtime Assets FINAL",
+  "sourceOfTruth": "V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V5.2",
+  "status": "FINAL",
+  "assetCount": 119,
+  "commonAssetCount": 10,
+  "themeIds": ["cultivation-default", "fantasy-default", "scifi-default", "urban-default"],
+  "sourceManifest": "asset-manifest.json",
+  "slotMap": "asset-slot-map.csv",
+  "checksums": "sha256sums.txt",
+  "performanceReport": "docs/v0.4.1/m9-theme-performance.json"
+}

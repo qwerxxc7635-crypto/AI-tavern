@@ -6317,3 +6317,18 @@
 - Urban/Sci-Fi/Fantasy/Cultivation/CombatScreen 联合专项 77/77 PASS；Urban 自身 10/10，覆盖 manifest/27 slots/transparency/7 digest/Stamina+Focus binding。Prettier、TypeScript noEmit、ESLint、`git diff --check` PASS。
 - 最终工作树完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M9-T02 DependsOn 与 V5.2 §25.4、FINAL urban manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于扁平但可访问的 Tactical variant；common/aggregate/performance 未提前实现。用户 `.gitignore` 保持未纳入提交。M9-T07 PASS；下一项严格为 M9-T08 Final Runtime Asset Package / Performance Gate。
+
+## 2026-09-12 — M9-T08 完成 Final Runtime Asset Package / Performance Gate
+
+### FINAL 119 素材收据与真实浏览器性能记录
+
+- 从 M9-T07 提交 `2aed9ac` 创建 `task/M9-T08-runtime-assets-gate`。接入 FINAL common 10 PNG 与原始 aggregate manifest/slot map/checksum/README，并以 `runtime-package.json` 标识 `Ember_Tavern_v0.4.1_Combat_Runtime_Assets_FINAL.zip`；新增 `DEC-238`。
+- `assets:check` 纳入 shared gate：source theme 确定性映射到四个 `*-default` runtime theme，逐项验证 119 asset count、分主题 10/27/27/28/27、theme/common manifest slot 完整性、theme+slot/path 无重复、无 missing/extra PNG、FINAL SHA-256/dimensions/RGBA transparency、slot-map/checksum receipt，以及整个 Runtime 包路径 lowercase kebab-case、无中文、无空格、无 `.DS_Store`。
+- 资产审计实测总量 194,484,582 source bytes、740,835,084 decoded RGBA bytes。所有运行时 PNG 只来自用户 FINAL 总包；没有重绘、压缩、生成占位图或混入 visual reference。
+- 新增不进入玩家导航的真实浏览器测量入口与可复跑 Chrome DevTools collector。每主题冷加载并 `createImageBitmap` 解码其 27/28 张素材及 common 10 张，再保留 bitmap 对代表性共享 `CombatScreen` 做 30 次 update→`requestAnimationFrame` 采样；报告写入 `docs/v0.4.1/m9-theme-performance.json`，evidenceKind=REAL_BROWSER。
+
+### 性能记录、验证与结束状态
+
+- Headless Chrome 152 / 1440×900 记录：Cultivation load 195.2ms、frame p95 17.9ms；Fantasy 215.8ms / 18.4ms；Sci-Fi 198.3ms / 18.6ms；Urban 212.4ms / 17.0ms。每主题 frame median 16.6–16.7ms，30 samples；每次加载的 decoded RGBA memory 为 230,637,956–236,223,520 bytes（含 common）。V5.2 §34 未定义绝对阈值，因此只保留真实绝对值，不伪造 baseline/regression 判定。
+- FINAL package Node 专项 2/2 PASS，覆盖完整资产审计与 committed REAL_BROWSER receipt 反查；TypeScript noEmit、ESLint、Prettier、zh-CN player-language gate、`git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 37/37，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- Gate F Theme 部分通过既有与本任务联合证据：四 Theme 共享同一 CombatState/Command API、Manifest exact-key 禁止规则字段、missing asset fallback 不崩溃、玩家功能文案 zh-CN、UI 只提交 Command 不写 HP/AP/Status。用户 `.gitignore` 保持未纳入提交。M9-T08 与 M9 Gate PASS；下一项严格为 M10-T01 BattleRecord / ActiveCombatSave Schema。

@@ -12,3 +12,5 @@ LOG.md
 README.md
 docs/
 database/migrations/README.md
+windows-app/public/assets/combat-themes/asset-manifest.json
+windows-app/public/assets/combat-themes/common/manifest.json
