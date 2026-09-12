@@ -4948,3 +4948,23 @@ Tooltip 直接复用 M6-T07 `AbilityTooltip`：AI flavor 仍限制为 displayNam
 - Cost Preview 是 disposable same-revision presentation，不是 reservation 或 provisional CombatState；真正提交后仍由统一 Command Boundary 复验和扣除。
 - M8-T06 不实现 Reaction、Tactical control、Combat Log、Enemy Intent UI 或 Theme resolver；这些按后续任务处理。
 - disabled Ability 仍可通过 pointer hover 阅读 tooltip 与禁用原因；原生 disabled button 不伪造 keyboard activation。
+
+## DEC-228：ReactionPrompt 只恢复 unresolved Player Ask，Tactical UI 等待 accepted projection
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §10/§12.1/§17.1/§17.1.1/§23，M4-T08/M7-T04/M7-T05/M8-T07，DEC-199、DEC-218、DEC-219
+
+### 决定
+
+Combat Presentation 将 Reaction mode 固定映射为 `Auto/自动`、`Ask/询问`、`Disabled/禁用`，并只为 authoritative CombatState 中 `Unresolved`、Player-owned 的 PendingReactionWindow 构造轻量 ReactionPrompt。eligible options 必须与 Window 的 eligibleReactionIds/eligibleItems 身份一致且对应 Ask projection；Utility-owned Ask、未知/不一致 item 或非 Ask eligible option 一律 fail closed。Resolved Window 不再投影 Prompt，因此 Active Save 恢复不会重复询问已接受的决定。
+
+Reaction UI 只提交既有 `RESOLVE_REACTION` payload：Trigger 必须携带选中的 stable reaction ID，Skip 必须为 null。首次点击后，同一 `combatInstanceId + stateRevision + reactionWindowId` 的控件进入 busy/disabled，阻止 UI 实例重复提交；最终 exactly-once、相同 commandId 幂等和冲突拒绝仍由 M4-T08 Command/Reaction boundary 拥有。关闭后重开若 State 仍 unresolved 则恢复同一 Prompt；若 accepted checkpoint 已清除/resolve Window 则不显示。
+
+TacticalStrategyPanel 只展示 `TacticalSettingsProjection` 中的正式 Companion，提供冻结的五策略及 healing threshold/ultimate/consumable/protect 四类受控偏好。每次修改立即生成 `SET_TACTICAL_STRATEGY` 或 `SET_TACTICAL_PREFERENCE` Command，但 select 的 value 始终受 ViewModel 控制，不在 acceptedSequence 返回前乐观改写。Pending Reaction 或非 quiescent 时 Engine 仍按 M7-T05 单一 FIFO Barrier 排队/拒绝，UI 不伪造生效状态，也不提供队友手动接管。
+
+### 影响与边界
+
+- ReactionPrompt 是右下轻量、可滚动卡片，不是全屏 modal；原 ResolutionContext/RNG/cost resume 数据继续只存在 Core State。
+- Reaction mode 在本任务只展示当前 Rules 配置；v0.4 没有定义战斗中 SetReactionMode Command，因此 UI 不发明平行 mutation API。
+- M8-T07 不实现 Combat Log、Enemy Intent card 或 Theme assets；后续 UI 继续消费同一个 Combat ViewModel。

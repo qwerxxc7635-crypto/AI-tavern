@@ -2,7 +2,9 @@ use std::{collections::BTreeMap, error::Error, fmt};
 
 use ember_combat_core::{
     CombatPhase, CombatResultType, CombatSide, CombatState, CombatStateInvariantValidator,
-    CombatVersionSet, CombatantState, PreconditionFailure, PreconditionFailureCode,
+    CombatVersionSet, CombatantState, ConsumablePolicy, PreconditionFailure,
+    PreconditionFailureCode, ProtectMainCharacterPriority, ReactionWindowStatus,
+    TacticalSettingsProjection, TacticalStrategyPreset, UltimatePolicy,
 };
 use serde::{Deserialize, Serialize};
 
@@ -72,6 +74,25 @@ pub struct CombatResourceTransitionRuleProjection {
 pub struct CombatRulesPresentationSnapshot {
     pub state_revision: u64,
     pub actions: Vec<CombatActionRuleProjection>,
+    pub reactions: Vec<CombatReactionRuleProjection>,
+    pub tactical_settings: TacticalSettingsProjection,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CombatReactionModeView {
+    Auto,
+    Ask,
+    Disabled,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatReactionRuleProjection {
+    pub reaction_id: String,
+    pub display_name_zh_cn: String,
+    pub cost_summary_zh_cn: String,
+    pub effect_summary_zh_cn: String,
+    pub mode: CombatReactionModeView,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -217,7 +238,56 @@ pub struct CombatViewModel {
     pub combatants: Vec<CombatantViewModel>,
     pub enemy_intents: Vec<EnemyIntentViewModel>,
     pub actions: Vec<CombatActionViewModel>,
+    pub reaction_modes: Vec<CombatReactionModeSettingViewModel>,
+    pub pending_reaction: Option<CombatReactionPromptViewModel>,
+    pub tactical_settings: Vec<CompanionTacticalViewModel>,
     pub result_label_zh_cn: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatReactionModeSettingViewModel {
+    pub reaction_id: String,
+    pub display_name_zh_cn: String,
+    pub mode: CombatReactionModeView,
+    pub mode_label_zh_cn: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatReactionPromptViewModel {
+    pub reaction_window_id: String,
+    pub actor_id: String,
+    pub actor_name_zh_cn: String,
+    pub options: Vec<CombatReactionOptionViewModel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatReactionOptionViewModel {
+    pub reaction_id: String,
+    pub display_name_zh_cn: String,
+    pub cost_summary_zh_cn: String,
+    pub effect_summary_zh_cn: String,
+    pub mode: CombatReactionModeView,
+    pub mode_label_zh_cn: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CompanionTacticalViewModel {
+    pub companion_id: String,
+    pub display_name_zh_cn: String,
+    pub strategy: TacticalStrategyPreset,
+    pub strategy_label_zh_cn: String,
+    pub healing_threshold_percent: u8,
+    pub ultimate_policy: UltimatePolicy,
+    pub ultimate_policy_label_zh_cn: String,
+    pub consumable_policy: ConsumablePolicy,
+    pub consumable_policy_label_zh_cn: String,
+    pub protect_main_character: ProtectMainCharacterPriority,
+    pub protect_main_character_label_zh_cn: String,
+    pub last_applied_sequence: u64,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -411,6 +481,13 @@ impl<'a> CombatViewModelProjector<'a> {
             })
             .collect::<Result<Vec<_>, CombatViewModelError>>()?;
         let actions = project_actions(request.state, request.rules, self.catalog)?;
+        let (reaction_modes, pending_reaction) =
+            project_reactions(request.state, &request.rules.reactions, &combatant_names)?;
+        let tactical_settings = project_tactical_settings(
+            request.state,
+            &request.rules.tactical_settings,
+            &combatant_names,
+        )?;
 
         Ok(CombatViewModel {
             schema_version: COMBAT_VIEW_MODEL_SCHEMA_VERSION,
@@ -425,12 +502,229 @@ impl<'a> CombatViewModelProjector<'a> {
             combatants,
             enemy_intents,
             actions,
+            reaction_modes,
+            pending_reaction,
+            tactical_settings,
             result_label_zh_cn: request
                 .state
                 .confirmed_result
                 .map(result_label)
                 .map(str::to_owned),
         })
+    }
+}
+
+fn project_reactions(
+    state: &CombatState,
+    reactions: &[CombatReactionRuleProjection],
+    combatant_names: &BTreeMap<&str, &str>,
+) -> Result<
+    (
+        Vec<CombatReactionModeSettingViewModel>,
+        Option<CombatReactionPromptViewModel>,
+    ),
+    CombatViewModelError,
+> {
+    let mut projections = BTreeMap::new();
+    let mut modes = Vec::with_capacity(reactions.len());
+    for reaction in reactions {
+        validate_visible_text(&reaction.display_name_zh_cn, "reactionName")?;
+        validate_visible_text(&reaction.cost_summary_zh_cn, "reactionCost")?;
+        validate_visible_text(&reaction.effect_summary_zh_cn, "reactionEffect")?;
+        if !valid_id(&reaction.reaction_id)
+            || projections
+                .insert(reaction.reaction_id.as_str(), reaction)
+                .is_some()
+        {
+            return Err(view_error(
+                CombatViewModelErrorCode::InvalidRulesProjection,
+                &reaction.reaction_id,
+            ));
+        }
+        modes.push(CombatReactionModeSettingViewModel {
+            reaction_id: reaction.reaction_id.clone(),
+            display_name_zh_cn: reaction.display_name_zh_cn.clone(),
+            mode: reaction.mode,
+            mode_label_zh_cn: reaction_mode_label(reaction.mode).to_owned(),
+        });
+    }
+    let Some(window) = state
+        .pending_reaction
+        .as_ref()
+        .filter(|window| window.status == ReactionWindowStatus::Unresolved)
+    else {
+        return Ok((modes, None));
+    };
+    let actor = state
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == window.actor_id)
+        .ok_or_else(|| {
+            view_error(
+                CombatViewModelErrorCode::UnknownRulesReference,
+                &window.actor_id,
+            )
+        })?;
+    if actor.side != CombatSide::Player
+        || window.eligible_reaction_ids.is_empty()
+        || window.eligible_items.len() != window.eligible_reaction_ids.len()
+    {
+        return Err(view_error(
+            CombatViewModelErrorCode::InvalidRulesProjection,
+            &window.window_id,
+        ));
+    }
+    for (reaction_id, item) in window
+        .eligible_reaction_ids
+        .iter()
+        .zip(&window.eligible_items)
+    {
+        if item.reaction_id != *reaction_id || item.scheduler_item.effect_stable_id != *reaction_id
+        {
+            return Err(view_error(
+                CombatViewModelErrorCode::InvalidRulesProjection,
+                reaction_id,
+            ));
+        }
+    }
+    let options = window
+        .eligible_reaction_ids
+        .iter()
+        .map(|reaction_id| {
+            let reaction = projections.get(reaction_id.as_str()).ok_or_else(|| {
+                view_error(CombatViewModelErrorCode::UnknownRulesReference, reaction_id)
+            })?;
+            if reaction.mode != CombatReactionModeView::Ask {
+                return Err(view_error(
+                    CombatViewModelErrorCode::InvalidRulesProjection,
+                    reaction_id,
+                ));
+            }
+            Ok(CombatReactionOptionViewModel {
+                reaction_id: reaction.reaction_id.clone(),
+                display_name_zh_cn: reaction.display_name_zh_cn.clone(),
+                cost_summary_zh_cn: reaction.cost_summary_zh_cn.clone(),
+                effect_summary_zh_cn: reaction.effect_summary_zh_cn.clone(),
+                mode: reaction.mode,
+                mode_label_zh_cn: reaction_mode_label(reaction.mode).to_owned(),
+            })
+        })
+        .collect::<Result<Vec<_>, CombatViewModelError>>()?;
+    Ok((
+        modes,
+        Some(CombatReactionPromptViewModel {
+            reaction_window_id: window.window_id.clone(),
+            actor_id: window.actor_id.clone(),
+            actor_name_zh_cn: require_name(combatant_names, &window.actor_id)?.to_owned(),
+            options,
+        }),
+    ))
+}
+
+fn project_tactical_settings(
+    state: &CombatState,
+    projection: &TacticalSettingsProjection,
+    combatant_names: &BTreeMap<&str, &str>,
+) -> Result<Vec<CompanionTacticalViewModel>, CombatViewModelError> {
+    let expected_ids: Vec<_> = state
+        .formal_party_member_ids
+        .iter()
+        .filter_map(|id| {
+            state
+                .combatants
+                .iter()
+                .any(|combatant| {
+                    combatant.combatant_id == id.as_str() && combatant.side == CombatSide::Companion
+                })
+                .then_some(id.as_str())
+        })
+        .collect();
+    if projection.companions.len() != expected_ids.len() {
+        return Err(view_error(
+            CombatViewModelErrorCode::InvalidRulesProjection,
+            "tacticalSettings",
+        ));
+    }
+    projection
+        .companions
+        .iter()
+        .zip(expected_ids)
+        .map(|(settings, expected_id)| {
+            if settings.companion_id != expected_id
+                || !matches!(settings.preferences.healing_threshold_percent, 30 | 50 | 70)
+            {
+                return Err(view_error(
+                    CombatViewModelErrorCode::InvalidRulesProjection,
+                    &settings.companion_id,
+                ));
+            }
+            Ok(CompanionTacticalViewModel {
+                companion_id: settings.companion_id.clone(),
+                display_name_zh_cn: require_name(combatant_names, &settings.companion_id)?
+                    .to_owned(),
+                strategy: settings.strategy,
+                strategy_label_zh_cn: tactical_strategy_label(settings.strategy).to_owned(),
+                healing_threshold_percent: settings.preferences.healing_threshold_percent,
+                ultimate_policy: settings.preferences.ultimate_policy,
+                ultimate_policy_label_zh_cn: ultimate_policy_label(
+                    settings.preferences.ultimate_policy,
+                )
+                .to_owned(),
+                consumable_policy: settings.preferences.consumable_policy,
+                consumable_policy_label_zh_cn: consumable_policy_label(
+                    settings.preferences.consumable_policy,
+                )
+                .to_owned(),
+                protect_main_character: settings.preferences.protect_main_character,
+                protect_main_character_label_zh_cn: protect_priority_label(
+                    settings.preferences.protect_main_character,
+                )
+                .to_owned(),
+                last_applied_sequence: settings.last_applied_sequence,
+            })
+        })
+        .collect()
+}
+
+const fn reaction_mode_label(mode: CombatReactionModeView) -> &'static str {
+    match mode {
+        CombatReactionModeView::Auto => "自动",
+        CombatReactionModeView::Ask => "询问",
+        CombatReactionModeView::Disabled => "禁用",
+    }
+}
+
+const fn tactical_strategy_label(strategy: TacticalStrategyPreset) -> &'static str {
+    match strategy {
+        TacticalStrategyPreset::Balanced => "均衡",
+        TacticalStrategyPreset::Aggressive => "进攻",
+        TacticalStrategyPreset::Defensive => "防守",
+        TacticalStrategyPreset::Support => "支援",
+        TacticalStrategyPreset::Conservative => "保守",
+    }
+}
+
+const fn ultimate_policy_label(policy: UltimatePolicy) -> &'static str {
+    match policy {
+        UltimatePolicy::FreeUse => "自由使用",
+        UltimatePolicy::EliteBossPriority => "精英与首领优先",
+        UltimatePolicy::Hold => "保留",
+    }
+}
+
+const fn consumable_policy_label(policy: ConsumablePolicy) -> &'static str {
+    match policy {
+        ConsumablePolicy::Allow => "允许",
+        ConsumablePolicy::EmergencyOnly => "仅紧急时",
+        ConsumablePolicy::Disabled => "禁用",
+    }
+}
+
+const fn protect_priority_label(priority: ProtectMainCharacterPriority) -> &'static str {
+    match priority {
+        ProtectMainCharacterPriority::Low => "低",
+        ProtectMainCharacterPriority::Normal => "普通",
+        ProtectMainCharacterPriority::High => "高",
     }
 }
 
@@ -826,10 +1120,12 @@ fn view_error(code: CombatViewModelErrorCode, subject: impl Into<String>) -> Com
 #[cfg(test)]
 mod tests {
     use ember_combat_core::{
-        CURRENT_COMBAT_VERSIONS, CombatRng, CombatantRuntime, EnemyIntentCategory, EnemyIntentPlan,
-        EnemyIntentTelegraphLevel, HardCcDrRuntime, ObjectiveRuntimeState, ProvisionalRuntimeDelta,
-        ReinforcementRuntimeState, ResourceState, RoundRuntimeState, ShieldRechargeRuntime,
-        TerminalPriorityPolicy, TimelineEntry, UtilityActionCategory,
+        CURRENT_COMBAT_VERSIONS, CombatRng, CombatantRuntime, CompanionTacticalSettings,
+        CostCommitState, EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel,
+        HardCcDrRuntime, HookPhase, ObjectiveRuntimeState, PendingReactionItem,
+        PendingReactionWindow, ProvisionalRuntimeDelta, ReinforcementRuntimeState, ResourceState,
+        RoundRuntimeState, SchedulerItem, SchedulerItemKind, ShieldRechargeRuntime,
+        TacticalPreferenceSet, TerminalPriorityPolicy, TimelineEntry, UtilityActionCategory,
     };
 
     use crate::{AiCombatFlavor, MechanicalTooltip, MechanicalTooltipLine, TooltipLineKind};
@@ -954,6 +1250,124 @@ mod tests {
         assert!(!heat.is_overheated_before);
         assert!(heat.is_overheated_after);
         assert_eq!(state.canonical_json_bytes().unwrap(), before);
+    }
+
+    #[test]
+    fn reaction_modes_pending_prompt_and_resolved_resume_are_projected_from_state() {
+        let mut state = state();
+        state.pending_reaction = Some(pending_reaction_window());
+        let mut rules = rules(state.revision);
+        rules.reactions = reaction_projections();
+        let names = names();
+        let names_by_id = presentation_map(
+            names
+                .iter()
+                .map(|entry| (&entry.combatant_id, &entry.display_name_zh_cn)),
+            "combatantPresentation",
+        )
+        .unwrap();
+        let (reaction_modes, pending_reaction) =
+            project_reactions(&state, &rules.reactions, &names_by_id).unwrap();
+        assert_eq!(
+            reaction_modes
+                .iter()
+                .map(|mode| mode.mode_label_zh_cn.as_str())
+                .collect::<Vec<_>>(),
+            ["自动", "询问", "禁用"]
+        );
+        let prompt = pending_reaction.expect("unresolved Ask is visible");
+        assert_eq!(prompt.reaction_window_id, "reaction-window-1");
+        assert_eq!(prompt.actor_name_zh_cn, "旅者");
+        assert_eq!(prompt.options[0].reaction_id, "reaction.spirit-shield");
+
+        let mut utility_owned = state.clone();
+        utility_owned
+            .pending_reaction
+            .as_mut()
+            .expect("pending reaction fixture exists")
+            .actor_id = "enemy".to_owned();
+        assert_eq!(
+            project_reactions(&utility_owned, &rules.reactions, &names_by_id)
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
+        );
+
+        let window = state
+            .pending_reaction
+            .as_mut()
+            .expect("pending reaction fixture exists");
+        window.status = ReactionWindowStatus::ResolvedSkip;
+        window.accepted_reaction_decision_command_id = Some("command-reaction-skip".to_owned());
+        let (_, resumed) = project_reactions(&state, &rules.reactions, &names_by_id).unwrap();
+        assert!(resumed.is_none());
+    }
+
+    #[test]
+    fn tactical_projection_only_exposes_formal_companions_and_validated_settings() {
+        let mut state = state();
+        state
+            .combatants
+            .push(combatant("companion-mira", CombatSide::Companion, 24, 30));
+        state
+            .formal_party_member_ids
+            .push("companion-mira".to_owned());
+        state.formal_party_member_ids.sort();
+        state.timeline.push(TimelineEntry {
+            combatant_id: "companion-mira".to_owned(),
+            initiative_result: 8,
+            initiative_base_stat: 1,
+            is_extra_turn: false,
+            source_sequence: 3,
+        });
+        let mut names = names();
+        names.push(CombatantPresentationEntry {
+            combatant_id: "companion-mira".to_owned(),
+            display_name_zh_cn: "米拉".to_owned(),
+        });
+        let mut rules = rules(state.revision);
+        rules.tactical_settings = TacticalSettingsProjection {
+            companions: vec![CompanionTacticalSettings {
+                companion_id: "companion-mira".to_owned(),
+                strategy: TacticalStrategyPreset::Support,
+                preferences: TacticalPreferenceSet {
+                    healing_threshold_percent: 70,
+                    ultimate_policy: UltimatePolicy::Hold,
+                    consumable_policy: ConsumablePolicy::Disabled,
+                    protect_main_character: ProtectMainCharacterPriority::High,
+                },
+                last_applied_sequence: 9,
+            }],
+        };
+        let catalog = CombatPresentationCatalog::v0_4_1();
+        let projector = CombatViewModelProjector::new(&catalog);
+        let view = projector.project(&request(&state, &rules, &names)).unwrap();
+        assert_eq!(view.tactical_settings.len(), 1);
+        assert_eq!(view.tactical_settings[0].display_name_zh_cn, "米拉");
+        assert_eq!(view.tactical_settings[0].strategy_label_zh_cn, "支援");
+        assert_eq!(
+            view.tactical_settings[0].ultimate_policy_label_zh_cn,
+            "保留"
+        );
+        assert_eq!(
+            view.tactical_settings[0].consumable_policy_label_zh_cn,
+            "禁用"
+        );
+        assert_eq!(
+            view.tactical_settings[0].protect_main_character_label_zh_cn,
+            "高"
+        );
+
+        rules.tactical_settings.companions[0]
+            .preferences
+            .healing_threshold_percent = 60;
+        assert_eq!(
+            projector
+                .project(&request(&state, &rules, &names))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
+        );
     }
 
     #[test]
@@ -1185,6 +1599,8 @@ mod tests {
                     )),
                 },
             ],
+            reactions: vec![],
+            tactical_settings: TacticalSettingsProjection { companions: vec![] },
         }
     }
 
@@ -1215,6 +1631,76 @@ mod tests {
                     text: "行动点：1".to_owned(),
                 }],
             },
+        }
+    }
+
+    fn reaction_projections() -> Vec<CombatReactionRuleProjection> {
+        vec![
+            reaction_projection(
+                "reaction.quick-guard",
+                "迅捷格挡",
+                CombatReactionModeView::Auto,
+            ),
+            reaction_projection(
+                "reaction.spirit-shield",
+                "灵力护盾",
+                CombatReactionModeView::Ask,
+            ),
+            reaction_projection(
+                "reaction.risky-counter",
+                "冒险反击",
+                CombatReactionModeView::Disabled,
+            ),
+        ]
+    }
+
+    fn reaction_projection(
+        reaction_id: &str,
+        display_name: &str,
+        mode: CombatReactionModeView,
+    ) -> CombatReactionRuleProjection {
+        CombatReactionRuleProjection {
+            reaction_id: reaction_id.to_owned(),
+            display_name_zh_cn: display_name.to_owned(),
+            cost_summary_zh_cn: "消耗 15 法力".to_owned(),
+            effect_summary_zh_cn: "减少本次伤害 40%".to_owned(),
+            mode,
+        }
+    }
+
+    fn pending_reaction_window() -> PendingReactionWindow {
+        let scheduler_item = SchedulerItem {
+            kind: SchedulerItemKind::Reaction,
+            event_chain_id: "event-chain-1".to_owned(),
+            depth: 1,
+            phase_priority: 20,
+            explicit_priority: 10,
+            source_initiative_order: 1,
+            source_stable_id: "hero".to_owned(),
+            effect_stable_id: "reaction.spirit-shield".to_owned(),
+            sequence: 3,
+            execution_counted: false,
+        };
+        PendingReactionWindow {
+            window_id: "reaction-window-1".to_owned(),
+            resolution_context_id: "resolution-context-1".to_owned(),
+            source_command_id: "command-ability-1".to_owned(),
+            actor_id: "hero".to_owned(),
+            target_ids: vec!["hero".to_owned()],
+            ability_id: Some("ability.strange-target".to_owned()),
+            event_chain_id: "event-chain-1".to_owned(),
+            hook_phase: HookPhase::PreEffect,
+            eligible_reaction_ids: vec!["reaction.spirit-shield".to_owned()],
+            eligible_items: vec![PendingReactionItem {
+                reaction_id: "reaction.spirit-shield".to_owned(),
+                scheduler_item,
+            }],
+            selected_reaction_id: None,
+            status: ReactionWindowStatus::Unresolved,
+            cost_state: CostCommitState::Reserved,
+            resolved_rolls: vec![14],
+            sequence_number: 3,
+            accepted_reaction_decision_command_id: None,
         }
     }
 

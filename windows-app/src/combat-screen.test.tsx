@@ -411,6 +411,147 @@ describe('CombatScreen shell', () => {
     expect(within(tooltipPanel).getByText(longFlavor).textContent).toBe(longFlavor);
     expect(within(tooltipPanel).getByText(longMechanical).textContent).toBe(longMechanical);
   });
+
+  it('shows Auto, Ask, and Disabled reaction modes with required Chinese labels', () => {
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
+    const modes = screen.getByRole('region', { name: '反应模式' });
+    expect(within(modes).getByText('自动')).toBeTruthy();
+    expect(within(modes).getByText('询问')).toBeTruthy();
+    expect(within(modes).getByText('禁用')).toBeTruthy();
+    expect(modes.querySelector('[data-reaction-mode="AUTO"]')?.textContent).toContain('迅捷格挡');
+  });
+
+  it('submits one structured trigger decision and blocks repeated UI submission', () => {
+    const port = commandPort();
+    render(
+      <CombatScreen
+        viewModel={{ ...viewModel(), pendingReaction: pendingReaction() }}
+        commandPort={port}
+      />,
+    );
+
+    const prompt = screen.getByLabelText('旅者的反应选择');
+    expect(within(prompt).getByText('模式：询问')).toBeTruthy();
+    expect(within(prompt).getByText('消耗 15 法力')).toBeTruthy();
+    const trigger = within(prompt).getByRole('button', { name: '发动' });
+    fireEvent.click(trigger);
+    fireEvent.click(trigger);
+
+    expect(port.createCommand).toHaveBeenCalledTimes(1);
+    expect(port.submitCommand).toHaveBeenCalledTimes(1);
+    expect(port.submitCommand.mock.calls[0]?.[0]?.payload).toEqual({
+      kind: 'RESOLVE_REACTION',
+      reactionWindowId: 'reaction-window-1',
+      choice: 'TRIGGER',
+      selectedReactionId: 'reaction.spirit-shield',
+    });
+    expect(prompt.getAttribute('aria-busy')).toBe('true');
+    expect(within(prompt).getByText('正在处理反应决定')).toBeTruthy();
+  });
+
+  it('submits Skip and does not reopen after the authoritative pending window clears', () => {
+    const model = { ...viewModel(), pendingReaction: pendingReaction() };
+    const port = commandPort();
+    const rendered = render(<CombatScreen viewModel={model} commandPort={port} />);
+    fireEvent.click(screen.getByRole('button', { name: '跳过' }));
+    expect(port.submitCommand.mock.calls[0]?.[0]?.payload).toEqual({
+      kind: 'RESOLVE_REACTION',
+      reactionWindowId: 'reaction-window-1',
+      choice: 'SKIP',
+      selectedReactionId: null,
+    });
+
+    rendered.rerender(
+      <CombatScreen
+        viewModel={{ ...model, stateRevision: model.stateRevision + 1, pendingReaction: null }}
+        commandPort={port}
+      />,
+    );
+    expect(screen.queryByLabelText('旅者的反应选择')).toBeNull();
+    expect(port.submitCommand).toHaveBeenCalledTimes(1);
+  });
+
+  it('restores an unresolved ReactionPrompt after the UI is closed and reopened', () => {
+    const model = { ...viewModel(), pendingReaction: pendingReaction() };
+    const first = render(<CombatScreen viewModel={model} commandPort={commandPort()} />);
+    expect(screen.getByLabelText('旅者的反应选择')).toBeTruthy();
+    first.unmount();
+
+    render(<CombatScreen viewModel={model} commandPort={commandPort()} />);
+    const restored = screen.getByLabelText('旅者的反应选择');
+    expect(restored.getAttribute('data-reaction-window-id')).toBe('reaction-window-1');
+    expect(within(restored).getByRole('button', { name: '发动' })).toBeTruthy();
+  });
+
+  it('submits every tactical strategy and preference as Commands without optimistic mutation', () => {
+    const model = viewModel();
+    const companion: CombatantStageViewModel = {
+      combatantId: 'companion-mira',
+      displayNameZhCn: '米拉',
+      side: 'COMPANION',
+      sideLabelZhCn: '我方队友',
+      stateLabelZhCn: '可行动',
+      isActiveTurn: false,
+      ...hud(),
+    };
+    const port = commandPort();
+    render(
+      <CombatScreen
+        viewModel={{
+          ...model,
+          combatants: [...model.combatants, companion],
+          tacticalSettings: [tacticalSettings()],
+        }}
+        commandPort={port}
+      />,
+    );
+
+    const strategy = screen.getByRole('combobox', { name: '米拉的基础策略' });
+    fireEvent.change(strategy, { target: { value: 'SUPPORT' } });
+    fireEvent.change(screen.getByRole('combobox', { name: '米拉的治疗阈值' }), {
+      target: { value: '70' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: '米拉的终极技能' }), {
+      target: { value: 'HOLD' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: '米拉的消耗品' }), {
+      target: { value: 'DISABLED' },
+    });
+    fireEvent.change(screen.getByRole('combobox', { name: '米拉的保护主角' }), {
+      target: { value: 'HIGH' },
+    });
+
+    expect(port.createCommand.mock.calls.map((call) => call[0])).toEqual([
+      { kind: 'SET_TACTICAL_STRATEGY', companionId: 'companion-mira', strategyId: 'SUPPORT' },
+      {
+        kind: 'SET_TACTICAL_PREFERENCE',
+        companionId: 'companion-mira',
+        preferenceKey: 'healingThreshold',
+        structuredValue: { valueType: 'INTEGER', value: 70 },
+      },
+      {
+        kind: 'SET_TACTICAL_PREFERENCE',
+        companionId: 'companion-mira',
+        preferenceKey: 'ultimatePolicy',
+        structuredValue: { valueType: 'STABLE_ID', value: 'HOLD' },
+      },
+      {
+        kind: 'SET_TACTICAL_PREFERENCE',
+        companionId: 'companion-mira',
+        preferenceKey: 'consumablePolicy',
+        structuredValue: { valueType: 'STABLE_ID', value: 'DISABLED' },
+      },
+      {
+        kind: 'SET_TACTICAL_PREFERENCE',
+        companionId: 'companion-mira',
+        preferenceKey: 'protectMainCharacter',
+        structuredValue: { valueType: 'STABLE_ID', value: 'HIGH' },
+      },
+    ]);
+    expect(port.submitCommand).toHaveBeenCalledTimes(5);
+    expect((strategy as HTMLSelectElement).value).toBe('BALANCED');
+    expect(screen.getByText('使用默认设置')).toBeTruthy();
+  });
 });
 
 function viewModel(): CombatScreenShellViewModel {
@@ -520,6 +661,28 @@ function viewModel(): CombatScreenShellViewModel {
         tooltip: null,
       },
     ],
+    reactionModes: [
+      {
+        reactionId: 'reaction.quick-guard',
+        displayNameZhCn: '迅捷格挡',
+        mode: 'AUTO',
+        modeLabelZhCn: '自动',
+      },
+      {
+        reactionId: 'reaction.spirit-shield',
+        displayNameZhCn: '灵力护盾',
+        mode: 'ASK',
+        modeLabelZhCn: '询问',
+      },
+      {
+        reactionId: 'reaction.risky-counter',
+        displayNameZhCn: '冒险反击',
+        mode: 'DISABLED',
+        modeLabelZhCn: '禁用',
+      },
+    ],
+    pendingReaction: null,
+    tacticalSettings: [],
   };
 }
 
@@ -556,6 +719,41 @@ function tooltip(abilityId: string, flavorDescription: string) {
         { kind: 'TARGET', sourceIds: ['enemy'], text: '目标：单个合法目标' },
       ],
     },
+  } as const;
+}
+
+function pendingReaction() {
+  return {
+    reactionWindowId: 'reaction-window-1',
+    actorId: 'hero',
+    actorNameZhCn: '旅者',
+    options: [
+      {
+        reactionId: 'reaction.spirit-shield',
+        displayNameZhCn: '灵力护盾',
+        costSummaryZhCn: '消耗 15 法力',
+        effectSummaryZhCn: '减少本次伤害 40%',
+        mode: 'ASK',
+        modeLabelZhCn: '询问',
+      },
+    ],
+  } as const;
+}
+
+function tacticalSettings() {
+  return {
+    companionId: 'companion-mira',
+    displayNameZhCn: '米拉',
+    strategy: 'BALANCED',
+    strategyLabelZhCn: '均衡',
+    healingThresholdPercent: 50,
+    ultimatePolicy: 'ELITE_BOSS_PRIORITY',
+    ultimatePolicyLabelZhCn: '精英与首领优先',
+    consumablePolicy: 'EMERGENCY_ONLY',
+    consumablePolicyLabelZhCn: '仅紧急时',
+    protectMainCharacter: 'NORMAL',
+    protectMainCharacterLabelZhCn: '普通',
+    lastAppliedSequence: 0,
   } as const;
 }
 

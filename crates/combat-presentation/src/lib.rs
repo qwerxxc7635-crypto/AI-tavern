@@ -11,12 +11,14 @@ mod view_model;
 pub use view_model::{
     COMBAT_VIEW_MODEL_SCHEMA_VERSION, CombatAbilityUsageViewModel, CombatActionRuleProjection,
     CombatActionViewKind, CombatActionViewModel, CombatCostPreviewRuleProjection,
-    CombatCostPreviewViewModel, CombatMeterViewModel, CombatResourceTransitionRuleProjection,
+    CombatCostPreviewViewModel, CombatMeterViewModel, CombatReactionModeSettingViewModel,
+    CombatReactionModeView, CombatReactionOptionViewModel, CombatReactionPromptViewModel,
+    CombatReactionRuleProjection, CombatResourceTransitionRuleProjection,
     CombatResourceTransitionViewModel, CombatResourceViewModel, CombatRulesPresentationSnapshot,
     CombatStatusViewModel, CombatValueTransitionViewModel, CombatViewModel, CombatViewModelError,
     CombatViewModelErrorCode, CombatViewModelProjector, CombatViewModelRequest,
-    CombatantPresentationEntry, CombatantSideView, CombatantViewModel, EnemyIntentViewModel,
-    StatusPresentationEntry, TimelineEntryViewModel,
+    CombatantPresentationEntry, CombatantSideView, CombatantViewModel, CompanionTacticalViewModel,
+    EnemyIntentViewModel, StatusPresentationEntry, TimelineEntryViewModel,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

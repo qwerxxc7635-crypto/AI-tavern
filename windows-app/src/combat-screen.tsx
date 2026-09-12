@@ -140,6 +140,51 @@ export interface CombatScreenShellViewModel {
   readonly timeline: readonly CombatTimelineEntryViewModel[];
   readonly combatants: readonly CombatantStageViewModel[];
   readonly actions: readonly CombatActionViewModel[];
+  readonly reactionModes: readonly CombatReactionModeSettingViewModel[];
+  readonly pendingReaction: CombatReactionPromptViewModel | null;
+  readonly tacticalSettings: readonly CompanionTacticalViewModel[];
+}
+
+export type CombatReactionModeView = 'AUTO' | 'ASK' | 'DISABLED';
+
+export interface CombatReactionModeSettingViewModel {
+  readonly reactionId: string;
+  readonly displayNameZhCn: string;
+  readonly mode: CombatReactionModeView;
+  readonly modeLabelZhCn: string;
+}
+
+export interface CombatReactionOptionViewModel extends CombatReactionModeSettingViewModel {
+  readonly costSummaryZhCn: string;
+  readonly effectSummaryZhCn: string;
+}
+
+export interface CombatReactionPromptViewModel {
+  readonly reactionWindowId: string;
+  readonly actorId: string;
+  readonly actorNameZhCn: string;
+  readonly options: readonly CombatReactionOptionViewModel[];
+}
+
+export type TacticalStrategyPreset =
+  'BALANCED' | 'AGGRESSIVE' | 'DEFENSIVE' | 'SUPPORT' | 'CONSERVATIVE';
+export type UltimatePolicy = 'FREE_USE' | 'ELITE_BOSS_PRIORITY' | 'HOLD';
+export type ConsumablePolicy = 'ALLOW' | 'EMERGENCY_ONLY' | 'DISABLED';
+export type ProtectMainCharacterPriority = 'LOW' | 'NORMAL' | 'HIGH';
+
+export interface CompanionTacticalViewModel {
+  readonly companionId: string;
+  readonly displayNameZhCn: string;
+  readonly strategy: TacticalStrategyPreset;
+  readonly strategyLabelZhCn: string;
+  readonly healingThresholdPercent: 30 | 50 | 70;
+  readonly ultimatePolicy: UltimatePolicy;
+  readonly ultimatePolicyLabelZhCn: string;
+  readonly consumablePolicy: ConsumablePolicy;
+  readonly consumablePolicyLabelZhCn: string;
+  readonly protectMainCharacter: ProtectMainCharacterPriority;
+  readonly protectMainCharacterLabelZhCn: string;
+  readonly lastAppliedSequence: number;
 }
 
 export interface CombatCommandPort {
@@ -160,6 +205,11 @@ export function CombatScreen({
     readonly stateRevision: number;
     readonly actionId: string;
   } | null>(null);
+  const [submittedReaction, setSubmittedReaction] = useState<{
+    readonly combatInstanceId: string;
+    readonly stateRevision: number;
+    readonly reactionWindowId: string;
+  } | null>(null);
   const party = viewModel.combatants.filter(
     (combatant) => combatant.side === 'PLAYER' || combatant.side === 'COMPANION',
   );
@@ -177,6 +227,10 @@ export function CombatScreen({
       action.enabled &&
       action.requiresTarget,
   );
+  const reactionDecisionPending =
+    submittedReaction?.combatInstanceId === viewModel.combatInstanceId &&
+    submittedReaction.stateRevision === viewModel.stateRevision &&
+    submittedReaction.reactionWindowId === viewModel.pendingReaction?.reactionWindowId;
 
   useEffect(() => {
     if (selectedAction === undefined) return undefined;
@@ -223,6 +277,29 @@ export function CombatScreen({
     setTargetSelection(null);
   };
 
+  const submitPayload = (payload: CombatCommandPayload) => {
+    commandPort.submitCommand(commandPort.createCommand(payload));
+  };
+
+  const submitReactionDecision = (
+    prompt: CombatReactionPromptViewModel,
+    choice: 'TRIGGER' | 'SKIP',
+    selectedReactionId: string | null,
+  ) => {
+    if (reactionDecisionPending) return;
+    setSubmittedReaction({
+      combatInstanceId: viewModel.combatInstanceId,
+      stateRevision: viewModel.stateRevision,
+      reactionWindowId: prompt.reactionWindowId,
+    });
+    submitPayload({
+      kind: 'RESOLVE_REACTION',
+      reactionWindowId: prompt.reactionWindowId,
+      choice,
+      selectedReactionId,
+    });
+  };
+
   return (
     <main
       className="combat-screen"
@@ -261,6 +338,10 @@ export function CombatScreen({
         }
       />
 
+      <ReactionModeStrip modes={viewModel.reactionModes} />
+
+      <TacticalStrategyPanel settings={viewModel.tacticalSettings} onCommand={submitPayload} />
+
       {activeName === undefined ? null : (
         <CharacterHUD
           combatant={requiredCombatant(viewModel.combatants, viewModel.activeCombatantId)}
@@ -276,6 +357,14 @@ export function CombatScreen({
           setTargetSelection(null);
         }}
       />
+
+      {viewModel.pendingReaction === null ? null : (
+        <ReactionPrompt
+          prompt={viewModel.pendingReaction}
+          decisionPending={reactionDecisionPending}
+          onDecision={submitReactionDecision}
+        />
+      )}
     </main>
   );
 }
@@ -487,6 +576,246 @@ export function CharacterHUD({ combatant }: { readonly combatant: CombatantStage
     </section>
   );
 }
+
+export function ReactionModeStrip({
+  modes,
+}: {
+  readonly modes: readonly CombatReactionModeSettingViewModel[];
+}) {
+  if (modes.length === 0) return null;
+  return (
+    <section className="reaction-mode-strip" aria-label="反应模式">
+      <h2>反应模式</h2>
+      <ul>
+        {modes.map((reaction) => (
+          <li key={reaction.reactionId} data-reaction-mode={reaction.mode}>
+            <span>{reaction.displayNameZhCn}</span>
+            <strong>{reaction.modeLabelZhCn}</strong>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+export function TacticalStrategyPanel({
+  settings,
+  onCommand,
+}: {
+  readonly settings: readonly CompanionTacticalViewModel[];
+  readonly onCommand: (payload: CombatCommandPayload) => void;
+}) {
+  if (settings.length === 0) return null;
+  return (
+    <section className="tactical-strategy-panel" aria-label="队友战术策略">
+      <h2>队友战术</h2>
+      <div className="tactical-strategy-panel__companions">
+        {settings.map((companion) => (
+          <fieldset key={companion.companionId} data-companion-id={companion.companionId}>
+            <legend>{companion.displayNameZhCn}</legend>
+            <label>
+              基础策略
+              <select
+                aria-label={`${companion.displayNameZhCn}的基础策略`}
+                value={companion.strategy}
+                onChange={(event) => {
+                  onCommand({
+                    kind: 'SET_TACTICAL_STRATEGY',
+                    companionId: companion.companionId,
+                    strategyId: event.currentTarget.value,
+                  });
+                }}
+              >
+                {TACTICAL_STRATEGIES.map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              治疗阈值
+              <select
+                aria-label={`${companion.displayNameZhCn}的治疗阈值`}
+                value={companion.healingThresholdPercent}
+                onChange={(event) => {
+                  onCommand({
+                    kind: 'SET_TACTICAL_PREFERENCE',
+                    companionId: companion.companionId,
+                    preferenceKey: 'healingThreshold',
+                    structuredValue: {
+                      valueType: 'INTEGER',
+                      value: Number(event.currentTarget.value),
+                    },
+                  });
+                }}
+              >
+                {[30, 50, 70].map((value) => (
+                  <option key={value} value={value}>
+                    {value}%
+                  </option>
+                ))}
+              </select>
+            </label>
+            <TacticalStableIdPreference
+              companion={companion}
+              label="终极技能"
+              preferenceKey="ultimatePolicy"
+              value={companion.ultimatePolicy}
+              options={ULTIMATE_POLICIES}
+              onCommand={onCommand}
+            />
+            <TacticalStableIdPreference
+              companion={companion}
+              label="消耗品"
+              preferenceKey="consumablePolicy"
+              value={companion.consumablePolicy}
+              options={CONSUMABLE_POLICIES}
+              onCommand={onCommand}
+            />
+            <TacticalStableIdPreference
+              companion={companion}
+              label="保护主角"
+              preferenceKey="protectMainCharacter"
+              value={companion.protectMainCharacter}
+              options={PROTECT_PRIORITIES}
+              onCommand={onCommand}
+            />
+            <small>
+              {companion.lastAppliedSequence === 0
+                ? '使用默认设置'
+                : `已应用至命令序列 ${String(companion.lastAppliedSequence)}`}
+            </small>
+          </fieldset>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function TacticalStableIdPreference({
+  companion,
+  label,
+  preferenceKey,
+  value,
+  options,
+  onCommand,
+}: {
+  readonly companion: CompanionTacticalViewModel;
+  readonly label: string;
+  readonly preferenceKey: 'ultimatePolicy' | 'consumablePolicy' | 'protectMainCharacter';
+  readonly value: string;
+  readonly options: readonly (readonly [string, string])[];
+  readonly onCommand: (payload: CombatCommandPayload) => void;
+}) {
+  return (
+    <label>
+      {label}
+      <select
+        aria-label={`${companion.displayNameZhCn}的${label}`}
+        value={value}
+        onChange={(event) => {
+          onCommand({
+            kind: 'SET_TACTICAL_PREFERENCE',
+            companionId: companion.companionId,
+            preferenceKey,
+            structuredValue: { valueType: 'STABLE_ID', value: event.currentTarget.value },
+          });
+        }}
+      >
+        {options.map(([optionValue, optionLabel]) => (
+          <option key={optionValue} value={optionValue}>
+            {optionLabel}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+export function ReactionPrompt({
+  prompt,
+  decisionPending,
+  onDecision,
+}: {
+  readonly prompt: CombatReactionPromptViewModel;
+  readonly decisionPending: boolean;
+  readonly onDecision: (
+    prompt: CombatReactionPromptViewModel,
+    choice: 'TRIGGER' | 'SKIP',
+    selectedReactionId: string | null,
+  ) => void;
+}) {
+  return (
+    <aside
+      className="reaction-prompt"
+      aria-label={`${prompt.actorNameZhCn}的反应选择`}
+      aria-live="assertive"
+      aria-busy={decisionPending}
+      data-reaction-window-id={prompt.reactionWindowId}
+    >
+      <header>
+        <span>可触发反应</span>
+        <strong>{prompt.actorNameZhCn}</strong>
+      </header>
+      <ul>
+        {prompt.options.map((option) => (
+          <li key={option.reactionId} data-reaction-id={option.reactionId}>
+            <div>
+              <strong>{option.displayNameZhCn}</strong>
+              <span>模式：{option.modeLabelZhCn}</span>
+            </div>
+            <p>{option.costSummaryZhCn}</p>
+            <p>{option.effectSummaryZhCn}</p>
+            <button
+              type="button"
+              disabled={decisionPending}
+              onClick={() => {
+                onDecision(prompt, 'TRIGGER', option.reactionId);
+              }}
+            >
+              发动
+            </button>
+          </li>
+        ))}
+      </ul>
+      <button
+        type="button"
+        className="reaction-prompt__skip"
+        disabled={decisionPending}
+        onClick={() => {
+          onDecision(prompt, 'SKIP', null);
+        }}
+      >
+        跳过
+      </button>
+      {decisionPending ? <p role="status">正在处理反应决定</p> : null}
+    </aside>
+  );
+}
+
+const TACTICAL_STRATEGIES = [
+  ['BALANCED', '均衡'],
+  ['AGGRESSIVE', '进攻'],
+  ['DEFENSIVE', '防守'],
+  ['SUPPORT', '支援'],
+  ['CONSERVATIVE', '保守'],
+] as const;
+const ULTIMATE_POLICIES = [
+  ['FREE_USE', '自由使用'],
+  ['ELITE_BOSS_PRIORITY', '精英与首领优先'],
+  ['HOLD', '保留'],
+] as const;
+const CONSUMABLE_POLICIES = [
+  ['ALLOW', '允许'],
+  ['EMERGENCY_ONLY', '仅紧急时'],
+  ['DISABLED', '禁用'],
+] as const;
+const PROTECT_PRIORITIES = [
+  ['LOW', '低'],
+  ['NORMAL', '普通'],
+  ['HIGH', '高'],
+] as const;
 
 export function ActionBar({
   actions,

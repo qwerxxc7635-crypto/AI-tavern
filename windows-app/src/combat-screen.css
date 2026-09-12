@@ -433,6 +433,93 @@
   color: var(--color-text-secondary);
 }
 
+.reaction-mode-strip,
+.tactical-strategy-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-translucent);
+}
+
+.reaction-mode-strip h2,
+.tactical-strategy-panel h2 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+}
+
+.reaction-mode-strip ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.reaction-mode-strip li {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-pill);
+  font-size: var(--font-size-xs);
+}
+
+.reaction-mode-strip li strong {
+  color: var(--color-accent);
+}
+
+.tactical-strategy-panel__companions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: var(--space-3);
+}
+
+.tactical-strategy-panel fieldset {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.tactical-strategy-panel legend {
+  padding-inline: var(--space-1);
+  font-weight: var(--font-weight-bold);
+}
+
+.tactical-strategy-panel label {
+  min-width: 0;
+  display: grid;
+  gap: var(--space-1);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.tactical-strategy-panel select {
+  min-width: 0;
+  min-height: 2.4rem;
+  padding-inline: var(--space-2);
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--color-surface);
+}
+
+.tactical-strategy-panel select:focus-visible {
+  outline: var(--border-width-medium) solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
+.tactical-strategy-panel fieldset > small {
+  grid-column: 1 / -1;
+  color: var(--color-text-secondary);
+}
+
 .action-bar {
   position: sticky;
   bottom: 0;
@@ -557,6 +644,84 @@
   cursor: pointer;
 }
 
+.reaction-prompt {
+  position: fixed;
+  right: clamp(var(--space-4), 2vw, var(--space-8));
+  bottom: clamp(7rem, 16vh, 10rem);
+  z-index: calc(var(--layer-sticky) + 2);
+  width: min(24rem, calc(100vw - var(--space-8)));
+  max-height: min(28rem, 65vh);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow: auto;
+  border: var(--border-width-thin) solid var(--color-accent);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-floating);
+  overflow-wrap: anywhere;
+}
+
+.reaction-prompt header,
+.reaction-prompt li > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.reaction-prompt header span,
+.reaction-prompt li span,
+.reaction-prompt li p,
+.reaction-prompt > p {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.reaction-prompt ul {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.reaction-prompt li {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  border: var(--border-width-thin) solid var(--color-border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.reaction-prompt li p,
+.reaction-prompt > p {
+  margin: 0;
+}
+
+.reaction-prompt button {
+  min-height: 2.5rem;
+  border: var(--border-width-thin) solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-primary);
+  background: var(--button-primary-background);
+  cursor: pointer;
+}
+
+.reaction-prompt button:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.reaction-prompt button:focus-visible {
+  outline: var(--border-width-medium) solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
+.reaction-prompt__skip {
+  background: var(--color-surface);
+}
+
 .ability-slot button:hover:not(:disabled),
 .action-bar__end-turn:hover:not(:disabled) {
   border-color: var(--color-accent);
@@ -636,6 +801,11 @@
   .action-bar__end-turn {
     width: 100%;
   }
+
+  .reaction-prompt {
+    right: var(--space-4);
+    bottom: var(--space-4);
+  }
 }
 
 @media (max-width: 520px) {
@@ -649,6 +819,14 @@
 
   .character-hud {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tactical-strategy-panel fieldset {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tactical-strategy-panel fieldset > small {
+    grid-column: auto;
   }
 }
 

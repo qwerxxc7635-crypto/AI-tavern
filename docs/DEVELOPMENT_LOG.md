@@ -6167,3 +6167,18 @@
 - CombatScreen/Tooltip jsdom 专项 21/21 PASS，覆盖 Hover/Focus/Selected、AP+Mana before→after、Heat 70→85/threshold 80/after overheat、机械与 AI flavor 分区、长动态文本；Presentation crate 12/12 PASS，覆盖 stale AP、resource/Heat 与 tooltip identity fail closed、State/RNG 零修改。
 - TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1159 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 503 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T03/M8-T04/M6-T07 DependsOn 与 V5.2 §11/§18.4/§18.5 已复核；没有进入 Reaction/Tactical/Log/Theme，无 SPEC BLOCKER。UI styling skill 用于 focus/description 关系、分层信息、响应式有界浮层与动态文本安全；用户 `.gitignore` 保持未纳入提交。M8-T06 PASS；下一项严格为 M8-T07 Reaction / Tactical Strategy UI。
+
+## 2026-09-12 — M8-T07 完成 Reaction / Tactical Strategy UI
+
+### Pending Ask 恢复、Command-only 决策与 accepted-only 战术设置
+
+- 从 M8-T06 提交 `5022885` 创建 `task/M8-T07-reaction-tactical-ui`。Combat Presentation 新增 Reaction mode/Prompt 与 Companion Tactical ViewModel；新增 `DEC-228`。Auto/Ask/Disabled exhaustive 输出“自动/询问/禁用”，但只允许 unresolved、Player-owned Ask Window 创建玩家 Prompt。
+- Pending projection 复验 eligibleReactionIds 与 eligibleItems 的 stable identity/order，拒绝 Utility-owned Ask、未知 option、非 Ask option及不一致 Scheduler item。Resolved Trigger/Skip 只保留 Core checkpoint，不再显示 Prompt；UI 重开时完全由恢复后的 PendingReactionWindow 决定是否重现。
+- ReactionPrompt 是右下轻量卡片，显示中文 cost/effect 与“发动/跳过”。两者只提交 `RESOLVE_REACTION` Command；同 combat/revision/window 首次提交后进入 busy 并禁用按钮，UI 不重跑 Resolution、RNG 或 cost。Core M4-T08 继续拥有 exactly-once/idempotency。
+- TacticalStrategyPanel 只接正式 Companion settings，提供均衡/进攻/防守/支援/保守及 30/50/70 healing threshold、三类 ultimate/consumable/protect 选项。所有变化提交既有 Tactical Command；controlled value 在新 accepted projection 到达前保持不变，不撤销已接受 Utility Command，也不提供手动接管。
+
+### 验证与结束状态
+
+- CombatScreen/Reaction/Tactical jsdom 专项 26/26 PASS，覆盖三模式中文、Trigger 单次提交、Skip、resolved 不重开、unresolved UI 重开恢复、五项 Tactical Command payload 与零 optimistic mutation；Presentation crate 14/14 PASS，覆盖 Player/Utility ownership、resolved resume、正式 Companion 唯一投影与非法 60% threshold 拒绝。
+- TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1164 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 505 PASS、1 credential-only ignore，archive interop 双向通过。
+- M4-T08/M7-T04 DependsOn 与 V5.2 §10/§12.1/§17.1/§23 已复核；M7-T05 Barrier 仍是唯一 acceptedSequence 生效点；没有进入 Log/Intent/Theme，无 SPEC BLOCKER。UI styling skill 用于轻量非 Modal 卡片、keyboard/focus、live/busy 状态、表单 label 与响应式布局；用户 `.gitignore` 保持未纳入提交。M8-T07 PASS；下一项严格为 M8-T08 Combat Log / Enemy Intent。
