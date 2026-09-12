@@ -5110,3 +5110,23 @@ public manifest 与 in-code manifest 完全一致，全部 27 PNG 校验 RGBA tr
 - LayoutPreset 只选择资源外观与局部布局，不读取或改写 AP、resource value、合法目标、damage 或 status rules。
 - M9-T05 不复制 Sci-Fi/Urban/common assets；它们留给后续任务。
 - Asset test helper 只用于读取仓库内 public fixture、PNG metadata 与 digest，不进入 production bundle。
+
+## DEC-236：Sci-Fi Shield 绑定独立护盾 meter，Energy/Heat 绑定资源行
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §8.1/§14/§25.4、M9-T06、FINAL Sci-Fi assets，DEC-234/DEC-235
+
+### 决定
+
+Sci-Fi 28 张 FINAL RGBA assets 原样进入 scifi-default package。与其他世界相同的 22 个 slots 复用共享选择器；Sci-Fi 专属 Shield/Energy/Heat frames、Energy Shield/EMP FX 与三类 result slots 由同一 binding 提供。
+
+`SCIFI_RESOURCE_SHIELD_FRAME` 装饰 `character-hud__meter--shield`，因为 Shield 是 Combatant 独立 meter，不伪装为 ResourceHUD resource；Energy/Heat frames 只按 ViewModel 的 stable resourceId 装饰对应行。Heat threshold/overheat 颜色与数值仍由 M8 ViewModel/CSS state 控制，图片不参与判断。
+
+用户材料特别指定的最终像素级 AP Empty 以 1254×1254 RGBA metadata 和完整 SHA-256 双重锁定；其他交互状态与 FX 同样抽样锁定 FINAL digest，全部 28 manifest paths 逐一校验透明 RGBA。
+
+### 影响与边界
+
+- Sci-Fi LayoutPreset 只改变 Shield/Energy/Heat 与结果视觉，不改变 Shield damage pipeline、Heat lifecycle 或 AP 当前值。
+- M9-T06 不接入 Urban/common，也不添加像素分析或运行时图片解码；M9-T08 负责全包 integrity/performance。
+- 共享 accessibility/focus/disabled/reduced-motion 结构继续由单一 CombatScreen 保持。

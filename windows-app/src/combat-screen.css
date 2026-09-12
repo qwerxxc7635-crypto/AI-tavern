@@ -1088,6 +1088,41 @@
     var(--combat-asset-theme-fantasy-combat-result-escape, none);
 }
 
+.combat-screen[data-layout-preset='scifi'] .character-hud__meter--shield {
+  padding: var(--space-2);
+  background: var(--combat-asset-scifi-resource-shield-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-layout-preset='scifi'] .resource-hud__item[data-resource-id='energy'] {
+  padding: var(--space-2);
+  background: var(--combat-asset-scifi-resource-energy-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-layout-preset='scifi'] .resource-hud__item[data-resource-id='heat'] {
+  padding: var(--space-2);
+  background: var(--combat-asset-scifi-resource-heat-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-layout-preset='scifi'] .combat-result[data-result-kind='VICTORY'],
+.combat-screen[data-layout-preset='scifi'] .combat-result[data-result-kind='SCRIPTED_VICTORY'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-scifi-combat-result-victory, none);
+}
+
+.combat-screen[data-layout-preset='scifi'] .combat-result[data-result-kind='DEFEAT'],
+.combat-screen[data-layout-preset='scifi'] .combat-result[data-result-kind='SCRIPTED_DEFEAT'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-scifi-combat-result-defeat, none);
+}
+
+.combat-screen[data-layout-preset='scifi'] .combat-result[data-result-kind='ESCAPE'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-scifi-combat-result-escape, none);
+}
+
 @media (max-width: 800px) {
   .combat-screen__header {
     align-items: start;

@@ -6287,3 +6287,18 @@
 - Fantasy/Cultivation/CombatScreen 联合专项 56/56 PASS；Fantasy package 自身 10/10 PASS，覆盖 manifest/27 slots/transparency/7 digest/binding zero warning。Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。
 - 最终工作树完整 `pnpm check` PASS：Vitest 198 files / 1220 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M9-T02 DependsOn 与 V5.2 §25、FINAL fantasy manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于共享 semantic overlay 与 preset-scoped variants；没有提前接入 Sci-Fi/Urban/common。用户 `.gitignore` 保持未纳入提交。M9-T05 PASS；下一项严格为 M9-T06 Sci-Fi Theme Integration。
+
+## 2026-09-12 — M9-T06 完成 Sci-Fi Theme Integration
+
+### FINAL 科幻资产与像素级 AP Empty 锁定
+
+- 从 M9-T05 提交 `8b79431` 创建 `task/M9-T06-scifi-theme`。原样复制 FINAL Sci-Fi 28 PNG，排除 `.DS_Store`；新增 public/in-code scifi-default manifests 与 `DEC-236`。
+- 28 slots 全部经 shared parser/resolver/binding 零 warning；22 个共享 UI slots 自动复用单一 CombatScreen，Shield meter、Energy/Heat resource rows 和 Sci-Fi results 使用 scifi LayoutPreset 局部样式。
+- `SCIFI_RESOURCE_SHIELD_FRAME` 明确绑定独立 shield meter；Heat 的数值/threshold/overheat 仍由 ViewModel 提供。Energy Shield/EMP 与 boss slot 只绑定变量，不在缺少权威 event/boss fact 时推断。
+- 全部文件验证 PNG signature/正 dimensions/RGBA；最终像素级 AP Empty 精确验证 1254×1254 与 SHA-256 `464101611820557de8e2301d79f368cd8b6f618ceaa28cfc811dbcdded0d27de`。
+
+### 验证与结束状态
+
+- Sci-Fi/Fantasy/Cultivation/CombatScreen 联合专项 67/67 PASS；Sci-Fi 自身 11/11，含 28 slots、transparency、7 digest、AP Empty 双锁与三资源 binding。Prettier、TypeScript noEmit、ESLint、`git diff --check` PASS。
+- 最终工作树完整 `pnpm check` PASS：Vitest 199 files / 1231 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M9-T02 DependsOn 与 V5.2 §8.1/§14/§25.4、FINAL scifi manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于共享状态变体与 Shield/Heat 层级；未接入 Urban/common。用户 `.gitignore` 保持未纳入提交。M9-T06 PASS；下一项严格为 M9-T07 Urban Theme Integration。

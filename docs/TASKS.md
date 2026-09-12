@@ -93,7 +93,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M9-T03 — Base Theme / Fallback | PASS | 2026-09-12 | selected Theme→fallback/Base asset→10 类 CSS/Vector fallback；59 slots 全覆盖；missing/source failure/cycle 产出结构化 Warning 且不抛到 CombatScreen |
 | M9-T04 — Cultivation Theme Integration | PASS | 2026-09-12 | FINAL 27 RGBA assets + validated cultivation-default manifest；全部 Slot→CSS variables，修仙背景/面板/时间线/技能/按钮/AP/资源/选取/意图/结算状态接入单一 CombatScreen |
 | M9-T05 — Fantasy Theme Integration | PASS | 2026-09-12 | FINAL 27 RGBA assets + fantasy-default manifest；共享 Theme selectors 复用，Mana/Stamina 与 Fantasy result variants 专属；完整 binding 零 warning |
-| M9-T06 — Sci-Fi Theme Integration | IN_PROGRESS | 2026-09-12 | 下一项；接入科幻 FINAL 28 assets，特别验证最终像素级 AP Empty、Shield/Energy/Heat 与状态变体 |
+| M9-T06 — Sci-Fi Theme Integration | PASS | 2026-09-12 | FINAL 28 RGBA assets + scifi-default manifest；AP Empty 1254² + exact digest；Shield meter/Energy/Heat 与 Sci-Fi result variants 接入共享 CombatScreen |
+| M9-T07 — Urban Theme Integration | IN_PROGRESS | 2026-09-12 | 下一项；接入都市 FINAL 27 assets、扁平战术化 Stamina/Focus 与状态/透明度验证 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
