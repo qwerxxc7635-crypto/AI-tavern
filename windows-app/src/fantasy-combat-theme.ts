@@ -1,0 +1,44 @@
+import { parseCombatThemeManifest } from '@ember-tavern/contracts';
+import type { CombatThemeAssetSlot } from '@ember-tavern/contracts';
+
+export const FANTASY_COMBAT_THEME_MANIFEST = parseCombatThemeManifest({
+  version: 1,
+  themeId: 'fantasy-default',
+  layoutPreset: 'fantasy',
+  fallbackThemeId: 'base',
+  assets: {
+    THEME_BG_BATTLE_01: 'assets/backgrounds/battle-background-01.png',
+    THEME_PANEL_CHARACTER: 'assets/panels/character-panel.png',
+    THEME_PANEL_TOOLTIP: 'assets/panels/tooltip-panel.png',
+    THEME_PANEL_REACTION: 'assets/panels/reaction-panel.png',
+    THEME_PANEL_COMBAT_LOG: 'assets/panels/combat-log-panel.png',
+    THEME_TIMELINE_FRAME_ALLY: 'assets/timeline/timeline-frame-ally.png',
+    THEME_TIMELINE_FRAME_ENEMY: 'assets/timeline/timeline-frame-enemy.png',
+    THEME_TIMELINE_FRAME_BOSS: 'assets/timeline/timeline-frame-boss.png',
+    THEME_ABILITY_SLOT_NORMAL: 'assets/ability-slot/ability-slot-normal.png',
+    THEME_BUTTON_ENDTURN_NORMAL: 'assets/buttons/end-turn-normal.png',
+    THEME_AP_NODE_FILLED: 'assets/resources/ap-node-filled.png',
+    THEME_SELECTION_ALLY: 'assets/selection/selection-ally.png',
+    THEME_SELECTION_ENEMY: 'assets/selection/selection-enemy.png',
+    THEME_INTENT_FRAME: 'assets/intent/intent-frame.png',
+    FANTASY_RESOURCE_MANA_FRAME: 'assets/resources/resource-mana-frame.png',
+    FANTASY_RESOURCE_STAMINA_FRAME: 'assets/resources/resource-stamina-frame.png',
+    THEME_ABILITY_SLOT_HOVER: 'assets/ability-slot/ability-slot-hover.png',
+    THEME_ABILITY_SLOT_SELECTED: 'assets/ability-slot/ability-slot-selected.png',
+    THEME_ABILITY_SLOT_DISABLED: 'assets/ability-slot/ability-slot-disabled.png',
+    THEME_BUTTON_ENDTURN_HOVER: 'assets/buttons/end-turn-hover.png',
+    THEME_BUTTON_ENDTURN_PRESSED: 'assets/buttons/end-turn-pressed.png',
+    THEME_AP_NODE_EMPTY: 'assets/resources/ap-node-empty.png',
+    FANTASY_FX_HOLY_SHIELD: 'assets/effects/fx-holy-shield.png',
+    FANTASY_FX_NECROTIC: 'assets/effects/fx-necrotic.png',
+    THEME_FANTASY_COMBAT_RESULT_VICTORY: 'assets/results/combat-result-victory.png',
+    THEME_FANTASY_COMBAT_RESULT_DEFEAT: 'assets/results/combat-result-defeat.png',
+    THEME_FANTASY_COMBAT_RESULT_ESCAPE: 'assets/results/combat-result-escape.png',
+  },
+});
+
+export const FANTASY_REQUIRED_ASSET_SLOTS = Object.freeze(
+  Object.keys(FANTASY_COMBAT_THEME_MANIFEST.assets).sort((left, right) =>
+    left.localeCompare(right, 'en'),
+  ) as CombatThemeAssetSlot[],
+);

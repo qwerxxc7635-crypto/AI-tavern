@@ -6272,3 +6272,18 @@
 - Cultivation Theme jsdom/asset 专项 10/10 PASS：public manifest 一致、27/27 文件存在且 PNG RGBA transparency、7 个关键返工状态 FINAL SHA-256、27 CSS variables 零 warning、Theme root 实际绑定且 semantic timeline 保留。CombatScreen 合并专项 46/46 PASS；Presentation crate 16/16 PASS。
 - Prettier、TypeScript noEmit、ESLint、Rustfmt 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 197 files / 1210 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M9-T02 DependsOn 与 V5.2 §24/§25、FINAL cultivation manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于 semantic overlay、focus/disabled/reduced-motion 与 scoped visual variants。没有提前复制其他三套或 common assets；用户 `.gitignore` 保持未纳入提交。M9-T04 PASS；下一项严格为 M9-T05 Fantasy Theme Integration。
+
+## 2026-09-12 — M9-T05 完成 Fantasy Theme Integration
+
+### FINAL 西幻资产与共享 Theme selectors
+
+- 从 M9-T04 提交 `8d566d2` 创建 `task/M9-T05-fantasy-theme`。原样复制 FINAL Fantasy 27 PNG，排除 `.DS_Store`；新增 public/in-code fantasy-default manifests、复用型 asset audit helper 与 `DEC-235`。
+- 完整 package 覆盖 22 个共享 visual slots 及 Mana/Stamina、Holy Shield/Necrotic、三类 Fantasy results 五个世界专属 slots。manifest parser、asset resolver 与 binder 全链路零 warning。
+- 将 M9-T04 中共享 bitmap selectors 泛化为任意 validated data-combat-theme；Cultivation/Fantasy 共用单一 CombatScreen。Mana/Stamina 与 Fantasy result frames 仅由 fantasy LayoutPreset 激活，未引入 WorldType rules branch。
+- 全部 27 文件逐一验证 PNG signature、正 dimensions、RGBA color type；关键 Hover/Selected/Disabled、EndTurn Hover/Pressed、AP Empty 与 FX SHA-256 匹配 FINAL 包。
+
+### 验证与结束状态
+
+- Fantasy/Cultivation/CombatScreen 联合专项 56/56 PASS；Fantasy package 自身 10/10 PASS，覆盖 manifest/27 slots/transparency/7 digest/binding zero warning。Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。
+- 最终工作树完整 `pnpm check` PASS：Vitest 198 files / 1220 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M9-T02 DependsOn 与 V5.2 §25、FINAL fantasy manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于共享 semantic overlay 与 preset-scoped variants；没有提前接入 Sci-Fi/Urban/common。用户 `.gitignore` 保持未纳入提交。M9-T05 PASS；下一项严格为 M9-T06 Sci-Fi Theme Integration。

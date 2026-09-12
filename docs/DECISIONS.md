@@ -5090,3 +5090,23 @@ Timeline side 由 Rust Presentation 从 validated Combatant side 显式投影，
 - Asset URL 始终由已验证 themeId/relative path 组合，Theme 不接触 Engine/State/Command/rules。
 - M9-T04 只接入 Cultivation；Fantasy/Sci-Fi/Urban 严格留给 M9-T05 至 M9-T07，common aggregate/performance 留给 M9-T08。
 - UI styling skill 要求的语义元素、可见 focus、文本对比 overlay、响应式 Base layout 与 reduced-motion 保持不变。
+
+## DEC-235：共享 Theme Slot 使用统一选择器，世界资源与结果由 LayoutPreset 局部变体
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §25.1/§25.4、M9-T05、FINAL Fantasy assets，DEC-234
+
+### 决定
+
+FINAL Fantasy 27 张 RGBA Runtime Assets 原样接入 fantasy-default package，并复用 M9-T04 的 manifest→resolver→CSS variable binding。background、panels、timeline、ability states、EndTurn states、AP nodes、selection 与 intent 都使用 `.combat-screen[data-combat-theme]` 下的共享 Slot selectors；不为西幻复制 CombatScreen 或事件处理逻辑。
+
+只有 SOT 明确允许的世界表现差异使用 `data-layout-preset='fantasy'`：Mana/Stamina resource frames 与 Fantasy Victory/Defeat/Escape result frames。ScriptedVictory/ScriptedDefeat 复用对应安全结果框，Aborted 保持 Base 安全样式。世界专属 FX 与 boss timeline 仍作为已绑定 visual slots 等待权威 presentation event/flag，不进行名称推断。
+
+public manifest 与 in-code manifest 完全一致，全部 27 PNG 校验 RGBA transparency，Hover/Selected/Disabled、EndTurn Hover/Pressed、AP Empty 和专属 FX 锁定 FINAL hashes。共享 CSS 重构同时由 Cultivation 回归测试保护。
+
+### 影响与边界
+
+- LayoutPreset 只选择资源外观与局部布局，不读取或改写 AP、resource value、合法目标、damage 或 status rules。
+- M9-T05 不复制 Sci-Fi/Urban/common assets；它们留给后续任务。
+- Asset test helper 只用于读取仓库内 public fixture、PNG metadata 与 digest，不进入 production bundle。
