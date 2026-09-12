@@ -21,6 +21,7 @@ export type {
 export {
   COMBAT_LAYOUT_PRESET_IDS,
   COMBAT_THEME_ASSET_SLOTS,
+  COMBAT_WORLD_TYPES,
   CURRENT_COMBAT_THEME_MANIFEST_VERSION,
   CombatThemeManifestError,
   assertSupportedCombatThemeManifest,
@@ -31,6 +32,7 @@ export type {
   CombatThemeAssetSlot,
   CombatThemeManifest,
   CombatThemeManifestErrorCode,
+  CombatWorldType,
 } from './combat-theme.js';
 export {
   CombatCommandContractError,

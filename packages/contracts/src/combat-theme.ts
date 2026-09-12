@@ -1,5 +1,9 @@
 export const CURRENT_COMBAT_THEME_MANIFEST_VERSION = 1;
 
+export const COMBAT_WORLD_TYPES = ['FANTASY', 'SCI_FI', 'CULTIVATION', 'URBAN'] as const;
+
+export type CombatWorldType = (typeof COMBAT_WORLD_TYPES)[number];
+
 export const COMBAT_LAYOUT_PRESET_IDS = [
   'base',
   'cultivation',

@@ -6227,3 +6227,18 @@
 - Combat Theme contract 专项 13/13 PASS，覆盖合法 manifest、59 slot 固定数量、深层冻结、规则字段、非法/纯数字 ID、self fallback、未知 layout/slot、绝对/穿越/非规范路径、future version 与 asset-free base。
 - Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 194 files / 1187 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T01 DependsOn 与 V5.2 §25.1..§25.4、FINAL asset manifests 已复核，无 SPEC BLOCKER。没有提前复制素材、实现 Resolver/Fallback 或主题 UI。用户 `.gitignore` 保持未纳入提交。M9-T01 PASS；下一项严格为 M9-T02 Theme Loader / Resolver。
+
+## 2026-09-12 — M9-T02 完成 Theme Loader / Resolver
+
+### 确定性 WorldType mapping 与 QA 强制切换
+
+- 从 M9-T01 提交 `e2a6527` 创建 `task/M9-T02-theme-loader-resolver`。共享 contract 增加与 Rust wire 对齐的四类 `CombatWorldType`；新增 `CombatThemeLoader`、`CombatThemeResolver` 与 `DEC-232`。
+- 默认映射严格为 FANTASY→fantasy-default、SCI_FI→scifi-default、CULTIVATION→cultivation-default、URBAN→urban-default。Loader 对 source unknown payload 顺序执行 M9-T01 schema、version compatibility 和 requested/manifest themeId identity 校验。
+- 开发/QA 可提供显式 themeId override，结果标记 QA_OVERRIDE；默认 mapping 本身不被修改。source failure 被归一为不携带底层异常详情的 typed error，unknown runtime WorldType、future version 或 identity mismatch 均 fail closed。
+- Resolver 返回冻结 `CombatThemePackage`，只包含 Theme 表现信息；API 不接收 Engine、State、Command、Rules 或 lifecycle callback。测试证明默认/override 切换前后外部 Runtime identity 与 serialized content 不变。
+
+### 验证与结束状态
+
+- Theme Manifest + Loader/Resolver 专项 21/21 PASS，覆盖四世界映射、QA override、结构/version/identity/source/unknown world failure，以及 Engine/State/Command/Rules 零修改。
+- Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 195 files / 1195 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M9-T01 DependsOn 与 V5.2 §25.1/§25.3/§25.4 已复核，无 SPEC BLOCKER。没有提前实现 fallback、复制素材或接入 Theme UI。用户 `.gitignore` 保持未纳入提交。M9-T02 PASS；下一项严格为 M9-T03 Base Theme / Fallback。

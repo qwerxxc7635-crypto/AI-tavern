@@ -5028,3 +5028,23 @@ Manifest exact-key allowlist 不包含伤害、合法目标、AP 消耗、状态
 - `base` Manifest 可以使用 null fallback 与空 asset map，为后续 CSS/Vector fallback 提供合法根节点。
 - M9-T01 不复制或加载 FINAL 素材，不实现 WorldType mapping、override、missing-slot fallback 或 performance；这些严格按 M9-T02 至 M9-T08 顺序完成。
 - Slot 目录的变更是显式契约变更，必须同步 manifest version/兼容策略，而不能靠运行时注册扩展。
+
+## DEC-232：WorldType Theme Resolver 只选择已验证 Package，QA override 不触碰 Runtime
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §25.1/§25.3/§25.4、M9-T02，DEC-230/DEC-231
+
+### 决定
+
+TypeScript 共享 Combat visual contract 补充与 Rust wire 一致的封闭 `CombatWorldType`：FANTASY、SCI_FI、CULTIVATION、URBAN。唯一默认映射固定为 fantasy-default、scifi-default、cultivation-default、urban-default；`CombatThemeResolver` 不按 UI 文案、资源名或 AI 输出猜测世界类型。
+
+`CombatThemeLoader` 通过注入的只读 `CombatThemeManifestSource` 取得 unknown payload，再依次执行 M9-T01 structure parser、version compatibility 与 requested themeId identity 检查。source 异常归一为不携带底层详情的 typed error；结构、版本与 identity 不匹配均 fail closed。Resolver 返回冻结的 `CombatThemePackage`，其中仅含 themeId、layoutPreset、validated manifest 与 WORLD_DEFAULT/QA_OVERRIDE selection receipt。
+
+开发/QA override 是 Resolver 的显式可选输入，只替换本次选择的 themeId 并留下 QA_OVERRIDE 标记，不改默认 WorldType mapping。Theme subsystem 的 API 不接收 Combat Engine、CombatState、Command、Rules 或重建回调；测试在默认与强制切换前后比较这些外部对象的 identity/serialized bytes，确认 Theme selection 只影响表现包。
+
+### 影响与边界
+
+- v0.4 不提供玩家任意主题切换器；override 仅是开发/QA 调用能力。
+- Loader source 的工程目录实现、base/CSS/Vector fallback 与 missing-slot warning 留给 M9-T03；本任务不读取文件系统或复制 FINAL assets。
+- Theme package 不持有 executable handler、State setter 或 Command factory，不能成为规则分支入口。
