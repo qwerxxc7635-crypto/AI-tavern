@@ -486,6 +486,63 @@
   gap: var(--space-1);
 }
 
+.ability-slot:hover,
+.ability-slot:focus-within,
+.ability-slot.is-selected {
+  z-index: calc(var(--layer-sticky) + 1);
+}
+
+.ability-tooltip {
+  position: absolute;
+  bottom: calc(100% + var(--space-3));
+  left: 0;
+  width: min(26rem, calc(100vw - var(--space-8)));
+  max-height: min(28rem, 65vh);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  overflow: auto;
+  border: var(--border-width-thin) solid var(--color-border-strong);
+  border-radius: var(--radius-md);
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+  box-shadow: var(--shadow-floating);
+  overflow-wrap: anywhere;
+}
+
+.ability-tooltip[hidden] {
+  display: none;
+}
+
+.ability-tooltip header,
+.ability-tooltip section {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.ability-tooltip h3,
+.ability-tooltip p {
+  margin: 0;
+}
+
+.ability-tooltip p,
+.ability-tooltip small {
+  color: var(--color-text-secondary);
+}
+
+.ability-tooltip__costs,
+.ability-tooltip__mechanics {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-4);
+  margin: 0;
+}
+
+.ability-tooltip__costs {
+  color: var(--color-accent);
+  font-weight: var(--font-weight-medium);
+}
+
 .ability-slot button,
 .action-bar__end-turn {
   min-height: 4rem;

@@ -283,6 +283,7 @@ describe('CombatScreen shell', () => {
               displayNameZhCn: '凝神',
               requiresTarget: false,
               legalTargetIds: [],
+              tooltip: tooltip('ability.focus-self', '收束思绪，让呼吸与战机合一。'),
             },
             ...model.actions.slice(1),
           ],
@@ -298,6 +299,117 @@ describe('CombatScreen shell', () => {
       targetId: null,
     });
     expect(screen.queryByRole('button', { name: /作为凝神的目标/ })).toBeNull();
+  });
+
+  it('shows the composed flavor, mechanical tooltip, and cost preview on hover and focus', () => {
+    render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
+    const ability = screen.getByRole('button', { name: '余烬斩' });
+    const slot = ability.closest('.ability-slot') as HTMLElement;
+    const hiddenTooltip = within(slot).getByRole('tooltip', { hidden: true });
+    expect(hiddenTooltip.hasAttribute('hidden')).toBe(true);
+
+    fireEvent.mouseEnter(slot);
+    const hoveredTooltip = within(slot).getByRole('tooltip');
+    expect(within(hoveredTooltip).getByText('余烬沿刃口迸发，照亮短暂战机。')).toBeTruthy();
+    expect(within(hoveredTooltip).getByRole('region', { name: '消耗预览' })).toBeTruthy();
+    expect(within(hoveredTooltip).getByText('行动点：2 → 1')).toBeTruthy();
+    expect(within(hoveredTooltip).getByText('法力：6 → 4')).toBeTruthy();
+    expect(within(hoveredTooltip).getByRole('region', { name: '技能规则' })).toBeTruthy();
+    expect(within(hoveredTooltip).getByText('伤害：物理（8）')).toBeTruthy();
+
+    fireEvent.mouseLeave(slot);
+    expect(hiddenTooltip.hasAttribute('hidden')).toBe(true);
+    fireEvent.focus(ability);
+    expect(hiddenTooltip.hasAttribute('hidden')).toBe(false);
+    fireEvent.blur(ability);
+    expect(hiddenTooltip.hasAttribute('hidden')).toBe(true);
+  });
+
+  it('keeps the tooltip open while selected and renders projected Heat transition state', () => {
+    const model = viewModel();
+    const action = requiredAt(model.actions, 0);
+    render(
+      <CombatScreen
+        viewModel={{
+          ...model,
+          actions: [
+            {
+              ...action,
+              costPreview: {
+                ...costPreview(),
+                resources: [
+                  {
+                    resourceId: 'heat',
+                    labelZhCn: '热量',
+                    before: 70,
+                    after: 85,
+                    overheatThreshold: 80,
+                    isOverheatedBefore: false,
+                    isOverheatedAfter: true,
+                    textZhCn: '热量：70 → 85',
+                  },
+                ],
+              },
+            },
+            ...model.actions.slice(1),
+          ],
+        }}
+        commandPort={commandPort()}
+      />,
+    );
+
+    const ability = screen.getByRole('button', { name: '余烬斩' });
+    fireEvent.click(ability);
+    fireEvent.blur(ability);
+    const tooltipPanel = within(ability.closest('.ability-slot') as HTMLElement).getByRole(
+      'tooltip',
+    );
+    expect(within(tooltipPanel).getByText('热量：70 → 85（过热阈值 80，使用后过热）')).toBeTruthy();
+    expect(
+      within(tooltipPanel)
+        .getByText(/热量：70/)
+        .closest('li')
+        ?.getAttribute('data-overheated-after'),
+    ).toBe('true');
+  });
+
+  it('preserves long dynamic flavor and mechanical text inside the bounded tooltip panel', () => {
+    const model = viewModel();
+    const action = requiredAt(model.actions, 0);
+    const longFlavor = `传承记述：${'余烬流转，星火不息。'.repeat(20)}`;
+    const longMechanical = `特殊效果：${'按规则顺序结算。'.repeat(24)}`;
+    const baseTooltip = tooltip(action.actionId, longFlavor);
+    render(
+      <CombatScreen
+        viewModel={{
+          ...model,
+          actions: [
+            {
+              ...action,
+              tooltip: {
+                ...baseTooltip,
+                mechanics: {
+                  ...baseTooltip.mechanics,
+                  lines: [
+                    ...baseTooltip.mechanics.lines,
+                    { kind: 'EFFECT', sourceIds: ['effect.long'], text: longMechanical },
+                  ],
+                },
+              },
+            },
+            ...model.actions.slice(1),
+          ],
+        }}
+        commandPort={commandPort()}
+      />,
+    );
+
+    const slot = screen.getByRole('button', { name: '余烬斩' }).closest('.ability-slot');
+    if (!(slot instanceof HTMLElement)) throw new Error('Missing ability slot');
+    fireEvent.mouseEnter(slot);
+    const tooltipPanel = within(slot).getByRole('tooltip');
+    expect(within(tooltipPanel).getByText(longFlavor).textContent).toBe(longFlavor);
+    expect(within(tooltipPanel).getByText(longMechanical).textContent).toBe(longMechanical);
   });
 });
 
@@ -374,6 +486,8 @@ function viewModel(): CombatScreenShellViewModel {
           usesThisBattle: 2,
           maxUsesPerBattle: 6,
         },
+        costPreview: costPreview(),
+        tooltip: tooltip('ability.ember-slash', '余烬沿刃口迸发，照亮短暂战机。'),
       },
       {
         actionId: 'ability.spark-shock',
@@ -390,6 +504,8 @@ function viewModel(): CombatScreenShellViewModel {
           usesThisBattle: 1,
           maxUsesPerBattle: null,
         },
+        costPreview: costPreview(),
+        tooltip: tooltip('ability.spark-shock', '星火震荡空气，压制近处的威胁。'),
       },
       {
         actionId: 'command.end-turn',
@@ -400,9 +516,47 @@ function viewModel(): CombatScreenShellViewModel {
         legalTargetIds: [],
         disabledReasonsZhCn: [],
         abilityUsage: null,
+        costPreview: null,
+        tooltip: null,
       },
     ],
   };
+}
+
+function costPreview() {
+  return {
+    actionPoints: { before: 2, after: 1, textZhCn: '行动点：2 → 1' },
+    resources: [
+      {
+        resourceId: 'mana',
+        labelZhCn: '法力',
+        before: 6,
+        after: 4,
+        overheatThreshold: null,
+        isOverheatedBefore: false,
+        isOverheatedAfter: false,
+        textZhCn: '法力：6 → 4',
+      },
+    ],
+  } as const;
+}
+
+function tooltip(abilityId: string, flavorDescription: string) {
+  return {
+    flavor: {
+      displayName: '余烬战技',
+      flavorDescription,
+      lore: '守火人世代相传的战斗技艺。',
+    },
+    mechanics: {
+      abilityId,
+      lines: [
+        { kind: 'ACTION_POINT', sourceIds: [], text: '行动点：1' },
+        { kind: 'DAMAGE', sourceIds: ['physical'], text: '伤害：物理（8）' },
+        { kind: 'TARGET', sourceIds: ['enemy'], text: '目标：单个合法目标' },
+      ],
+    },
+  } as const;
 }
 
 function requiredAt<T>(values: readonly T[], index: number): T {

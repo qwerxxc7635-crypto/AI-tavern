@@ -67,6 +67,56 @@ export interface CombatAbilityUsageViewModel {
   readonly maxUsesPerBattle: number | null;
 }
 
+export interface CombatValueTransitionViewModel {
+  readonly before: number;
+  readonly after: number;
+  readonly textZhCn: string;
+}
+
+export interface CombatResourceTransitionViewModel extends CombatValueTransitionViewModel {
+  readonly resourceId: string;
+  readonly labelZhCn: string;
+  readonly overheatThreshold: number | null;
+  readonly isOverheatedBefore: boolean;
+  readonly isOverheatedAfter: boolean;
+}
+
+export interface CombatCostPreviewViewModel {
+  readonly actionPoints: CombatValueTransitionViewModel;
+  readonly resources: readonly CombatResourceTransitionViewModel[];
+}
+
+export type TooltipLineKind =
+  | 'ACTION_POINT'
+  | 'RESOURCE'
+  | 'RESOLUTION'
+  | 'DAMAGE'
+  | 'HEALING'
+  | 'SHIELD'
+  | 'CRITICAL'
+  | 'SAVE'
+  | 'STATUS'
+  | 'COOLDOWN'
+  | 'TARGET'
+  | 'EFFECT'
+  | 'TAG';
+
+export interface CombatAbilityTooltipViewModel {
+  readonly flavor: {
+    readonly displayName: string;
+    readonly flavorDescription: string;
+    readonly lore: string;
+  };
+  readonly mechanics: {
+    readonly abilityId: string;
+    readonly lines: readonly {
+      readonly kind: TooltipLineKind;
+      readonly sourceIds: readonly string[];
+      readonly text: string;
+    }[];
+  };
+}
+
 export interface CombatActionViewModel {
   readonly actionId: string;
   readonly displayNameZhCn: string;
@@ -76,6 +126,8 @@ export interface CombatActionViewModel {
   readonly legalTargetIds: readonly string[];
   readonly disabledReasonsZhCn: readonly string[];
   readonly abilityUsage: CombatAbilityUsageViewModel | null;
+  readonly costPreview: CombatCostPreviewViewModel | null;
+  readonly tooltip: CombatAbilityTooltipViewModel | null;
 }
 
 export interface CombatScreenShellViewModel {
@@ -505,22 +557,44 @@ export function AbilitySlot({
   readonly onSelected: (actionId: string) => void;
 }) {
   const reasonId = useId();
-  if (action.kind !== 'ABILITY' || action.abilityUsage === null) {
+  const tooltipId = useId();
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  if (
+    action.kind !== 'ABILITY' ||
+    action.abilityUsage === null ||
+    action.costPreview === null ||
+    action.tooltip === null ||
+    action.tooltip.mechanics.abilityId !== action.actionId
+  ) {
     throw new Error('AbilitySlot requires an ability action');
   }
   const usage = action.abilityUsage;
   const usageLines = abilityUsageLines(usage);
+  const tooltipOpen = selected || hovered || focused;
   return (
     <div
       className={selected ? 'ability-slot is-selected' : 'ability-slot'}
       data-action-id={action.actionId}
+      onMouseEnter={() => {
+        setHovered(true);
+      }}
+      onMouseLeave={() => {
+        setHovered(false);
+      }}
+      onFocus={() => {
+        setFocused(true);
+      }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false);
+      }}
     >
       <button
         type="button"
         disabled={!action.enabled}
         aria-label={action.displayNameZhCn}
         aria-pressed={selected}
-        aria-describedby={action.enabled ? undefined : reasonId}
+        aria-describedby={action.enabled ? tooltipId : `${tooltipId} ${reasonId}`}
         onClick={() => {
           onSelected(action.actionId);
         }}
@@ -540,7 +614,63 @@ export function AbilitySlot({
           ))}
         </ul>
       )}
+      <AbilityTooltipPanel id={tooltipId} action={action} hidden={!tooltipOpen} />
     </div>
+  );
+}
+
+export function AbilityTooltipPanel({
+  id,
+  action,
+  hidden,
+}: {
+  readonly id: string;
+  readonly action: CombatActionViewModel;
+  readonly hidden: boolean;
+}) {
+  if (action.costPreview === null || action.tooltip === null) {
+    throw new Error('AbilityTooltipPanel requires projected tooltip data');
+  }
+  return (
+    <aside id={id} className="ability-tooltip" role="tooltip" hidden={hidden}>
+      <header>
+        <strong>{action.tooltip.flavor.displayName}</strong>
+        <p>{action.tooltip.flavor.flavorDescription}</p>
+        <small>{action.tooltip.flavor.lore}</small>
+      </header>
+      <section aria-label="消耗预览">
+        <h3>使用后预览</h3>
+        <ul className="ability-tooltip__costs">
+          <li>{action.costPreview.actionPoints.textZhCn}</li>
+          {action.costPreview.resources.map((resource) => (
+            <li
+              key={resource.resourceId}
+              data-resource-id={resource.resourceId}
+              data-overheated-after={resource.isOverheatedAfter ? 'true' : 'false'}
+            >
+              {resource.textZhCn}
+              {resource.overheatThreshold === null
+                ? null
+                : `（过热阈值 ${String(resource.overheatThreshold)}${resource.isOverheatedAfter ? '，使用后过热' : ''}）`}
+            </li>
+          ))}
+        </ul>
+      </section>
+      <section aria-label="技能规则">
+        <h3>规则数据</h3>
+        <ul className="ability-tooltip__mechanics">
+          {action.tooltip.mechanics.lines.map((line, index) => (
+            <li
+              key={`${line.kind}:${line.sourceIds.join(',')}:${String(index)}`}
+              data-tooltip-kind={line.kind}
+              data-source-ids={line.sourceIds.join(',')}
+            >
+              {line.text}
+            </li>
+          ))}
+        </ul>
+      </section>
+    </aside>
   );
 }
 

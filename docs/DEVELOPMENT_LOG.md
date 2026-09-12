@@ -6152,3 +6152,18 @@
 - CombatScreen/Target Selection jsdom 专项 18/18 PASS，覆盖 exact legal highlight 与 UseAbility envelope、非常规 Rules target override、三类取消、targetless ability、disabled+reason，以及 ViewModel revision replacement 清除 stale selection；Presentation crate 11/11 PASS，含 target cardinality/唯一性拒绝。
 - TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1156 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 502 PASS、1 credential-only ignore，archive interop 双向通过。
 - M8-T04/M1-T07 DependsOn 与 V5.2 §18.4 已复核；Cost Preview 按任务边界保留给 M8-T06，无 SPEC BLOCKER。UI styling skill 用于语义 button、focus、live prompt、键盘 Escape 与响应式目标态；用户 `.gitignore` 保持未纳入提交。M8-T05 PASS；下一项严格为 M8-T06 Cost Preview / Tooltip。
+
+## 2026-09-12 — M8-T06 完成 Cost Preview / Tooltip
+
+### 绑定 Runtime 快照的 Preview 与分层 Tooltip
+
+- 从 M8-T05 提交 `1df4db5` 创建 `task/M8-T06-cost-preview-tooltip`。Combat Presentation action projection 新增 AP/resource before→after cost preview 与既有 M6-T07 `AbilityTooltip`；新增 `DEC-227`。Ability 必须同时携带两者且 mechanical abilityId 匹配，非 Ability 必须为空。
+- Projector 将 AP/resource before 精确复验为 active combatant 当前值，拒绝越界 after、未知/重复资源或 stale preview；resource 中文名与 Heat threshold 来自现有 catalog/Runtime State。Heat before/after overheat 由 Presentation 投影，不交给 React 推断。
+- `AbilityTooltipPanel` 分开显示 validated AI flavor、使用后 AP/resource/Heat 预览和 programmatic mechanical lines。Hover、Focus 与 selected target mode 都可见；button 通过 aria-describedby 关联 tooltip，动态长文本保持完整并由 max width/height、内部滚动与 wrapping 约束。
+- Preview/Tooltip 不提交 Command、不创建 reservation、不写 State。Rust Heat 专项在 projection 前后比较 canonical bytes，覆盖 State 与三 RNG channel cursor 全量不变。
+
+### 验证与结束状态
+
+- CombatScreen/Tooltip jsdom 专项 21/21 PASS，覆盖 Hover/Focus/Selected、AP+Mana before→after、Heat 70→85/threshold 80/after overheat、机械与 AI flavor 分区、长动态文本；Presentation crate 12/12 PASS，覆盖 stale AP、resource/Heat 与 tooltip identity fail closed、State/RNG 零修改。
+- TypeScript noEmit、ESLint、Prettier、Rustfmt、`cargo clippy -p ember-combat-presentation --all-targets -- -D warnings` 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 193 files / 1159 tests（另 2 files / 6 tests baseline skip），Node 33/33，Rust workspace 503 PASS、1 credential-only ignore，archive interop 双向通过。
+- M8-T03/M8-T04/M6-T07 DependsOn 与 V5.2 §11/§18.4/§18.5 已复核；没有进入 Reaction/Tactical/Log/Theme，无 SPEC BLOCKER。UI styling skill 用于 focus/description 关系、分层信息、响应式有界浮层与动态文本安全；用户 `.gitignore` 保持未纳入提交。M8-T06 PASS；下一项严格为 M8-T07 Reaction / Tactical Strategy UI。

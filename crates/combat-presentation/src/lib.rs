@@ -10,8 +10,10 @@ mod view_model;
 
 pub use view_model::{
     COMBAT_VIEW_MODEL_SCHEMA_VERSION, CombatAbilityUsageViewModel, CombatActionRuleProjection,
-    CombatActionViewKind, CombatActionViewModel, CombatMeterViewModel, CombatResourceViewModel,
-    CombatRulesPresentationSnapshot, CombatStatusViewModel, CombatViewModel, CombatViewModelError,
+    CombatActionViewKind, CombatActionViewModel, CombatCostPreviewRuleProjection,
+    CombatCostPreviewViewModel, CombatMeterViewModel, CombatResourceTransitionRuleProjection,
+    CombatResourceTransitionViewModel, CombatResourceViewModel, CombatRulesPresentationSnapshot,
+    CombatStatusViewModel, CombatValueTransitionViewModel, CombatViewModel, CombatViewModelError,
     CombatViewModelErrorCode, CombatViewModelProjector, CombatViewModelRequest,
     CombatantPresentationEntry, CombatantSideView, CombatantViewModel, EnemyIntentViewModel,
     StatusPresentationEntry, TimelineEntryViewModel,

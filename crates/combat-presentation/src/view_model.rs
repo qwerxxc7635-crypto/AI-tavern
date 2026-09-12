@@ -6,7 +6,7 @@ use ember_combat_core::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{CombatPresentationCatalog, is_cjk};
+use crate::{AbilityTooltip, CombatPresentationCatalog, is_cjk};
 
 pub const COMBAT_VIEW_MODEL_SCHEMA_VERSION: u32 = 1;
 
@@ -50,6 +50,22 @@ pub struct CombatActionRuleProjection {
     pub legal_target_ids: Vec<String>,
     pub failures: Vec<PreconditionFailure>,
     pub ability_usage: Option<CombatAbilityUsageViewModel>,
+    pub cost_preview: Option<CombatCostPreviewRuleProjection>,
+    pub tooltip: Option<AbilityTooltip>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatCostPreviewRuleProjection {
+    pub action_points_before: i64,
+    pub action_points_after: i64,
+    pub resource_transitions: Vec<CombatResourceTransitionRuleProjection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatResourceTransitionRuleProjection {
+    pub resource_id: String,
+    pub before: i64,
+    pub after: i64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -144,6 +160,36 @@ pub struct CombatActionViewModel {
     pub legal_target_ids: Vec<String>,
     pub disabled_reasons_zh_cn: Vec<String>,
     pub ability_usage: Option<CombatAbilityUsageViewModel>,
+    pub cost_preview: Option<CombatCostPreviewViewModel>,
+    pub tooltip: Option<AbilityTooltip>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatCostPreviewViewModel {
+    pub action_points: CombatValueTransitionViewModel,
+    pub resources: Vec<CombatResourceTransitionViewModel>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatValueTransitionViewModel {
+    pub before: i64,
+    pub after: i64,
+    pub text_zh_cn: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CombatResourceTransitionViewModel {
+    pub resource_id: String,
+    pub label_zh_cn: String,
+    pub before: i64,
+    pub after: i64,
+    pub overheat_threshold: Option<i64>,
+    pub is_overheated_before: bool,
+    pub is_overheated_after: bool,
+    pub text_zh_cn: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -364,7 +410,7 @@ impl<'a> CombatViewModelProjector<'a> {
                 })
             })
             .collect::<Result<Vec<_>, CombatViewModelError>>()?;
-        let actions = project_actions(request.state, request.rules)?;
+        let actions = project_actions(request.state, request.rules, self.catalog)?;
 
         Ok(CombatViewModel {
             schema_version: COMBAT_VIEW_MODEL_SCHEMA_VERSION,
@@ -391,6 +437,7 @@ impl<'a> CombatViewModelProjector<'a> {
 fn project_actions(
     state: &CombatState,
     rules: &CombatRulesPresentationSnapshot,
+    catalog: &CombatPresentationCatalog,
 ) -> Result<Vec<CombatActionViewModel>, CombatViewModelError> {
     let mut action_ids = BTreeMap::new();
     let state_ids: BTreeMap<_, _> = state
@@ -410,6 +457,7 @@ fn project_actions(
                 || (!action.requires_target && !action.legal_target_ids.is_empty())
                 || (!action.is_legal && !action.legal_target_ids.is_empty())
                 || !valid_ability_usage(action.kind, action.ability_usage.as_ref())
+                || !valid_ability_presentation(action)
             {
                 return Err(view_error(
                     CombatViewModelErrorCode::InvalidRulesProjection,
@@ -447,9 +495,129 @@ fn project_actions(
                 legal_target_ids: action.legal_target_ids.clone(),
                 disabled_reasons_zh_cn: reasons,
                 ability_usage: action.ability_usage.clone(),
+                cost_preview: action
+                    .cost_preview
+                    .as_ref()
+                    .map(|preview| project_cost_preview(state, catalog, preview))
+                    .transpose()?,
+                tooltip: action.tooltip.clone(),
             })
         })
         .collect()
+}
+
+fn valid_ability_presentation(action: &CombatActionRuleProjection) -> bool {
+    match action.kind {
+        CombatActionViewKind::Ability => {
+            action.cost_preview.is_some()
+                && action
+                    .tooltip
+                    .as_ref()
+                    .is_some_and(|tooltip| tooltip.mechanics().ability_id() == action.action_id)
+        }
+        CombatActionViewKind::EndTurn
+        | CombatActionViewKind::Escape
+        | CombatActionViewKind::Reaction => {
+            action.cost_preview.is_none() && action.tooltip.is_none()
+        }
+    }
+}
+
+fn project_cost_preview(
+    state: &CombatState,
+    catalog: &CombatPresentationCatalog,
+    preview: &CombatCostPreviewRuleProjection,
+) -> Result<CombatCostPreviewViewModel, CombatViewModelError> {
+    let actor_id = state.round.active_combatant_id.as_deref().ok_or_else(|| {
+        view_error(
+            CombatViewModelErrorCode::InvalidRulesProjection,
+            "activeCombatantId",
+        )
+    })?;
+    let actor = state
+        .combatants
+        .iter()
+        .find(|combatant| combatant.combatant_id == actor_id)
+        .ok_or_else(|| view_error(CombatViewModelErrorCode::InvalidRulesProjection, actor_id))?;
+    if preview.action_points_before != actor.action_points
+        || preview.action_points_after < 0
+        || preview.action_points_after > preview.action_points_before
+    {
+        return Err(view_error(
+            CombatViewModelErrorCode::InvalidRulesProjection,
+            "actionPoints",
+        ));
+    }
+    let mut resource_ids = BTreeMap::new();
+    let resources = preview
+        .resource_transitions
+        .iter()
+        .map(|transition| {
+            if !valid_id(&transition.resource_id)
+                || resource_ids
+                    .insert(transition.resource_id.as_str(), ())
+                    .is_some()
+            {
+                return Err(view_error(
+                    CombatViewModelErrorCode::InvalidRulesProjection,
+                    &transition.resource_id,
+                ));
+            }
+            let resource = actor
+                .resources
+                .iter()
+                .find(|resource| resource.resource_id == transition.resource_id)
+                .ok_or_else(|| {
+                    view_error(
+                        CombatViewModelErrorCode::UnknownRulesReference,
+                        &transition.resource_id,
+                    )
+                })?;
+            let label = catalog
+                .resources
+                .get(&transition.resource_id)
+                .ok_or_else(|| {
+                    view_error(
+                        CombatViewModelErrorCode::MissingPresentationEntry,
+                        &transition.resource_id,
+                    )
+                })?;
+            if transition.before != resource.current
+                || transition.after < resource.min_value
+                || transition.after > resource.max_value
+            {
+                return Err(view_error(
+                    CombatViewModelErrorCode::InvalidRulesProjection,
+                    &transition.resource_id,
+                ));
+            }
+            Ok(CombatResourceTransitionViewModel {
+                resource_id: transition.resource_id.clone(),
+                label_zh_cn: label.clone(),
+                before: transition.before,
+                after: transition.after,
+                overheat_threshold: resource.overheat_threshold,
+                is_overheated_before: resource
+                    .overheat_threshold
+                    .is_some_and(|threshold| transition.before >= threshold),
+                is_overheated_after: resource
+                    .overheat_threshold
+                    .is_some_and(|threshold| transition.after >= threshold),
+                text_zh_cn: format!("{label}：{} → {}", transition.before, transition.after),
+            })
+        })
+        .collect::<Result<Vec<_>, CombatViewModelError>>()?;
+    Ok(CombatCostPreviewViewModel {
+        action_points: CombatValueTransitionViewModel {
+            before: preview.action_points_before,
+            after: preview.action_points_after,
+            text_zh_cn: format!(
+                "行动点：{} → {}",
+                preview.action_points_before, preview.action_points_after
+            ),
+        },
+        resources,
+    })
 }
 
 fn valid_ability_usage(
@@ -664,6 +832,8 @@ mod tests {
         TerminalPriorityPolicy, TimelineEntry, UtilityActionCategory,
     };
 
+    use crate::{AiCombatFlavor, MechanicalTooltip, MechanicalTooltipLine, TooltipLineKind};
+
     use super::*;
 
     const SEED: &str = "0123456789abcdef0123456789abcdef";
@@ -694,6 +864,24 @@ mod tests {
         assert_eq!(view.actions[0].legal_target_ids, ["hero", "enemy"]);
         assert!(view.actions[0].requires_target);
         assert!(view.actions[0].enabled);
+        assert_eq!(
+            view.actions[0]
+                .cost_preview
+                .as_ref()
+                .expect("cost preview is projected")
+                .action_points
+                .text_zh_cn,
+            "行动点：2 → 1"
+        );
+        assert_eq!(
+            view.actions[0]
+                .tooltip
+                .as_ref()
+                .expect("tooltip is projected")
+                .flavor()
+                .flavor_description,
+            "牵引命运丝线，改变此刻的攻势。"
+        );
         assert_eq!(view.actions[1].disabled_reasons_zh_cn, ["技能仍在冷却"]);
         assert_eq!(
             view.actions[1]
@@ -727,6 +915,45 @@ mod tests {
             serde_json::to_vec(&second).unwrap()
         );
         assert_eq!(first.combatants[0].combatant_id, "enemy");
+    }
+
+    #[test]
+    fn cost_preview_projects_heat_transition_without_mutating_state_or_rng() {
+        let mut state = state();
+        state.combatants[1].resources.clear();
+        state.combatants[0].resources = vec![ResourceState {
+            resource_id: "heat".to_owned(),
+            current: 70,
+            min_value: 0,
+            max_value: 100,
+            overheat_threshold: Some(80),
+            hard_max_value: Some(100),
+        }];
+        let mut rules = rules(state.revision);
+        for action in &mut rules.actions {
+            action
+                .cost_preview
+                .as_mut()
+                .expect("ability cost preview exists")
+                .resource_transitions = vec![CombatResourceTransitionRuleProjection {
+                resource_id: "heat".to_owned(),
+                before: 70,
+                after: 85,
+            }];
+        }
+        let before = state.canonical_json_bytes().unwrap();
+        let view = CombatViewModelProjector::new(&CombatPresentationCatalog::v0_4_1())
+            .project(&request(&state, &rules, &names()))
+            .unwrap();
+        let heat = &view.actions[0]
+            .cost_preview
+            .as_ref()
+            .expect("cost preview is projected")
+            .resources[0];
+        assert_eq!(heat.text_zh_cn, "热量：70 → 85");
+        assert!(!heat.is_overheated_before);
+        assert!(heat.is_overheated_after);
+        assert_eq!(state.canonical_json_bytes().unwrap(), before);
     }
 
     #[test]
@@ -800,6 +1027,35 @@ mod tests {
         assert_eq!(
             projector
                 .project(&request(&state, &invalid_usage, &names))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
+        );
+
+        let mut stale_cost_preview = rules(state.revision);
+        stale_cost_preview.actions[0]
+            .cost_preview
+            .as_mut()
+            .expect("cost preview fixture exists")
+            .action_points_before = 3;
+        assert_eq!(
+            projector
+                .project(&request(&state, &stale_cost_preview, &names))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidRulesProjection
+        );
+
+        let mut mismatched_tooltip = rules(state.revision);
+        mismatched_tooltip.actions[0]
+            .tooltip
+            .as_mut()
+            .expect("tooltip fixture exists")
+            .mechanics
+            .ability_id = "ability.other".to_owned();
+        assert_eq!(
+            projector
+                .project(&request(&state, &mismatched_tooltip, &names))
                 .unwrap_err()
                 .code,
             CombatViewModelErrorCode::InvalidRulesProjection
@@ -897,6 +1153,11 @@ mod tests {
                         uses_this_battle: 1,
                         max_uses_per_battle: None,
                     }),
+                    cost_preview: Some(cost_preview()),
+                    tooltip: Some(tooltip(
+                        "ability.strange-target",
+                        "牵引命运丝线，改变此刻的攻势。",
+                    )),
                 },
                 CombatActionRuleProjection {
                     action_id: "ability.cooldown".to_owned(),
@@ -917,8 +1178,43 @@ mod tests {
                         uses_this_battle: 1,
                         max_uses_per_battle: Some(3),
                     }),
+                    cost_preview: Some(cost_preview()),
+                    tooltip: Some(tooltip(
+                        "ability.cooldown",
+                        "余烬沿刃口迸发，照亮短暂战机。",
+                    )),
                 },
             ],
+        }
+    }
+
+    fn cost_preview() -> CombatCostPreviewRuleProjection {
+        CombatCostPreviewRuleProjection {
+            action_points_before: 2,
+            action_points_after: 1,
+            resource_transitions: vec![CombatResourceTransitionRuleProjection {
+                resource_id: "mana".to_owned(),
+                before: 6,
+                after: 4,
+            }],
+        }
+    }
+
+    fn tooltip(ability_id: &str, flavor_description: &str) -> AbilityTooltip {
+        AbilityTooltip {
+            flavor: AiCombatFlavor {
+                display_name: "命运术式".to_owned(),
+                flavor_description: flavor_description.to_owned(),
+                lore: "灰烬中的古老技艺。".to_owned(),
+            },
+            mechanics: MechanicalTooltip {
+                ability_id: ability_id.to_owned(),
+                lines: vec![MechanicalTooltipLine {
+                    kind: TooltipLineKind::ActionPoint,
+                    source_ids: vec![],
+                    text: "行动点：1".to_owned(),
+                }],
+            },
         }
     }
 

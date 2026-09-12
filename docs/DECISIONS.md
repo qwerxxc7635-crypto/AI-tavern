@@ -4928,3 +4928,23 @@ Combat Presentation 在 action ViewModel 中显式投影 `requiresTarget`，并 
 - M8-T05 的 GetLegalTargets 输入是 M8-T01 same-revision Rules projection；UI 不维护第二份 target rule 或缓存跨 revision 结果。
 - Cost/Resource Preview 与 mechanical tooltip 仍由 M8-T06 注入；本任务不读取或消费任何 RNG，也不实现 Reaction、Log 或 Theme package。
 - Stage/CombatantView 继续可独立展示；只有存在 active target selection 时，合法对象才增加交互控件。
+
+## DEC-227：Cost Preview 由 Rules 绑定当前资源快照，Tooltip 保持机械与 AI 文案分层
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §11、§18.4/§18.5、M5 Gate/M6-T07/M8-T03/M8-T04/M8-T06，DEC-208、DEC-214、DEC-224 至 DEC-226
+
+### 决定
+
+每个 Ability action 的 Presentation projection 必须携带 `CombatCostPreviewRuleProjection` 与既有不透明 `AbilityTooltip`。Projector 要求 tooltip 的 mechanical abilityId 与 actionId 一致，并把 cost preview 的 AP before 精确绑定当前 active combatant AP、resource before 精确绑定对应 Runtime resource；after 必须保持各自合法范围，资源 ID 必须存在且唯一。非 Ability action 不得携带这两类数据。
+
+ViewModel 输出程序化的 AP/resource before→after 中文文本，并从当前 resource threshold 投影 Heat 使用前/后 overheat 状态。React 只显示这些结果，不减算 AP、不套用 Spend/GainPressure、不重算 Heat lifecycle。投影全程只读 State，测试比较 canonical State bytes，因此不会消费 initiative/resolution/utilityTieBreak 或写入任何 RNG cursor。
+
+Tooltip 直接复用 M6-T07 `AbilityTooltip`：AI flavor 仍限制为 displayName/flavorDescription/lore，mechanical lines 仍由 Approved Definition + Profile + canonical catalogs 程序生成。UI 把 flavor、使用后预览和规则数据分区渲染，不把 AI 文案解析为数值或规则。Tooltip 在 mouse hover、keyboard focus 或 target-selected 状态显示；动态文本使用有界宽高、内部滚动和 anywhere wrapping，不撑破 ActionBar/Stage。
+
+### 影响与边界
+
+- Cost Preview 是 disposable same-revision presentation，不是 reservation 或 provisional CombatState；真正提交后仍由统一 Command Boundary 复验和扣除。
+- M8-T06 不实现 Reaction、Tactical control、Combat Log、Enemy Intent UI 或 Theme resolver；这些按后续任务处理。
+- disabled Ability 仍可通过 pointer hover 阅读 tooltip 与禁用原因；原生 disabled button 不伪造 keyboard activation。

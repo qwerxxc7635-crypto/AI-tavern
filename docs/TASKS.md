@@ -83,7 +83,8 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M8-T03 — HUD / AP / Resources / Status | PASS | 2026-09-10 | Active CharacterHUD 显示生命/护盾、精确 AP、Reaction、ViewModel 差异资源/Heat 阈值与 StatusStrip；无规则写入 |
 | M8-T04 — ActionBar / AbilitySlot / EndTurn | PASS | 2026-09-10 | AbilitySlot 显示 Rules-projected cooldown/usage/disabled reason；选择 ability 不写状态，独立 EndTurn 经注入 command port 提交真实 CombatCommandEnvelope |
 | M8-T05 — Target Selection | PASS | 2026-09-12 | requiresTarget 与唯一 legalTargetIds 来自 Rules projection；只将返回对象变成目标按钮，支持 select/显式取消/Esc/空白取消并提交标准 UseAbility Command |
-| M8-T06 — Cost Preview / Tooltip | IN_PROGRESS | 2026-09-12 | 下一项；Hover/Focus/Selected 显示 AP/resource/Heat before→after，组合程序机械层与 AI flavor，不消费规则 RNG |
+| M8-T06 — Cost Preview / Tooltip | PASS | 2026-09-12 | Rules projection 校验 active actor AP/resource before→after 与 Heat 阈值；Hover/Focus/Selected 展示既有 Programmatic Mechanical Tooltip + validated AI flavor，零 RNG |
+| M8-T07 — Reaction / Tactical Strategy UI | IN_PROGRESS | 2026-09-12 | 下一项；轻量 ReactionPrompt、Auto/Ask/Disabled、strategy control、Pending resume，重复交互不得重复提交 decision |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 
