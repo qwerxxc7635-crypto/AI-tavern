@@ -712,18 +712,21 @@ function viewModel(): CombatScreenShellViewModel {
       {
         combatantId: 'enemy-b',
         displayNameZhCn: '灰烬守卫',
+        side: 'HOSTILE',
         isExtraTurn: false,
         isCurrent: false,
       },
       {
         combatantId: 'hero',
         displayNameZhCn: '旅者',
+        side: 'PLAYER',
         isExtraTurn: false,
         isCurrent: true,
       },
       {
         combatantId: 'enemy-a',
         displayNameZhCn: '暮影',
+        side: 'HOSTILE',
         isExtraTurn: true,
         isCurrent: false,
       },

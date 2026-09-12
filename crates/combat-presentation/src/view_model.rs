@@ -246,6 +246,7 @@ pub struct CombatantViewModel {
 pub struct TimelineEntryViewModel {
     pub combatant_id: String,
     pub display_name_zh_cn: String,
+    pub side: CombatantSideView,
     pub is_extra_turn: bool,
     pub is_current: bool,
 }
@@ -516,6 +517,15 @@ impl<'a> CombatViewModelProjector<'a> {
                     combatant_id: entry.combatant_id.clone(),
                     display_name_zh_cn: require_name(&combatant_names, &entry.combatant_id)?
                         .to_owned(),
+                    side: side_view(
+                        request
+                            .state
+                            .combatants
+                            .iter()
+                            .find(|combatant| combatant.combatant_id == entry.combatant_id)
+                            .expect("validated timeline combatant exists")
+                            .side,
+                    ),
                     is_extra_turn: entry.is_extra_turn,
                     is_current: request.state.round.active_combatant_id.as_deref()
                         == Some(entry.combatant_id.as_str()),
@@ -1508,6 +1518,7 @@ mod tests {
         assert_eq!(view.phase_label_zh_cn, "等待行动");
         assert_eq!(view.round_label_zh_cn, "第 2 轮");
         assert_eq!(view.timeline[0].combatant_id, "enemy");
+        assert_eq!(view.timeline[0].side, CombatantSideView::Hostile);
         assert!(view.timeline[1].is_current);
         assert_eq!(view.combatants[0].display_name_zh_cn, "灰烬守卫");
         assert_eq!(view.combatants[1].health.text_zh_cn, "生命：30/40");

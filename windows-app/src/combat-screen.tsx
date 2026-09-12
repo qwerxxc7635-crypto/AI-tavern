@@ -1,10 +1,13 @@
 import { useEffect, useId, useState } from 'react';
+import type { CSSProperties } from 'react';
 
 import type {
   CombatCommandEnvelope,
   CombatCommandPayload,
   CombatVersionSet,
 } from '@ember-tavern/contracts';
+
+import type { CombatThemeBinding } from './combat-theme-binding.js';
 
 import './combat-screen.css';
 
@@ -13,6 +16,7 @@ export type CombatantSideView = 'PLAYER' | 'COMPANION' | 'HOSTILE' | 'NEUTRAL';
 export interface CombatTimelineEntryViewModel {
   readonly combatantId: string;
   readonly displayNameZhCn: string;
+  readonly side: CombatantSideView;
   readonly isExtraTurn: boolean;
   readonly isCurrent: boolean;
 }
@@ -228,9 +232,11 @@ export interface CombatCommandPort {
 export function CombatScreen({
   viewModel,
   commandPort,
+  theme,
 }: {
   readonly viewModel: CombatScreenShellViewModel;
   readonly commandPort: CombatCommandPort;
+  readonly theme?: CombatThemeBinding;
 }) {
   const [targetSelection, setTargetSelection] = useState<{
     readonly combatInstanceId: string;
@@ -338,6 +344,9 @@ export function CombatScreen({
       aria-label="战斗界面"
       data-combat-instance-id={viewModel.combatInstanceId}
       data-state-revision={viewModel.stateRevision}
+      data-combat-theme={theme?.themeId}
+      data-layout-preset={theme?.layoutPreset}
+      style={theme?.cssVariables as CSSProperties | undefined}
     >
       <header className="combat-screen__header">
         <div>
@@ -439,6 +448,7 @@ export function TurnTimeline({
             }
             aria-current={entry.isCurrent ? 'step' : undefined}
             data-combatant-id={entry.combatantId}
+            data-combatant-side={entry.side}
           >
             <span className="combat-timeline__order" aria-hidden="true">
               {index + 1}

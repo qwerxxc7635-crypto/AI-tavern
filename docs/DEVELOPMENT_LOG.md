@@ -6257,3 +6257,18 @@
 - Theme fallback 专项 5/5 PASS，覆盖当前 Theme 命中、Base asset 命中、FINAL 59 slots 全部 CSS/Vector fallback、missing Base source 与 cycle recovery；联合 Manifest/Loader/Resolver 专项 26/26 PASS。
 - Prettier、TypeScript noEmit、ESLint 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 196 files / 1200 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
 - M9-T02 DependsOn 与 V5.2 §25.2/§25.4/§26.1 已复核，无 SPEC BLOCKER。没有提前接入任一世界素材。用户 `.gitignore` 保持未纳入提交。M9-T03 PASS；下一项严格为 M9-T04 Cultivation Theme Integration。
+
+## 2026-09-12 — M9-T04 完成 Cultivation Theme Integration
+
+### FINAL 修仙资产接入单一语义 CombatScreen
+
+- 从 M9-T03 提交 `5266a0c` 创建 `task/M9-T04-cultivation-theme`。从用户提供的 FINAL 包原样复制 27 张修仙 Runtime PNG 到 Windows public theme 目录，排除 `.DS_Store`；新增 public/in-code 双 manifest、通用 asset→CSS variable binding 与 `DEC-234`。
+- 27 slots 覆盖 background、四 panel、三 timeline、四 ability state、三 EndTurn state、AP filled/empty、qi/soul、ally/enemy selection、intent、两 FX 与 Victory/Defeat/Escape results。全部路径经过 M9-T01 parser，binding 经过 M9-T03 resolver；零 warning 时才得到 concrete URL variables。
+- CombatScreen 仅增加可选 Theme binding，在 root 写 theme/layout/style；ViewModel 与 Command Port 未改变。修仙 CSS 全部以 cultivation-default scope 应用 semantic overlay 和图片层，保留 Base fallback、键盘 focus、disabled、响应式与 reduced-motion 行为。
+- 为 timeline 增加 Presentation-projected side，样式直接使用 typed PLAYER/COMPANION/HOSTILE data，不根据名称/位置推断；Boss slot 已绑定但不在缺少 authoritative boss field 时擅自启用。FX slots 同样可用，等待权威 UI event 消费。
+
+### 验证与结束状态
+
+- Cultivation Theme jsdom/asset 专项 10/10 PASS：public manifest 一致、27/27 文件存在且 PNG RGBA transparency、7 个关键返工状态 FINAL SHA-256、27 CSS variables 零 warning、Theme root 实际绑定且 semantic timeline 保留。CombatScreen 合并专项 46/46 PASS；Presentation crate 16/16 PASS。
+- Prettier、TypeScript noEmit、ESLint、Rustfmt 与 `git diff --check` PASS。最终工作树完整 `pnpm check` PASS：Vitest 197 files / 1210 tests（另 2 files / 6 tests baseline skip），Node 35/35，Rust workspace 507 PASS、1 credential-only ignore，archive interop 双向通过。
+- M9-T02 DependsOn 与 V5.2 §24/§25、FINAL cultivation manifest 已复核，无 SPEC BLOCKER。UI styling skill 用于 semantic overlay、focus/disabled/reduced-motion 与 scoped visual variants。没有提前复制其他三套或 common assets；用户 `.gitignore` 保持未纳入提交。M9-T04 PASS；下一项严格为 M9-T05 Fantasy Theme Integration。

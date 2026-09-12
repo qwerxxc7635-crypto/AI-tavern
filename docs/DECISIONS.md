@@ -5068,3 +5068,25 @@ Base Theme 是 version 1、themeId=base、layoutPreset=base、fallback=null 的�
 - Missing asset 是可观察的 degraded presentation，不是 Crash，也不修改 Combat ViewModel/State/Command/rules。
 - M9-T03 不复制 FINAL images、不为具体世界绑定 CSS variables；四套主题资产按 M9-T04 至 M9-T07 分别接入。
 - Warning 作为 resolution receipt 返回，由上层 telemetry/QA 消费；普通玩家界面不渲染 machine code 或底层 source exception。
+
+## DEC-234：世界主题通过 Asset CSS Variables 装饰单一 CombatScreen
+
+- 日期：2026-09-12
+- 状态：已采纳
+- 依据：V5.2 §24/§25、M9-T04、FINAL Cultivation assets，DEC-230 至 DEC-233
+
+### 决定
+
+FINAL 修仙 27 张 Runtime Source Assets 原样放入 Windows public `assets/combat-themes/cultivation-default`，不重绘、不压缩、不混入 `.DS_Store`。public manifest 与 in-code validated manifest 都使用 M9-T01 schema，并由测试强制完全相等；每个声明路径必须存在、PNG signature/IHDR 必须为 RGBA color type 6，关键返工状态额外锁定 FINAL SHA-256。
+
+`bindCombatThemePackage` 只消费 M9-T02 package 与 M9-T03 per-slot resolution，把 concrete theme/base assets 转成 scoped CSS custom properties；CSS/Vector fallback 不伪造 URL。`CombatScreen` 仅新增可选只读 Theme binding，在 root 设置 theme/layout data attributes 与 style variables，既有 ViewModel/CommandPort 和 semantic DOM 均不改变。
+
+修仙 CSS 以 data-combat-theme scope 覆盖 background、character/tooltip/reaction/log panels、timeline ally/enemy、ability normal/hover/selected/disabled、EndTurn normal/hover/pressed、AP filled/empty、qi/soul、ally/enemy target selection、intent 及 Victory/Defeat/Escape（含 Scripted 对应）result。文本上方保留半透明 semantic overlay，focus/disabled/reduced-motion 和 Base CSS fallback 继续生效。Cultivation FX 与 boss timeline Slot 同样绑定为可用 CSS variables，但只有权威 UI event/boss presentation 出现后才消费，不从名称或图像推断规则。
+
+Timeline side 由 Rust Presentation 从 validated Combatant side 显式投影，React 只写 data attribute；Theme 不根据中文名、位置或图片判断阵营。Boss 身份当前没有权威 ViewModel 字段，因此不擅自推断，保留已验证 Slot binding。
+
+### 影响与边界
+
+- Asset URL 始终由已验证 themeId/relative path 组合，Theme 不接触 Engine/State/Command/rules。
+- M9-T04 只接入 Cultivation；Fantasy/Sci-Fi/Urban 严格留给 M9-T05 至 M9-T07，common aggregate/performance 留给 M9-T08。
+- UI styling skill 要求的语义元素、可见 focus、文本对比 overlay、响应式 Base layout 与 reduced-motion 保持不变。

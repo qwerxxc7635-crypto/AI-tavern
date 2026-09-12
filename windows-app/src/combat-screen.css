@@ -892,6 +892,180 @@
   background: var(--button-primary-background);
 }
 
+/* Cultivation Theme: bitmap layers decorate the shared semantic CombatScreen only. */
+.combat-screen[data-combat-theme='cultivation-default'] {
+  background-image:
+    radial-gradient(circle at 50% 42%, var(--et-alpha-copper-13), transparent 35%),
+    var(--combat-asset-theme-bg-battle-01, none);
+  background-position: center;
+  background-size: auto, cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .character-hud {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-panel-character, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .ability-tooltip {
+  background-image:
+    linear-gradient(var(--et-alpha-night-94), var(--et-alpha-night-94)),
+    var(--combat-asset-theme-panel-tooltip, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .reaction-prompt {
+  background-image:
+    linear-gradient(var(--et-alpha-night-94), var(--et-alpha-night-94)),
+    var(--combat-asset-theme-panel-reaction, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .combat-log {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-panel-combat-log, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default']
+  .combat-timeline__entry[data-combatant-side='PLAYER'],
+.combat-screen[data-combat-theme='cultivation-default']
+  .combat-timeline__entry[data-combatant-side='COMPANION'] {
+  background-image: var(--combat-asset-theme-timeline-frame-ally, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default']
+  .combat-timeline__entry[data-combatant-side='HOSTILE'] {
+  background-image: var(--combat-asset-theme-timeline-frame-enemy, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .ability-slot > button {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-ability-slot-normal, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default']
+  .ability-slot
+  > button:hover:not(:disabled) {
+  background-image:
+    linear-gradient(var(--et-alpha-night-64), var(--et-alpha-night-64)),
+    var(--combat-asset-theme-ability-slot-hover, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .ability-slot.is-selected > button {
+  background-image:
+    linear-gradient(var(--et-alpha-night-64), var(--et-alpha-night-64)),
+    var(--combat-asset-theme-ability-slot-selected, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .ability-slot > button:disabled {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-ability-slot-disabled, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .action-bar__end-turn {
+  background-image:
+    linear-gradient(var(--et-alpha-night-64), var(--et-alpha-night-64)),
+    var(--combat-asset-theme-button-endturn-normal, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .action-bar__end-turn:hover:not(:disabled) {
+  background-image:
+    linear-gradient(var(--et-alpha-night-54), var(--et-alpha-night-54)),
+    var(--combat-asset-theme-button-endturn-hover, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default']
+  .action-bar__end-turn:active:not(:disabled) {
+  background-image:
+    linear-gradient(var(--et-alpha-night-64), var(--et-alpha-night-64)),
+    var(--combat-asset-theme-button-endturn-pressed, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .action-economy__pips > span {
+  background: var(--combat-asset-theme-ap-node-empty, none) center / cover no-repeat;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .action-economy__pips > span.is-filled {
+  background: var(--combat-asset-theme-ap-node-filled, var(--color-accent)) center / cover no-repeat;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .resource-hud__item[data-resource-id='qi'] {
+  padding: var(--space-2);
+  background: var(--combat-asset-cultivation-resource-qi-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-combat-theme='cultivation-default']
+  .resource-hud__item[data-resource-id='soul'] {
+  padding: var(--space-2);
+  background: var(--combat-asset-cultivation-resource-soul-frame, none) center / 100% 100% no-repeat;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .combatant-view.is-legal-target {
+  position: relative;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .combatant-view.is-legal-target::after {
+  position: absolute;
+  inset: calc(var(--space-2) * -1);
+  z-index: 1;
+  border-radius: inherit;
+  background: var(--combat-asset-theme-selection-ally, none) center / 100% 100% no-repeat;
+  content: '';
+  pointer-events: none;
+}
+
+.combat-screen[data-combat-theme='cultivation-default']
+  .combatant-view--hostile.is-legal-target::after {
+  background-image: var(--combat-asset-theme-selection-enemy, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .enemy-intent-panel li {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-intent-frame, none);
+  background-position: center;
+  background-size: cover;
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .combat-result[data-result-kind='VICTORY'],
+.combat-screen[data-combat-theme='cultivation-default']
+  .combat-result[data-result-kind='SCRIPTED_VICTORY'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-cultivation-combat-result-victory, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .combat-result[data-result-kind='DEFEAT'],
+.combat-screen[data-combat-theme='cultivation-default']
+  .combat-result[data-result-kind='SCRIPTED_DEFEAT'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-cultivation-combat-result-defeat, none);
+}
+
+.combat-screen[data-combat-theme='cultivation-default'] .combat-result[data-result-kind='ESCAPE'] {
+  background-image:
+    linear-gradient(var(--et-alpha-night-74), var(--et-alpha-night-74)),
+    var(--combat-asset-theme-cultivation-combat-result-escape, none);
+}
+
 @media (max-width: 800px) {
   .combat-screen__header {
     align-items: start;
