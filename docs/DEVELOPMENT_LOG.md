@@ -6440,3 +6440,14 @@
 ### 验证与结束状态
 
 - Save Home / Transfer Gateway UI 专项 21/21 PASS；原生 compatibility error policy 1/1 PASS。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T08 PASS；M10 Persistence / Replay / Compatibility Gate=PASS，下一项严格为 M11-T01 Cross-World Baseline Scenario Gate。
+
+## 2026-09-13 — M11-T01 完成 Gate A Deterministic Core Suite
+
+### SOT 条款到真实 Core tests 的可审计映射
+
+- 从 M10-T08 提交 `a469f67` 创建 `task/M11-T01-cross-world-baseline`。新增 `M11_GATE_A_DETERMINISTIC_CORE.md`，将 Gate A 的 replay determinism、Scheduler/Reaction order、Loop Guard exact counters、fixed-point、Objective/Protect Removed、usage commit、RNG isolation、submission/revalidation、cost resume、lethal closure、invariant 与 terminal arbitration 逐项绑定到权威 Core 测试名。
+- Gate 执行完整 `ember-combat-core` suite，不仅执行映射中的代表测试；没有 mock PASS、固定收据、删减测试或降低校验。macOS 结果不冒充 Windows exact-value evidence，双平台比较继续保留给依赖 Gate A–G 的 M11-T08。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core --lib` 338/338 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate A=PASS；下一项严格为 M11-T02 Gate B Resolution / Effect Suite。
