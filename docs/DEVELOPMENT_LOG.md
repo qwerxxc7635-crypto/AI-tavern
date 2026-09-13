@@ -6462,3 +6462,14 @@
 ### 验证与结束状态
 
 - `cargo test -p ember-combat-core --lib` 338/338 PASS，0 failed/ignored；审计索引中的全部 exact test names 已核对存在。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate B=PASS；下一项严格为 M11-T03 Gate C Status / Reaction Suite。
+
+## 2026-09-13 — M11-T03 完成 Gate C Status / Reaction Suite
+
+### Status clocks、Reaction ownership 与真实 crash-resume
+
+- 从 Gate B 提交 `cb52330` 创建 `task/M11-T03-status-reaction-gate`。新增 `M11_GATE_C_STATUS_REACTION.md`，将 StackMode/RefreshPolicy、即时规则效果、四类 clocks、Stun lifecycle、HARD_CC DR、Auto/Ask/多 charges、ownership 与 PendingReaction exactly-once 逐项映射到 Core tests。
+- 除完整 Core suite 外，Gate 单独执行 M10 原生 SQLite crash-resume 测试，要求 Ask window 的 ResolutionContext、Scheduler queue/depth/counters、RNG cursors、Cost reservations 与 decision identity 在关闭并重开数据库后原样恢复。
+
+### 验证与结束状态
+
+- Core 338/338 与 native PendingReaction crash-resume 1/1 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate C=PASS；下一项严格为 M11-T04 Gate D Four World Profiles。
