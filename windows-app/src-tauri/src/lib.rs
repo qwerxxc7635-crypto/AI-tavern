@@ -148,6 +148,7 @@ fn command_error_policy(code: &str) -> CommandErrorPolicy {
         "CAMPAIGN_NOT_FOUND"
         | "CAMPAIGN_ARCHIVED"
         | "CAMPAIGN_DATA_INVALID"
+        | "SAVE_COMPATIBILITY_REQUIRED"
         | "SAVE_ARCHIVE_INVALID"
         | "SAVE_ARCHIVE_FUTURE"
         | "SAVE_ARCHIVE_CONFLICT"
@@ -196,9 +197,13 @@ impl From<CampaignStoreError> for CommandError {
                 code: "CAMPAIGN_STATE_INVALID",
                 message: "当前存档阶段不允许执行该操作。",
             },
-            CampaignStoreError::InvalidData | CampaignStoreError::IncompatibleSchema => Self {
+            CampaignStoreError::InvalidData => Self {
                 code: "CAMPAIGN_DATA_INVALID",
                 message: "本地存档数据无法读取。",
+            },
+            CampaignStoreError::IncompatibleSchema => Self {
+                code: "SAVE_COMPATIBILITY_REQUIRED",
+                message: "该存档包含当前版本无法安全恢复的进度，本次操作已停止。",
             },
             CampaignStoreError::FactConflict => Self {
                 code: "FACT_CONFLICT",
@@ -2156,6 +2161,21 @@ mod tests {
         let error = CommandError::from(CampaignStoreError::ConcurrentModification);
         assert_eq!(error.code, "CONCURRENT_MODIFICATION");
         assert!(error.message.contains("取消"));
+    }
+
+    #[test]
+    fn incompatible_save_uses_a_dedicated_non_retryable_persistence_gate() {
+        let error = CommandError::from(CampaignStoreError::IncompatibleSchema);
+        assert_eq!(error.code, "SAVE_COMPATIBILITY_REQUIRED");
+        assert_eq!(
+            error.message,
+            "该存档包含当前版本无法安全恢复的进度，本次操作已停止。"
+        );
+        let policy = command_error_policy(error.code);
+        assert_eq!(policy.kind, "PERSISTENCE");
+        assert!(!policy.retryable);
+        assert!(!policy.fallback_eligible);
+        assert_eq!(policy.actions, ["DISMISS"]);
     }
 
     #[test]

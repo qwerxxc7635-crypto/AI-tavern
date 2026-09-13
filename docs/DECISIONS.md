@@ -5288,3 +5288,21 @@ Archive v1/v2/v3 均作为 immutable historical inputs 继续支持：v1/v2 走�
 - 历史 v1/v2/v3 fixture 加入不可变 checksum 清单；当前 TypeScript/Rust v4 fixtures 继续执行双向互操作检查。
 - v0.3 Character、NPC、equipment、world 数据仍复用原 domain tables 与 M1 版本化 CombatAttributeResolver；不创建重复角色属性体系。Archive v4 往返后相同 v0.3 character fixture 必须得到相同 Combat 派生值。
 - 不兼容提示的玩家可见中文投影属于 M10-T08；本任务只提供可区分且原子失败的 domain error。
+
+## DEC-245：Compatibility Gate 使用内部分类，玩家界面只投影安全中文
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §17、M10-T08，DEC-244
+
+### 决定
+
+`CampaignStoreError::IncompatibleSchema` 在 Tauri command boundary 映射为专用、不可重试、不可 fallback 的 persistence 分类 `SAVE_COMPATIBILITY_REQUIRED`，与损坏文件、未来 archive、普通 I/O 失败分开。该分类只供程序选择固定 UX，不作为玩家文案；后端 message 也只说明操作已安全停止，不携带 schema/version/stack 等诊断值。
+
+Windows 存档页对导入和导出分别提供固定中文 Compatibility Gate。导入明确说明无法安全恢复旧战斗、原文件和本地存档均未改变；导出明确说明不会生成无法恢复的正式文件、本地存档未改变。两者都给出保留旧文件、使用创建战斗的版本或等待兼容更新的安全下一步。旧版正常 migration 的确认文案不再显示 save/world schema 数字，只说明隔离副本升级和原文件不改写。
+
+### 影响与边界
+
+- 内部 code 仍保留在 IPC contract 中以支持确定性投影和自动测试，但 UI 不拼接后端 message、code、schema id 或 stack trace。
+- Compatibility failure 不提供“按新规则继续”、fallback 或盲目重试操作；真正的 migration/version support 仍只能在持久化层显式实现。
+- 本决定不改变 M10-T07 的 archive transaction 与 rollback 语义，只补齐玩家可见 Gate。

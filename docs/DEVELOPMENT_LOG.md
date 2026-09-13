@@ -6428,3 +6428,15 @@
 
 - Native archive 14/14、active combat compatibility 2/2、v0.3 Character Mapping archive roundtrip 1/1、incompatible current archive atomic rollback 1/1 PASS。TypeScript save suite 16/16 PASS，覆盖 v4 71-table receipt、v3 normal campaign migration 与 unsupported engine version export rejection；`pnpm archive:interop` TypeScript→Rust→TypeScript 双向 PASS。
 - Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1243 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 523 PASS、1 credential-only ignore，archive interop 双向通过。首次完整运行仅既有 secure-http 时序测试偶发一次 timeout，随即专项连续 5/5 与第二次完整门禁均 PASS。用户 `.gitignore` 保持未纳入提交。M10-T07 PASS；下一项严格为 M10-T08 Compatibility UX。
+
+## 2026-09-13 — M10-T08 完成 Compatibility UX
+
+### 显式中文 Gate 与诊断隔离
+
+- 从 M10-T07 提交 `9331827` 创建 `task/M10-T08-compatibility-ux`。新增 `DEC-245`；原生 command boundary 将 `IncompatibleSchema` 单独映射为不可重试、不可 fallback 的 persistence compatibility 分类，不再与普通损坏数据共用分类。
+- Windows 存档页在 import/inspect 与 export 失败路径识别该内部分类，只显示固定中文说明：不兼容战斗不会被当前规则解释，操作已停止，原文件/本地存档保持不变，并提示保留旧文件、使用创建战斗的版本或等待兼容更新。
+- 玩家界面不拼接后端 message；测试注入包含 schema/version/code/stack/trace 的恶意诊断并验证全部不出现在 alert。正常旧版 migration 确认也移除了存档/世界结构编号，仅保留隔离升级和原文件不改写说明。
+
+### 验证与结束状态
+
+- Save Home / Transfer Gateway UI 专项 21/21 PASS；原生 compatibility error policy 1/1 PASS。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T08 PASS；M10 Persistence / Replay / Compatibility Gate=PASS，下一项严格为 M11-T01 Cross-World Baseline Scenario Gate。

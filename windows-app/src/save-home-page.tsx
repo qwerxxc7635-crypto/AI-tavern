@@ -169,7 +169,7 @@ export function SaveHomePage({
       let mode: 'CREATE' | 'OVERWRITE' = 'CREATE';
       if (inspection.migrationRequired) {
         const accepted = await confirmPlayerAction(
-          `这是旧版存档。导入时会从原文件的兼容副本升级到存档结构 ${inspection.saveSchemaVersion} / 世界结构 ${inspection.worldSchemaVersion}；原文件不会被改写。确定继续吗？`,
+          '这是旧版存档。导入时会在隔离副本中完成兼容升级；原文件不会被改写。确定继续吗？',
         );
         if (!accepted) return;
       }
@@ -206,8 +206,8 @@ export function SaveHomePage({
       if (path === null) return;
       await transferGateway.exportArchive(campaign.id, path);
       setTransferNotice(`存档 ${campaign.id.slice(0, 8)} 已导出到所选位置。`);
-    } catch {
-      setError('导出失败：没有生成正式存档文件，本地游戏数据未被修改。');
+    } catch (exportError) {
+      setError(exportArchiveErrorMessage(exportError));
     } finally {
       markBusy(null);
     }
@@ -376,22 +376,31 @@ export function SaveHomePage({
 }
 
 function importArchiveErrorMessage(error: unknown): string {
-  if (typeof error === 'string') {
-    try {
-      return importArchiveErrorMessage(JSON.parse(error) as unknown);
-    } catch {
-      return '导入失败：文件未通过校验或无法写入；本地存档保持原状。';
-    }
+  if (hasCommandErrorCode(error, 'SAVE_COMPATIBILITY_REQUIRED')) {
+    return '该存档包含当前版本无法安全恢复的战斗进度。为避免使用不同规则改写战斗，本次导入已停止；原文件与本地存档均保持不变。请保留原文件，并使用创建它的版本继续战斗，或等待兼容更新。';
   }
-  if (
-    error !== null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    error.code === 'SAVE_ARCHIVE_FUTURE'
-  ) {
+  if (hasCommandErrorCode(error, 'SAVE_ARCHIVE_FUTURE')) {
     return '该存档来自更新版本；请升级 Ember Tavern 后再导入。本地存档保持原状。';
   }
   return '导入失败：文件未通过校验或无法写入；本地存档保持原状。';
+}
+
+function exportArchiveErrorMessage(error: unknown): string {
+  if (hasCommandErrorCode(error, 'SAVE_COMPATIBILITY_REQUIRED')) {
+    return '当前存档中的战斗进度无法由此版本安全导出。为避免生成无法恢复的文件，本次导出已停止；本地存档保持不变。请使用创建该战斗的版本继续，或等待兼容更新。';
+  }
+  return '导出失败：没有生成正式存档文件，本地游戏数据未被修改。';
+}
+
+function hasCommandErrorCode(error: unknown, expected: string): boolean {
+  if (typeof error === 'string') {
+    try {
+      return hasCommandErrorCode(JSON.parse(error) as unknown, expected);
+    } catch {
+      return false;
+    }
+  }
+  return error !== null && typeof error === 'object' && 'code' in error && error.code === expected;
 }
 
 function formatLastPlayed(value: string): string {

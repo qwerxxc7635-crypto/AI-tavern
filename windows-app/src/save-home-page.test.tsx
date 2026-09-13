@@ -191,6 +191,10 @@ describe('save home page', () => {
     await waitFor(() =>
       expect(confirm).toHaveBeenCalledWith(expect.stringContaining('原文件不会被改写')),
     );
+    const prompt = String(confirm.mock.calls[0]?.[0]);
+    expect(prompt).not.toContain('存档结构');
+    expect(prompt).not.toContain('世界结构');
+    expect(prompt).not.toMatch(/schema|version|\d+\s*\/\s*\d+/i);
     expect((await screen.findByRole('status')).textContent).toContain('原文件保持不变');
     expect(transfers.importCalls).toEqual([['D:\\Saves\\v02.emtavern', 'CREATE']]);
   });
@@ -206,6 +210,48 @@ describe('save home page', () => {
 
     expect((await screen.findByRole('alert')).textContent).toContain('请升级 Ember Tavern');
     expect(screen.getByRole('alert').textContent).toContain('本地存档保持原状');
+  });
+
+  it('stops an incompatible active combat behind a Chinese-only import gate', async () => {
+    const gateway = new FakeCampaignGateway([]);
+    const transfers = new FakeSaveTransferGateway();
+    transfers.importPath = 'D:\\Saves\\active-combat.emtavern';
+    transfers.importFailure = JSON.stringify({
+      code: 'SAVE_COMPATIBILITY_REQUIRED',
+      message: 'engineVersion=2 schemaVersion=9',
+      stack: 'internal stack trace',
+    });
+    renderSaveHome(gateway, transfers);
+
+    fireEvent.click(await screen.findByRole('button', { name: '导入存档' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('无法安全恢复的战斗进度');
+    expect(alert.textContent).toContain('本次导入已停止');
+    expect(alert.textContent).toContain('原文件与本地存档均保持不变');
+    expect(alert.textContent).not.toMatch(/SAVE_|schema|engineVersion|stack|trace|=\d/i);
+    expect(transfers.importCalls).toEqual([]);
+  });
+
+  it('stops an incompatible active combat export without exposing diagnostics', async () => {
+    const gateway = new FakeCampaignGateway([EXISTING_CAMPAIGN]);
+    const transfers = new FakeSaveTransferGateway();
+    transfers.exportPath = 'D:\\Saves\\active-combat.emtavern';
+    transfers.exportFailure = {
+      code: 'SAVE_COMPATIBILITY_REQUIRED',
+      message: 'combat_schema_version=9',
+      stack: 'internal stack trace',
+    };
+    renderSaveHome(gateway, transfers);
+
+    fireEvent.click(await screen.findByRole('button', { name: '导出' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toContain('战斗进度无法由此版本安全导出');
+    expect(alert.textContent).toContain('本次导出已停止');
+    expect(alert.textContent).toContain('本地存档保持不变');
+    expect(alert.textContent).not.toMatch(/SAVE_|schema|combat_|stack|trace|=\d/i);
+    expect(transfers.exportCalls).toEqual([]);
   });
 
   it('confirms overwrite for a conflicting archive and accepts a single dropped file', async () => {
@@ -274,6 +320,7 @@ class FakeSaveTransferGateway implements SaveTransferGateway {
   public readonly exportCalls: Array<[string, string]> = [];
   public dropHandler: ((paths: readonly string[]) => void) | null = null;
   public importFailure: unknown = null;
+  public exportFailure: unknown = null;
 
   public async chooseImportPath(): Promise<string | null> {
     return this.importPath;
@@ -303,6 +350,7 @@ class FakeSaveTransferGateway implements SaveTransferGateway {
   }
 
   public async exportArchive(campaignId: string, path: string): Promise<void> {
+    if (this.exportFailure !== null) throw this.exportFailure;
     this.exportCalls.push([campaignId, path]);
   }
 
