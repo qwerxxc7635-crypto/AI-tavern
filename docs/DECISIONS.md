@@ -5210,3 +5210,23 @@ BattleRecord 与 ActiveCombatSave 在一次短 `IMMEDIATE` transaction 内原子
 - SQLite 仍是唯一 durable truth；恢复不采用当前默认 loop guard 或版本替代存档值，unsupported version 显式拒绝。
 - Battle events 在本任务作为结构化 object list 与 digest 原子保存；正式 Event Ledger 边界仍按顺序留给 M10-T05。
 - Portable archive compatibility、active-combat 导入策略与迁移不在本任务实现，留给 M10-T07。
+
+## DEC-241：Replay Runner 只编排 Accepted Sequence，并复用 Live Canonical Executor
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §17/§17.1/§17.2、M10-T03，DEC-219/DEC-240
+
+### 决定
+
+Combat Core 的 Replay 输入固定为 `CombatVersionSet + randomSeed + InitialState + AcceptedCommands`。Runner 先恢复并验证完整 AcceptedCommandLedger，再严格按 acceptedSequence 逐条生成 Replay envelope；每步只向 canonical command executor 暴露此前已接受的 history 与当前记录，Utility AI command 不重新评分，Reaction choice 不重新询问，UI 到达时间、动画、events 和系统时间均不参与规则执行。
+
+Runner 负责 live/replay 共用执行器之外的强制验证：InitialState/每步 state 的 Core invariant 与 RNG snapshot、combat identity/versions/seed 不漂移；每个 RNG channel 的 cursor delta 必须与执行器提交的 roll evidence 数量及 cursorAfter 连续一致；仍可观察的 Scheduler executedEventCount delta 必须与 eventChain/sequence/depth execution evidence 一致。最终 receipt 固定 InitialState hash、AcceptedCommands digest、逐步 trace digest、final RNG、CombatResult 与 final state hash/state。
+
+SQLite BattleRecord 提供单独的 replay-input loader，只读取上述四项并复验 InitialState hash、seed、versions 与 AcceptedCommandLedger。Active checkpoint 和 event ledger 不被偷偷加入 Replay 最小输入；事件证据是回放输出/调试材料，不是驱动输入。
+
+### 影响与边界
+
+- Runner 不复制一套 Command switch；应用必须注入与 live combat 相同的 canonical executor，避免 live/replay 规则分叉。
+- Encounter/System deterministic action 仍从 versions/state/hooks 推导，不伪装为外部 AcceptedCommand。
+- Replay UI 是 SHOULD，M10-T03 只实现 Core runner、证据 receipt 与 SQLite 输入边界。

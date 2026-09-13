@@ -6361,3 +6361,16 @@
 
 - Combat persistence Rust 专项 3/3 PASS：真实 Ask Reaction 在落盘后允许第二 SQLite writer、关闭并重开 store 后 state/RNG/scheduler counter+queue/depth/pending context/reservations 完全相等；同一 reaction decision 在 live/resumed 路径产生相同 outcome/state/accepted ledger。另覆盖连续 save revision、冗余 RNG tamper 拒绝，以及冻结 loop guard 与错误当前默认值冲突时拒绝。
 - Rustfmt、native clippy、Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 510 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T02 PASS；下一项严格为 M10-T03 Replay Runner / Deterministic Verification。
+
+## 2026-09-13 — M10-T03 完成 Deterministic Replay
+
+### 四项最小输入与逐步确定性证据
+
+- 从 M10-T02 提交 `6063789` 创建 `task/M10-T03-replay-runner`。新增 Core-owned `CombatReplayRunner` 与 `DEC-241`；输入严格只有 versions、seed、InitialState、AcceptedCommands，按 acceptedSequence 串行调用与 live 共用的 canonical executor，不依赖 events、UI 时间、动画或系统时间。
+- Runner 验证完整 ledger/replay envelope、supported versions、InitialState 与每步 Core invariant、combat identity/seed/version 不漂移。每个 RNG channel 的 cursor delta 必须由逐骰 roll evidence 完整解释；Scheduler counter delta 必须由 eventChain/sequence/depth execution evidence 完整解释。
+- Replay receipt 保存 initial hash、AcceptedCommands digest、每步 rolls/scheduler evidence 与 trace digest、final RNG、CombatResult、final state/hash。BattleRecord 新增 replay-input loader，只提取四项输入并复验 seed/InitialState hash/ledger，不把 ActiveSave 或 Event Ledger 变成隐藏规则输入。
+
+### 验证与结束状态
+
+- Replay Core 专项 3/3 PASS：同一 fixture 两次回放的 roll、Scheduler execution、UtilityAI accepted command、loop-guard Aborted result、trace digest 与 final hash 完全一致；真实 Ask Reaction suspend/Trigger decision 在两次回放中得到同一 resumed ResolutionContext 与 final hash；漏报 RNG 消费和 identity drift 均 fail closed。Combat persistence 专项 3/3 PASS，并验证 SQLite replay loader 返回 exact 四项输入。
+- Rustfmt、combat-core/native clippy、Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 513 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T03 PASS；下一项严格为 M10-T04 CombatResult Exactly-Once Commit。

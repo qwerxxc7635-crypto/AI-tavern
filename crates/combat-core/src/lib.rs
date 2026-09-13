@@ -34,6 +34,7 @@ mod power_budget;
 mod precondition;
 mod reaction;
 mod recovery;
+mod replay;
 mod resolution;
 mod resolution_context;
 mod rng;
@@ -198,6 +199,10 @@ pub use recovery::{
     NoReviveFollowups, RecoveryEffectCommit, RecoveryEffectProcessor, RecoveryEffectRequest,
     RecoveryRuleError, RecoveryRuleErrorCode, ReviveFollowupApplier, SoloRecoveryBalanceConfig,
     StandardLethalPolicy,
+};
+pub use replay::{
+    CombatReplayError, CombatReplayErrorCode, CombatReplayInput, CombatReplayReceipt,
+    CombatReplayRoll, CombatReplayRunner, CombatReplaySchedulerExecution, CombatReplayStepTrace,
 };
 pub use resolution::{
     ConditionalComparison, OpposedTieRule, ResolutionError, ResolutionErrorCode, ResolutionRequest,

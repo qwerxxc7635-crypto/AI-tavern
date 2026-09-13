@@ -1,7 +1,8 @@
 use ember_combat_core::{
-    AcceptedCombatCommand, AcceptedCommandLedger, CanonicalReactionCore, CombatRng,
-    CombatRngSnapshot, CombatState, CostSnapshot, EventSchedulerCheckpoint, ObjectiveRuntimeState,
-    PendingReactionSnapshot, ReinforcementRuntimeState, ResolutionContextSnapshot,
+    AcceptedCombatCommand, AcceptedCommandLedger, CanonicalReactionCore, CombatReplayInput,
+    CombatRng, CombatRngSnapshot, CombatState, CostSnapshot, EventSchedulerCheckpoint,
+    ObjectiveRuntimeState, PendingReactionSnapshot, ReinforcementRuntimeState,
+    ResolutionContextSnapshot,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
@@ -222,6 +223,51 @@ impl CampaignStore {
             },
         ).optional()?.ok_or(CombatPersistenceError::NotFound)?;
         restore_row(row)
+    }
+
+    /// Loads exactly the four deterministic replay inputs from BattleRecord.
+    /// Events, wall-clock timestamps and the active checkpoint are deliberately
+    /// excluded from this contract.
+    pub fn load_combat_replay_input(
+        &self,
+        combat_instance_id: &str,
+    ) -> Result<CombatReplayInput, CombatPersistenceError> {
+        let connection = self.connect().map_err(CombatPersistenceError::Store)?;
+        let (random_seed, initial_json, initial_hash, commands_json) = connection
+            .query_row(
+                "SELECT random_seed,initial_state_json,initial_state_hash,accepted_commands_json
+                 FROM battle_records WHERE combat_instance_id=?1",
+                [combat_instance_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, String>(3)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or(CombatPersistenceError::NotFound)?;
+        let initial_state: CombatState = serde_json::from_str(&initial_json)?;
+        let accepted_commands: Vec<AcceptedCombatCommand> = serde_json::from_str(&commands_json)?;
+        validate_state(&initial_state)?;
+        AcceptedCommandLedger::restore(accepted_commands.clone())
+            .map_err(|_| CombatPersistenceError::InvalidCheckpoint)?;
+        if initial_state.random_seed != random_seed
+            || initial_state.state_hash_sha256()? != initial_hash
+            || accepted_commands
+                .iter()
+                .any(|command| command.versions != initial_state.versions)
+        {
+            return Err(CombatPersistenceError::InvalidCheckpoint);
+        }
+        Ok(CombatReplayInput {
+            versions: initial_state.versions,
+            random_seed,
+            initial_state,
+            accepted_commands,
+        })
     }
 }
 
@@ -515,6 +561,13 @@ mod tests {
         let restored = reopened
             .restore_combat_checkpoint(&live.combat_instance_id)
             .unwrap();
+        let replay_input = reopened
+            .load_combat_replay_input(&live.combat_instance_id)
+            .unwrap();
+        assert_eq!(replay_input.versions, initial.versions);
+        assert_eq!(replay_input.random_seed, initial.random_seed);
+        assert_eq!(replay_input.initial_state, initial);
+        assert_eq!(replay_input.accepted_commands, ledger.commands());
         assert_eq!(restored.state, live);
         assert_eq!(restored.state.rng, live.rng);
         assert_eq!(restored.state.scheduler, live.scheduler);
