@@ -6506,3 +6506,14 @@
 ### 验证与结束状态
 
 - UI/theme/contracts Vitest 103/103、FINAL assets 119/119、player-language 与 Presentation 16/16 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate F=PASS；下一项严格为 M11-T07 Gate G Persistence / Release。
+
+## 2026-09-13 — M11-T07 完成 Gate G Persistence / Release Suite
+
+### Rollback、checkpoint/replay、exactly-once 与 compatibility
+
+- 从 Gate F 提交 `32e6b6d` 创建 `task/M11-T07-persistence-release-gate`。新增 `M11_GATE_G_PERSISTENCE_RELEASE.md`，将 defeat/aborted rollback、victory/escape commit、strategy/preference、loop guard counters、objective/reinforcement、exactly-once crash window、scripted policy、RNG checkpoint、reaction/tactical replay 与 archive compatibility 绑定到 Core/native/TypeScript 真实 tests。
+- 文档明确区分 M11-T07 Persistence / Release suite 与 V5.2 最终 Gate G 中的 stress 条件。Long combat / trigger depth / generated content stress 严格由后续 M11-T09 实施；在其及 M11-T10 未完成前，不宣称 M11 Final 或 Combat Development Complete。
+
+### 验证与结束状态
+
+- Core 338/338、native combat persistence 9/9、native save archive 14/14、TypeScript save/Compatibility UX 35/35 与 archive interop 双向专项 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11-T07 Gate G Persistence / Release suite=PASS；最终 stress 条件仍待 M11-T09，下一项严格为 M11-T08 Cross-Platform Determinism。
