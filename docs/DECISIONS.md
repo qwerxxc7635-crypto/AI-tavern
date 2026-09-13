@@ -5268,3 +5268,23 @@ SQLite BattleRecord 提供单独的 replay-input loader，只读取上述四项�
 - 普通 Defeat 与其他结果的 Restore/Commit 策略由 M10-T06 决定；本任务只保证任何结果都不能提前泄露可回滚 canonical HP/item/world facts。
 - Local database schema 从 33 升至 34；portable save schema 仍保持 v3，active-combat 导入策略仍留给 M10-T07。
 - Replay 的最小输入仍是 versions/seed/InitialState/AcceptedCommands，Event Ledger 不成为规则驱动输入。
+
+## DEC-244：Portable Archive v4 携带 Combat Records，Campaign Save Schema 仍为 v3
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §4.5.2.1/§17/§37、M10-T07，DEC-202/DEC-239/DEC-240
+
+### 决定
+
+区分 portable archive 的数据库容器版本与 campaign semantic save schema。既有 `campaigns.save_schema_version=3` 及其 SQLite CHECK 保持不变；archive `databaseSchemaVersion` 从 3 升至 4，因为 portable table graph 新增 `battle_records` 与 `active_combat_saves`。这样无需重建被整个 domain graph 引用的 campaigns 表，也不把 device-only local schema 34 错当作 portable contract。
+
+Archive v1/v2/v3 均作为 immutable historical inputs 继续支持：v1/v2 走既有 deterministic defaults/migrations，v3 使用原 69-table graph；缺少 combat tables 解释为“没有 v0.4 active combat”，绝不合成战斗或随机状态。Current v4 使用 71-table graph，BattleRecord 必须先于 ActiveCombatSave 插入，并保留 Event Ledger 作为既有独立表。
+
+导出前和导入 transaction 内都执行 Combat compatibility gate。所有七个扁平 versions 必须与当前 CombatVersionSet 一致；InitialState identity/hash/seed、AcceptedCommand ledger、event digest/object shape 必须有效；ActiveCombatSave 必须通过与本地 crash-resume 相同的 typed partition/checkpoint/RNG/scheduler/pending/cost restore validation。Unsupported version 返回 incompatible schema；结构损坏返回 invalid archive。导入失败时 campaign、BattleRecord 与 ActiveCombatSave 全部 rollback，不允许稍后用当前规则猜测恢复。
+
+### 影响与边界
+
+- 历史 v1/v2/v3 fixture 加入不可变 checksum 清单；当前 TypeScript/Rust v4 fixtures 继续执行双向互操作检查。
+- v0.3 Character、NPC、equipment、world 数据仍复用原 domain tables 与 M1 版本化 CombatAttributeResolver；不创建重复角色属性体系。Archive v4 往返后相同 v0.3 character fixture 必须得到相同 Combat 派生值。
+- 不兼容提示的玩家可见中文投影属于 M10-T08；本任务只提供可区分且原子失败的 domain error。

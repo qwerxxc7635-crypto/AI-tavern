@@ -10,8 +10,8 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const fixtureDirectory = join(root, 'packages', 'persistence', 'test-fixtures');
 const manifest = JSON.parse(readFileSync(join(fixtureDirectory, 'archive-fixtures.json'), 'utf8'));
 const work = mkdtempSync(join(tmpdir(), 'ember-archive-interop-'));
-const typescriptOutput = join(work, 'typescript-export-v3.emtavern');
-const rustOutput = join(work, 'rust-export-v3.emtavern');
+const typescriptOutput = join(work, 'typescript-export-v4.emtavern');
+const rustOutput = join(work, 'rust-export-v4.emtavern');
 
 try {
   verifyHistoricalFixtures();

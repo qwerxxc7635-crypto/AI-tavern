@@ -5,7 +5,7 @@ use ember_combat_core::{
     ResolutionContextSnapshot, RuntimeCommitContract, RuntimeFinalizationPlan,
     RuntimeFinalizationRequest,
 };
-use rusqlite::{OptionalExtension, TransactionBehavior, params};
+use rusqlite::{Connection, OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -464,6 +464,142 @@ impl CampaignStore {
         )?;
         transaction.commit()?;
         Ok(removed == 1)
+    }
+}
+
+pub(crate) fn validate_combat_archive_compatibility(
+    connection: &Connection,
+    campaign_id: &str,
+) -> Result<(), CampaignStoreError> {
+    let combat_ids = connection
+        .prepare(
+            "SELECT combat_instance_id FROM battle_records
+             WHERE campaign_id=?1 ORDER BY combat_instance_id",
+        )?
+        .query_map([campaign_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for combat_id in &combat_ids {
+        validate_archive_battle_record(connection, campaign_id, combat_id)?;
+    }
+    let active_ids = connection
+        .prepare(
+            "SELECT combat_instance_id FROM active_combat_saves
+             WHERE campaign_id=?1 ORDER BY combat_instance_id",
+        )?
+        .query_map([campaign_id], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>, _>>()?;
+    for combat_id in active_ids {
+        load_combat_checkpoint_row(connection, &combat_id)
+            .and_then(restore_row)
+            .map_err(archive_combat_error)?;
+    }
+    Ok(())
+}
+
+fn validate_archive_battle_record(
+    connection: &Connection,
+    campaign_id: &str,
+    combat_instance_id: &str,
+) -> Result<(), CampaignStoreError> {
+    let row = connection.query_row(
+        "SELECT combat_schema_version,ruleset_version,balance_version,engine_version,
+                world_profile_version,attribute_mapping_version,rng_contract_version,
+                random_seed,initial_state_json,initial_state_hash,accepted_commands_json,
+                events_json,event_digest
+         FROM battle_records WHERE campaign_id=?1 AND combat_instance_id=?2",
+        params![campaign_id, combat_instance_id],
+        |row| {
+            Ok((
+                [
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, i64>(1)?,
+                    row.get::<_, i64>(2)?,
+                    row.get::<_, i64>(3)?,
+                    row.get::<_, i64>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, i64>(6)?,
+                ],
+                row.get::<_, String>(7)?,
+                row.get::<_, String>(8)?,
+                row.get::<_, String>(9)?,
+                row.get::<_, String>(10)?,
+                row.get::<_, String>(11)?,
+                row.get::<_, String>(12)?,
+            ))
+        },
+    )?;
+    let supported_versions = [
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.combat_schema_version),
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.ruleset_version),
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.balance_version),
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.engine_version),
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.world_profile_version),
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.attribute_mapping_version),
+        version(ember_combat_core::CURRENT_COMBAT_VERSIONS.rng_contract_version),
+    ];
+    if row.0 != supported_versions {
+        return Err(CampaignStoreError::IncompatibleSchema);
+    }
+    let initial: CombatState =
+        serde_json::from_str(&row.2).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    validate_state(&initial).map_err(archive_combat_error)?;
+    let expected_versions = [
+        version(initial.versions.combat_schema_version),
+        version(initial.versions.ruleset_version),
+        version(initial.versions.balance_version),
+        version(initial.versions.engine_version),
+        version(initial.versions.world_profile_version),
+        version(initial.versions.attribute_mapping_version),
+        version(initial.versions.rng_contract_version),
+    ];
+    if row.0 != expected_versions
+        || initial.combat_instance_id != combat_instance_id
+        || initial.random_seed != row.1
+        || initial
+            .state_hash_sha256()
+            .map_err(|_| CampaignStoreError::ArchiveInvalid)?
+            != row.3
+    {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    let commands: Vec<AcceptedCombatCommand> =
+        serde_json::from_str(&row.4).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    AcceptedCommandLedger::restore(commands).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    let events: Vec<Value> =
+        serde_json::from_str(&row.5).map_err(|_| CampaignStoreError::ArchiveInvalid)?;
+    if events.iter().any(|event| !event.is_object()) || digest(row.5.as_bytes()) != row.6 {
+        return Err(CampaignStoreError::ArchiveInvalid);
+    }
+    Ok(())
+}
+
+fn load_combat_checkpoint_row(
+    connection: &Connection,
+    combat_instance_id: &str,
+) -> Result<Vec<Option<String>>, CombatPersistenceError> {
+    connection.query_row(
+        "SELECT r.campaign_id,r.initial_state_json,r.initial_state_hash,r.accepted_commands_json,
+                r.events_json,r.event_digest,CAST(r.last_committed_sequence AS TEXT),
+                s.rng_streams_json,s.current_combat_state_json,s.checkpoint_hash,
+                s.objective_runtime_state_json,s.reinforcement_runtime_state_json,
+                s.event_scheduler_checkpoint_json,s.loop_guard_contract_json,
+                s.pending_reaction_snapshot_json,s.resolution_context_snapshot_json,
+                s.cost_snapshot_json,CAST(s.last_committed_sequence AS TEXT),CAST(s.revision AS TEXT)
+         FROM battle_records r JOIN active_combat_saves s USING(combat_instance_id,campaign_id)
+         WHERE r.combat_instance_id=?1",
+        [combat_instance_id],
+        |row| {
+            (0..19)
+                .map(|index| row.get::<_, Option<String>>(index))
+                .collect::<Result<Vec<_>, _>>()
+        },
+    ).optional()?.ok_or(CombatPersistenceError::NotFound)
+}
+
+fn archive_combat_error(error: CombatPersistenceError) -> CampaignStoreError {
+    match error {
+        CombatPersistenceError::IncompatibleVersion => CampaignStoreError::IncompatibleSchema,
+        _ => CampaignStoreError::ArchiveInvalid,
     }
 }
 
@@ -1574,6 +1710,108 @@ mod tests {
         assert_eq!(durable, (None, 1));
     }
 
+    #[test]
+    fn portable_archive_round_trips_a_compatible_active_combat_checkpoint() {
+        let source_directory = tempfile::tempdir().unwrap();
+        let source = CampaignStore::open(source_directory.path().join("source.sqlite")).unwrap();
+        let campaign = source.create_campaign().unwrap();
+        let initial = fixture_state_with_id("combat-portable-roundtrip");
+        let (mut active, ledger, _, _) =
+            pending_reaction_state_with_id(&initial.combat_instance_id);
+        active.combat_instance_id = initial.combat_instance_id.clone();
+        active.rng = CombatRng::new(
+            SEED,
+            &initial.combat_instance_id,
+            CURRENT_COMBAT_VERSIONS.rng_contract_version,
+        )
+        .unwrap()
+        .snapshot();
+        source
+            .save_combat_checkpoint(CombatCheckpointWrite {
+                campaign_id: &campaign.id,
+                initial_state: &initial,
+                state: &active,
+                accepted_commands: ledger.commands(),
+                events: &[json!({"kind":"REACTION_WINDOW_OPENED"})],
+                loop_guard: guard(),
+            })
+            .unwrap();
+        let archive_path = source_directory.path().join("active-combat.emtavern");
+        source
+            .export_campaign_archive(&campaign.id, &archive_path, "0.4.1-test")
+            .unwrap();
+
+        let target_directory = tempfile::tempdir().unwrap();
+        let target = CampaignStore::open(target_directory.path().join("target.sqlite")).unwrap();
+        target
+            .import_campaign_archive(&archive_path, crate::CampaignArchiveImportMode::Create)
+            .unwrap();
+        let restored = target
+            .restore_combat_checkpoint(&initial.combat_instance_id)
+            .unwrap();
+        assert_eq!(restored.initial_state, initial);
+        assert_eq!(restored.state, active);
+        assert_eq!(restored.accepted_commands, ledger.commands());
+        let connection = target.connect().unwrap();
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM battle_records WHERE campaign_id=?1",
+                    [&campaign.id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM active_combat_saves WHERE campaign_id=?1",
+                    [&campaign.id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            1
+        );
+    }
+
+    #[test]
+    fn portable_archive_export_rejects_an_unsupported_combat_version() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("unsupported.sqlite")).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let connection = store.connect().unwrap();
+        connection
+            .execute(
+                "INSERT INTO battle_records (
+                   combat_instance_id,campaign_id,combat_schema_version,ruleset_version,
+                   balance_version,engine_version,world_profile_version,attribute_mapping_version,
+                   rng_contract_version,random_seed,initial_state_json,initial_state_hash,
+                   accepted_commands_json,events_json,event_digest,last_committed_sequence,
+                   created_at,updated_at
+                 ) VALUES (
+                   'combat-unsupported-version',?1,1,1,1,2,1,1,1,?2,'{}',?3,'[]','[]',?4,0,?5,?5
+                 )",
+                params![
+                    &campaign.id,
+                    SEED,
+                    "a".repeat(64),
+                    digest(b"[]"),
+                    "2026-09-13T00:00:00.000Z"
+                ],
+            )
+            .unwrap();
+        assert!(matches!(
+            store.export_campaign_archive(
+                &campaign.id,
+                directory.path().join("must-not-exist.emtavern"),
+                "0.4.1-test"
+            ),
+            Err(CampaignStoreError::IncompatibleSchema)
+        ));
+        assert!(!directory.path().join("must-not-exist.emtavern").exists());
+    }
+
     fn apply_result_policy_to_probe(
         transaction: &rusqlite::Transaction<'_>,
         plan: &RuntimeFinalizationPlan,
@@ -1726,7 +1964,18 @@ mod tests {
         Vec<ReactionBinding>,
         Vec<CombatControlAssignment>,
     ) {
-        let mut state = fixture_state();
+        pending_reaction_state_with_id("combat-persistence-fixture")
+    }
+
+    fn pending_reaction_state_with_id(
+        combat_instance_id: &str,
+    ) -> (
+        CombatState,
+        AcceptedCommandLedger,
+        Vec<ReactionBinding>,
+        Vec<CombatControlAssignment>,
+    ) {
+        let mut state = fixture_state_with_id(combat_instance_id);
         let mut ledger = AcceptedCommandLedger::new();
         let accepted = ledger
             .accept_external(CombatCommandEnvelope {

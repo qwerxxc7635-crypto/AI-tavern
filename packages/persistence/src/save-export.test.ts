@@ -102,7 +102,7 @@ describe('exportCampaignSave', () => {
     expect(manifest).toMatchObject({
       application: 'ember-tavern',
       campaignId: campaignKey,
-      databaseSchemaVersion: 3,
+      databaseSchemaVersion: 4,
       formatVersion: 1,
       files: {
         'campaign.json': { records: 1 },
@@ -117,7 +117,9 @@ describe('exportCampaignSave', () => {
     expect(campaignRow['world_schema_version']).toBe(1);
     expect(requireArray(tables['world_facts'])).toHaveLength(2);
     expect(requireArray(tables['scene_frames'])).toHaveLength(1);
-    expect(Object.keys(tables)).toHaveLength(69);
+    expect(Object.keys(tables)).toHaveLength(71);
+    expect(requireArray(tables['battle_records'])).toEqual([]);
+    expect(requireArray(tables['active_combat_saves'])).toEqual([]);
     expect(events).toHaveLength(1);
     expect(parseObject(events[0] ?? '')).toMatchObject({
       id: gameEventId('event-export'),
@@ -204,6 +206,33 @@ describe('exportCampaignSave', () => {
     expect(() => database.exec('BEGIN IMMEDIATE')).not.toThrow();
     database.exec('ROLLBACK');
   });
+
+  it('rejects an unsupported active-combat version instead of exporting it under current rules', () => {
+    native
+      .prepare(
+        `INSERT INTO battle_records (
+           combat_instance_id,campaign_id,combat_schema_version,ruleset_version,balance_version,
+           engine_version,world_profile_version,attribute_mapping_version,rng_contract_version,
+           random_seed,initial_state_json,initial_state_hash,accepted_commands_json,events_json,
+           event_digest,last_committed_sequence,created_at,updated_at
+         ) VALUES (?, ?, 1,1,1,2,1,1,1, ?, '{}', ?, '[]', '[]', ?, 0, ?, ?)`,
+      )
+      .run(
+        'combat-incompatible-export',
+        campaignKey,
+        '00112233445566778899aabbccddeeff',
+        'a'.repeat(64),
+        sha256(new TextEncoder().encode('[]')),
+        at,
+        at,
+      );
+    expect(() =>
+      exportCampaignSave(database, campaignKey, {
+        createdAt: at,
+        generatorVersion: '0.4.1-test',
+      }),
+    ).toThrow(/incompatible engineVersion/u);
+  });
 });
 
 describe('importCampaignSave', () => {
@@ -277,6 +306,32 @@ describe('importCampaignSave', () => {
         .get(campaignKey),
     ).toEqual({ save_schema_version: 3, world_schema_version: 1 });
     expect(readFileSync(fixtureUrl)).toEqual(before);
+  });
+
+  it('loads the historical v3 campaign graph with empty combat tables', async () => {
+    const fixtureUrl = new URL('../test-fixtures/rust-export-v3.emtavern', import.meta.url);
+    const before = readFileSync(fixtureUrl);
+    native.prepare('DELETE FROM campaigns WHERE id = ?').run(campaignKey);
+    const imported = await importCampaignSave(database, new Uint8Array(before), {
+      mode: 'CREATE',
+      importedAt: isoTimestamp('2026-08-01T13:00:32.000Z'),
+      snapshotId: snapshotId('snapshot-rust-v3-compatibility'),
+    });
+
+    expect(imported.campaign.id).toBe(campaignKey);
+    expect(readFileSync(fixtureUrl)).toEqual(before);
+    expect(native.prepare('SELECT COUNT(*) AS count FROM battle_records').get()).toEqual({
+      count: 0,
+    });
+    expect(native.prepare('SELECT COUNT(*) AS count FROM active_combat_saves').get()).toEqual({
+      count: 0,
+    });
+    expect(native.prepare('SELECT name FROM npcs WHERE id=?').get('npc-export')).toEqual({
+      name: 'Ilyra',
+    });
+    expect(
+      native.prepare('SELECT statement FROM world_facts WHERE id=?').get('fact-export'),
+    ).toEqual({ statement: 'The beacon is lit.' });
   });
 
   it('restores a deleted campaign, creates an IMPORT snapshot and can continue play', async () => {

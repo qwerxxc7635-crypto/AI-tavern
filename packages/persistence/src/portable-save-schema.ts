@@ -1,4 +1,5 @@
 export const PORTABLE_SAVE_SCHEMA_VERSION = 3;
+export const PORTABLE_ARCHIVE_DATABASE_VERSION = 4;
 export const WORLD_SCHEMA_VERSION = 1;
 
 export const LEGACY_CAMPAIGN_TABLES = [
@@ -24,7 +25,7 @@ export const V2_CAMPAIGN_TABLES = [
   ...LEGACY_CAMPAIGN_TABLES.slice(9),
 ] as const;
 
-export const PORTABLE_CAMPAIGN_TABLES = [
+export const V3_CAMPAIGN_TABLES = [
   ...V2_CAMPAIGN_TABLES,
   'world_constitutions',
   'world_seeds',
@@ -80,6 +81,12 @@ export const PORTABLE_CAMPAIGN_TABLES = [
   'lazy_world_generation_transitions',
   'event_ledger',
   'ai_candidates',
+] as const;
+
+export const PORTABLE_CAMPAIGN_TABLES = [
+  ...V3_CAMPAIGN_TABLES,
+  'battle_records',
+  'active_combat_saves',
 ] as const;
 
 export type PortableCampaignTable = (typeof PORTABLE_CAMPAIGN_TABLES)[number];

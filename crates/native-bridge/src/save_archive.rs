@@ -24,9 +24,11 @@ use super::{
 };
 
 const FORMAT_VERSION: u64 = 1;
-const DATABASE_SCHEMA_VERSION: u64 = 3;
+const DATABASE_SCHEMA_VERSION: u64 = 4;
+const SAVE_SCHEMA_VERSION: u64 = 3;
 const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
 const V2_DATABASE_SCHEMA_VERSION: u64 = 2;
+const V3_DATABASE_SCHEMA_VERSION: u64 = 3;
 const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 34;
 const WORLD_SCHEMA_VERSION: u64 = 1;
 const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
@@ -79,7 +81,7 @@ const V2_CAMPAIGN_TABLES: [&str; 15] = [
     "items",
     "world_clocks",
 ];
-const CAMPAIGN_TABLES: [&str; 69] = [
+const V3_CAMPAIGN_TABLES: [&str; 69] = [
     "world_bibles",
     "world_facts",
     "player_characters",
@@ -150,7 +152,11 @@ const CAMPAIGN_TABLES: [&str; 69] = [
     "event_ledger",
     "ai_candidates",
 ];
-const INSERT_ORDER: [&str; 69] = CAMPAIGN_TABLES;
+const COMBAT_CAMPAIGN_TABLES: [&str; 2] = ["battle_records", "active_combat_saves"];
+
+fn campaign_tables() -> impl Iterator<Item = &'static str> {
+    V3_CAMPAIGN_TABLES.into_iter().chain(COMBAT_CAMPAIGN_TABLES)
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
@@ -205,7 +211,7 @@ impl CampaignStore {
         Ok(CampaignArchiveInspection {
             campaign_id: parsed.campaign_id,
             campaign_exists,
-            save_schema_version: DATABASE_SCHEMA_VERSION,
+            save_schema_version: SAVE_SCHEMA_VERSION,
             world_schema_version: WORLD_SCHEMA_VERSION,
             migration_required: parsed.database_schema_version < DATABASE_SCHEMA_VERSION,
         })
@@ -297,14 +303,14 @@ impl CampaignStore {
             transaction.execute("DELETE FROM campaigns WHERE id = ?1", [&parsed.campaign_id])?;
         }
         insert_row(&transaction, "campaigns", &parsed.campaign)?;
-        if parsed.database_schema_version == DATABASE_SCHEMA_VERSION {
+        if parsed.database_schema_version >= V3_DATABASE_SCHEMA_VERSION {
             prepare_portable_restore(&transaction, &parsed.campaign_id)?;
         }
         for row in &parsed.generations {
             insert_row(&transaction, "generation_records", row)?;
         }
-        for table in INSERT_ORDER {
-            if parsed.database_schema_version == DATABASE_SCHEMA_VERSION
+        for table in campaign_tables() {
+            if parsed.database_schema_version >= V3_DATABASE_SCHEMA_VERSION
                 && table == "world_constitutions"
             {
                 clear_legacy_projections(&transaction, &parsed.campaign_id)?;
@@ -328,7 +334,7 @@ impl CampaignStore {
         assert_foreign_keys(&transaction)?;
         let campaign = load_campaign(&transaction, &parsed.campaign_id)?
             .ok_or(CampaignStoreError::ArchiveInvalid)?;
-        if parsed.database_schema_version == DATABASE_SCHEMA_VERSION {
+        if parsed.database_schema_version >= V3_DATABASE_SCHEMA_VERSION {
             finish_portable_restore(&transaction, &parsed.campaign_id)?;
         }
         transaction.commit()?;
@@ -362,6 +368,10 @@ impl CampaignStore {
             campaign_id,
         )?
         .ok_or(CampaignStoreError::NotFound)?;
+        crate::combat_persistence::validate_combat_archive_compatibility(
+            &transaction,
+            campaign_id,
+        )?;
         campaign.insert("default_model_profile_id".to_owned(), Value::Null);
         campaign.insert("fallback_model_profile_id".to_owned(), Value::Null);
         campaign.insert(
@@ -370,7 +380,7 @@ impl CampaignStore {
         );
         let mut tables = Map::new();
         let mut total_records = 1_usize;
-        for table in CAMPAIGN_TABLES {
+        for table in campaign_tables() {
             let rows = query_campaign_table(&transaction, table, campaign_id)?;
             validate_record_count(rows.len(), MAX_TABLE_RECORDS)?;
             total_records = total_records
@@ -541,7 +551,7 @@ fn query_campaign_table(
     if let Some(sql) = indirect_sql {
         return query_rows(connection, table, sql, campaign_id);
     }
-    if !CAMPAIGN_TABLES.contains(&table) {
+    if !campaign_tables().any(|candidate| candidate == table) {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
     let sql = format!(
@@ -738,6 +748,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
     if ![
         LEGACY_DATABASE_SCHEMA_VERSION,
         V2_DATABASE_SCHEMA_VERSION,
+        V3_DATABASE_SCHEMA_VERSION,
         DATABASE_SCHEMA_VERSION,
     ]
     .contains(&database_version)
@@ -797,9 +808,8 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
     {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
-    if database_version == DATABASE_SCHEMA_VERSION {
-        if campaign.get("save_schema_version").and_then(Value::as_u64)
-            != Some(DATABASE_SCHEMA_VERSION)
+    if database_version >= V3_DATABASE_SCHEMA_VERSION {
+        if campaign.get("save_schema_version").and_then(Value::as_u64) != Some(SAVE_SCHEMA_VERSION)
             || campaign.get("world_schema_version").and_then(Value::as_u64)
                 != Some(WORLD_SCHEMA_VERSION)
         {
@@ -813,7 +823,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         }
         campaign.insert(
             "save_schema_version".to_owned(),
-            Value::Number(Number::from(DATABASE_SCHEMA_VERSION)),
+            Value::Number(Number::from(SAVE_SCHEMA_VERSION)),
         );
         campaign.insert(
             "world_schema_version".to_owned(),
@@ -821,16 +831,17 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         );
     }
     let table_root = require_object(campaign_document.get("tables"))?;
-    let archive_tables: &[&str] = match database_version {
-        LEGACY_DATABASE_SCHEMA_VERSION => &LEGACY_CAMPAIGN_TABLES,
-        V2_DATABASE_SCHEMA_VERSION => &V2_CAMPAIGN_TABLES,
-        DATABASE_SCHEMA_VERSION => &CAMPAIGN_TABLES,
+    let archive_tables = match database_version {
+        LEGACY_DATABASE_SCHEMA_VERSION => LEGACY_CAMPAIGN_TABLES.to_vec(),
+        V2_DATABASE_SCHEMA_VERSION => V2_CAMPAIGN_TABLES.to_vec(),
+        V3_DATABASE_SCHEMA_VERSION => V3_CAMPAIGN_TABLES.to_vec(),
+        DATABASE_SCHEMA_VERSION => campaign_tables().collect::<Vec<_>>(),
         _ => return Err(CampaignStoreError::IncompatibleSchema),
     };
-    require_exact_keys(table_root, archive_tables)?;
+    require_exact_keys(table_root, &archive_tables)?;
     let mut tables = BTreeMap::new();
     let mut total_records = 1_usize;
-    for &table in archive_tables {
+    for &table in &archive_tables {
         let values = require_array(table_root.get(table))?;
         validate_record_count(values.len(), MAX_TABLE_RECORDS)?;
         total_records = total_records
@@ -857,7 +868,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
     }
     upgrade_legacy_rumor_rows(&mut tables)?;
     if database_version != DATABASE_SCHEMA_VERSION {
-        for table in CAMPAIGN_TABLES {
+        for table in campaign_tables() {
             tables.entry(table.to_owned()).or_default();
         }
     }
@@ -1422,7 +1433,7 @@ fn table_columns(connection: &Connection, table: &str) -> Result<Vec<String>, Ca
     if table != "campaigns"
         && table != "generation_records"
         && table != "game_events"
-        && !CAMPAIGN_TABLES.contains(&table)
+        && !campaign_tables().any(|candidate| candidate == table)
     {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
@@ -1460,13 +1471,17 @@ fn validate_imported_state(
     transaction: &Transaction<'_>,
     parsed: &ParsedArchive,
 ) -> Result<(), CampaignStoreError> {
+    crate::combat_persistence::validate_combat_archive_compatibility(
+        transaction,
+        &parsed.campaign_id,
+    )?;
     let campaign = load_campaign(transaction, &parsed.campaign_id)?
         .ok_or(CampaignStoreError::ArchiveInvalid)?;
     if campaign.id != parsed.campaign_id {
         return Err(CampaignStoreError::ArchiveInvalid);
     }
-    if parsed.database_schema_version == DATABASE_SCHEMA_VERSION {
-        for table in CAMPAIGN_TABLES {
+    if parsed.database_schema_version >= V3_DATABASE_SCHEMA_VERSION {
+        for table in campaign_tables() {
             let expected = parsed
                 .tables
                 .get(table)
@@ -1519,7 +1534,7 @@ fn create_import_snapshot(
     imported_at: &str,
 ) -> Result<(), CampaignStoreError> {
     let mut tables = Map::new();
-    for table in CAMPAIGN_TABLES {
+    for table in campaign_tables() {
         let rows = parsed
             .tables
             .get(table)
@@ -2056,17 +2071,186 @@ mod tests {
     }
 
     #[test]
+    fn imports_historical_v3_without_inventing_an_active_combat() {
+        let directory = tempfile::tempdir().expect("temp directory");
+        let archive_path = directory.path().join("typescript-export-v3.emtavern");
+        let fixture = include_bytes!(
+            "../../../packages/persistence/test-fixtures/typescript-export-v3.emtavern"
+        );
+        fs::write(&archive_path, fixture).expect("write TypeScript v3 fixture");
+        let before = fs::read(&archive_path).expect("read source fixture");
+        let store =
+            CampaignStore::open(directory.path().join("v3-import.sqlite")).expect("open database");
+
+        assert_eq!(
+            store
+                .inspect_campaign_archive(&archive_path)
+                .expect("inspect v3 fixture"),
+            CampaignArchiveInspection {
+                campaign_id: "campaign-export".to_owned(),
+                campaign_exists: false,
+                save_schema_version: 3,
+                world_schema_version: 1,
+                migration_required: true,
+            }
+        );
+        store
+            .import_campaign_archive(&archive_path, CampaignArchiveImportMode::Create)
+            .expect("import v3 fixture");
+        assert_eq!(fs::read(&archive_path).expect("reread fixture"), before);
+        let connection = store.connect().expect("inspect imported campaign");
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM battle_records WHERE campaign_id='campaign-export'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("battle records"),
+            0
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM active_combat_saves
+                     WHERE campaign_id='campaign-export'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .expect("active saves"),
+            0
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT name FROM npcs WHERE id='npc-export'", [], |row| {
+                    row.get::<_, String>(0)
+                })
+                .expect("legacy NPC"),
+            "Ilyra"
+        );
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT statement FROM world_facts WHERE id='fact-export'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .expect("legacy world fact"),
+            "The beacon is lit."
+        );
+    }
+
+    #[test]
+    fn current_archive_rejects_incompatible_combat_versions_atomically() {
+        let mut files = BTreeMap::new();
+        let mut archive = ZipArchive::new(Cursor::new(include_bytes!(
+            "../../../packages/persistence/test-fixtures/typescript-export-v4.emtavern"
+        )))
+        .expect("open current archive fixture");
+        for index in 0..archive.len() {
+            let mut entry = archive.by_index(index).expect("read archive entry");
+            let mut bytes = Vec::new();
+            entry.read_to_end(&mut bytes).expect("read entry bytes");
+            files.insert(entry.name().to_owned(), bytes);
+        }
+        let mut campaign =
+            parse_canonical_document(files.get("campaign.json").expect("campaign document bytes"))
+                .expect("parse campaign document");
+        campaign
+            .get_mut("tables")
+            .and_then(Value::as_object_mut)
+            .and_then(|tables| tables.get_mut("battle_records"))
+            .and_then(Value::as_array_mut)
+            .expect("battle record array")
+            .push(json!({
+                "accepted_commands_json":"[]",
+                "attribute_mapping_version":1,
+                "balance_version":1,
+                "campaign_id":"campaign-export",
+                "canonical_delta_hash":null,
+                "canonical_result_committed_at":null,
+                "combat_instance_id":"combat-incompatible-import",
+                "combat_result":null,
+                "combat_schema_version":1,
+                "created_at":FIRST_TIME,
+                "engine_version":2,
+                "event_digest":sha256(b"[]"),
+                "events_json":"[]",
+                "initial_state_hash":"a".repeat(64),
+                "initial_state_json":"{}",
+                "last_committed_sequence":0,
+                "random_seed":"00112233445566778899aabbccddeeff",
+                "result_commit_id":null,
+                "rng_contract_version":1,
+                "ruleset_version":1,
+                "updated_at":FIRST_TIME,
+                "world_profile_version":1
+            }));
+        files.insert(
+            "campaign.json".to_owned(),
+            canonical_document_bytes(&Value::Object(campaign)).expect("encode campaign document"),
+        );
+        let checksums = [
+            "manifest.json",
+            "campaign.json",
+            "events.ndjson",
+            "generations.json",
+        ]
+        .into_iter()
+        .map(|name| {
+            (
+                name.to_owned(),
+                Value::String(sha256(files.get(name).expect("archive member"))),
+            )
+        })
+        .collect::<Map<_, _>>();
+        files.insert(
+            "checksum.json".to_owned(),
+            canonical_document_bytes(&json!({
+                "algorithm":"SHA-256",
+                "files":checksums,
+                "formatVersion":FORMAT_VERSION
+            }))
+            .expect("encode checksums"),
+        );
+        let directory = tempfile::tempdir().expect("temp directory");
+        let path = directory.path().join("incompatible-combat.emtavern");
+        fs::write(&path, encode_zip(&files).expect("encode archive")).expect("write archive");
+        let store = CampaignStore::open(directory.path().join("target.sqlite")).unwrap();
+
+        assert!(matches!(
+            store.import_campaign_archive(&path, CampaignArchiveImportMode::Create),
+            Err(CampaignStoreError::IncompatibleSchema)
+        ));
+        let connection = store.connect().unwrap();
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM campaigns", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(
+            connection
+                .query_row("SELECT COUNT(*) FROM battle_records", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+    }
+
+    #[test]
     fn current_archive_interop_gate_imports_typescript_and_emits_rust() {
         let fallback = tempfile::tempdir().unwrap();
         let typescript_archive = std::env::var_os("EMBER_TS_ARCHIVE_INPUT")
             .map(PathBuf::from)
             .unwrap_or_else(|| {
                 Path::new(env!("CARGO_MANIFEST_DIR"))
-                    .join("../../packages/persistence/test-fixtures/typescript-export-v3.emtavern")
+                    .join("../../packages/persistence/test-fixtures/typescript-export-v4.emtavern")
             });
         let rust_archive = std::env::var_os("EMBER_RUST_ARCHIVE_OUTPUT")
             .map(PathBuf::from)
-            .unwrap_or_else(|| fallback.path().join("rust-export-v3.emtavern"));
+            .unwrap_or_else(|| fallback.path().join("rust-export-v4.emtavern"));
         let work_directory = std::env::var_os("EMBER_ARCHIVE_INTEROP_WORK")
             .map(PathBuf::from)
             .unwrap_or_else(|| fallback.path().join("work"));

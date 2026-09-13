@@ -6414,3 +6414,17 @@
 ### 验证与结束状态
 
 - Combat persistence 专项 7/7 PASS；单一结果矩阵内部覆盖 7 个 SQLite database cases 与六个 CombatResult enum，另独立验证 Scripted policy omission 零写入。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、native clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 518 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T06 PASS；下一项严格为 M10-T07 v0.3 Character / Save Compatibility。
+
+## 2026-09-13 — M10-T07 完成 v0.3 Character / Save Compatibility
+
+### Archive database v4 与显式 Combat compatibility gate
+
+- 从 M10-T06 提交 `375c82f` 创建 `task/M10-T07-v03-save-compatibility`。新增 `DEC-244`，将 archive database version 从 v3 升至 v4，同时保留 campaign semantic `save_schema_version=3`；current portable graph 从 69 表增加 BattleRecord/ActiveCombatSave 至 71 表，避免进行中战斗被静默遗漏。
+- TypeScript 与 Rust import/export 使用同一版本矩阵：历史 v1/v2/v3 精确表清单继续加载，v3 缺少 combat tables 只表示没有 v0.4 combat；current v4 完整携带 BattleRecord、Active checkpoint、accepted commands、events、RNG/scheduler/pending reaction/cost snapshots。
+- Rust 在 export 与 import transaction 内复用 typed combat restore 校验；InitialState hash/seed/versions、AcceptedCommand ledger、event digest、checkpoint partitions、RNG 与 scheduler 全部 fail closed。TypeScript 同步校验七个扁平 versions、Initial/Current state version identity 与 RNG contract。Unsupported Combat version 显式返回 incompatible schema；current archive import 失败时 campaign 与 combat rows 原子回滚。
+- v1/v2 fixtures 不变，原 TypeScript/Rust v3 fixtures 转入 historical checksum 集；生成并登记 current v4 双向 fixtures。v0.3 Character SQLite fixture 经 archive v4 往返后，四属性、trait/status modifiers 与 numeric proficiency 仍由既有版本化 Mapping Matrix 得到相同结果；NPC/world/item 继续使用既有 domain tables。
+
+### 验证与结束状态
+
+- Native archive 14/14、active combat compatibility 2/2、v0.3 Character Mapping archive roundtrip 1/1、incompatible current archive atomic rollback 1/1 PASS。TypeScript save suite 16/16 PASS，覆盖 v4 71-table receipt、v3 normal campaign migration 与 unsupported engine version export rejection；`pnpm archive:interop` TypeScript→Rust→TypeScript 双向 PASS。
+- Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1243 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 523 PASS、1 credential-only ignore，archive interop 双向通过。首次完整运行仅既有 secure-http 时序测试偶发一次 timeout，随即专项连续 5/5 与第二次完整门禁均 PASS。用户 `.gitignore` 保持未纳入提交。M10-T07 PASS；下一项严格为 M10-T08 Compatibility UX。

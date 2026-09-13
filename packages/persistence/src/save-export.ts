@@ -6,7 +6,7 @@ import { PersistenceDataError } from './campaign-repository.js';
 import { currentSchemaVersion } from './migrations.mjs';
 import {
   PORTABLE_CAMPAIGN_TABLES,
-  PORTABLE_SAVE_SCHEMA_VERSION,
+  PORTABLE_ARCHIVE_DATABASE_VERSION,
   portableTableQuery,
   type PortableCampaignTable,
 } from './portable-save-schema.js';
@@ -23,6 +23,7 @@ import {
   validateRecordCount,
 } from './save-resource-limits.js';
 import { findSecretInJson, findSecretInText } from './save-secret-scanner.js';
+import { validateCombatCompatibility } from './save-import.js';
 import type { TransactionalSqliteDatabase } from './sqlite-port.js';
 
 type StoredScalar = string | number | null;
@@ -31,7 +32,7 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 const FORMAT_VERSION = 1;
 // Device-only schema migrations (for example, credential cleanup bookkeeping)
 // must not change the portable campaign archive contract.
-const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_SAVE_SCHEMA_VERSION;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_ARCHIVE_DATABASE_VERSION;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -191,6 +192,7 @@ function captureSave(
   if (sourceCampaign === undefined) {
     throw new PersistenceDataError(`Campaign not found for export: ${campaignId}`);
   }
+  validateCombatCompatibility(database, campaignId);
   const campaign = normalizeRow('campaigns', sourceCampaign);
   const tables = campaignTableRecord((table) =>
     Object.freeze(

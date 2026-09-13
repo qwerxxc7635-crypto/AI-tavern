@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { inflateRawSync } from 'node:zlib';
 
 import {
+  CURRENT_COMBAT_VERSION_SET,
   adventureId,
   campaignId,
   conversationId,
@@ -34,9 +35,11 @@ import { AdventureRepository, QuestRepository } from './quest-adventure-reposito
 import { SnapshotRepository } from './snapshot-repository.js';
 import {
   LEGACY_CAMPAIGN_TABLES,
+  PORTABLE_ARCHIVE_DATABASE_VERSION,
   PORTABLE_CAMPAIGN_TABLES,
   PORTABLE_SAVE_SCHEMA_VERSION,
   V2_CAMPAIGN_TABLES,
+  V3_CAMPAIGN_TABLES,
   WORLD_SCHEMA_VERSION,
   portableTableQuery,
   type PortableCampaignTable,
@@ -65,9 +68,10 @@ type StoredRow = Readonly<Record<string, StoredScalar>>;
 type ImportMode = 'CREATE' | 'OVERWRITE';
 
 const FORMAT_VERSION = 1;
-const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_SAVE_SCHEMA_VERSION;
+const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_ARCHIVE_DATABASE_VERSION;
 const LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
 const V2_ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
+const V3_ARCHIVE_DATABASE_SCHEMA_VERSION = 3;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -135,13 +139,13 @@ export async function importCampaignSave(
       database.prepare('DELETE FROM campaigns WHERE id = ?').run(parsed.campaignId);
     }
     insertRow(database, 'campaigns', parsed.campaign);
-    if (parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+    if (parsed.databaseSchemaVersion >= V3_ARCHIVE_DATABASE_SCHEMA_VERSION) {
       preparePortableRestore(database, parsed.campaignId);
     }
     for (const row of parsed.generations) insertRow(database, 'generation_records', row);
     for (const table of INSERT_ORDER) {
       if (
-        parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION &&
+        parsed.databaseSchemaVersion >= V3_ARCHIVE_DATABASE_SCHEMA_VERSION &&
         table === 'world_constitutions'
       ) {
         clearLegacyProjections(database, parsed.campaignId);
@@ -152,6 +156,7 @@ export async function importCampaignSave(
       for (const row of parsed.tables[table]) insertRow(database, table, row);
     }
     assertForeignKeys(database);
+    validateCombatCompatibility(database, parsed.campaignId);
     validateImportedDomain(database, parsed);
     const snapshot = new SnapshotRepository(database).createInCurrentTransaction({
       id: options.snapshotId,
@@ -167,7 +172,7 @@ export async function importCampaignSave(
     const campaign = new CampaignRepository(database).get(parsed.campaignId);
     if (campaign === null)
       throw new PersistenceDataError('Imported campaign could not be reloaded');
-    if (parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+    if (parsed.databaseSchemaVersion >= V3_ARCHIVE_DATABASE_SCHEMA_VERSION) {
       finishPortableRestore(database, parsed.campaignId);
     }
     database.exec('COMMIT');
@@ -246,6 +251,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
   if (
     databaseVersion !== LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION &&
     databaseVersion !== V2_ARCHIVE_DATABASE_SCHEMA_VERSION &&
+    databaseVersion !== V3_ARCHIVE_DATABASE_SCHEMA_VERSION &&
     databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION
   ) {
     throw new PersistenceDataError(
@@ -292,7 +298,9 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
       ? LEGACY_CAMPAIGN_TABLES
       : databaseVersion === V2_ARCHIVE_DATABASE_SCHEMA_VERSION
         ? V2_CAMPAIGN_TABLES
-        : PORTABLE_CAMPAIGN_TABLES;
+        : databaseVersion === V3_ARCHIVE_DATABASE_SCHEMA_VERSION
+          ? V3_CAMPAIGN_TABLES
+          : PORTABLE_CAMPAIGN_TABLES;
   requireExactKeys(tableRoot, [...archiveTables], 'campaign.tables');
   const parsedTables = campaignTableRecord((table) =>
     !archiveTables.includes(table as never)
@@ -644,7 +652,7 @@ function validateImportedDomain(
   if (campaign.get(parsed.campaignId) === null)
     throw new PersistenceDataError('Campaign is invalid');
   campaign.getModelSwitchPolicy(parsed.campaignId);
-  if (parsed.databaseSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+  if (parsed.databaseSchemaVersion >= V3_ARCHIVE_DATABASE_SCHEMA_VERSION) {
     for (const table of PORTABLE_CAMPAIGN_TABLES) {
       const reloaded = database
         .prepare(portableTableQuery(table))
@@ -771,7 +779,7 @@ function parseStoredRow(value: unknown, label: string): StoredRow {
 }
 
 function upgradeCampaignSchema(row: StoredRow, archiveSchemaVersion: number): StoredRow {
-  if (archiveSchemaVersion === ARCHIVE_DATABASE_SCHEMA_VERSION) {
+  if (archiveSchemaVersion >= V3_ARCHIVE_DATABASE_SCHEMA_VERSION) {
     if (
       row['save_schema_version'] !== PORTABLE_SAVE_SCHEMA_VERSION ||
       row['world_schema_version'] !== WORLD_SCHEMA_VERSION
@@ -788,6 +796,91 @@ function upgradeCampaignSchema(row: StoredRow, archiveSchemaVersion: number): St
     save_schema_version: PORTABLE_SAVE_SCHEMA_VERSION,
     world_schema_version: WORLD_SCHEMA_VERSION,
   });
+}
+
+export function validateCombatCompatibility(
+  database: TransactionalSqliteDatabase,
+  campaignIdValue: CampaignId,
+): void {
+  const records = database
+    .prepare(
+      `SELECT combat_instance_id,combat_schema_version,ruleset_version,balance_version,
+              engine_version,world_profile_version,attribute_mapping_version,
+              rng_contract_version,initial_state_json
+       FROM battle_records WHERE campaign_id=? ORDER BY combat_instance_id`,
+    )
+    .all(campaignIdValue);
+  for (const value of records) {
+    const row = requireRecord(value, 'battle record compatibility row');
+    const versions = combatVersionsFromRow(row);
+    const initial = requireRecord(
+      parseJson(
+        requireString(row['initial_state_json'], 'initial_state_json'),
+        'initial_state_json',
+      ),
+      'initial combat state',
+    );
+    requireMatchingCombatVersions(initial['versions'], versions, 'initial combat state');
+  }
+  const active = database
+    .prepare(
+      `SELECT combat_instance_id,combat_schema_version,ruleset_version,balance_version,
+              engine_version,world_profile_version,attribute_mapping_version,
+              rng_contract_version,current_combat_state_json,rng_streams_json
+       FROM active_combat_saves WHERE campaign_id=? ORDER BY combat_instance_id`,
+    )
+    .all(campaignIdValue);
+  for (const value of active) {
+    const row = requireRecord(value, 'active combat compatibility row');
+    const versions = combatVersionsFromRow(row);
+    const state = requireRecord(
+      parseJson(
+        requireString(row['current_combat_state_json'], 'current_combat_state_json'),
+        'current_combat_state_json',
+      ),
+      'current combat state',
+    );
+    requireMatchingCombatVersions(state['versions'], versions, 'current combat state');
+    const rng = requireRecord(
+      parseJson(requireString(row['rng_streams_json'], 'rng_streams_json'), 'rng_streams_json'),
+      'combat RNG snapshot',
+    );
+    if (rng['rngContractVersion'] !== CURRENT_COMBAT_VERSION_SET.rngContractVersion) {
+      throw new PersistenceDataError('Active combat RNG version is incompatible');
+    }
+  }
+}
+
+function combatVersionsFromRow(row: Record<string, unknown>): typeof CURRENT_COMBAT_VERSION_SET {
+  const versions = {
+    combatSchemaVersion: row['combat_schema_version'],
+    rulesetVersion: row['ruleset_version'],
+    balanceVersion: row['balance_version'],
+    engineVersion: row['engine_version'],
+    worldProfileVersion: row['world_profile_version'],
+    attributeMappingVersion: row['attribute_mapping_version'],
+    rngContractVersion: row['rng_contract_version'],
+  };
+  for (const [field, expected] of Object.entries(CURRENT_COMBAT_VERSION_SET)) {
+    if (versions[field as keyof typeof versions] !== expected) {
+      throw new PersistenceDataError(`Combat archive uses an incompatible ${field}`);
+    }
+  }
+  return CURRENT_COMBAT_VERSION_SET;
+}
+
+function requireMatchingCombatVersions(
+  value: unknown,
+  expected: typeof CURRENT_COMBAT_VERSION_SET,
+  label: string,
+): void {
+  const versions = requireRecord(value, `${label} versions`);
+  requireExactKeys(versions, Object.keys(expected), `${label} versions`);
+  for (const [field, version] of Object.entries(expected)) {
+    if (versions[field] !== version) {
+      throw new PersistenceDataError(`${label} has incompatible ${field}`);
+    }
+  }
 }
 
 function upgradeLegacyKnowledgeRow(row: StoredRow): StoredRow {

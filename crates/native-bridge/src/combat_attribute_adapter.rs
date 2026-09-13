@@ -239,6 +239,33 @@ mod tests {
     }
 
     #[test]
+    fn v03_character_mapping_survives_portable_archive_v4_upgrade() {
+        let source_directory = tempfile::tempdir().unwrap();
+        let source = CampaignStore::open(source_directory.path().join("source.sqlite")).unwrap();
+        seed_v03_fixture(&source);
+        let profile = profile(WorldCombatProfileId::Fantasy);
+        let expected = source
+            .resolve_player_combat_attributes(CHARACTER_ID, CURRENT_COMBAT_VERSIONS, &profile)
+            .unwrap();
+        let archive = source_directory.path().join("v03-character.emtavern");
+        source
+            .export_campaign_archive(CAMPAIGN_ID, &archive, "0.4.1-test")
+            .unwrap();
+
+        let target_directory = tempfile::tempdir().unwrap();
+        let target = CampaignStore::open(target_directory.path().join("target.sqlite")).unwrap();
+        target
+            .import_campaign_archive(&archive, crate::CampaignArchiveImportMode::Create)
+            .unwrap();
+        let restored = target
+            .resolve_player_combat_attributes(CHARACTER_ID, CURRENT_COMBAT_VERSIONS, &profile)
+            .unwrap();
+        assert_eq!(restored, expected);
+        assert_eq!(restored.effective_attributes.physique, 5);
+        assert_eq!(restored.resolve_proficiency("weapon.blades").unwrap(), 5);
+    }
+
+    #[test]
     fn unknown_universal_text_cannot_change_numeric_output() {
         let directory = tempfile::tempdir().unwrap();
         let store = CampaignStore::open(directory.path().join("unknown-text.sqlite")).unwrap();
