@@ -6451,3 +6451,14 @@
 ### 验证与结束状态
 
 - `cargo test -p ember-combat-core --lib` 338/338 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate A=PASS；下一项严格为 M11-T02 Gate B Resolution / Effect Suite。
+
+## 2026-09-13 — M11-T02 完成 Gate B Resolution / Effect Suite
+
+### Resolution 到 committed event 的完整证据索引
+
+- 从 Gate A 提交 `df1eb88` 创建 `task/M11-T02-resolution-effect-gate`。新增 `M11_GATE_B_RESOLUTION_EFFECT.md`，逐项绑定 Attack/Save/Opposed/Critical、fixed-point mitigation/recovery、LethalResolution、Reinforcement、Shield spillover、DamageBundle、committed events、Encounter/System path、Revive 与 bounds 到权威 Core tests。
+- Gate 运行完整 338 项 Core suite，而非只挑选 happy path。所有公式、rounding point、working-to-committed closure 与 fail-closed 数值边界保持已冻结实现，未新增 skip/ignore 或改低阈值。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core --lib` 338/338 PASS，0 failed/ignored；审计索引中的全部 exact test names 已核对存在。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate B=PASS；下一项严格为 M11-T03 Gate C Status / Reaction Suite。
