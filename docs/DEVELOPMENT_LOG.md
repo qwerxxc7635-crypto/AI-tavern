@@ -6473,3 +6473,14 @@
 ### 验证与结束状态
 
 - Core 338/338 与 native PendingReaction crash-resume 1/1 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate C=PASS；下一项严格为 M11-T04 Gate D Four World Profiles。
+
+## 2026-09-13 — M11-T04 完成 Gate D Four World Profiles
+
+### 每个 Profile 的真实 lifecycle / defense / recovery / signature 证据
+
+- 从 Gate C 提交 `171ebda` 创建 `task/M11-T04-four-world-profiles-gate`。新增 `M11_GATE_D_WORLD_PROFILES.md`，分别绑定 Fantasy mana/stamina 双循环、Cultivation spirit sense/soul check、Sci-Fi energy/heat/shield recharge、Urban focus action/limited healing 到真实规则测试。
+- 跨世界 tests 同时验证四个 Profile registry 完整、lifecycle shape 不同、共用同一 mitigation pipeline type，且 presentation theme label 不改变 resolved rule bytes；每个世界的 malformed balance/resource 都 fail closed。
+
+### 验证与结束状态
+
+- `cargo test -p ember-combat-core --lib` 338/338 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate D=PASS；下一项严格为 M11-T05 Gate E AI Content。
