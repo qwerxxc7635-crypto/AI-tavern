@@ -6401,3 +6401,16 @@
 
 - Schema 33→34 Rust migration 专项 PASS：既有 TURN fact 原样保留，历史 BattleRecord 回填 started，详细 DAMAGE event 未泄露到 ledger。Combat persistence 5/5 PASS：提交前仅 started；成功后严格为 started/finished revisions 1/2 且 finished 与 resultCommitId/hash 对齐；domain body 失败后 probe、marker、finished 同时 rollback。
 - TypeScript EventLedgerRepository 3/3 PASS，新两类 combat facts 经契约与 SQLite 约束真实往返；Node 完整 40/40 PASS。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、native clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Rust workspace 516 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T05 PASS；下一项严格为 M10-T06 CombatResult Integration Tests。
+
+## 2026-09-13 — M10-T06 完成 Ordinary Defeat / Scripted / Aborted Persistence
+
+### 六类 Result 与三种 Scripted policy 的事务矩阵
+
+- 从 M10-T05 提交 `1dbfb4d` 创建 `task/M10-T06-combat-result-integration`。没有重写 M2 已冻结的 `RuntimeCommitContract`；通过 M10 的真实 checkpoint、canonical result transaction、BattleRecord marker 和 finished ledger 将全部 Persistence Policy 端到端接线验证。
+- Victory/Escape 使用 `COMMIT_RUNTIME_DELTA`，将 HP、物品和世界 delta 写入 domain probe；Ordinary Defeat/Aborted 使用 `RESTORE_PRECOMBAT_SNAPSHOT`，最终保持 snapshot 的 HP/物品/世界值。Aborted 由真实 Loop Guard overflow 产生，使用其 overflow sequence，reward 保持为零。
+- ScriptedVictory 以显式 `COMMIT_RUNTIME_DELTA` 提交；ScriptedDefeat 分别覆盖显式 `RESTORE_PRECOMBAT_SNAPSHOT` 与 `RESTORE_SNAPSHOT_THEN_APPLY_SCRIPTED_DELTA`，后者先恢复 snapshot，再只提交确定性 scripted world delta。Scripted Result 缺省 policy 在 domain callback 前 fail closed，BattleRecord marker 为空且 ledger 只有 started。
+- 每个成功场景都在同一 transaction 后观察到正确 canonical domain 值、恰好一个 BattleRecord result marker，以及 started/finished 两条 ledger revisions；未创建 result-specific persistence switch 或第二套 Event Ledger。
+
+### 验证与结束状态
+
+- Combat persistence 专项 7/7 PASS；单一结果矩阵内部覆盖 7 个 SQLite database cases 与六个 CombatResult enum，另独立验证 Scripted policy omission 零写入。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、native clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 518 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T06 PASS；下一项严格为 M10-T07 v0.3 Character / Save Compatibility。

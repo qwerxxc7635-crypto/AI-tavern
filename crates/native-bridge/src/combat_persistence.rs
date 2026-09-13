@@ -1345,6 +1345,381 @@ mod tests {
         assert!(!only_payload.contains("rollback-world"));
     }
 
+    #[test]
+    fn every_combat_result_applies_its_persistence_policy_in_the_canonical_transaction() {
+        let runtime_world_digest = "c".repeat(64);
+        let scripted_world_digest = "d".repeat(64);
+        let cases = vec![
+            (
+                "victory",
+                CombatResultType::Victory,
+                RuntimeFinalizationRequest::default(),
+                ResultPersistencePolicy::CommitRuntimeDelta,
+                (6, 1, Some(runtime_world_digest.clone()), 1),
+            ),
+            (
+                "escape",
+                CombatResultType::Escape,
+                RuntimeFinalizationRequest::default(),
+                ResultPersistencePolicy::CommitRuntimeDelta,
+                (6, 1, Some(runtime_world_digest.clone()), 0),
+            ),
+            (
+                "defeat",
+                CombatResultType::Defeat,
+                RuntimeFinalizationRequest::default(),
+                ResultPersistencePolicy::RestorePrecombatSnapshot,
+                (10, 2, None, 0),
+            ),
+            (
+                "aborted",
+                CombatResultType::Aborted,
+                RuntimeFinalizationRequest::default(),
+                ResultPersistencePolicy::RestorePrecombatSnapshot,
+                (10, 2, None, 0),
+            ),
+            (
+                "scripted-victory-commit",
+                CombatResultType::ScriptedVictory,
+                RuntimeFinalizationRequest {
+                    scripted_persistence_policy: Some(ResultPersistencePolicy::CommitRuntimeDelta),
+                    scripted_delta_entries: vec![],
+                },
+                ResultPersistencePolicy::CommitRuntimeDelta,
+                (6, 1, Some(runtime_world_digest.clone()), 1),
+            ),
+            (
+                "scripted-defeat-restore",
+                CombatResultType::ScriptedDefeat,
+                RuntimeFinalizationRequest {
+                    scripted_persistence_policy: Some(
+                        ResultPersistencePolicy::RestorePrecombatSnapshot,
+                    ),
+                    scripted_delta_entries: vec![],
+                },
+                ResultPersistencePolicy::RestorePrecombatSnapshot,
+                (10, 2, None, 0),
+            ),
+            (
+                "scripted-defeat-restore-then-apply",
+                CombatResultType::ScriptedDefeat,
+                RuntimeFinalizationRequest {
+                    scripted_persistence_policy: Some(
+                        ResultPersistencePolicy::RestoreSnapshotThenApplyScriptedDelta,
+                    ),
+                    scripted_delta_entries: vec![ProvisionalDeltaEntry::WorldFact {
+                        fact_id: "encounter-outcome".into(),
+                        before_digest: None,
+                        after_digest: Some(scripted_world_digest.clone()),
+                    }],
+                },
+                ResultPersistencePolicy::RestoreSnapshotThenApplyScriptedDelta,
+                (10, 2, Some(scripted_world_digest.clone()), 0),
+            ),
+        ];
+
+        for (name, result_type, request, expected_policy, expected_values) in cases {
+            let directory = tempfile::tempdir().unwrap();
+            let database_path = directory.path().join(format!("{name}.sqlite"));
+            let store = CampaignStore::open(&database_path).unwrap();
+            let campaign = store.create_campaign().unwrap();
+            let combat_id = format!("combat-result-policy-{name}");
+            let (initial, mut final_state, snapshot) =
+                result_policy_fixture(&combat_id, &runtime_world_digest);
+            if result_type == CombatResultType::Aborted {
+                force_loop_guard_abort(&mut final_state);
+            } else {
+                confirm_result(&mut final_state, result_type);
+            }
+            let loop_guard = final_state
+                .scheduler
+                .as_ref()
+                .map_or_else(guard, |scheduler| CombatLoopGuardContract {
+                    max_trigger_depth: scheduler.max_trigger_depth,
+                    max_event_count: scheduler.max_event_count,
+                });
+            store
+                .save_combat_checkpoint(CombatCheckpointWrite {
+                    campaign_id: &campaign.id,
+                    initial_state: &initial,
+                    state: &final_state,
+                    accepted_commands: &[],
+                    events: &[json!({"kind":"RESULT_POLICY_FIXTURE","case":name})],
+                    loop_guard,
+                })
+                .unwrap();
+            let connection = Connection::open(&database_path).unwrap();
+            connection
+                .execute_batch(
+                    "CREATE TABLE combat_result_domain_probe (
+                       hit_points INTEGER NOT NULL,
+                       item_quantity INTEGER NOT NULL,
+                       world_digest TEXT,
+                       reward_count INTEGER NOT NULL
+                     );
+                     INSERT INTO combat_result_domain_probe VALUES (10,2,NULL,0);",
+                )
+                .unwrap();
+
+            let receipt = store
+                .commit_combat_result_with(
+                    &campaign.id,
+                    &final_state,
+                    &snapshot,
+                    request,
+                    |transaction, plan| {
+                        assert_eq!(plan.persistence_policy, expected_policy, "{name}");
+                        apply_result_policy_to_probe(transaction, plan)?;
+                        if matches!(
+                            plan.result_type,
+                            CombatResultType::Victory | CombatResultType::ScriptedVictory
+                        ) && plan.persistence_policy
+                            == ResultPersistencePolicy::CommitRuntimeDelta
+                        {
+                            transaction.execute(
+                                "UPDATE combat_result_domain_probe
+                                 SET reward_count=reward_count+1",
+                                [],
+                            )?;
+                        }
+                        Ok(())
+                    },
+                )
+                .unwrap();
+            assert_eq!(
+                receipt.status,
+                CombatResultCommitStatus::Committed,
+                "{name}"
+            );
+            let actual = Connection::open(&database_path)
+                .unwrap()
+                .query_row(
+                    "SELECT hit_points,item_quantity,world_digest,reward_count
+                     FROM combat_result_domain_probe",
+                    [],
+                    |row| {
+                        Ok((
+                            row.get::<_, i64>(0)?,
+                            row.get::<_, i64>(1)?,
+                            row.get::<_, Option<String>>(2)?,
+                            row.get::<_, i64>(3)?,
+                        ))
+                    },
+                )
+                .unwrap();
+            assert_eq!(actual, expected_values, "{name}");
+            let durable_result = Connection::open(&database_path)
+                .unwrap()
+                .query_row(
+                    "SELECT combat_result,(SELECT COUNT(*) FROM event_ledger
+                       WHERE aggregate_type='COMBAT' AND aggregate_id=?1)
+                     FROM battle_records WHERE combat_instance_id=?1",
+                    [&combat_id],
+                    |row| Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?)),
+                )
+                .unwrap();
+            assert_eq!(
+                durable_result,
+                (result_name(result_type).into(), 2),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn scripted_result_without_explicit_policy_writes_nothing() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("scripted-missing-policy.sqlite");
+        let store = CampaignStore::open(&database_path).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let (initial, mut final_state, snapshot) =
+            result_policy_fixture("combat-scripted-missing-policy", &"c".repeat(64));
+        confirm_result(&mut final_state, CombatResultType::ScriptedVictory);
+        store
+            .save_combat_checkpoint(CombatCheckpointWrite {
+                campaign_id: &campaign.id,
+                initial_state: &initial,
+                state: &final_state,
+                accepted_commands: &[],
+                events: &[],
+                loop_guard: guard(),
+            })
+            .unwrap();
+        let mut callback_called = false;
+        let result = store.commit_combat_result_with(
+            &campaign.id,
+            &final_state,
+            &snapshot,
+            RuntimeFinalizationRequest::default(),
+            |_, _| {
+                callback_called = true;
+                Ok(())
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(CombatPersistenceError::ResultNotReady)
+        ));
+        assert!(!callback_called);
+        let connection = Connection::open(&database_path).unwrap();
+        let durable = connection
+            .query_row(
+                "SELECT result_commit_id,(SELECT COUNT(*) FROM event_ledger
+                   WHERE aggregate_type='COMBAT' AND aggregate_id=?1)
+                 FROM battle_records WHERE combat_instance_id=?1",
+                [&final_state.combat_instance_id],
+                |row| Ok((row.get::<_, Option<String>>(0)?, row.get::<_, i64>(1)?)),
+            )
+            .unwrap();
+        assert_eq!(durable, (None, 1));
+    }
+
+    fn apply_result_policy_to_probe(
+        transaction: &rusqlite::Transaction<'_>,
+        plan: &RuntimeFinalizationPlan,
+    ) -> Result<(), CampaignStoreError> {
+        if let Some(snapshot) = &plan.rollback_snapshot {
+            for entry in &snapshot.entries {
+                match entry {
+                    CanonicalDomainValue::HitPoints { value, .. } => {
+                        transaction.execute(
+                            "UPDATE combat_result_domain_probe SET hit_points=?1",
+                            [value],
+                        )?;
+                    }
+                    CanonicalDomainValue::ItemQuantity { value, .. } => {
+                        transaction.execute(
+                            "UPDATE combat_result_domain_probe SET item_quantity=?1",
+                            [value],
+                        )?;
+                    }
+                    CanonicalDomainValue::WorldFact { digest, .. } => {
+                        transaction.execute(
+                            "UPDATE combat_result_domain_probe SET world_digest=?1",
+                            [digest],
+                        )?;
+                    }
+                    _ => return Err(CampaignStoreError::InvalidData),
+                }
+            }
+        }
+        for entry in &plan.canonical_delta.entries {
+            match entry {
+                ProvisionalDeltaEntry::HitPoints { after, .. } => {
+                    transaction.execute(
+                        "UPDATE combat_result_domain_probe SET hit_points=?1",
+                        [after],
+                    )?;
+                }
+                ProvisionalDeltaEntry::ItemQuantity { after, .. } => {
+                    transaction.execute(
+                        "UPDATE combat_result_domain_probe SET item_quantity=?1",
+                        [after],
+                    )?;
+                }
+                ProvisionalDeltaEntry::WorldFact { after_digest, .. } => {
+                    transaction.execute(
+                        "UPDATE combat_result_domain_probe SET world_digest=?1",
+                        [after_digest],
+                    )?;
+                }
+                _ => return Err(CampaignStoreError::InvalidData),
+            }
+        }
+        Ok(())
+    }
+
+    fn result_policy_fixture(
+        combat_instance_id: &str,
+        runtime_world_digest: &str,
+    ) -> (CombatState, CombatState, PreCombatSnapshot) {
+        let mut initial = fixture_state_with_id(combat_instance_id);
+        initial.combat_inventory.push(CombatInventoryItemState {
+            owner_id: "actor-a".into(),
+            item_id: "potion-a".into(),
+            current_quantity: 2,
+        });
+        let snapshot = RuntimeCommitContract::capture_precombat_snapshot(
+            combat_instance_id.into(),
+            initial.versions,
+            vec![
+                CanonicalDomainValue::HitPoints {
+                    combatant_id: "actor-a".into(),
+                    value: 10,
+                },
+                CanonicalDomainValue::ItemQuantity {
+                    owner_id: "actor-a".into(),
+                    item_id: "potion-a".into(),
+                    value: 2,
+                },
+                CanonicalDomainValue::WorldFact {
+                    fact_id: "encounter-outcome".into(),
+                    digest: None,
+                },
+            ],
+        )
+        .unwrap();
+        let mut state = initial.clone();
+        state.combatants[0].hit_points = 6;
+        state.combat_inventory[0].current_quantity = 1;
+        state.provisional_delta = ProvisionalRuntimeDelta {
+            revision: 3,
+            entries: vec![
+                ProvisionalDeltaEntry::HitPoints {
+                    combatant_id: "actor-a".into(),
+                    before: 10,
+                    after: 6,
+                },
+                ProvisionalDeltaEntry::ItemQuantity {
+                    owner_id: "actor-a".into(),
+                    item_id: "potion-a".into(),
+                    before: 2,
+                    after: 1,
+                },
+                ProvisionalDeltaEntry::WorldFact {
+                    fact_id: "encounter-outcome".into(),
+                    before_digest: None,
+                    after_digest: Some(runtime_world_digest.into()),
+                },
+            ],
+        };
+        (initial, state, snapshot)
+    }
+
+    fn confirm_result(state: &mut CombatState, result_type: CombatResultType) {
+        state.result_candidates.push(ResultCandidate {
+            candidate_id: format!("result-{}", result_name(result_type).to_ascii_lowercase()),
+            result_type,
+            source_kind: "SYSTEM".into(),
+            source_id: "result-policy-fixture".into(),
+            explicit_priority: None,
+            sequence: 1,
+        });
+        TerminalOutcomeArbitrator::confirm(state).unwrap();
+    }
+
+    fn force_loop_guard_abort(state: &mut CombatState) {
+        CanonicalEventChainScheduler::begin(state, "chain-aborted".into(), 8, 0).unwrap();
+        CanonicalEventChainScheduler::enqueue_roots(
+            state,
+            vec![SchedulerCandidate {
+                kind: SchedulerItemKind::Trigger,
+                phase_priority: 1,
+                explicit_priority: 0,
+                source_stable_id: "system".into(),
+                effect_stable_id: "overflow".into(),
+            }],
+        )
+        .unwrap();
+        CanonicalEventChainScheduler::dequeue_next(state)
+            .unwrap()
+            .unwrap();
+        assert!(matches!(
+            CanonicalEventChainScheduler::gate_current_for_execution(state, true).unwrap(),
+            SchedulerExecutionGateOutcome::EngineFailure { .. }
+        ));
+    }
+
     fn pending_reaction_state() -> (
         CombatState,
         AcceptedCommandLedger,
@@ -1438,6 +1813,10 @@ mod tests {
     }
 
     fn fixture_state() -> CombatState {
+        fixture_state_with_id("combat-persistence-fixture")
+    }
+
+    fn fixture_state_with_id(combat_instance_id: &str) -> CombatState {
         let combatant = |id: &str, side: CombatSide| CombatantRuntime {
             combatant_id: id.into(),
             definition_id: format!("definition-{id}"),
@@ -1470,7 +1849,7 @@ mod tests {
             solo_recovery_available: false,
         };
         CombatState {
-            combat_instance_id: "combat-persistence-fixture".into(),
+            combat_instance_id: combat_instance_id.into(),
             versions: CURRENT_COMBAT_VERSIONS,
             random_seed: SEED.into(),
             revision: 1,
@@ -1542,7 +1921,7 @@ mod tests {
             confirmed_result: None,
             rng: CombatRng::new(
                 SEED,
-                "combat-persistence-fixture",
+                combat_instance_id,
                 CURRENT_COMBAT_VERSIONS.rng_contract_version,
             )
             .unwrap()
