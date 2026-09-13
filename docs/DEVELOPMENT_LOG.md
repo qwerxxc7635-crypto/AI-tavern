@@ -6484,3 +6484,14 @@
 ### 验证与结束状态
 
 - `cargo test -p ember-combat-core --lib` 338/338 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate D=PASS；下一项严格为 M11-T05 Gate E AI Content。
+
+## 2026-09-13 — M11-T05 完成 Gate E AI Content
+
+### Untrusted Concept → local canonical mechanics → candidate transaction
+
+- 从 Gate D 提交 `26fea13` 创建 `task/M11-T05-ai-content-gate`。新增 `M11_GATE_E_AI_CONTENT.md`，将 AI 禁止代码/final numeric、canonical mapping/typed override、programmatic tooltip、中文、validation/exploit/budget 与 Candidate commit policy 绑定到 TypeScript orchestration/application tests 和 Rust Core/Presentation tests。
+- Gate 明确验证 provider proposal 必须先过严格 schema/repair；数字由本地 PowerBudget 生成并带可复验 receipt；非法或 exploit candidate 在 domain write 前拒绝，background transaction 失败时 candidate 与 domain state 一起 rollback。
+
+### 验证与结束状态
+
+- AI schema/candidate/orchestrator Vitest 100/100、Core 338/338、Presentation 16/16 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate E=PASS；下一项严格为 M11-T06 Gate F UI / Theme / Asset。
