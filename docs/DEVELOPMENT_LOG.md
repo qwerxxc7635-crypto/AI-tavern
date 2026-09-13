@@ -6495,3 +6495,14 @@
 ### 验证与结束状态
 
 - AI schema/candidate/orchestrator Vitest 100/100、Core 338/338、Presentation 16/16 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate E=PASS；下一项严格为 M11-T06 Gate F UI / Theme / Asset。
+
+## 2026-09-13 — M11-T06 完成 Gate F UI / Theme / Asset
+
+### 单一 Combat API、四 Theme、Fallback 与只读 UI boundary
+
+- 从 Gate E 提交 `8572712` 创建 `task/M11-T06-ui-theme-asset-gate`。新增 `M11_GATE_F_UI_THEME_ASSET.md`，将四 Theme 共用 API、Theme 不触碰规则、全 stable-slot fallback、119 FINAL assets、中文 leakage gate 与 UI structured-command-only 逐项绑定到 UI/contracts/scripts/Presentation tests。
+- Gate 要求 CombatScreen 只渲染 replacement authoritative ViewModel，EndTurn/UseAbility/Reaction/Tactical 只提交 Commands，不在 React 本地推导或 optimistic 写 HP/AP/Status；Theme service 的输入类型中没有 CombatState、Command、rules 或 Engine lifecycle。
+
+### 验证与结束状态
+
+- UI/theme/contracts Vitest 103/103、FINAL assets 119/119、player-language 与 Presentation 16/16 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11 Gate F=PASS；下一项严格为 M11-T07 Gate G Persistence / Release。
