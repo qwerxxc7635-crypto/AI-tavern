@@ -174,6 +174,13 @@ impl CampaignStore {
                 as_i64(write.state.last_committed_sequence)?, &at,
             ],
         )?;
+        ensure_combat_started_fact(
+            &transaction,
+            write.campaign_id,
+            &write.state.combat_instance_id,
+            &initial_hash,
+            &at,
+        )?;
 
         let state_json = serde_json::to_string(write.state)?;
         let rng_json = serde_json::to_string(&write.state.rng)?;
@@ -360,6 +367,14 @@ impl CampaignStore {
             {
                 return Err(CombatPersistenceError::ResultCommitConflict);
             }
+            validate_combat_finished_fact(
+                &transaction,
+                campaign_id,
+                &state.combat_instance_id,
+                result,
+                commit_id,
+                delta_hash,
+            )?;
             transaction.commit()?;
             return Ok(CombatResultCommitReceipt {
                 status: CombatResultCommitStatus::AlreadyCommitted,
@@ -404,6 +419,15 @@ impl CampaignStore {
         if changed != 1 {
             return Err(CombatPersistenceError::ResultCommitConflict);
         }
+        insert_combat_finished_fact(
+            &transaction,
+            campaign_id,
+            &state.combat_instance_id,
+            result_name(plan.result_type),
+            &plan.result_commit_id,
+            &plan.canonical_delta_hash_sha256,
+            &at,
+        )?;
         transaction.commit()?;
         Ok(CombatResultCommitReceipt {
             status: CombatResultCommitStatus::Committed,
@@ -441,6 +465,148 @@ impl CampaignStore {
         transaction.commit()?;
         Ok(removed == 1)
     }
+}
+
+fn ensure_combat_started_fact(
+    transaction: &rusqlite::Transaction<'_>,
+    campaign_id: &str,
+    combat_instance_id: &str,
+    initial_state_hash: &str,
+    occurred_at: &str,
+) -> Result<(), CombatPersistenceError> {
+    let expected_id = format!("combat-ledger-start:{combat_instance_id}");
+    let expected_operation = format!("combat-start:{combat_instance_id}");
+    let expected_payload = serde_json::json!({
+        "combatInstanceId": combat_instance_id,
+        "event": "combat.started",
+        "initialStateHash": initial_state_hash,
+    });
+    let stored = transaction
+        .query_row(
+            "SELECT id,campaign_id,event_type,operation_id,payload_json,payload_version,source
+             FROM event_ledger WHERE aggregate_type='COMBAT' AND aggregate_id=?1 AND revision=1",
+            [combat_instance_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .optional()?;
+    if let Some((id, campaign, event_type, operation, payload, version, source)) = stored {
+        if id != expected_id
+            || campaign != campaign_id
+            || event_type != "COMBAT_STARTED"
+            || operation != expected_operation
+            || serde_json::from_str::<Value>(&payload)? != expected_payload
+            || version != 1
+            || source != "SYSTEM"
+        {
+            return Err(CombatPersistenceError::ResultCommitConflict);
+        }
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO event_ledger (
+           id,campaign_id,event_type,operation_id,aggregate_type,aggregate_id,revision,
+           payload_json,payload_version,source,occurred_at
+         ) VALUES (?1,?2,'COMBAT_STARTED',?3,'COMBAT',?4,1,?5,1,'SYSTEM',?6)",
+        params![
+            expected_id,
+            campaign_id,
+            expected_operation,
+            combat_instance_id,
+            serde_json::to_string(&expected_payload)?,
+            occurred_at,
+        ],
+    )?;
+    Ok(())
+}
+
+fn insert_combat_finished_fact(
+    transaction: &rusqlite::Transaction<'_>,
+    campaign_id: &str,
+    combat_instance_id: &str,
+    combat_result: &str,
+    result_commit_id: &str,
+    canonical_delta_hash: &str,
+    occurred_at: &str,
+) -> Result<(), CombatPersistenceError> {
+    let payload = serde_json::json!({
+        "canonicalDeltaHash": canonical_delta_hash,
+        "combatInstanceId": combat_instance_id,
+        "combatResult": combat_result,
+        "event": "combat.finished",
+        "resultCommitId": result_commit_id,
+    });
+    transaction.execute(
+        "INSERT INTO event_ledger (
+           id,campaign_id,event_type,operation_id,aggregate_type,aggregate_id,revision,
+           payload_json,payload_version,source,occurred_at
+         ) VALUES (?1,?2,'COMBAT_FINISHED',?3,'COMBAT',?4,2,?5,1,'SYSTEM',?6)",
+        params![
+            format!("combat-ledger-finish:{result_commit_id}"),
+            campaign_id,
+            result_commit_id,
+            combat_instance_id,
+            serde_json::to_string(&payload)?,
+            occurred_at,
+        ],
+    )?;
+    Ok(())
+}
+
+fn validate_combat_finished_fact(
+    transaction: &rusqlite::Transaction<'_>,
+    campaign_id: &str,
+    combat_instance_id: &str,
+    combat_result: &str,
+    result_commit_id: &str,
+    canonical_delta_hash: &str,
+) -> Result<(), CombatPersistenceError> {
+    let stored = transaction
+        .query_row(
+            "SELECT id,campaign_id,event_type,operation_id,payload_json,payload_version,source
+             FROM event_ledger WHERE aggregate_type='COMBAT' AND aggregate_id=?1 AND revision=2",
+            [combat_instance_id],
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                    row.get::<_, String>(4)?,
+                    row.get::<_, i64>(5)?,
+                    row.get::<_, String>(6)?,
+                ))
+            },
+        )
+        .optional()?;
+    let expected_payload = serde_json::json!({
+        "canonicalDeltaHash": canonical_delta_hash,
+        "combatInstanceId": combat_instance_id,
+        "combatResult": combat_result,
+        "event": "combat.finished",
+        "resultCommitId": result_commit_id,
+    });
+    if let Some((id, campaign, event_type, operation, payload, version, source)) = stored
+        && id == format!("combat-ledger-finish:{result_commit_id}")
+        && campaign == campaign_id
+        && event_type == "COMBAT_FINISHED"
+        && operation == result_commit_id
+        && serde_json::from_str::<Value>(&payload)? == expected_payload
+        && version == 1
+        && source == "SYSTEM"
+    {
+        return Ok(());
+    }
+    Err(CombatPersistenceError::ResultCommitConflict)
 }
 
 struct Parts {
@@ -896,11 +1062,43 @@ mod tests {
                 initial_state: &initial,
                 state: &final_state,
                 accepted_commands: &[],
-                events: &[],
+                events: &[
+                    json!({"kind":"DAMAGE_APPLIED","hitPointsAfter":1}),
+                    json!({"kind":"ITEM_CONSUMED","itemId":"potion-a"}),
+                    json!({"kind":"WORLD_FACT_PROVISIONAL","factId":"door-open"}),
+                ],
                 loop_guard: guard(),
             })
             .unwrap();
         let connection = Connection::open(&database_path).unwrap();
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT json_array_length(events_json) FROM battle_records
+                     WHERE combat_instance_id=?1",
+                    [&final_state.combat_instance_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            3
+        );
+        let precommit_ledger = connection
+            .prepare(
+                "SELECT event_type,payload_json FROM event_ledger
+                 WHERE aggregate_type='COMBAT' AND aggregate_id=?1 ORDER BY revision",
+            )
+            .unwrap()
+            .query_map([&final_state.combat_instance_id], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(precommit_ledger.len(), 1);
+        assert_eq!(precommit_ledger[0].0, "COMBAT_STARTED");
+        for forbidden in ["hitPointsAfter", "itemId", "factId"] {
+            assert!(!precommit_ledger[0].1.contains(forbidden));
+        }
         connection
             .execute_batch(
                 "CREATE TABLE domain_commit_probe (
@@ -977,6 +1175,40 @@ mod tests {
             .unwrap();
         assert_eq!(counts, (1, 1, 1));
         let connection = Connection::open(&database_path).unwrap();
+        let committed_facts = connection
+            .prepare(
+                "SELECT revision,event_type,operation_id,payload_json FROM event_ledger
+                 WHERE aggregate_type='COMBAT' AND aggregate_id=?1 ORDER BY revision",
+            )
+            .unwrap()
+            .query_map([&final_state.combat_instance_id], |row| {
+                Ok((
+                    row.get::<_, i64>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                    row.get::<_, String>(3)?,
+                ))
+            })
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        assert_eq!(committed_facts.len(), 2);
+        assert_eq!(
+            (committed_facts[0].0, committed_facts[0].1.as_str()),
+            (1, "COMBAT_STARTED")
+        );
+        assert_eq!(
+            (committed_facts[1].0, committed_facts[1].1.as_str()),
+            (2, "COMBAT_FINISHED")
+        );
+        assert_eq!(committed_facts[1].2, first.result_commit_id);
+        let finished_payload: Value = serde_json::from_str(&committed_facts[1].3).unwrap();
+        assert_eq!(finished_payload["resultCommitId"], first.result_commit_id);
+        assert_eq!(
+            finished_payload["canonicalDeltaHash"],
+            first.canonical_delta_hash
+        );
+        assert_eq!(finished_payload["combatResult"], "VICTORY");
         connection
             .execute(
                 "UPDATE battle_records SET canonical_delta_hash=?1 WHERE combat_instance_id=?2",
@@ -1046,7 +1278,12 @@ mod tests {
                 initial_state: &initial,
                 state: &final_state,
                 accepted_commands: &[],
-                events: &[],
+                events: &[json!({
+                    "kind":"DAMAGE_APPLIED",
+                    "hitPointsAfter":0,
+                    "itemId":"rollback-item",
+                    "worldFact":"rollback-world"
+                })],
                 loop_guard: guard(),
             })
             .unwrap();
@@ -1084,6 +1321,28 @@ mod tests {
             )
             .unwrap();
         assert_eq!(marker, None);
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT COUNT(*) FROM event_ledger
+                     WHERE aggregate_type='COMBAT' AND aggregate_id=?1",
+                    [&final_state.combat_instance_id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap(),
+            1
+        );
+        let only_payload: String = connection
+            .query_row(
+                "SELECT payload_json FROM event_ledger
+                 WHERE aggregate_type='COMBAT' AND aggregate_id=?1",
+                [&final_state.combat_instance_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(!only_payload.contains("hitPointsAfter"));
+        assert!(!only_payload.contains("rollback-item"));
+        assert!(!only_payload.contains("rollback-world"));
     }
 
     fn pending_reaction_state() -> (

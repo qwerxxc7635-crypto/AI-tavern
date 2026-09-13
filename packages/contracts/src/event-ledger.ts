@@ -10,6 +10,8 @@ export const LEDGER_EVENT_TYPES = [
   'KNOWLEDGE_COMMITTED',
   'SNAPSHOT_CREATED',
   'RECOVERY_COMMITTED',
+  'COMBAT_STARTED',
+  'COMBAT_FINISHED',
 ] as const;
 export type LedgerEventType = (typeof LEDGER_EVENT_TYPES)[number];
 
@@ -22,6 +24,7 @@ export const LEDGER_AGGREGATE_TYPES = [
   'KNOWLEDGE',
   'SNAPSHOT',
   'RECOVERY',
+  'COMBAT',
 ] as const;
 export type LedgerAggregateType = (typeof LEDGER_AGGREGATE_TYPES)[number];
 

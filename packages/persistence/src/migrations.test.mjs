@@ -525,7 +525,7 @@ test('backfills deterministic provenance from schema 6 without exposing excluded
     );
     assert.equal(
       database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-      33,
+      34,
     );
     const importedKnowledge = database
       .prepare(

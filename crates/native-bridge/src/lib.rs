@@ -152,7 +152,9 @@ const SAVE_SCHEMA_MIGRATION: &str =
     include_str!("../../../database/migrations/0032_save_schema.sql");
 const COMBAT_PERSISTENCE_MIGRATION: &str =
     include_str!("../../../database/migrations/0033_combat_persistence.sql");
-const LATEST_SCHEMA_VERSION: i64 = 33;
+const COMBAT_EVENT_LEDGER_MIGRATION: &str =
+    include_str!("../../../database/migrations/0034_combat_event_ledger.sql");
+const LATEST_SCHEMA_VERSION: i64 = 34;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -772,6 +774,7 @@ fn apply_migrations_through(
         (31_i64, "prefetch", PREFETCH_MIGRATION),
         (32_i64, "save_schema", SAVE_SCHEMA_MIGRATION),
         (33_i64, "combat_persistence", COMBAT_PERSISTENCE_MIGRATION),
+        (34_i64, "combat_event_ledger", COMBAT_EVENT_LEDGER_MIGRATION),
     ];
     let history = {
         let mut statement = connection.prepare(
@@ -1195,7 +1198,7 @@ mod tests {
 
         let store = CampaignStore::open(&database_path).expect("migrate database");
         let migrated = store.connect().expect("open migrated database");
-        assert_eq!(schema_version(&migrated).expect("schema version"), 33);
+        assert_eq!(schema_version(&migrated).expect("schema version"), 34);
         assert_eq!(
             migrated
                 .query_row(
@@ -1243,6 +1246,84 @@ mod tests {
     }
 
     #[test]
+    fn combat_ledger_migration_preserves_existing_facts_and_backfills_started_audit() {
+        let connection = Connection::open_in_memory().expect("open database");
+        let mut connection = connection;
+        apply_migrations_through(&mut connection, 33).expect("apply schema 33");
+        connection
+            .execute(
+                "INSERT INTO campaigns (id,schema_version,state,created_at,updated_at)
+                 VALUES ('campaign-ledger-migration',1,'TAVERN',?1,?1)",
+                [FIRST_TIME],
+            )
+            .expect("seed campaign");
+        connection
+            .execute(
+                "INSERT INTO event_ledger (
+                   id,campaign_id,event_type,operation_id,aggregate_type,aggregate_id,revision,
+                   payload_json,payload_version,source,occurred_at
+                 ) VALUES (
+                   'ledger-existing','campaign-ledger-migration','TURN_COMMITTED','operation-existing',
+                   'TURN','turn-existing',1,'{\"kept\":true}',1,'LOCAL_RULE',?1
+                 )",
+                [FIRST_TIME],
+            )
+            .expect("seed existing ledger fact");
+        connection
+            .execute(
+                "INSERT INTO battle_records (
+                   combat_instance_id,campaign_id,combat_schema_version,ruleset_version,
+                   balance_version,engine_version,world_profile_version,attribute_mapping_version,
+                   rng_contract_version,random_seed,initial_state_json,initial_state_hash,
+                   accepted_commands_json,events_json,event_digest,last_committed_sequence,
+                   created_at,updated_at
+                 ) VALUES (
+                   'combat-ledger-migration','campaign-ledger-migration',1,1,1,1,1,1,1,
+                   '00112233445566778899aabbccddeeff','{}',?1,'[]',
+                   '[{\"kind\":\"DAMAGE_APPLIED\",\"hitPointsAfter\":0}]',?2,0,?3,?3
+                 )",
+                params!["a".repeat(64), "b".repeat(64), FIRST_TIME],
+            )
+            .expect("seed battle record");
+
+        apply_migrations_through(&mut connection, 34).expect("apply combat ledger migration");
+
+        assert_eq!(schema_version(&connection).expect("schema version"), 34);
+        assert_eq!(
+            connection
+                .query_row(
+                    "SELECT payload_json FROM event_ledger WHERE id='ledger-existing'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .expect("preserved fact"),
+            "{\"kept\":true}"
+        );
+        let started = connection
+            .query_row(
+                "SELECT event_type,operation_id,aggregate_type,revision,payload_json
+                 FROM event_ledger WHERE aggregate_id='combat-ledger-migration'",
+                [],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, String>(2)?,
+                        row.get::<_, i64>(3)?,
+                        row.get::<_, String>(4)?,
+                    ))
+                },
+            )
+            .expect("backfilled started fact");
+        assert_eq!(started.0, "COMBAT_STARTED");
+        assert_eq!(started.1, "combat-start:combat-ledger-migration");
+        assert_eq!(started.2, "COMBAT");
+        assert_eq!(started.3, 1);
+        assert!(!started.4.contains("hitPointsAfter"));
+        assert!(!started.4.contains("DAMAGE_APPLIED"));
+    }
+
+    #[test]
     fn native_startup_migrates_an_existing_schema_zero_file() {
         let directory = tempfile::tempdir().expect("temp directory");
         let database_path = directory.path().join("schema-zero.sqlite");
@@ -1256,7 +1337,7 @@ mod tests {
 
         let store = CampaignStore::open(&database_path).expect("migrate schema zero");
         let migrated = store.connect().expect("open migrated database");
-        assert_eq!(schema_version(&migrated).expect("schema version"), 33);
+        assert_eq!(schema_version(&migrated).expect("schema version"), 34);
         assert_eq!(
             migrated
                 .query_row(

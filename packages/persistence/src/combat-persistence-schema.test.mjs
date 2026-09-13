@@ -11,14 +11,14 @@ const HASH_A = 'a'.repeat(64);
 const HASH_B = 'b'.repeat(64);
 const SEED = '0123456789abcdef0123456789abcdef';
 
-test('schema 33 stores the complete BattleRecord and ActiveCombatSave boundary', async () => {
+test('schema 34 stores the complete BattleRecord and ActiveCombatSave boundary', async () => {
   const database = new DatabaseSync(':memory:');
   await applyMigrations(database);
   seedCampaign(database);
   insertBattleRecord(database);
   insertActiveSave(database, { pendingReaction: true });
 
-  assert.equal(currentSchemaVersion, 33);
+  assert.equal(currentSchemaVersion, 34);
   assert.deepEqual(
     row(database, `SELECT * FROM battle_records WHERE combat_instance_id=?`, COMBAT_ID),
     {
@@ -135,7 +135,7 @@ test('schema rejects version drift malformed checkpoints and incomplete result i
   database.close();
 });
 
-test('migration upgrades schema 32 without rewriting existing campaign data', async () => {
+test('migration upgrades schema 32 through combat persistence without rewriting campaign data', async () => {
   const database = new DatabaseSync(':memory:');
   await applyMigrations(database);
   seedCampaign(database);
@@ -145,6 +145,7 @@ test('migration upgrades schema 32 without rewriting existing campaign data', as
     DROP TRIGGER battle_record_identity_immutable;
     DROP TABLE active_combat_saves;
     DROP TABLE battle_records;
+    DELETE FROM schema_migrations WHERE version=34;
     DELETE FROM schema_migrations WHERE version=33;
   `);
 
@@ -152,7 +153,7 @@ test('migration upgrades schema 32 without rewriting existing campaign data', as
 
   assert.equal(
     database.prepare('SELECT MAX(version) AS version FROM schema_migrations').get().version,
-    33,
+    34,
   );
   assert.equal(
     database.prepare('SELECT state FROM campaigns WHERE id=?').get(CAMPAIGN_ID).state,

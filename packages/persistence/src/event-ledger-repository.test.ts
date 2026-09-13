@@ -15,28 +15,29 @@ import { EventLedgerRepository } from './event-ledger-repository.js';
 const campaign = campaignId('campaign-ledger');
 
 describe('EventLedgerRepository', () => {
-  it('covers the eight initial aggregate families with database timestamps', async () => {
+  it('covers all aggregate families and both selected combat facts', async () => {
     const database = await createDatabase();
     try {
       const ledger = new EventLedgerRepository(database);
       LEDGER_EVENT_TYPES.forEach((eventType, index) => {
-        const aggregateType = LEDGER_AGGREGATE_TYPES[index];
-        if (aggregateType === undefined) throw new Error('Ledger registry length mismatch');
+        const combatFact = eventType === 'COMBAT_STARTED' || eventType === 'COMBAT_FINISHED';
+        const aggregateType = combatFact ? 'COMBAT' : LEDGER_AGGREGATE_TYPES[index];
+        if (aggregateType === undefined) throw new Error('Ledger registry mismatch');
         ledger.append({
           id: eventLedgerId(`ledger-${index + 1}`),
           campaignId: campaign,
           eventType,
           operationId: aiOperationId(`operation-${index + 1}`),
           aggregateType,
-          aggregateId: `aggregate-${index + 1}`,
-          revision: 1,
+          aggregateId: combatFact ? 'combat-a' : `aggregate-${index + 1}`,
+          revision: eventType === 'COMBAT_FINISHED' ? 2 : 1,
           payload: { eventType },
           payloadVersion: 1,
           source: index % 2 === 0 ? 'LOCAL_RULE' : 'USER_ACCEPTANCE',
         });
       });
       const entries = ledger.listCampaign(campaign);
-      expect(entries).toHaveLength(8);
+      expect(entries).toHaveLength(LEDGER_EVENT_TYPES.length);
       expect(entries.map(({ eventType }) => eventType).sort()).toEqual(
         [...LEDGER_EVENT_TYPES].sort(),
       );

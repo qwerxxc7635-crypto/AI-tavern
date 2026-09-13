@@ -6387,3 +6387,17 @@
 
 - Combat persistence 专项 5/5 PASS：模拟 reward/inventory/world 三类 delta 各只增加一次，关闭 store 模拟 cleanup 前 crash，重开重试返回 ALREADY_COMMITTED 且恶意二次 body 未执行；随后 cleanup 首次删除、再次 no-op。另覆盖相同 result ID/hash tamper 冲突，以及 domain body 写入后报错时 domain effect 与 BattleRecord marker 同时 rollback。
 - Rustfmt、native clippy、Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 515 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T04 PASS；下一项严格为 M10-T05 Event Ledger Boundary。
+
+## 2026-09-13 — M10-T05 完成 Event Ledger Boundary
+
+### Selected committed facts 与 rollback 一致性
+
+- 从 M10-T04 提交 `c2e7b57` 创建 `task/M10-T05-event-ledger-boundary`。Schema 34 扩展既有 Event Ledger 的 event/aggregate 枚举，仅新增 `COMBAT_STARTED`、`COMBAT_FINISHED` 与 `COMBAT`；迁移无损保留原 ledger entries，并为已有 BattleRecord 确定性回填 revision 1 started audit。
+- 新战斗首次稳定 checkpoint 与 BattleRecord 在同一短 transaction 写入 started；重复 checkpoint 只核对同一 ID/campaign/operation/payload，不增加 revision。started payload 仅包含 combatInstanceId、event 与 initialStateHash。
+- 完整 damage/HP、item/resource、downed/world provisional runtime events 继续只保存在 BattleRecord `events_json`/digest，未引入完整 Event Sourcing。结果确认前 Existing Event Ledger 恰好只有 started，不含这些可回滚字段。
+- canonical result transaction 在 reward/inventory/world domain body 与 BattleRecord marker 成功后追加 revision 2 finished；operationId 与 payload 共用 resultCommitId，并携带 CombatResult/canonicalDeltaHash。任一失败三者共同 rollback；崩溃重试核对 finished exact identity 后返回 AlreadyCommitted，不重复追加。
+
+### 验证与结束状态
+
+- Schema 33→34 Rust migration 专项 PASS：既有 TURN fact 原样保留，历史 BattleRecord 回填 started，详细 DAMAGE event 未泄露到 ledger。Combat persistence 5/5 PASS：提交前仅 started；成功后严格为 started/finished revisions 1/2 且 finished 与 resultCommitId/hash 对齐；domain body 失败后 probe、marker、finished 同时 rollback。
+- TypeScript EventLedgerRepository 3/3 PASS，新两类 combat facts 经契约与 SQLite 约束真实往返；Node 完整 40/40 PASS。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、native clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Rust workspace 516 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T05 PASS；下一项严格为 M10-T06 CombatResult Integration Tests。

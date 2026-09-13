@@ -5248,3 +5248,23 @@ SQLite BattleRecord 提供单独的 replay-input loader，只读取上述四项�
 - “Domain transaction 成功、Active save 清理前崩溃”恢复后只执行 cleanup/navigation，不会二次发奖、扣物品或应用 world delta。
 - M10-T04 提供 transaction/idempotency boundary；各 Result 的 Commit/Restore/Scripted/Aborted 策略仍由 Core plan 决定，并在 M10-T06 完整接线测试。
 - Selected Existing Event Ledger facts 将在 M10-T05 作为同一 transaction body 的一部分接入，不提前创建第二套 event sourcing。
+
+## DEC-243：Combat Event Ledger 只收 started/finished，Runtime Event 保留在 BattleRecord
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §11.2、M10-T05，DEC-239 至 DEC-242
+
+### 决定
+
+既有 Event Ledger 只新增 `COMBAT_STARTED` 与 `COMBAT_FINISHED` 两类 selected durable facts，并复用同一个 `COMBAT` aggregate，不把完整 Combat event stream 改造成第二套 Event Sourcing。完整 runtime log、UI/replay/debug events 继续存入 BattleRecord `events_json`/digest；其中 damage/HP、item/resource、downed 与 world provisional facts 即使已在 runtime 发生，也不得在 canonical result transaction 之前进入 Existing Event Ledger。
+
+首次稳定 checkpoint 写入 BattleRecord 时，在同一短 transaction 中创建 revision 1 `combat.started` audit fact；payload 只包含 combatInstanceId、事件名与 initialStateHash。Schema 34 对历史 BattleRecord 确定性回填同一事实，同时无损复制既有 ledger entries。重复 checkpoint 必须核对 started identity/payload，不得追加新 revision 或接受漂移。
+
+结果 commit 在 domain mutation 与 BattleRecord marker 的同一 SQLite transaction 中追加 revision 2 `combat.finished`。该 fact 的 operationId 与 payload 共用稳定 `resultCommitId`，并只携带 CombatResult 与 canonicalDeltaHash 等已确认事实。提交失败则 domain delta、marker 与 finished fact 一起 rollback；相同 marker 重试必须验证已存在 finished fact 后返回 AlreadyCommitted，缺失或冲突时 fail closed。
+
+### 影响与边界
+
+- 普通 Defeat 与其他结果的 Restore/Commit 策略由 M10-T06 决定；本任务只保证任何结果都不能提前泄露可回滚 canonical HP/item/world facts。
+- Local database schema 从 33 升至 34；portable save schema 仍保持 v3，active-combat 导入策略仍留给 M10-T07。
+- Replay 的最小输入仍是 versions/seed/InitialState/AcceptedCommands，Event Ledger 不成为规则驱动输入。
