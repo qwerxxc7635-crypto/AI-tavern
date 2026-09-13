@@ -6374,3 +6374,16 @@
 
 - Replay Core 专项 3/3 PASS：同一 fixture 两次回放的 roll、Scheduler execution、UtilityAI accepted command、loop-guard Aborted result、trace digest 与 final hash 完全一致；真实 Ask Reaction suspend/Trigger decision 在两次回放中得到同一 resumed ResolutionContext 与 final hash；漏报 RNG 消费和 identity drift 均 fail closed。Combat persistence 专项 3/3 PASS，并验证 SQLite replay loader 返回 exact 四项输入。
 - Rustfmt、combat-core/native clippy、Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 513 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T03 PASS；下一项严格为 M10-T04 CombatResult Exactly-Once Commit。
+
+## 2026-09-13 — M10-T04 完成 CombatResult Exactly-Once Commit
+
+### Existing Domain Transaction 与 durable marker
+
+- 从 M10-T03 提交 `3918b47` 创建 `task/M10-T04-exactly-once-result`。新增 `DEC-242` 与 `CampaignStore::commit_combat_result_with`；继续使用 M2 RuntimeCommitContract 的稳定 resultCommitId/canonicalDeltaHash，不另造 identity。
+- 提交前核对 BattleRecord campaign、ActiveCombatSave exact Current CombatState 与 Core finalization plan。reward/inventory/world domain mutation body 和 BattleRecord combatResult/resultCommitId/canonicalDeltaHash/committedAt marker 在同一短 SQLite transaction 中提交；任一失败全部 rollback。
+- 相同 marker 重试返回原 committed receipt 且不再调用 domain body；同 ID/hash/result 冲突 fail closed。ActiveCombatSave 由 marker-guarded cleanup API 后续幂等删除，刻意覆盖 canonical transaction 成功后、cleanup 前崩溃的恢复窗口。
+
+### 验证与结束状态
+
+- Combat persistence 专项 5/5 PASS：模拟 reward/inventory/world 三类 delta 各只增加一次，关闭 store 模拟 cleanup 前 crash，重开重试返回 ALREADY_COMMITTED 且恶意二次 body 未执行；随后 cleanup 首次删除、再次 no-op。另覆盖相同 result ID/hash tamper 冲突，以及 domain body 写入后报错时 domain effect 与 BattleRecord marker 同时 rollback。
+- Rustfmt、native clippy、Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets 与 `git diff --check` PASS。完整 `pnpm check` PASS：Vitest 200 files / 1241 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 515 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M10-T04 PASS；下一项严格为 M10-T05 Event Ledger Boundary。

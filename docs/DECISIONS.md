@@ -5230,3 +5230,21 @@ SQLite BattleRecord 提供单独的 replay-input loader，只读取上述四项�
 - Runner 不复制一套 Command switch；应用必须注入与 live combat 相同的 canonical executor，避免 live/replay 规则分叉。
 - Encounter/System deterministic action 仍从 versions/state/hooks 推导，不伪装为外部 AcceptedCommand。
 - Replay UI 是 SHOULD，M10-T03 只实现 Core runner、证据 receipt 与 SQLite 输入边界。
+
+## DEC-242：Canonical Domain Mutation 与 BattleRecord Marker 同事务，清理独立幂等
+
+- 日期：2026-09-13
+- 状态：已采纳
+- 依据：V5.2 §11.2.1/§11.2.2、M10-T04，DEC-177/DEC-239
+
+### 决定
+
+继续使用 M2 `RuntimeCommitContract` 从 combatInstanceId、finalResultSequence、CombatResult 与 canonicalDeltaHash 稳定派生 resultCommitId，不引入时间或新随机数。原生 `CampaignStore` 在单个 SQLite `IMMEDIATE` transaction 内先核对 BattleRecord/ActiveCombatSave 的 campaign、完整 Current CombatState 与 plan，再调用既有 domain mutation body，最后写入同一 BattleRecord 的 combatResult/resultCommitId/canonicalDeltaHash/committedAt marker；domain mutation 失败时 marker 与全部变化一起 rollback。
+
+重试首先按 resultCommitId 和 BattleRecord marker 查询。相同 combat/result/hash 直接返回第一次 committedAt 的 `ALREADY_COMMITTED` receipt，绝不再次调用 reward/inventory/world delta body；同一 ID 或同一 BattleRecord 对应不同 hash/result 时 fail closed。ActiveCombatSave 不在 canonical transaction 内删除，而由独立 cleanup API 在核对相同 resultCommitId marker 后幂等删除。
+
+### 影响与边界
+
+- “Domain transaction 成功、Active save 清理前崩溃”恢复后只执行 cleanup/navigation，不会二次发奖、扣物品或应用 world delta。
+- M10-T04 提供 transaction/idempotency boundary；各 Result 的 Commit/Restore/Scripted/Aborted 策略仍由 Core plan 决定，并在 M10-T06 完整接线测试。
+- Selected Existing Event Ledger facts 将在 M10-T05 作为同一 transaction body 的一部分接入，不提前创建第二套 event sourcing。

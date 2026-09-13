@@ -1,8 +1,9 @@
 use ember_combat_core::{
     AcceptedCombatCommand, AcceptedCommandLedger, CanonicalReactionCore, CombatReplayInput,
     CombatRng, CombatRngSnapshot, CombatState, CostSnapshot, EventSchedulerCheckpoint,
-    ObjectiveRuntimeState, PendingReactionSnapshot, ReinforcementRuntimeState,
-    ResolutionContextSnapshot,
+    ObjectiveRuntimeState, PendingReactionSnapshot, PreCombatSnapshot, ReinforcementRuntimeState,
+    ResolutionContextSnapshot, RuntimeCommitContract, RuntimeFinalizationPlan,
+    RuntimeFinalizationRequest,
 };
 use rusqlite::{OptionalExtension, TransactionBehavior, params};
 use serde::{Deserialize, Serialize};
@@ -58,12 +59,33 @@ pub enum CombatPersistenceError {
     StateRegression,
     #[error("combat checkpoint uses unsupported combat versions")]
     IncompatibleVersion,
+    #[error("combat result is not ready for canonical commit")]
+    ResultNotReady,
+    #[error("combat result commit identity conflicts with durable state")]
+    ResultCommitConflict,
     #[error("combat persistence database operation failed")]
     Store(#[from] CampaignStoreError),
     #[error("combat persistence database operation failed")]
     Database(#[from] rusqlite::Error),
     #[error("combat checkpoint serialization failed")]
     Serialization(#[from] serde_json::Error),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum CombatResultCommitStatus {
+    Committed,
+    AlreadyCommitted,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CombatResultCommitReceipt {
+    pub status: CombatResultCommitStatus,
+    pub combat_instance_id: String,
+    pub result_commit_id: String,
+    pub canonical_delta_hash: String,
+    pub committed_at: String,
 }
 
 #[derive(Serialize)]
@@ -268,6 +290,156 @@ impl CampaignStore {
             initial_state,
             accepted_commands,
         })
+    }
+
+    /// Commits the canonical domain mutation and its BattleRecord marker in one
+    /// SQLite transaction. Retries inspect the marker before invoking the
+    /// supplied existing-domain transaction body.
+    pub fn commit_combat_result_with<F>(
+        &self,
+        campaign_id: &str,
+        state: &CombatState,
+        precombat_snapshot: &PreCombatSnapshot,
+        finalization: RuntimeFinalizationRequest,
+        apply_domain_delta: F,
+    ) -> Result<CombatResultCommitReceipt, CombatPersistenceError>
+    where
+        F: FnOnce(
+            &rusqlite::Transaction<'_>,
+            &RuntimeFinalizationPlan,
+        ) -> Result<(), CampaignStoreError>,
+    {
+        let plan =
+            RuntimeCommitContract::build_finalization_plan(state, precombat_snapshot, finalization)
+                .map_err(|_| CombatPersistenceError::ResultNotReady)?;
+        let at = current_timestamp().map_err(CombatPersistenceError::Store)?;
+        let mut connection = self.connect().map_err(CombatPersistenceError::Store)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        if let Some((owner_combat_id, owner_hash)) = transaction
+            .query_row(
+                "SELECT combat_instance_id,canonical_delta_hash FROM battle_records
+                 WHERE result_commit_id=?1",
+                [&plan.result_commit_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+            && (owner_combat_id != state.combat_instance_id
+                || owner_hash != plan.canonical_delta_hash_sha256)
+        {
+            return Err(CombatPersistenceError::ResultCommitConflict);
+        }
+
+        let stored = transaction
+            .query_row(
+                "SELECT campaign_id,combat_result,result_commit_id,canonical_delta_hash,
+                        canonical_result_committed_at
+                 FROM battle_records WHERE combat_instance_id=?1",
+                [&state.combat_instance_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Option<String>>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                        row.get::<_, Option<String>>(3)?,
+                        row.get::<_, Option<String>>(4)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or(CombatPersistenceError::NotFound)?;
+        if stored.0 != campaign_id {
+            return Err(CombatPersistenceError::ResultCommitConflict);
+        }
+        if let (Some(result), Some(commit_id), Some(delta_hash), Some(committed_at)) =
+            (&stored.1, &stored.2, &stored.3, &stored.4)
+        {
+            if result != result_name(plan.result_type)
+                || commit_id != &plan.result_commit_id
+                || delta_hash != &plan.canonical_delta_hash_sha256
+            {
+                return Err(CombatPersistenceError::ResultCommitConflict);
+            }
+            transaction.commit()?;
+            return Ok(CombatResultCommitReceipt {
+                status: CombatResultCommitStatus::AlreadyCommitted,
+                combat_instance_id: state.combat_instance_id.clone(),
+                result_commit_id: commit_id.clone(),
+                canonical_delta_hash: delta_hash.clone(),
+                committed_at: committed_at.clone(),
+            });
+        }
+        if stored.1.is_some() || stored.2.is_some() || stored.3.is_some() || stored.4.is_some() {
+            return Err(CombatPersistenceError::ResultCommitConflict);
+        }
+
+        let active_state_json = transaction
+            .query_row(
+                "SELECT current_combat_state_json FROM active_combat_saves
+                 WHERE combat_instance_id=?1 AND campaign_id=?2",
+                params![&state.combat_instance_id, campaign_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or(CombatPersistenceError::ResultNotReady)?;
+        let active_state: CombatState = serde_json::from_str(&active_state_json)?;
+        if &active_state != state {
+            return Err(CombatPersistenceError::ResultNotReady);
+        }
+
+        apply_domain_delta(&transaction, &plan).map_err(CombatPersistenceError::Store)?;
+        let changed = transaction.execute(
+            "UPDATE battle_records SET combat_result=?1,result_commit_id=?2,
+                    canonical_delta_hash=?3,canonical_result_committed_at=?4,updated_at=?4
+             WHERE combat_instance_id=?5 AND campaign_id=?6 AND result_commit_id IS NULL",
+            params![
+                result_name(plan.result_type),
+                &plan.result_commit_id,
+                &plan.canonical_delta_hash_sha256,
+                &at,
+                &state.combat_instance_id,
+                campaign_id,
+            ],
+        )?;
+        if changed != 1 {
+            return Err(CombatPersistenceError::ResultCommitConflict);
+        }
+        transaction.commit()?;
+        Ok(CombatResultCommitReceipt {
+            status: CombatResultCommitStatus::Committed,
+            combat_instance_id: state.combat_instance_id.clone(),
+            result_commit_id: plan.result_commit_id,
+            canonical_delta_hash: plan.canonical_delta_hash_sha256,
+            committed_at: at,
+        })
+    }
+
+    /// Idempotently removes a resumable checkpoint only after the durable
+    /// canonical result marker proves which transaction succeeded.
+    pub fn complete_combat_result_cleanup(
+        &self,
+        combat_instance_id: &str,
+        result_commit_id: &str,
+    ) -> Result<bool, CombatPersistenceError> {
+        let mut connection = self.connect().map_err(CombatPersistenceError::Store)?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let marker = transaction
+            .query_row(
+                "SELECT result_commit_id FROM battle_records WHERE combat_instance_id=?1",
+                [combat_instance_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .optional()?
+            .ok_or(CombatPersistenceError::NotFound)?;
+        if marker.as_deref() != Some(result_commit_id) {
+            return Err(CombatPersistenceError::ResultCommitConflict);
+        }
+        let removed = transaction.execute(
+            "DELETE FROM active_combat_saves WHERE combat_instance_id=?1",
+            [combat_instance_id],
+        )?;
+        transaction.commit()?;
+        Ok(removed == 1)
     }
 }
 
@@ -511,6 +683,17 @@ fn digest(bytes: &[u8]) -> String {
     format!("{:x}", Sha256::digest(bytes))
 }
 
+const fn result_name(result: ember_combat_core::CombatResultType) -> &'static str {
+    match result {
+        ember_combat_core::CombatResultType::Victory => "VICTORY",
+        ember_combat_core::CombatResultType::Defeat => "DEFEAT",
+        ember_combat_core::CombatResultType::Escape => "ESCAPE",
+        ember_combat_core::CombatResultType::ScriptedVictory => "SCRIPTED_VICTORY",
+        ember_combat_core::CombatResultType::ScriptedDefeat => "SCRIPTED_DEFEAT",
+        ember_combat_core::CombatResultType::Aborted => "ABORTED",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::time::Duration;
@@ -693,6 +876,216 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn result_commit_survives_crash_before_cleanup_without_reapplying_domain_delta() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("combat.sqlite");
+        let store = CampaignStore::open(&database_path).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let initial = fixture_state();
+        let final_state = confirmed_victory(&initial);
+        let snapshot = RuntimeCommitContract::capture_precombat_snapshot(
+            initial.combat_instance_id.clone(),
+            initial.versions,
+            vec![],
+        )
+        .unwrap();
+        store
+            .save_combat_checkpoint(CombatCheckpointWrite {
+                campaign_id: &campaign.id,
+                initial_state: &initial,
+                state: &final_state,
+                accepted_commands: &[],
+                events: &[],
+                loop_guard: guard(),
+            })
+            .unwrap();
+        let connection = Connection::open(&database_path).unwrap();
+        connection
+            .execute_batch(
+                "CREATE TABLE domain_commit_probe (
+                   campaign_id TEXT PRIMARY KEY,
+                   reward_count INTEGER NOT NULL,
+                   inventory_delta_count INTEGER NOT NULL,
+                   world_delta_count INTEGER NOT NULL
+                 );",
+            )
+            .unwrap();
+        connection
+            .execute(
+                "INSERT INTO domain_commit_probe VALUES (?1,0,0,0)",
+                [&campaign.id],
+            )
+            .unwrap();
+
+        let first = store
+            .commit_combat_result_with(
+                &campaign.id,
+                &final_state,
+                &snapshot,
+                RuntimeFinalizationRequest::default(),
+                |transaction, plan| {
+                    assert_eq!(plan.result_type, CombatResultType::Victory);
+                    transaction.execute(
+                        "UPDATE domain_commit_probe SET reward_count=reward_count+1,
+                         inventory_delta_count=inventory_delta_count+1,
+                         world_delta_count=world_delta_count+1 WHERE campaign_id=?1",
+                        [&campaign.id],
+                    )?;
+                    Ok(())
+                },
+            )
+            .unwrap();
+        assert_eq!(first.status, CombatResultCommitStatus::Committed);
+        drop(store); // Simulated crash: ActiveCombatSave was not cleaned.
+
+        let reopened = CampaignStore::open(&database_path).unwrap();
+        let retry = reopened
+            .commit_combat_result_with(
+                &campaign.id,
+                &final_state,
+                &snapshot,
+                RuntimeFinalizationRequest::default(),
+                |transaction, _| {
+                    transaction.execute(
+                        "UPDATE domain_commit_probe SET reward_count=reward_count+100,
+                         inventory_delta_count=inventory_delta_count+100,
+                         world_delta_count=world_delta_count+100 WHERE campaign_id=?1",
+                        [&campaign.id],
+                    )?;
+                    Ok(())
+                },
+            )
+            .unwrap();
+        assert_eq!(retry.status, CombatResultCommitStatus::AlreadyCommitted);
+        assert_eq!(retry.result_commit_id, first.result_commit_id);
+        assert_eq!(retry.canonical_delta_hash, first.canonical_delta_hash);
+        let counts = Connection::open(&database_path)
+            .unwrap()
+            .query_row(
+                "SELECT reward_count,inventory_delta_count,world_delta_count
+                 FROM domain_commit_probe WHERE campaign_id=?1",
+                [&campaign.id],
+                |row| {
+                    Ok((
+                        row.get::<_, i64>(0)?,
+                        row.get::<_, i64>(1)?,
+                        row.get::<_, i64>(2)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(counts, (1, 1, 1));
+        let connection = Connection::open(&database_path).unwrap();
+        connection
+            .execute(
+                "UPDATE battle_records SET canonical_delta_hash=?1 WHERE combat_instance_id=?2",
+                params!["0".repeat(64), &final_state.combat_instance_id],
+            )
+            .unwrap();
+        assert!(matches!(
+            reopened.commit_combat_result_with(
+                &campaign.id,
+                &final_state,
+                &snapshot,
+                RuntimeFinalizationRequest::default(),
+                |_, _| Ok(()),
+            ),
+            Err(CombatPersistenceError::ResultCommitConflict)
+        ));
+        connection
+            .execute(
+                "UPDATE battle_records SET canonical_delta_hash=?1 WHERE combat_instance_id=?2",
+                params![&first.canonical_delta_hash, &final_state.combat_instance_id],
+            )
+            .unwrap();
+        assert!(
+            reopened
+                .restore_combat_checkpoint(&final_state.combat_instance_id)
+                .is_ok()
+        );
+        assert!(
+            reopened
+                .complete_combat_result_cleanup(
+                    &final_state.combat_instance_id,
+                    &first.result_commit_id
+                )
+                .unwrap()
+        );
+        assert!(
+            !reopened
+                .complete_combat_result_cleanup(
+                    &final_state.combat_instance_id,
+                    &first.result_commit_id
+                )
+                .unwrap()
+        );
+        assert!(matches!(
+            reopened.restore_combat_checkpoint(&final_state.combat_instance_id),
+            Err(CombatPersistenceError::NotFound)
+        ));
+    }
+
+    #[test]
+    fn failed_domain_transaction_rolls_back_effect_and_result_marker_together() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("combat.sqlite");
+        let store = CampaignStore::open(&database_path).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let initial = fixture_state();
+        let final_state = confirmed_victory(&initial);
+        let snapshot = RuntimeCommitContract::capture_precombat_snapshot(
+            initial.combat_instance_id.clone(),
+            initial.versions,
+            vec![],
+        )
+        .unwrap();
+        store
+            .save_combat_checkpoint(CombatCheckpointWrite {
+                campaign_id: &campaign.id,
+                initial_state: &initial,
+                state: &final_state,
+                accepted_commands: &[],
+                events: &[],
+                loop_guard: guard(),
+            })
+            .unwrap();
+        let connection = Connection::open(&database_path).unwrap();
+        connection.execute_batch("CREATE TABLE domain_rollback_probe (value INTEGER NOT NULL); INSERT INTO domain_rollback_probe VALUES (0);").unwrap();
+        let result = store.commit_combat_result_with(
+            &campaign.id,
+            &final_state,
+            &snapshot,
+            RuntimeFinalizationRequest::default(),
+            |transaction, _| {
+                transaction.execute("UPDATE domain_rollback_probe SET value=1", [])?;
+                Err(CampaignStoreError::InvalidData)
+            },
+        );
+        assert!(matches!(
+            result,
+            Err(CombatPersistenceError::Store(
+                CampaignStoreError::InvalidData
+            ))
+        ));
+        let connection = Connection::open(&database_path).unwrap();
+        assert_eq!(
+            connection
+                .query_row("SELECT value FROM domain_rollback_probe", [], |row| row
+                    .get::<_, i64>(0))
+                .unwrap(),
+            0
+        );
+        let marker = connection
+            .query_row(
+                "SELECT result_commit_id FROM battle_records WHERE combat_instance_id=?1",
+                [&final_state.combat_instance_id],
+                |row| row.get::<_, Option<String>>(0),
+            )
+            .unwrap();
+        assert_eq!(marker, None);
+    }
+
     fn pending_reaction_state() -> (
         CombatState,
         AcceptedCommandLedger,
@@ -769,6 +1162,20 @@ mod tests {
             ReactionRouteOutcome::AskWindowOpened(_)
         ));
         (state, ledger, bindings, assignments)
+    }
+
+    fn confirmed_victory(initial: &CombatState) -> CombatState {
+        let mut state = initial.clone();
+        state.result_candidates.push(ResultCandidate {
+            candidate_id: "result-victory".into(),
+            result_type: CombatResultType::Victory,
+            source_kind: "SYSTEM".into(),
+            source_id: "result-fixture".into(),
+            explicit_priority: None,
+            sequence: 1,
+        });
+        TerminalOutcomeArbitrator::confirm(&mut state).unwrap();
+        state
     }
 
     fn fixture_state() -> CombatState {
