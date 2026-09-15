@@ -412,6 +412,99 @@ describe('CombatScreen shell', () => {
     expect(within(tooltipPanel).getByText(longMechanical).textContent).toBe(longMechanical);
   });
 
+  it('m11 long combat generated content stress keeps large projected collections operable', () => {
+    const base = viewModel();
+    const baseCombatant = requiredAt(base.combatants, 1);
+    const combatants = Array.from({ length: 48 }, (_, index): CombatantStageViewModel => ({
+      ...baseCombatant,
+      combatantId: `stress-combatant-${String(index).padStart(2, '0')}`,
+      displayNameZhCn: `压力单位${String(index).padStart(2, '0')}`,
+      side: index % 2 === 0 ? 'PLAYER' : 'HOSTILE',
+      sideLabelZhCn: index % 2 === 0 ? '我方' : '敌方',
+      isActiveTurn: index === 0,
+      statuses:
+        index === 0
+          ? Array.from({ length: 128 }, (_, statusIndex) => ({
+              statusInstanceId: `stress-status-${String(statusIndex).padStart(3, '0')}`,
+              statusDefinitionId: `status.stress-${String(statusIndex).padStart(3, '0')}`,
+              displayNameZhCn: `压力状态${String(statusIndex).padStart(3, '0')}`,
+              stackCount: (statusIndex % 64) + 1,
+              remainingDuration: statusIndex % 5,
+            }))
+          : [],
+    }));
+    const actions = Array.from({ length: 128 }, (_, index) => ({
+      ...requiredAt(base.actions, 0),
+      actionId: `ability.stress-${String(index).padStart(3, '0')}`,
+      displayNameZhCn: `压力技能${String(index).padStart(3, '0')}`,
+      legalTargetIds: ['stress-combatant-47'],
+      tooltip: tooltip(
+        `ability.stress-${String(index).padStart(3, '0')}`,
+        `第${String(index)}个确定性压力技能说明。`,
+      ),
+    }));
+    const port = commandPort();
+    render(
+      <CombatScreen
+        viewModel={{
+          ...base,
+          activeCombatantId: 'stress-combatant-00',
+          timeline: combatants.map((combatant, index) => ({
+            combatantId: combatant.combatantId,
+            displayNameZhCn: combatant.displayNameZhCn,
+            side: combatant.side,
+            isExtraTurn: index % 11 === 0,
+            isCurrent: index === 0,
+          })),
+          combatants,
+          actions: [...actions, requiredAt(base.actions, 2)],
+          enemyIntents: Array.from({ length: 96 }, (_, index) => ({
+            enemyId: `stress-enemy-${String(index).padStart(2, '0')}`,
+            enemyDisplayNameZhCn: `压力敌人${String(index).padStart(2, '0')}`,
+            intentLabelZhCn: '攻击',
+            targetHintId: 'stress-combatant-00',
+            targetHintNameZhCn: '压力单位00',
+          })),
+          combatLog: Array.from({ length: 512 }, (_, index) => ({
+            eventId: `stress-event-${String(index).padStart(3, '0')}`,
+            sequence: index + 1,
+            kind: 'DAMAGE' as const,
+            titleZhCn: `压力事件${String(index).padStart(3, '0')}`,
+            detailZhCn: `确定性战斗事件序号 ${String(index + 1)}`,
+          })),
+        }}
+        commandPort={port}
+      />,
+    );
+
+    expect(
+      within(screen.getByRole('navigation', { name: '行动顺序' })).getAllByRole('listitem'),
+    ).toHaveLength(48);
+    expect(
+      within(screen.getByRole('region', { name: '战斗场景' })).getAllByRole('article'),
+    ).toHaveLength(48);
+    expect(
+      within(screen.getByRole('region', { name: '压力单位00的战斗状态' })).getAllByRole('listitem'),
+    ).toHaveLength(129);
+    expect(within(screen.getByRole('group', { name: '技能' })).getAllByRole('button')).toHaveLength(
+      128,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: '压力技能127' }));
+    fireEvent.click(screen.getByRole('button', { name: '选择压力单位47作为压力技能127的目标' }));
+    expect(port.submitCommand).toHaveBeenCalledTimes(1);
+    expect(port.submitCommand.mock.calls[0]?.[0].payload).toEqual({
+      kind: 'USE_ABILITY',
+      abilityId: 'ability.stress-127',
+      targetId: 'stress-combatant-47',
+    });
+
+    const log = screen.getByText('战斗日志', { exact: false }).closest('details');
+    if (!(log instanceof HTMLElement)) throw new Error('Missing combat log');
+    fireEvent.click(log.querySelector('summary') as HTMLElement);
+    expect(within(log).getAllByRole('listitem')).toHaveLength(512);
+  });
+
   it('shows Auto, Ask, and Disabled reaction modes with required Chinese labels', () => {
     render(<CombatScreen viewModel={viewModel()} commandPort={commandPort()} />);
     const modes = screen.getByRole('region', { name: '反应模式' });

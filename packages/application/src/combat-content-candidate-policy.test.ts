@@ -167,6 +167,67 @@ describe('CombatContentCandidatePolicy', () => {
       database.close();
     }
   });
+
+  it('m11 long combat generated content stress commits a large mixed fixture catalog atomically', async () => {
+    const database = await createDatabase();
+    try {
+      const validator: CombatCandidateValidator = {
+        validate(payload: unknown) {
+          const record = payload as { id?: unknown; kind?: unknown; exploit?: unknown };
+          if (
+            payload === null ||
+            typeof payload !== 'object' ||
+            Array.isArray(payload) ||
+            typeof record.id !== 'string' ||
+            !['ABILITY', 'STATUS', 'EQUIPMENT'].includes(String(record.kind)) ||
+            record.exploit === true
+          ) {
+            throw new CombatCandidatePolicyError('fixture rejected by combat validation pipeline');
+          }
+          return {
+            canonicalPayload: { id: record.id, kind: String(record.kind), canonical: true },
+            checks: COMBAT_CANDIDATE_REQUIRED_CHECKS,
+          };
+        },
+      };
+      const policy = new CombatContentCandidatePolicy(database, validator, () => at);
+      let committed = 0;
+      const kinds = ['ABILITY', 'STATUS', 'EQUIPMENT'] as const;
+      for (let index = 0; index < 192; index += 1) {
+        const suffix = `stress-${String(index).padStart(3, '0')}`;
+        const input = generated(suffix, 'BACKGROUND_WORLD_CONTENT');
+        const accepted = policy.acceptGenerated(
+          {
+            ...input,
+            payload: { id: `${kinds[index % kinds.length]}.${suffix}`, kind: kinds[index % 3] },
+          },
+          (payload) => {
+            database
+              .prepare('INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)')
+              .run(`stress-${String(committed).padStart(3, '0')}`, JSON.stringify(payload), at);
+            committed += 1;
+          },
+        );
+        expect(accepted.status).toBe('ACCEPTED');
+      }
+      expect(committed).toBe(192);
+      expect(candidateCount(database)).toBe(192);
+
+      for (let index = 0; index < 64; index += 1) {
+        const suffix = `exploit-${String(index).padStart(2, '0')}`;
+        expect(() =>
+          policy.acceptGenerated({
+            ...generated(suffix, 'USER_REQUESTED'),
+            payload: { id: `STATUS.${suffix}`, kind: 'STATUS', exploit: true },
+          }),
+        ).toThrow(/validation pipeline/u);
+      }
+      expect(candidateCount(database)).toBe(192);
+      expect(committed).toBe(192);
+    } finally {
+      database.close();
+    }
+  });
 });
 
 function canonicalValidator() {

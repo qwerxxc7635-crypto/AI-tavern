@@ -583,6 +583,58 @@ mod tests {
     }
 
     #[test]
+    fn m11_long_combat_generated_content_stress_activates_64_preallocated_reinforcements() {
+        let run = || {
+            let mut state = fixture();
+            state.reinforcements.reinforcements = (0..64)
+                .map(|index| {
+                    reinforcement(combatant(
+                        &format!("reinforcement-stress-{index:02}"),
+                        CombatSide::Hostile,
+                        10,
+                        10,
+                        100 - index,
+                        2,
+                    ))
+                })
+                .collect();
+            let target_ids = state
+                .reinforcements
+                .reinforcements
+                .iter()
+                .map(|entry| entry.combatant_id.clone())
+                .collect::<Vec<_>>();
+            let envelope = internal(
+                "cmd-stress-wave",
+                "rule.stress-wave",
+                target_ids.iter().map(String::as_str).collect(),
+            );
+            let commit = EncounterRuleExecutor::activate_reinforcements(
+                &mut state,
+                &AcceptedCommandLedger::new(),
+                envelope,
+            )
+            .unwrap();
+            assert_eq!(commit.committed_events.len(), 64);
+            assert_eq!(state.reinforcements.reinforcements.len(), 64);
+            assert!(
+                state
+                    .reinforcements
+                    .reinforcements
+                    .iter()
+                    .all(|entry| entry.is_deployed)
+            );
+            state.snapshot().unwrap().verify_and_restore().unwrap()
+        };
+
+        let first = run();
+        let second = run();
+        assert_eq!(first, second);
+        assert_eq!(first.timeline.len(), 66);
+        assert_eq!(first.last_committed_sequence, 64);
+    }
+
+    #[test]
     fn unknown_and_repeated_reinforcements_fail_without_mutating_that_chain() {
         let mut state = fixture();
         let before = state.clone();

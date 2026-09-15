@@ -1969,6 +1969,53 @@ mod tests {
     }
 
     #[test]
+    fn m11_long_combat_generated_content_stress_routes_128_reactions_deterministically() {
+        let run = || {
+            let (mut state, mut ledger) = prepared_state();
+            state.combatants[0].reaction_charges = 128;
+            state.combatants[0].max_reaction_charges = 128;
+            let bindings = (0..128)
+                .map(|index| {
+                    binding(
+                        "actor-a",
+                        &format!("reaction-stress-{index:03}"),
+                        ReactionExecutionMode::Ask,
+                        1,
+                    )
+                })
+                .collect::<Vec<_>>();
+            enqueue_and_dequeue(&mut state, &bindings);
+            let ReactionRouteOutcome::AskWindowOpened(window) =
+                CanonicalReactionCore::route_current(&mut state, &bindings, &assignments(), None)
+                    .unwrap()
+            else {
+                panic!("expected stress ask window")
+            };
+            assert_eq!(window.eligible_reaction_ids.len(), 128);
+            let selected = window.eligible_reaction_ids[127].clone();
+            let outcome = CanonicalReactionCore::resolve_ask_window(
+                &mut state,
+                &mut ledger,
+                decision_envelope(
+                    "decision-stress",
+                    &window.window_id,
+                    ReactionDecisionChoice::Trigger,
+                    Some(&selected),
+                ),
+                &bindings,
+                &assignments(),
+            )
+            .unwrap();
+            assert_eq!(outcome.status, ReactionDecisionStatus::AcceptedTrigger);
+            assert_eq!(outcome.permit.unwrap().reaction_id, selected);
+            assert_eq!(state.combatants[0].reaction_charges, 127);
+            state.snapshot().unwrap().verify_and_restore().unwrap()
+        };
+
+        assert_eq!(run(), run());
+    }
+
+    #[test]
     fn tampered_pending_item_shape_and_selected_identity_fail_restore() {
         let (mut state, _ledger) = prepared_state();
         let bindings = vec![binding(

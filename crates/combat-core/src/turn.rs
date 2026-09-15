@@ -931,6 +931,36 @@ mod tests {
     }
 
     #[test]
+    fn m11_long_combat_generated_content_stress_runs_128_rounds_deterministically() {
+        let run = || {
+            let mut state = battle_start_state();
+            for completed_round in 1..=128 {
+                let roster = TurnRoundStateMachine::begin_round(&mut state).unwrap();
+                assert_eq!(roster.len(), 3);
+                for _ in 0..roster.len() {
+                    finish_one_normal_turn(&mut state);
+                }
+                finish_round(&mut state);
+                assert_eq!(state.round.completed_round_count, completed_round);
+                state = state.snapshot().unwrap().verify_and_restore().unwrap();
+            }
+            state
+        };
+
+        let first = run();
+        let second = run();
+        assert_eq!(first, second);
+        assert_eq!(first.round.round_number, 128);
+        assert_eq!(first.round.completed_round_count, 128);
+        assert!(
+            first
+                .combatants
+                .iter()
+                .all(|combatant| combatant.normal_owner_turn_index == 128)
+        );
+    }
+
+    #[test]
     fn illegal_transitions_and_hash_valid_roster_tampering_fail_closed() {
         let mut state = battle_start_state();
         let before = state.clone();

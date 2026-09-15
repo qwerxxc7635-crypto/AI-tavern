@@ -779,6 +779,72 @@ mod tests {
     }
 
     #[test]
+    fn m11_long_combat_generated_content_stress_hits_exact_depth_then_aborts() {
+        let run = || {
+            let mut state = fixture_state();
+            state.combatants[0].statuses = vec![runtime("instance-a", "status-a", 1)];
+            let definitions = vec![definition(
+                "status-a",
+                vec![
+                    trigger("root", StatusTriggerHook::TurnStart, 1),
+                    trigger("child", StatusTriggerHook::DamageApplied, 1),
+                ],
+            )];
+            CanonicalEventChainScheduler::begin(&mut state, "stress-chain".into(), 32, 256)
+                .unwrap();
+            CanonicalTriggerPipeline::enqueue_roots(
+                &mut state,
+                &definitions,
+                &TriggerSignal::Lifecycle(LifecycleTriggerHook::TurnStart),
+            )
+            .unwrap();
+
+            for expected_depth in 1..=32 {
+                let item = CanonicalEventChainScheduler::dequeue_next(&mut state)
+                    .unwrap()
+                    .unwrap();
+                assert_eq!(item.depth, expected_depth);
+                assert!(matches!(
+                    CanonicalTriggerPipeline::gate_current(&mut state, &definitions).unwrap(),
+                    TriggerDispatchOutcome::ReadyToExecute(_)
+                ));
+                state.last_committed_sequence = expected_depth.into();
+                let children = CanonicalTriggerPipeline::complete_current_with_children(
+                    &mut state,
+                    &definitions,
+                    &TriggerSignal::Committed(CommittedTriggerEvent::DamageApplied {
+                        target_combatant_id: "actor-b".into(),
+                        event_chain_id: "stress-chain".into(),
+                        committed_sequence: expected_depth.into(),
+                    }),
+                )
+                .unwrap();
+                assert_eq!(children.len(), 1);
+            }
+
+            let overflow = CanonicalEventChainScheduler::dequeue_next(&mut state)
+                .unwrap()
+                .unwrap();
+            assert_eq!(overflow.depth, 33);
+            assert!(matches!(
+                CanonicalTriggerPipeline::gate_current(&mut state, &definitions).unwrap(),
+                TriggerDispatchOutcome::EngineFailure(_)
+            ));
+            state
+        };
+
+        let first = run();
+        let second = run();
+        assert_eq!(first, second);
+        assert_eq!(first.rng, fixture_state().rng);
+        assert_eq!(first.scheduler.as_ref().unwrap().executed_event_count, 32);
+        assert_eq!(
+            first.confirmed_result,
+            Some(crate::CombatResultType::Aborted)
+        );
+    }
+
+    #[test]
     fn trigger_gate_rejects_other_scheduler_kinds_without_mutation() {
         let mut state = fixture_state();
         begin(&mut state);

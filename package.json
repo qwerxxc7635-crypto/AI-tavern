@@ -17,6 +17,7 @@
     "test": "vitest run --passWithNoTests && node --test packages/persistence/src/*.test.mjs scripts/*.test.mjs",
     "test:windows-e2e": "cargo test -p ember-native-bridge windows_e2e::completes_the_windows_release_vertical_slice_on_one_persistent_save",
     "test:combat-determinism": "cargo test -p ember-combat-core replay::tests::same_fixture_replays_roll_scheduler_ai_command_result_and_final_hash -- --exact && cargo test -p ember-combat-core numeric::tests::shared_exact_value_fixture_locks_every_rounding_contract -- --exact",
+    "test:combat-stress": "node scripts/combat-stress.mjs",
     "archive:interop": "node scripts/archive-interop.mjs",
     "performance:baseline": "node scripts/performance-baseline.mjs",
     "performance:gate": "node scripts/performance-regression.mjs",

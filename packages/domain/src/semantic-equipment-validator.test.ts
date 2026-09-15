@@ -160,6 +160,40 @@ describe('Semantic equipment rules', () => {
       expect(mechanics.defense).toBe(category === 'ARMOR' ? 4 : 0);
     },
   );
+
+  it('m11 long combat generated content stress validates 256 deterministic equipment fixtures', () => {
+    const categories = [
+      'WEAPON',
+      'ARMOR',
+      'TOOL',
+      'CONSUMABLE',
+      'CLUE',
+      'TREASURE',
+      'OTHER',
+    ] as const;
+    const first = Array.from({ length: 256 }, (_, index) => {
+      const category = categories[index % categories.length] as EquipmentCategory;
+      return validateEquipmentMechanics(
+        createEquipmentMechanics(category, 'LEGENDARY', 'knowledge', [
+          `stress-${String(index).padStart(3, '0')}`,
+        ]),
+      );
+    });
+    const second = Array.from({ length: 256 }, (_, index) => {
+      const category = categories[index % categories.length] as EquipmentCategory;
+      return validateEquipmentMechanics(
+        createEquipmentMechanics(category, 'LEGENDARY', 'knowledge', [
+          `stress-${String(index).padStart(3, '0')}`,
+        ]),
+      );
+    });
+
+    expect(second).toEqual(first);
+    expect(first).toHaveLength(256);
+    expect(first.every((mechanics) => mechanics.balance.cost <= mechanics.balance.budget)).toBe(
+      true,
+    );
+  });
 });
 
 function worldConstitution(key: 'fantasy' | 'investigation' | 'cyberpunk'): WorldConstitution {

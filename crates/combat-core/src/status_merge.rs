@@ -510,6 +510,48 @@ mod tests {
     }
 
     #[test]
+    fn m11_long_combat_generated_content_stress_caps_thousands_of_stack_applications() {
+        let run = || {
+            let catalog = GameplayTagCatalog::v0_4_1();
+            let definition = definition(
+                "status-stress",
+                StatusStackMode::Add,
+                StatusRefreshPolicy::RefreshDuration,
+                64,
+                None,
+                4,
+            );
+            let mut current: Vec<StatusRuntime> = Vec::new();
+            for sequence in 1..=4_096 {
+                let incoming = runtime(
+                    &format!("incoming-{sequence:04}"),
+                    "status-stress",
+                    "shared",
+                    sequence,
+                    1,
+                    4,
+                    None,
+                );
+                match StatusMergeEngine::merge(&definition, &catalog, &current, incoming).unwrap() {
+                    StatusMergeOutcome::Applied { instance, .. } => current = vec![instance],
+                    StatusMergeOutcome::NoOp {
+                        reason: StatusMergeNoOpReason::AddAtMaximumWithNoDurationChange,
+                    } => {}
+                    outcome => panic!("unexpected stress merge outcome: {outcome:?}"),
+                }
+            }
+            current
+        };
+
+        let first = run();
+        let second = run();
+        assert_eq!(first, second);
+        assert_eq!(first.len(), 1);
+        assert_eq!(first[0].stack_count, 64);
+        assert_eq!(first[0].remaining_duration, Some(4));
+    }
+
+    #[test]
     fn replace_is_atomic_and_uses_the_incoming_identity_and_clocks() {
         let catalog = GameplayTagCatalog::v0_4_1();
         let definition = definition(

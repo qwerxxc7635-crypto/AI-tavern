@@ -1154,6 +1154,47 @@ mod tests {
     }
 
     #[test]
+    fn m11_long_combat_generated_content_stress_reopens_64_pending_reaction_checkpoints() {
+        let directory = tempfile::tempdir().unwrap();
+        let database_path = directory.path().join("combat.sqlite");
+        let mut store = CampaignStore::open(&database_path).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let initial = fixture_state();
+        let (live, ledger, _, _) = pending_reaction_state();
+        let events = vec![json!({"sequence": 1, "kind": "REACTION_WINDOW_OPENED"})];
+
+        for expected_revision in 1..=64 {
+            let receipt = store
+                .save_combat_checkpoint(CombatCheckpointWrite {
+                    campaign_id: &campaign.id,
+                    initial_state: &initial,
+                    state: &live,
+                    accepted_commands: ledger.commands(),
+                    events: &events,
+                    loop_guard: guard(),
+                })
+                .unwrap();
+            assert_eq!(receipt.persistence_revision, expected_revision);
+
+            drop(store);
+            store = CampaignStore::open(&database_path).unwrap();
+            let restored = store
+                .restore_combat_checkpoint(&live.combat_instance_id)
+                .unwrap();
+            assert_eq!(restored.state, live);
+            assert_eq!(restored.accepted_commands, ledger.commands());
+            assert_eq!(restored.checkpoint_hash, receipt.checkpoint_hash);
+            assert_eq!(
+                store
+                    .load_combat_replay_input(&live.combat_instance_id)
+                    .unwrap()
+                    .accepted_commands,
+                ledger.commands()
+            );
+        }
+    }
+
+    #[test]
     fn loop_guard_limits_are_frozen_instead_of_replaced_by_current_defaults() {
         let directory = tempfile::tempdir().unwrap();
         let store = CampaignStore::open(directory.path().join("combat.sqlite")).unwrap();
