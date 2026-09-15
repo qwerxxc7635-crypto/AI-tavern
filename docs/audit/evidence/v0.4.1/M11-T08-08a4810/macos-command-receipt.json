@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "command": ["pnpm", "test:combat-determinism"],
+  "startedAt": "2026-09-15T05:55:25.434Z",
+  "endedAt": "2026-09-15T05:55:31.220Z",
+  "exitCode": 0,
+  "signal": null,
+  "stdout": "\nrunning 1 test\ntest replay::tests::same_fixture_replays_roll_scheduler_ai_command_result_and_final_hash ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 0.02s\n\n\nrunning 1 test\ntest numeric::tests::shared_exact_value_fixture_locks_every_rounding_contract ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 337 filtered out; finished in 0.00s\n\n",
+  "stderr": "$ cargo test -p ember-combat-core replay::tests::same_fixture_replays_roll_scheduler_ai_command_result_and_final_hash -- --exact && cargo test -p ember-combat-core numeric::tests::shared_exact_value_fixture_locks_every_rounding_contract -- --exact\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.57s\n     Running unittests src/lib.rs (target/debug/deps/ember_combat_core-5798056347acf6db)\n    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.12s\n     Running unittests src/lib.rs (target/debug/deps/ember_combat_core-5798056347acf6db)\n"
+}

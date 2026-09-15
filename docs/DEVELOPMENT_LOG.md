@@ -6527,5 +6527,6 @@
 
 ### 验证与阻塞状态
 
-- 当前 macOS arm64（Darwin 23.6.0、rustc 1.97.1）两项 exact tests PASS；本地 command receipt 为 `artifacts/evidence/combat-determinism-macos-local.json`。Windows 环境及该分支的当前 CI run 均不存在，因此 Windows 严格记录为 `NOT_RUN/BLOCKED`。
+- 当前 macOS arm64（Darwin 23.6.0、rustc 1.97.1）针对源码提交 `08a481059f636ac0e877cb0918051ce9cba8693a` 的两项 exact tests PASS；脱敏 command receipt 与 manifest 持久化在 `docs/audit/evidence/v0.4.1/M11-T08-08a4810/`。Windows 环境及该分支的当前 CI run 均不存在，因此 Windows 严格记录为 `NOT_RUN/BLOCKED`。
+- 本地完整 `pnpm check` exit 0：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip）、Node 40/40、Rust workspace 524 PASS（另 1 credential-only ignore），archive interop TypeScript 16 + Rust 1 + TypeScript 16 全部通过；CI topology 6/6、M11-T08 exact fixture 2/2 另行复核通过。
 - M11-T08 DoD 要求 Release 前 macOS + Windows 双平台 evidence PASS，当前不满足。任务分支不合并到 `develop/v0.4.1-combat`，不继续 M11-T09。关闭阻塞需要用户授权推送该任务分支并运行 GitHub Actions，或提供同一 commit 的真实 Windows runner receipt。用户 `.gitignore` 保持未纳入任务改动。

@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "taskOrGateId": "M11-T08",
+  "sourceCommit": "08a481059f636ac0e877cb0918051ce9cba8693a",
+  "platform": {
+    "os": "macOS",
+    "kernel": "Darwin 23.6.0",
+    "architecture": "arm64",
+    "rustc": "1.97.1",
+    "node": "26.7.0",
+    "pnpm": "11.9.0"
+  },
+  "command": ["pnpm", "test:combat-determinism"],
+  "startedAt": "2026-09-15T05:55:25.434Z",
+  "completedAt": "2026-09-15T05:55:31.220Z",
+  "status": "BLOCKED",
+  "platformStatuses": {
+    "macOS": "PASS",
+    "Windows": "NOT_RUN/BLOCKED"
+  },
+  "providerMode": "not-used",
+  "artifacts": [
+    {
+      "path": "macos-command-receipt.json",
+      "sha256": "9c1ff200dcee91e457e30d634a7068fda2bd5ce9c6b2854ed265422ab6e6b9b3"
+    },
+    {
+      "path": "../../../../../crates/combat-core/test-fixtures/combat-numeric-v1.json",
+      "sha256": "5eab48395bfb2c96ce7c5040b5f285472bdd80bf95a1d3657f49f56098823ca8"
+    }
+  ],
+  "findingsSummary": {
+    "unresolved": 1,
+    "details": [
+      "Required Windows execution evidence is unavailable; CI configuration alone is not a PASS."
+    ]
+  }
+}

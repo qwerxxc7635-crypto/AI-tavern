@@ -22,9 +22,9 @@ The fixed-point fixture covers scale `1_000_000`, multiply-floor, scalar multipl
 
 | Platform | Environment | Evidence | Status |
 | --- | --- | --- | --- |
-| macOS arm64 | Darwin 23.6.0; rustc 1.97.1; Node 26.7.0; pnpm 11.9.0 | Local `artifacts/evidence/combat-determinism-macos-local.json`; both exact tests exit 0 | PASS |
+| macOS arm64 | Darwin 23.6.0; rustc 1.97.1; Node 26.7.0; pnpm 11.9.0 | `docs/audit/evidence/v0.4.1/M11-T08-08a4810/`; source `08a481059f636ac0e877cb0918051ce9cba8693a`; both exact tests exit 0 | PASS |
 | Windows | No Windows execution environment or current CI run was available for this task branch | None | NOT_RUN/BLOCKED |
 
 ## Gate status
 
-M11-T08 is **BLOCKED** and its release DoD is not satisfied. The branch must be executed by an actual Windows runner and its uploaded receipt must show exit code 0 against the same commit. A user-authorized push/CI run, or an independently supplied Windows receipt for the exact commit, can close the gate. Until then this task must not be marked complete or merged into `develop/v0.4.1-combat`, and strict task-order execution stops before M11-T09.
+M11-T08 is **BLOCKED** and its release DoD is not satisfied. The branch must be executed by an actual Windows runner and its uploaded receipt must show exit code 0 against the same source tree. A user-authorized push/CI run, or an independently supplied Windows receipt for the task branch, can close the gate. Until then this task must not be marked complete or merged into `develop/v0.4.1-combat`, and strict task-order execution stops before M11-T09.
