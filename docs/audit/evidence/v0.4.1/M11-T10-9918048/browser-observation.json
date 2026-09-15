@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "taskId": "M11-T10",
+  "sourceCommit": "9918048ba9e5c6df38f190aa4244d010353c6e29",
+  "observedAt": "2026-09-15T07:30:17Z",
+  "status": "BLOCKED",
+  "environment": {
+    "browser": "gstack headless Chromium",
+    "url": "http://127.0.0.1:4179/#/combat?campaignId=playtest-m11-cultivation",
+    "httpStatus": 200
+  },
+  "observedPlayerText": [
+    "未知路径",
+    "路径不可用",
+    "这条路还没有点灯。返回酒馆，继续查看当前可用内容。",
+    "返回酒馆"
+  ],
+  "combatUiPresent": false,
+  "consoleErrors": [],
+  "sourceFindings": {
+    "combatRouteRegistered": false,
+    "combatPathDeclared": false,
+    "combatPagePresent": false,
+    "combatServicePresent": false,
+    "tauriCombatCommandsRegistered": false,
+    "nativePersistenceMethodsExistButAreNotExposedToUi": true
+  },
+  "productionBuild": {
+    "command": "pnpm build:desktop",
+    "exitCode": 0,
+    "combatPageChunkPresent": false
+  },
+  "requiredCoverageStatuses": {
+    "cultivation": "NOT_RUN/BLOCKED",
+    "fantasy": "NOT_RUN/BLOCKED",
+    "scienceFiction": "NOT_RUN/BLOCKED",
+    "urban": "NOT_RUN/BLOCKED",
+    "action": "NOT_RUN/BLOCKED",
+    "status": "NOT_RUN/BLOCKED",
+    "resource": "NOT_RUN/BLOCKED",
+    "reaction": "NOT_RUN/BLOCKED",
+    "intent": "NOT_RUN/BLOCKED",
+    "result": "NOT_RUN/BLOCKED",
+    "return": "NOT_RUN/BLOCKED",
+    "saveReopen": "NOT_RUN/BLOCKED"
+  }
+}

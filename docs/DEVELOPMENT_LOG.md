@@ -6555,3 +6555,15 @@
 ### 验证与结束状态
 
 - 专项 receipt PASS：Core 6/6、Native SQLite 1/1、Vitest stress 3/3、replay/numeric exact 2/2。完整 `pnpm check` PASS：Vitest 200 files / 1248 tests（另 2 files / 6 tests baseline skip）、Node 40/40、Rust workspace 531 PASS、1 credential-only ignore，archive interop 双向通过。Receipt 与 manifest 位于 `docs/audit/evidence/v0.4.1/M11-T09-8d6dcf1/`，receipt SHA-256 为 `f85571d8ba900bc7a15e36a3c56047ba8deb35c802b76c078307d5fd864247f9`。无未解释 determinism/persistence finding；用户 `.gitignore` 保持未纳入提交。M11-T09=PASS；下一项严格为 M11-T10 Four-World Production Playtest。
+
+## 2026-09-15 — M11-T10 Four-World Production Playtest 阻塞记录
+
+### Production UI integration 缺失
+
+- 从 M11-T09 提交 `9918048` 创建 `task/M11-T10-four-world-production-playtest`。只读核对确认生产 `APP_PATHS`/`AppRoutes` 没有 Combat 路径，仓库没有 production `combat-page.tsx`/`combat-service.ts`，Tauri `generate_handler!` 也没有暴露既有 `CampaignStore` combat checkpoint/replay/result methods。
+- `pnpm build:desktop` exit 0，但产物中没有 Combat page chunk。使用 `browse` QA skill 启动真实 Vite 页面并访问 `#/combat?campaignId=playtest-m11-cultivation`，实际只显示“路径不可用……返回酒馆”，没有可操作 CombatScreen；console 无错误，这不是加载故障而是未注册产品路径。
+- 因四世界共用同一缺失入口，修仙/西幻/科幻/都市的 action/status/resource/reaction/intent/result/return/save-reopen 均严格记录为 `NOT_RUN/BLOCKED`。没有用 theme benchmark、JSDOM fixture 或硬编码状态轮播冒充真实 UI 完整战斗。
+
+### 阻塞状态
+
+- 要解除阻塞，需新增 production Combat route/page、typed UI service、Tauri combat commands 与连接 Core/Presentation/SQLite 的 orchestrator；这属于 M11-T10 playtest scope 之外的实现扩展，需要用户明确决定如何补排任务。Evidence 位于 `docs/audit/evidence/v0.4.1/M11-T10-9918048/`。M11-T10=BLOCKED，M11 Final Gate 未通过，不进入 M12。用户 `.gitignore` 保持未纳入提交。

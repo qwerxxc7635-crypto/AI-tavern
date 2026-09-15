@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "taskOrGateId": "M11-T10",
+  "sourceCommit": "9918048ba9e5c6df38f190aa4244d010353c6e29",
+  "status": "BLOCKED",
+  "platformStatuses": {
+    "macOSProductionBuild": "PASS",
+    "cultivationPlaytest": "NOT_RUN/BLOCKED",
+    "fantasyPlaytest": "NOT_RUN/BLOCKED",
+    "scienceFictionPlaytest": "NOT_RUN/BLOCKED",
+    "urbanPlaytest": "NOT_RUN/BLOCKED"
+  },
+  "artifacts": [
+    {
+      "path": "browser-observation.json",
+      "sha256": "d62f872d4e4c10de0eff1a03b52390e9040fb7cdf7ffb5d88fb30f5b32bb6b86"
+    }
+  ],
+  "findingsSummary": {
+    "unresolved": 1,
+    "details": [
+      "The production app has no Combat route/page/service/Tauri command integration, so no real UI battle or SQLite save/reopen flow is reachable."
+    ]
+  }
+}
