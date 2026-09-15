@@ -68,8 +68,19 @@ jobs:
       - name: Test Rust
         run: cargo test --workspace
 
+      - name: Cross-platform combat determinism fixture
+        run: node scripts/run-with-evidence.mjs --output artifacts/evidence/combat-determinism-${{ runner.os }}.json -- pnpm test:combat-determinism
+
       - name: Verify current TypeScript and Rust save interoperability
         run: pnpm archive:interop
+
+      - name: Upload cross-platform combat determinism evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ember-tavern-combat-determinism-${{ runner.os }}
+          path: artifacts/evidence/combat-determinism-${{ runner.os }}.json
+          if-no-files-found: error
 
   windows-release:
     needs: quality

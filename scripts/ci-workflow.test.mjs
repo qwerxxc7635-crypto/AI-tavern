@@ -15,6 +15,8 @@ test('runs shared quality gates on Windows and macOS', () => {
   assert.match(workflow, /pnpm archive:interop/u);
   assert.match(workflow, /cargo clippy --workspace --all-targets --all-features/u);
   assert.match(workflow, /cargo test --workspace/u);
+  assert.match(workflow, /pnpm test:combat-determinism/u);
+  assert.match(workflow, /combat-determinism-\$\{\{ runner\.os \}\}\.json/u);
 });
 
 test('keeps the local shared gate aligned with release, language and archive checks', () => {
@@ -59,7 +61,7 @@ test('pins every CI action and does not persist checkout credentials', () => {
   const actionReferences = [...workflow.matchAll(/^\s*uses:\s*([^\s#]+)/gmu)].map(
     ([, reference]) => reference,
   );
-  assert.equal(actionReferences.length, 14);
+  assert.equal(actionReferences.length, 15);
   for (const reference of actionReferences) {
     assert.match(reference, /@[0-9a-f]{40}$/u, `CI action is not commit-pinned: ${reference}`);
   }

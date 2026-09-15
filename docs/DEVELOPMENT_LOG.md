@@ -6517,3 +6517,15 @@
 ### 验证与结束状态
 
 - Core 338/338、native combat persistence 9/9、native save archive 14/14、TypeScript save/Compatibility UX 35/35 与 archive interop 双向专项 PASS，0 failed/ignored。Prettier、ESLint、TypeScript noEmit、zh-CN player-language、FINAL assets、Rustfmt、Clippy 与 `git diff --check` PASS；完整 `pnpm check` PASS：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip），Node 40/40，Rust workspace 524 PASS、1 credential-only ignore，archive interop 双向通过。用户 `.gitignore` 保持未纳入提交。M11-T07 Gate G Persistence / Release suite=PASS；最终 stress 条件仍待 M11-T09，下一项严格为 M11-T08 Cross-Platform Determinism。
+
+## 2026-09-13 — M11-T08 Cross-Platform Determinism 阻塞记录
+
+### 同 fixture 的 golden contract 与双平台 CI 入口
+
+- 从 M11-T07 提交 `b723851` 创建 `task/M11-T08-cross-platform-determinism`。将 replay fixture 的 roll、scheduler event、events digest、trace digest、final state hash 与 result 从“同进程两次相等”加强为逐字段 golden 断言，并复用 committed numeric fixture 校验全部 fixed-point exact values。
+- 新增 `pnpm test:combat-determinism`，CI `quality` matrix 会在 `macos-latest` 与 `windows-latest` 运行同一命令，并分别上传带 exit code/stdout/stderr 的 evidence receipt。CI 配置存在不等于平台执行通过。
+
+### 验证与阻塞状态
+
+- 当前 macOS arm64（Darwin 23.6.0、rustc 1.97.1）两项 exact tests PASS；本地 command receipt 为 `artifacts/evidence/combat-determinism-macos-local.json`。Windows 环境及该分支的当前 CI run 均不存在，因此 Windows 严格记录为 `NOT_RUN/BLOCKED`。
+- M11-T08 DoD 要求 Release 前 macOS + Windows 双平台 evidence PASS，当前不满足。任务分支不合并到 `develop/v0.4.1-combat`，不继续 M11-T09。关闭阻塞需要用户授权推送该任务分支并运行 GitHub Actions，或提供同一 commit 的真实 Windows runner receipt。用户 `.gitignore` 保持未纳入任务改动。

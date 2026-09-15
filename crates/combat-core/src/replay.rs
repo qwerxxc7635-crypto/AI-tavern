@@ -399,11 +399,49 @@ mod tests {
         assert_eq!(first, second);
         assert_eq!(first.combat_result, Some(CombatResultType::Aborted));
         assert_eq!(first.accepted_command_count, 2);
-        assert_eq!(first.step_traces[0].rolls.len(), 1);
-        assert_eq!(first.step_traces[0].scheduler_executions.len(), 1);
+        let rolls = first
+            .step_traces
+            .iter()
+            .flat_map(|step| step.rolls.iter().cloned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            rolls,
+            vec![CombatReplayRoll {
+                roll_id: "utility-attack-roll".into(),
+                channel: RngChannel::Resolution,
+                sides: 20,
+                value: 8,
+                cursor_after: 1,
+            }]
+        );
+        let scheduler_executions = first
+            .step_traces
+            .iter()
+            .flat_map(|step| step.scheduler_executions.iter().cloned())
+            .collect::<Vec<_>>();
+        assert_eq!(
+            scheduler_executions,
+            vec![CombatReplaySchedulerExecution {
+                event_chain_id: "replay-chain".into(),
+                sequence: 1,
+                depth: 1,
+                source_stable_id: "companion".into(),
+                effect_stable_id: "utility-effect-a".into(),
+            }]
+        );
+        assert_eq!(
+            digest(&serde_json::to_vec(&scheduler_executions).unwrap()),
+            "a5a67467868ee57528ddba0f05be597879459ed869e33d4aeb33479fb7a3e818"
+        );
         assert_eq!(first.final_rng.streams[1].cursor, 1);
-        assert_eq!(first.final_state_hash, second.final_state_hash);
-        assert_eq!(first.trace_digest, second.trace_digest);
+        assert_eq!(
+            first.trace_digest,
+            "5edca44ce0b56d98d2575632f445287c28fceadfa04a7de14aec2ce207ff6031"
+        );
+        assert_eq!(
+            first.final_state_hash,
+            "21aaf52c175ccd4b2ec412c1e26937ecd2320c2e5aa66809a21f0f7d97387656"
+        );
     }
 
     #[test]
