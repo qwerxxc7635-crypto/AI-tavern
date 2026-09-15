@@ -22,9 +22,9 @@ The fixed-point fixture covers scale `1_000_000`, multiply-floor, scalar multipl
 
 | Platform | Environment | Evidence | Status |
 | --- | --- | --- | --- |
-| macOS arm64 | Darwin 23.6.0; rustc 1.97.1; Node 26.7.0; pnpm 11.9.0 | `docs/audit/evidence/v0.4.1/M11-T08-08a4810/`; source `08a481059f636ac0e877cb0918051ce9cba8693a`; both exact tests exit 0 | PASS |
-| Windows | No Windows execution environment or current CI run was available for this task branch | None | NOT_RUN/BLOCKED |
+| macOS | GitHub-hosted `macos-latest` | CI run `34937746643`, job `104279266194`; artifact `ember-tavern-combat-determinism-macOS`, SHA-256 `00616ab4abf51c2a7bbff3bb5d7a11274b7b17f00005c24b78311efdfccdab67`, exit 0 | PASS |
+| Windows | GitHub-hosted `windows-latest` | CI run `34937746643`, job `104279265927`; artifact `ember-tavern-combat-determinism-Windows`, SHA-256 `60e0181304272ef682b158c4b9bf7633b4949b4ecffde001735f9e8fce1fdfbc`, exit 0 | PASS |
 
 ## Gate status
 
-M11-T08 is **BLOCKED** and its release DoD is not satisfied. The branch must be executed by an actual Windows runner and its uploaded receipt must show exit code 0 against the same source tree. A user-authorized push/CI run, or an independently supplied Windows receipt for the task branch, can close the gate. Until then this task must not be marked complete or merged into `develop/v0.4.1-combat`, and strict task-order execution stops before M11-T09.
+M11-T08 is **PASS**. Both platform jobs ran source commit `a5d5e4c4aac44396725e51a7104dcf28db6996a5`, asserted the same committed roll/event/hash/result/fixed-point golden values, exited 0, and uploaded independently hashed receipts. Durable evidence is recorded in `docs/audit/evidence/v0.4.1/M11-T08-a5d5e4c/`. This supersedes, but does not delete, the earlier `NOT_RUN/BLOCKED` evidence.

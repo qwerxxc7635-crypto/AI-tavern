@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "taskOrGateId": "M11-T08",
+  "sourceCommit": "a5d5e4c4aac44396725e51a7104dcf28db6996a5",
+  "platform": ["macOS", "Windows"],
+  "command": ["pnpm", "test:combat-determinism"],
+  "startedAt": "2026-09-15T06:46:40.707Z",
+  "completedAt": "2026-09-15T06:59:32.557Z",
+  "status": "PASS",
+  "providerMode": "not-used",
+  "ci": {
+    "runId": 34937746643,
+    "runUrl": "https://github.com/qwerxxc7635-crypto/AI-tavern/actions/runs/34937746643",
+    "headSha": "a5d5e4c4aac44396725e51a7104dcf28db6996a5",
+    "jobs": [
+      {
+        "platform": "macOS",
+        "jobId": 104279266194,
+        "conclusion": "success",
+        "determinismStep": "success",
+        "startedAt": "2026-09-15T06:46:40Z",
+        "completedAt": "2026-09-15T06:47:07Z"
+      },
+      {
+        "platform": "Windows",
+        "jobId": 104279265927,
+        "conclusion": "success",
+        "determinismStep": "success",
+        "startedAt": "2026-09-15T06:58:59Z",
+        "completedAt": "2026-09-15T06:59:32Z"
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "platform": "macOS",
+      "artifactId": 10384067412,
+      "name": "ember-tavern-combat-determinism-macOS",
+      "downloadedFile": "combat-determinism-macOS.json",
+      "sha256": "00616ab4abf51c2a7bbff3bb5d7a11274b7b17f00005c24b78311efdfccdab67",
+      "exitCode": 0
+    },
+    {
+      "platform": "Windows",
+      "artifactId": 10383853842,
+      "name": "ember-tavern-combat-determinism-Windows",
+      "downloadedFile": "combat-determinism-Windows.json",
+      "sha256": "60e0181304272ef682b158c4b9bf7633b4949b4ecffde001735f9e8fce1fdfbc",
+      "exitCode": 0
+    },
+    {
+      "path": "../../../../../crates/combat-core/test-fixtures/combat-numeric-v1.json",
+      "sha256": "5eab48395bfb2c96ce7c5040b5f285472bdd80bf95a1d3657f49f56098823ca8"
+    }
+  ],
+  "golden": {
+    "roll": {
+      "rollId": "utility-attack-roll",
+      "channel": "resolution",
+      "sides": 20,
+      "value": 8,
+      "cursorAfter": 1
+    },
+    "eventsDigest": "a5a67467868ee57528ddba0f05be597879459ed869e33d4aeb33479fb7a3e818",
+    "traceDigest": "5edca44ce0b56d98d2575632f445287c28fceadfa04a7de14aec2ce207ff6031",
+    "finalStateHash": "21aaf52c175ccd4b2ec412c1e26937ecd2320c2e5aa66809a21f0f7d97387656",
+    "result": "ABORTED"
+  },
+  "findingsSummary": {
+    "unresolved": 0,
+    "details": []
+  },
+  "supersedes": "../M11-T08-08a4810/manifest.json"
+}

@@ -6530,3 +6530,15 @@
 - 当前 macOS arm64（Darwin 23.6.0、rustc 1.97.1）针对源码提交 `08a481059f636ac0e877cb0918051ce9cba8693a` 的两项 exact tests PASS；脱敏 command receipt 与 manifest 持久化在 `docs/audit/evidence/v0.4.1/M11-T08-08a4810/`。Windows 环境及该分支的当前 CI run 均不存在，因此 Windows 严格记录为 `NOT_RUN/BLOCKED`。
 - 本地完整 `pnpm check` exit 0：Vitest 200 files / 1245 tests（另 2 files / 6 tests baseline skip）、Node 40/40、Rust workspace 524 PASS（另 1 credential-only ignore），archive interop TypeScript 16 + Rust 1 + TypeScript 16 全部通过；CI topology 6/6、M11-T08 exact fixture 2/2 另行复核通过。
 - M11-T08 DoD 要求 Release 前 macOS + Windows 双平台 evidence PASS，当前不满足。任务分支不合并到 `develop/v0.4.1-combat`，不继续 M11-T09。关闭阻塞需要用户授权推送该任务分支并运行 GitHub Actions，或提供同一 commit 的真实 Windows runner receipt。用户 `.gitignore` 保持未纳入任务改动。
+
+## 2026-09-15 — M11-T08 完成 Cross-Platform Determinism
+
+### 同源码提交的 macOS / Windows 真实 runner evidence
+
+- 用户授权继续后，将 `task/M11-T08-cross-platform-determinism` 的 `a5d5e4c4aac44396725e51a7104dcf28db6996a5` 推送到 origin。GitHub Actions run `34937746643` 的 `quality (macos-latest)` job `104279266194` 与 `quality (windows-latest)` job `104279265927` 均为 success。
+- 两个平台均运行 `pnpm test:combat-determinism`，逐值校验 roll、scheduler event/events digest、trace digest、final state hash、`ABORTED` result 与 committed fixed-point fixture，均 exit 0。下载后 receipt SHA-256 分别为 macOS `00616ab4abf51c2a7bbff3bb5d7a11274b7b17f00005c24b78311efdfccdab67`、Windows `60e0181304272ef682b158c4b9bf7633b4949b4ecffde001735f9e8fce1fdfbc`。
+- 持久化 PASS manifest 位于 `docs/audit/evidence/v0.4.1/M11-T08-a5d5e4c/`，并显式 supersede、但不删除先前 Windows `NOT_RUN/BLOCKED` 记录。GitHub Actions 的 Node 20 deprecation annotation 为非阻塞维护提示；本轮 actions 实际由 Node 24 执行，未影响 gate。
+
+### 验证与结束状态
+
+- 本地完整 `pnpm check` exit 0；远端 macOS/Windows quality 全步骤 PASS，两个 determinism evidence artifact 均已下载、解析、复算 SHA-256，命令一致、exit code 均为 0。用户 `.gitignore` 保持未纳入提交。M11-T08=PASS；下一项严格为 M11-T09 Long Combat / Generated Content Stress。
