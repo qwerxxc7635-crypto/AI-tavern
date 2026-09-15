@@ -6542,3 +6542,16 @@
 ### 验证与结束状态
 
 - 本地完整 `pnpm check` exit 0；远端 macOS/Windows quality 全步骤 PASS，两个 determinism evidence artifact 均已下载、解析、复算 SHA-256，命令一致、exit code 均为 0。用户 `.gitignore` 保持未纳入提交。M11-T08=PASS；下一项严格为 M11-T09 Long Combat / Generated Content Stress。
+
+## 2026-09-15 — M11-T09 完成 Long Combat / Generated Content Stress
+
+### 长战斗、深链、批量内容与 UI 大集合
+
+- 从 M11-T08 提交 `29fd0e1` 创建 `task/M11-T09-long-combat-generated-content-stress`，实现提交为 `8d6dcf19d1a745bb8e879da6388ce6a532406c5a`。新增 `pnpm test:combat-stress` 单一入口和 fail-on-overwrite JSON receipt，将长回合、Trigger、Reaction、Status、Reinforcement、SQLite save/resume、generated content、exploit、equipment、UI overflow 与 replay 放进同一可重复门禁。
+- Core 压力覆盖 128 轮/384 个普通 owner turns、允许 32 层并在第 33 层安全 Aborted 的 trigger chain、128 个 Ask Reaction、4096 次状态叠加并稳定封顶 64、64 个预分配增援，以及 32 abilities + 64 statuses 的最大配置 catalog；递归 Damage/AP exploit 由真实 `CombatBuildValidator` 拒绝。
+- Native SQLite 在 PendingReaction 未决时连续 64 次保存、关闭、重开并逐次核对 checkpoint hash、accepted commands 与 replay input。Application candidate transaction 接受 192 个 ability/status/equipment-shaped fixtures，并验证 64 个 rejected fixtures 不增加 candidate/domain rows；Equipment validator 对 256 个程序定值定义重复运行完全一致。
+- CombatScreen 以 48 timeline entries、48 combatants、128 statuses、128 abilities、96 enemy intents、512 log entries 验证大集合完整渲染、末项目标选择、structured command submission 与折叠日志可操作。该项明确是 JSDOM render/interaction 证据，不冒充真实浏览器像素性能；generated content 明确是 deterministic fixtures，真实 provider 状态为 `NOT_RUN`。
+
+### 验证与结束状态
+
+- 专项 receipt PASS：Core 6/6、Native SQLite 1/1、Vitest stress 3/3、replay/numeric exact 2/2。完整 `pnpm check` PASS：Vitest 200 files / 1248 tests（另 2 files / 6 tests baseline skip）、Node 40/40、Rust workspace 531 PASS、1 credential-only ignore，archive interop 双向通过。Receipt 与 manifest 位于 `docs/audit/evidence/v0.4.1/M11-T09-8d6dcf1/`，receipt SHA-256 为 `f85571d8ba900bc7a15e36a3c56047ba8deb35c802b76c078307d5fd864247f9`。无未解释 determinism/persistence finding；用户 `.gitignore` 保持未纳入提交。M11-T09=PASS；下一项严格为 M11-T10 Four-World Production Playtest。

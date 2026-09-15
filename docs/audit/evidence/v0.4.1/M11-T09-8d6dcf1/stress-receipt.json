@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "taskId": "M11-T09",
+  "sourceCommit": "8d6dcf19d1a745bb8e879da6388ce6a532406c5a",
+  "startedAt": "2026-09-15T07:19:36.984Z",
+  "completedAt": "2026-09-15T07:19:47.844Z",
+  "status": "PASS",
+  "evidenceKind": "DETERMINISTIC_FIXTURE",
+  "realProviderStatus": "NOT_RUN",
+  "uiOverflowMode": "JSDOM_RENDER_AND_INTERACTION",
+  "platform": {
+    "os": "darwin",
+    "architecture": "arm64"
+  },
+  "coverage": {
+    "rounds": 128,
+    "triggerDepthAccepted": 32,
+    "triggerDepthOverflow": 33,
+    "reactionCandidates": 128,
+    "statusApplications": 4096,
+    "reinforcements": 64,
+    "checkpointReopens": 64,
+    "generatedCombatCandidatesAccepted": 192,
+    "generatedCombatCandidatesRejected": 64,
+    "generatedEquipmentDefinitions": 256,
+    "uiTimelineEntries": 48,
+    "uiCombatants": 48,
+    "uiStatuses": 128,
+    "uiAbilities": 128,
+    "uiEnemyIntents": 96,
+    "uiLogEntries": 512
+  },
+  "checks": [
+    {
+      "command": "cargo test -p ember-combat-core m11_long_combat_generated_content_stress -- --nocapture",
+      "durationMs": 547,
+      "outputSha256": "756ee7ffc3c97b4b43ffb9c1900ead51cf1eb926663a6927ad4f9226b2c97976"
+    },
+    {
+      "command": "cargo test -p ember-native-bridge combat_persistence::tests::m11_long_combat_generated_content_stress_reopens_64_pending_reaction_checkpoints -- --exact --nocapture",
+      "durationMs": 5035,
+      "outputSha256": "9330c7664f0014820e3e01468439615f3e3bf5bd409433214c26ebe8f0916457"
+    },
+    {
+      "command": "pnpm exec vitest run packages/application/src/combat-content-candidate-policy.test.ts packages/domain/src/semantic-equipment-validator.test.ts windows-app/src/combat-screen.test.tsx -t m11 long combat generated content stress --maxWorkers=1",
+      "durationMs": 4206,
+      "outputSha256": "9799b6252f8b45dfcbc789012f45b9861307051b8c23fe66f63d6fbb7371d454"
+    },
+    {
+      "command": "pnpm test:combat-determinism",
+      "durationMs": 1071,
+      "outputSha256": "7b1d0ea5e7ff9b36f8594521fe281bbba03d77b6c8b4d9d42209819ba2941e22"
+    }
+  ]
+}

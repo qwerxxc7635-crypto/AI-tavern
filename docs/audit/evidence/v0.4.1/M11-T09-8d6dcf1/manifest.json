@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "taskId": "M11-T09",
+  "sourceCommit": "8d6dcf19d1a745bb8e879da6388ce6a532406c5a",
+  "status": "PASS",
+  "evidenceKind": "DETERMINISTIC_FIXTURE",
+  "realProviderStatus": "NOT_RUN",
+  "stressReceipt": {
+    "path": "stress-receipt.json",
+    "sha256": "f85571d8ba900bc7a15e36a3c56047ba8deb35c802b76c078307d5fd864247f9"
+  },
+  "fullGate": {
+    "command": "pnpm check",
+    "exitCode": 0,
+    "vitestFilesPassed": 200,
+    "vitestTestsPassed": 1248,
+    "nodeTestsPassed": 40,
+    "rustTestsPassed": 531,
+    "rustCredentialOnlyIgnored": 1,
+    "archiveInterop": "PASS"
+  },
+  "findings": []
+}
