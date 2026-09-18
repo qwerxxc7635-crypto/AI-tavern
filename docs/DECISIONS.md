@@ -5306,3 +5306,23 @@ Windows 存档页对导入和导出分别提供固定中文 Compatibility Gate�
 - 内部 code 仍保留在 IPC contract 中以支持确定性投影和自动测试，但 UI 不拼接后端 message、code、schema id 或 stack trace。
 - Compatibility failure 不提供“按新规则继续”、fallback 或盲目重试操作；真正的 migration/version support 仍只能在持久化层显式实现。
 - 本决定不改变 M10-T07 的 archive transaction 与 rollback 语义，只补齐玩家可见 Gate。
+
+## DEC-246：生产 Combat 页面只提交结构化命令，原生 Session 复用 Canonical Core 与 SQLite 边界
+
+- 日期：2026-09-19
+- 状态：已采纳
+- 依据：V5.2 §4/§8/§11/§17、M11-T10，DEC-219/DEC-240/DEC-242
+
+### 决定
+
+生产 `/combat` 页面只接收 `CombatViewModel`、渲染玩家可见中文，并通过既有 `CombatCommandEnvelope` 提交 Reaction 与 Ability 命令；React 不推导 HP、AP、资源、Status、Intent 或 CombatResult，也不做 optimistic state write。Tauri 只暴露 start/restore、submit、complete 三个 typed commands，错误在命令边界投影为固定中文安全分类。
+
+原生 `CampaignStore` 的 Combat Session 是产品编排层，不另建第二套规则引擎。它复用 `CombatSubmissionService`、`CostReservationModel`、`CanonicalReactionCore`、`CanonicalEventChainScheduler`、`EncounterRuleExecutor`、`WorldCombatProfileResolver`、`StatusMergeEngine`、`TerminalOutcomeArbitrator`、`RuntimeCommitContract` 与 `CombatViewModelProjector`。四个世界只提供角色、能力、资源、Reaction、Status 与 Damage Channel 数据；Command、checkpoint、result commit 和 presentation contract 共用同一路径。
+
+每次被接受的玩家命令都在返回 replacement ViewModel 前写入 `ActiveCombatSave`；重新打开必须从 SQLite checkpoint 恢复同一 state、AcceptedCommands、event evidence 和 persistence revision。胜负结果先由 Core 确认，页面点击返回时才调用 canonical result transaction，写入 BattleRecord/`COMBAT_FINISHED` 并幂等清理 active checkpoint。当前受控 production playtest 不包含 campaign domain reward，所以 domain mutation body 为空，但 result marker、ledger fact 与 cleanup 仍必须同现有事务契约执行。
+
+### 影响与边界
+
+- SQLite 继续是唯一 durable truth；UI、Theme 与 AI 都不能直接修改战斗状态。
+- `CombatSessionWorld` 的分支只选择数据和既有 World Profile，不复制各世界完整 lifecycle；四 Profile 的完整机制差异继续由 Gate D 的 canonical tests 负责。
+- M11-T10 的 unit/JSDOM/build 结果只验证边界，不替代四世界真实 `.app` action/status/resource/reaction/intent/result/return/save-reopen 实机证据。

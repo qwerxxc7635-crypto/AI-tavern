@@ -9,6 +9,7 @@ path = "src/lib.rs"
 
 [dependencies]
 ember-combat-core = { path = "../combat-core" }
+ember-combat-presentation = { path = "../combat-presentation" }
 ember-secure-http = { path = "../secure-http" }
 ember-platform-services = { path = "../platform-services" }
 regex = "1.12.3"

@@ -16,6 +16,7 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 ember-native-bridge = { path = "../../crates/native-bridge" }
+ember-combat-core = { path = "../../crates/combat-core" }
 ember-platform-services = { path = "../../crates/platform-services" }
 ember-provider-openai-compatible = { path = "../../crates/provider-openai-compatible" }
 ember-secure-secrets = { path = "../../crates/secure-secrets" }

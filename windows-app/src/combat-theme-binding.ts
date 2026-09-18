@@ -10,6 +10,24 @@ export interface CombatThemeBinding {
   readonly warnings: readonly CombatThemeWarning[];
 }
 
+export function combatThemeForWorld(
+  world: 'CULTIVATION' | 'FANTASY' | 'SCI_FI' | 'URBAN',
+): CombatThemeBinding {
+  const themes = {
+    CULTIVATION: ['cultivation-ink', '#d7b56d', '#15231f'],
+    FANTASY: ['fantasy-ember', '#f3a45b', '#261812'],
+    SCI_FI: ['sci-fi-neon', '#62d8f2', '#101d29'],
+    URBAN: ['urban-noir', '#d7cfbd', '#202124'],
+  } as const;
+  const [themeId, accent, surface] = themes[world];
+  return Object.freeze({
+    themeId,
+    layoutPreset: 'TACTICAL_DUEL',
+    cssVariables: Object.freeze({ '--combat-accent': accent, '--combat-surface': surface }),
+    warnings: Object.freeze([]),
+  });
+}
+
 export async function bindCombatThemePackage(
   themePackage: CombatThemePackage,
   resolver: CombatThemeAssetResolver,

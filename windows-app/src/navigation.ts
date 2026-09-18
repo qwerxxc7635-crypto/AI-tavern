@@ -11,6 +11,7 @@ export const APP_PATHS = Object.freeze({
   npc: '/npc',
   quests: '/quests',
   adventure: '/adventure',
+  combat: '/combat',
   character: '/character',
   archives: '/archives',
   my: '/my',

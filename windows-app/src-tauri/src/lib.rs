@@ -18,6 +18,7 @@ use ember_native_bridge::{
     CampaignRecoverySnapshot, CampaignStore, CampaignStoreError, CampaignSummary, CapabilitySource,
     CareerPool, CareerPoolGenerationCommit, CharacterCandidateConfirm, CharacterCompletionCommit,
     CharacterCreationSnapshot, CharacterRulesState, CharacterTraitGenerationCommit,
+    CombatSessionCompletion, CombatSessionError, CombatSessionSnapshot, CombatSessionWorld,
     CredentialAction, CredentialCleanupReason, DialogueSuggestionCommit,
     DialogueSuggestionPreparation, DialogueSuggestionPrepareCommand, DialogueSuggestionSet,
     DirectorBudgetAdmitCommand, DirectorBudgetSnapshot, DynamicLocationGenerationCommit,
@@ -242,6 +243,25 @@ impl From<CampaignStoreError> for CommandError {
             | CampaignStoreError::Io(_) => Self {
                 code: "LOCAL_STORAGE_UNAVAILABLE",
                 message: "暂时无法访问本地存档。",
+            },
+        }
+    }
+}
+
+impl From<CombatSessionError> for CommandError {
+    fn from(error: CombatSessionError) -> Self {
+        match error {
+            CombatSessionError::InvalidInput | CombatSessionError::CommandRejected => Self {
+                code: "COMBAT_COMMAND_REJECTED",
+                message: "当前战斗状态不允许执行该操作。",
+            },
+            CombatSessionError::InvalidState => Self {
+                code: "COMBAT_STATE_INVALID",
+                message: "战斗状态未通过本地规则校验。",
+            },
+            CombatSessionError::Persistence(_) => Self {
+                code: "LOCAL_STORAGE_UNAVAILABLE",
+                message: "暂时无法访问本地战斗存档。",
             },
         }
     }
@@ -1127,6 +1147,40 @@ fn campaign_recovery_restore(
 }
 
 #[tauri::command]
+fn combat_session_start(
+    campaign_id: String,
+    world: CombatSessionWorld,
+    store: State<'_, CampaignStore>,
+) -> Result<CombatSessionSnapshot, CommandError> {
+    store
+        .start_or_restore_combat_session(&campaign_id, world)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn combat_session_submit(
+    campaign_id: String,
+    world: CombatSessionWorld,
+    command: ember_combat_core::CombatCommandEnvelope,
+    store: State<'_, CampaignStore>,
+) -> Result<CombatSessionSnapshot, CommandError> {
+    store
+        .submit_combat_session_command(&campaign_id, world, command)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
+fn combat_session_complete(
+    campaign_id: String,
+    world: CombatSessionWorld,
+    store: State<'_, CampaignStore>,
+) -> Result<CombatSessionCompletion, CommandError> {
+    store
+        .complete_combat_session(&campaign_id, world)
+        .map_err(Into::into)
+}
+
+#[tauri::command]
 fn rules_state_get(
     player_character_id: String,
     store: State<'_, CampaignStore>,
@@ -1902,6 +1956,9 @@ pub fn run() {
             campaign_delete,
             campaign_recovery_get,
             campaign_recovery_restore,
+            combat_session_start,
+            combat_session_submit,
+            combat_session_complete,
             rules_state_get,
             rules_apply,
             save_archive_inspect,

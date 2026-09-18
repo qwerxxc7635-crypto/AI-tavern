@@ -806,6 +806,7 @@ name = "ember-native-bridge"
 version = "0.3.0"
 dependencies = [
  "ember-combat-core",
+ "ember-combat-presentation",
  "ember-platform-services",
  "ember-secure-http",
  "regex",
@@ -873,6 +874,7 @@ dependencies = [
 name = "ember-tavern-windows"
 version = "0.3.0"
 dependencies = [
+ "ember-combat-core",
  "ember-native-bridge",
  "ember-platform-services",
  "ember-provider-openai-compatible",

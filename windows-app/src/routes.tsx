@@ -38,6 +38,9 @@ const QuestsPage = lazy(() =>
 const AdventurePage = lazy(() =>
   import('./adventure-page.js').then(({ AdventurePage: page }) => ({ default: page })),
 );
+const CombatPage = lazy(() =>
+  import('./combat-page.js').then(({ CombatPage: page }) => ({ default: page })),
+);
 const CharacterPage = lazy(() =>
   sectionPages().then(({ CharacterPage: page }) => ({ default: page })),
 );
@@ -95,6 +98,7 @@ export function AppRoutes() {
           <Route path="tavern" element={<TavernPage />} />
           <Route path="quests" element={<QuestsPage />} />
           <Route path="adventure" element={<AdventurePage />} />
+          <Route path="combat" element={<CombatPage />} />
           <Route path="character" element={<CharacterPage />} />
           <Route path="archives" element={<ArchivesPage />} />
         </Route>
@@ -116,9 +120,11 @@ export function AppShell() {
     WINDOWS_NAVIGATION.find(({ path }) => path === location.pathname) ??
     (location.pathname === APP_PATHS.npc
       ? { label: playerText.navigation.npcDialogue }
-      : location.pathname === APP_PATHS.settings
-        ? { label: playerText.navigation.modelSettings }
-        : undefined);
+      : location.pathname === APP_PATHS.combat
+        ? { label: '战斗' }
+        : location.pathname === APP_PATHS.settings
+          ? { label: playerText.navigation.modelSettings }
+          : undefined);
   const campaignId = routeContext.ok ? (routeContext.context.campaignId ?? null) : null;
   const breadcrumbs = breadcrumbsFor(location.pathname, campaignId);
 
