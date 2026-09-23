@@ -6567,3 +6567,16 @@
 ### 阻塞状态
 
 - 要解除阻塞，需新增 production Combat route/page、typed UI service、Tauri combat commands 与连接 Core/Presentation/SQLite 的 orchestrator；这属于 M11-T10 playtest scope 之外的实现扩展，需要用户明确决定如何补排任务。Evidence 位于 `docs/audit/evidence/v0.4.1/M11-T10-9918048/`。M11-T10=BLOCKED，M11 Final Gate 未通过，不进入 M12。用户 `.gitignore` 保持未纳入提交。
+
+## 2026-09-23 — M11-T10 完成 Four-World Production Playtest
+
+### Production Combat 纵向切片与四世界真实 UI
+
+- 用户明确授权解除先前 blocker 后，在同一任务分支实现 production `/combat` route、typed Tauri commands、Native session orchestrator 与 SQLite checkpoint/result lifecycle；实现提交为 `504073649e6d286830e659a7497c9f0d65a09d66`。UI 只提交结构化命令，Native 复用 canonical Core、Presentation 与 `CampaignStore`，四世界差异仅来自 data-driven world/theme 配置。
+- 从该源码提交构建四个 route-specific macOS release `.app` shell，并通过真实应用 accessibility tree 操作修仙、西幻、科幻、都市战斗。每轮均覆盖敌方意图、Ask Reaction、世界专属技能与目标、资源/AP 消耗、状态与 Combat Log、胜利结果及返回流程；四世界共用同一生产实现，没有使用 JSDOM、预览页或写死结果代替真实 UI。
+- 每个世界在第一次攻击后关闭并重开 `.app`，SQLite revision 3 与 checkpoint hash 逐字节保持不变；第二次攻击后均提交唯一 deterministic `resultCommitId`、canonical delta hash、event digest、`COMBAT_STARTED`/`COMBAT_FINISHED` ledger facts，并清除 `active_combat_saves`。精确身份和哈希记录在 `docs/audit/evidence/v0.4.1/M11-T10-5040736/`。
+
+### 验证与结束状态
+
+- UI 完成后串行执行 `pnpm test:combat-determinism && pnpm test:combat-stress && pnpm check && pnpm build:desktop`，总命令 exit 0。Determinism 2/2；stress Core 6/6、Native SQLite 1/1、UI 3/3、replay/numeric 2/2；完整门禁 Vitest 202 files PASS / 2 baseline skip、1252 tests PASS / 6 baseline skip，Node 40/40，Core 344、Presentation 16、Native 119、platform 5、provider 19、secure-http 12、secure-secrets 3、Tauri 14（另 1 credential-only ignore），archive interop 双向通过；production desktop build 输出 Combat chunk。
+- 先前提交 `9918048` 的 BLOCKED evidence 保留为当时真实状态，并由新 PASS evidence 显式 supersede。用户 `.gitignore` 保持未纳入任务提交。M11-T10=PASS，M11 Final Gate=PASS；下一项严格为 M12-T01 First Independent Full Audit。

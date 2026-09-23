@@ -95,7 +95,28 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M9-T05 — Fantasy Theme Integration | PASS | 2026-09-12 | FINAL 27 RGBA assets + fantasy-default manifest；共享 Theme selectors 复用，Mana/Stamina 与 Fantasy result variants 专属；完整 binding 零 warning |
 | M9-T06 — Sci-Fi Theme Integration | PASS | 2026-09-12 | FINAL 28 RGBA assets + scifi-default manifest；AP Empty 1254² + exact digest；Shield meter/Energy/Heat 与 Sci-Fi result variants 接入共享 CombatScreen |
 | M9-T07 — Urban Theme Integration | PASS | 2026-09-12 | FINAL 27 RGBA assets + urban-default manifest；Stamina/Focus、扁平 Tactical 与 Urban results 接入共享 CombatScreen；完整 binding 零 warning |
-| M9-T08 — Final Runtime Asset Package / Performance Gate | IN_PROGRESS | 2026-09-12 | 下一项；FINAL 唯一来源、119 assets、manifest/hash/naming/duplicate/missing slots 与 theme load/memory/frame 性能 Gate |
+| M9-T08 — Final Runtime Asset Package / Performance Gate | PASS | 2026-09-12 | FINAL 唯一来源；119 assets、manifest/hash/naming/duplicate/missing slots 与真实浏览器 theme load/memory/frame 收据通过 |
+| M9 Gate — Gate F Theme / Asset | PASS | 2026-09-12 | M9-T01..T08 独立验收；FINAL assets 与四 Theme runtime/performance 闭环 |
+| M10-T01 — BattleRecord / ActiveCombatSave Schema | PASS | 2026-09-13 | schema 33；deterministic BattleRecord identity + replaceable ActiveCombatSave，SQLite constraints fail closed |
+| M10-T02 — Stable Checkpoint / Save / Resume | PASS | 2026-09-13 | typed partitions/hash/RNG/Scheduler/PendingReaction/Cost 交叉复验；短事务保存与精确恢复 |
+| M10-T03 — Deterministic Replay | PASS | 2026-09-13 | versions + seed + InitialState + AcceptedCommands 最小输入；live/replay 共用 canonical executor |
+| M10-T04 — CombatResult Exactly-Once Commit | PASS | 2026-09-13 | domain mutation + BattleRecord marker 同事务；stable resultCommitId；cleanup 独立幂等 |
+| M10-T05 — Event Ledger Boundary | PASS | 2026-09-13 | Event Ledger 仅持久化 COMBAT_STARTED/FINISHED；runtime events 留在 BattleRecord |
+| M10-T06 — Ordinary Defeat / Scripted / Aborted Persistence | PASS | 2026-09-13 | 六类结果的 Restore/Commit policy 与 rollback/override rules 全覆盖 |
+| M10-T07 — v0.3 Character / Save Compatibility | PASS | 2026-09-13 | portable archive v4 携带 combat records；v1/v2/v3 immutable compatibility 与 v0.3 attribute parity |
+| M10-T08 — Compatibility UX | PASS | 2026-09-13 | 不兼容分类与固定中文安全投影；不暴露 schema/code/stack，不提供 unsafe fallback |
+| M10 Gate — Persistence / Compatibility | PASS | 2026-09-13 | M10-T01..T08 独立验收；checkpoint/replay/result/ledger/policy/archive/UX 闭环 |
+| M11-T01 — Gate A — Deterministic Core Suite | PASS | 2026-09-13 | [`M11_GATE_A_DETERMINISTIC_CORE.md`](v0.4.1/M11_GATE_A_DETERMINISTIC_CORE.md) |
+| M11-T02 — Gate B — Resolution / Effect Suite | PASS | 2026-09-13 | [`M11_GATE_B_RESOLUTION_EFFECT.md`](v0.4.1/M11_GATE_B_RESOLUTION_EFFECT.md) |
+| M11-T03 — Gate C — Status / Reaction Suite | PASS | 2026-09-13 | [`M11_GATE_C_STATUS_REACTION.md`](v0.4.1/M11_GATE_C_STATUS_REACTION.md) |
+| M11-T04 — Gate D — Four World Profiles | PASS | 2026-09-13 | [`M11_GATE_D_WORLD_PROFILES.md`](v0.4.1/M11_GATE_D_WORLD_PROFILES.md) |
+| M11-T05 — Gate E — AI Content | PASS | 2026-09-13 | [`M11_GATE_E_AI_CONTENT.md`](v0.4.1/M11_GATE_E_AI_CONTENT.md) |
+| M11-T06 — Gate F — UI / Theme / Asset | PASS | 2026-09-13 | [`M11_GATE_F_UI_THEME_ASSET.md`](v0.4.1/M11_GATE_F_UI_THEME_ASSET.md) |
+| M11-T07 — Gate G — Persistence / Release | PASS | 2026-09-13 | [`M11_GATE_G_PERSISTENCE_RELEASE.md`](v0.4.1/M11_GATE_G_PERSISTENCE_RELEASE.md) |
+| M11-T08 — Cross-Platform Determinism | PASS | 2026-09-15 | [`M11_CROSS_PLATFORM_DETERMINISM.md`](v0.4.1/M11_CROSS_PLATFORM_DETERMINISM.md)；同 commit macOS/Windows runner receipts |
+| M11-T09 — Long Combat / Generated Content Stress | PASS | 2026-09-15 | [`M11_LONG_COMBAT_GENERATED_CONTENT_STRESS.md`](v0.4.1/M11_LONG_COMBAT_GENERATED_CONTENT_STRESS.md) |
+| M11-T10 — Four-World Production Playtest | PASS | 2026-09-23 | [`M11_FOUR_WORLD_PRODUCTION_PLAYTEST.md`](v0.4.1/M11_FOUR_WORLD_PRODUCTION_PLAYTEST.md)；四个真实 release `.app` action/status/resource/reaction/intent/result/return/reopen 全通过 |
+| M11 Final Gate | PASS | 2026-09-23 | Gate A-G、cross-platform determinism、stress、four-world production UI 与最终全量质量门均 PASS；下一项严格为 M12-T01 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

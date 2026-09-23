@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "task": "M11-T10",
+  "sourceCommit": "504073649e6d286830e659a7497c9f0d65a09d66",
+  "recordedAt": "2026-09-23T14:52:00Z",
+  "platform": {
+    "os": "macOS",
+    "architecture": "arm64",
+    "darwin": "23.6.0",
+    "node": "v26.7.0",
+    "pnpm": "11.9.0",
+    "rustc": "1.97.1"
+  },
+  "releaseShells": [
+    {"world": "CULTIVATION", "binarySha256": "f97d634468b10b87a22ec3d2992d6f8fd258100f49309d6ccba479317ef411df"},
+    {"world": "FANTASY", "binarySha256": "3a9da76a14db329a808e2f913227cc34352eef4e4071b4b967e243fbb7b0a88f"},
+    {"world": "SCI_FI", "binarySha256": "f1ab8026dae40154191e8df3a2fca0114c771d9150ecfed0ea50d491f35ec22e"},
+    {"world": "URBAN", "binarySha256": "17f26979cc8bf05731a26887e79733d3fdd3cd8a2f9e1425c1c7b87a91ad5c77"}
+  ],
+  "gates": [
+    {"command": "pnpm test:combat-determinism", "exitCode": 0, "summary": "2 exact deterministic golden tests passed"},
+    {"command": "pnpm test:combat-stress", "exitCode": 0, "summary": "Core 6, Native SQLite 1, UI 3 and exact replay/numeric 2 passed"},
+    {"command": "pnpm check", "exitCode": 0, "summary": "Prettier, release metadata, zh-CN, 119 assets, ESLint, TypeScript, Vitest 1252, Node 40, Rust workspace and archive interop passed; one credential-only test ignored by policy"},
+    {"command": "pnpm build:desktop", "exitCode": 0, "summary": "Production Vite build passed and emitted the combat-page chunk"}
+  ],
+  "artifacts": [
+    "README.md",
+    "four-world-playtest-receipt.json"
+  ],
+  "status": "PASS"
+}
