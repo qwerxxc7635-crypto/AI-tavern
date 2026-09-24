@@ -9,6 +9,7 @@ import { CURRENT_COMBAT_VERSION_SET, type CombatCommandEnvelope } from '@ember-t
 import { CombatPage } from './combat-page.js';
 import type { CombatSessionGateway, CombatSessionSnapshot, CombatWorld } from './combat-service.js';
 import type { CombatScreenShellViewModel } from './combat-screen.js';
+import { readPublicThemeManifest } from './combat-theme-asset-test-helpers.js';
 
 afterEach(() => {
   cleanup();
@@ -18,6 +19,19 @@ afterEach(() => {
 describe('combat production page', () => {
   it('loads a durable session, submits the reaction envelope, commits the result, and returns', async () => {
     vi.stubGlobal('crypto', { randomUUID: () => 'ui-command-1' });
+    vi.stubGlobal('fetch', async (url: string) => ({
+      ok:
+        url === '/assets/combat-themes/fantasy-default/manifest.json' ||
+        url === '/assets/combat-themes/common/manifest.json',
+      json: async () =>
+        url === '/assets/combat-themes/common/manifest.json'
+          ? {
+              assets: {
+                COMBAT_VFX_HIT_PHYSICAL: 'effects/hit-physical.png',
+              },
+            }
+          : readPublicThemeManifest('fantasy-default'),
+    }));
     const gateway = new FakeCombatGateway();
     render(
       <MemoryRouter initialEntries={['/combat?campaignId=campaign-ui&world=FANTASY']}>
@@ -29,6 +43,15 @@ describe('combat production page', () => {
     );
 
     expect(await screen.findByRole('complementary', { name: '旅者的反应选择' })).toBeTruthy();
+    const combatScreen = screen.getByRole('main', { name: '战斗界面' });
+    expect(combatScreen.getAttribute('data-combat-theme')).toBe('fantasy-default');
+    expect(combatScreen.getAttribute('data-layout-preset')).toBe('fantasy');
+    expect(combatScreen.style.getPropertyValue('--combat-asset-theme-bg-battle-01')).toContain(
+      '/assets/combat-themes/fantasy-default/assets/backgrounds/battle-background-01.png',
+    );
+    expect(combatScreen.style.getPropertyValue('--combat-asset-combat-vfx-hit-physical')).toContain(
+      '/assets/combat-themes/common/effects/hit-physical.png',
+    );
     fireEvent.click(screen.getByRole('button', { name: '发动' }));
 
     expect(await screen.findByText('胜利')).toBeTruthy();

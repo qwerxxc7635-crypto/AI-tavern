@@ -1,7 +1,14 @@
-import type { CombatThemeAssetSlot } from '@ember-tavern/contracts';
+import { COMBAT_THEME_ASSET_SLOTS } from '@ember-tavern/contracts';
+import type { CombatThemeAssetSlot, CombatWorldType } from '@ember-tavern/contracts';
 
-import type { CombatThemeAssetResolver, CombatThemeWarning } from './combat-theme-fallback.js';
-import type { CombatThemePackage } from './combat-theme-service.js';
+import { CombatThemeAssetResolver, type CombatThemeWarning } from './combat-theme-fallback.js';
+import {
+  CombatThemeLoader,
+  CombatThemeResolver,
+  DEFAULT_COMBAT_THEME_BY_WORLD_TYPE,
+  type CombatThemeManifestSource,
+  type CombatThemePackage,
+} from './combat-theme-service.js';
 
 export interface CombatThemeBinding {
   readonly themeId: string;
@@ -10,22 +17,62 @@ export interface CombatThemeBinding {
   readonly warnings: readonly CombatThemeWarning[];
 }
 
-export function combatThemeForWorld(
-  world: 'CULTIVATION' | 'FANTASY' | 'SCI_FI' | 'URBAN',
-): CombatThemeBinding {
-  const themes = {
-    CULTIVATION: ['cultivation-ink', '#d7b56d', '#15231f'],
-    FANTASY: ['fantasy-ember', '#f3a45b', '#261812'],
-    SCI_FI: ['sci-fi-neon', '#62d8f2', '#101d29'],
-    URBAN: ['urban-noir', '#d7cfbd', '#202124'],
-  } as const;
-  const [themeId, accent, surface] = themes[world];
-  return Object.freeze({
-    themeId,
-    layoutPreset: 'TACTICAL_DUEL',
-    cssVariables: Object.freeze({ '--combat-accent': accent, '--combat-surface': surface }),
-    warnings: Object.freeze([]),
+const publicThemeSource: CombatThemeManifestSource = {
+  async read(themeId) {
+    const packageId = themeId === 'base' ? 'common' : themeId;
+    const response = await fetch(`/assets/combat-themes/${packageId}/manifest.json`);
+    if (!response.ok) throw new Error('Combat theme manifest unavailable');
+    const manifest: unknown = await response.json();
+    if (themeId !== 'base') return manifest;
+    if (typeof manifest !== 'object' || manifest === null || !('assets' in manifest)) {
+      throw new TypeError('Shared combat theme manifest is invalid');
+    }
+    return {
+      version: 1,
+      themeId: 'base',
+      layoutPreset: 'base',
+      fallbackThemeId: null,
+      assets: manifest.assets,
+    };
+  },
+};
+
+export async function loadCombatThemeForWorld(
+  world: CombatWorldType,
+  source: CombatThemeManifestSource = publicThemeSource,
+): Promise<CombatThemeBinding> {
+  const manifestReads = new Map<string, Promise<unknown>>();
+  const loader = new CombatThemeLoader({
+    read(themeId) {
+      let reading = manifestReads.get(themeId);
+      if (reading === undefined) {
+        reading = source.read(themeId);
+        manifestReads.set(themeId, reading);
+      }
+      return reading;
+    },
   });
+  try {
+    const themePackage = await new CombatThemeResolver(loader).resolve(world);
+    return bindCombatThemePackage(
+      themePackage,
+      new CombatThemeAssetResolver(loader),
+      COMBAT_THEME_ASSET_SLOTS,
+    );
+  } catch {
+    return Object.freeze({
+      themeId: 'base',
+      layoutPreset: 'base',
+      cssVariables: Object.freeze({}),
+      warnings: Object.freeze(
+        COMBAT_THEME_ASSET_SLOTS.map((slot) => ({
+          code: 'FALLBACK_THEME_FAILED' as const,
+          themeId: DEFAULT_COMBAT_THEME_BY_WORLD_TYPE[world],
+          slot,
+        })),
+      ),
+    });
+  }
 }
 
 export async function bindCombatThemePackage(
@@ -39,7 +86,9 @@ export async function bindCombatThemePackage(
     const resolved = await resolver.resolveAsset(themePackage, slot);
     warnings.push(...resolved.warnings);
     if (resolved.asset.source !== 'CSS_VECTOR_FALLBACK') {
-      const publicPath = `/assets/combat-themes/${resolved.asset.ownerThemeId}/${resolved.asset.path}`;
+      const packageId =
+        resolved.asset.ownerThemeId === 'base' ? 'common' : resolved.asset.ownerThemeId;
+      const publicPath = `/assets/combat-themes/${packageId}/${resolved.asset.path}`;
       cssVariables[cssVariableForSlot(slot)] = `url("${publicPath}")`;
     }
   }

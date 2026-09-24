@@ -10,20 +10,24 @@ import {
   tauriCombatSessionGateway,
   type CombatSessionGateway,
   type CombatSessionSnapshot,
+  type CombatWorld,
 } from './combat-service.js';
-import { combatThemeForWorld } from './combat-theme-binding.js';
+import { loadCombatThemeForWorld, type CombatThemeBinding } from './combat-theme-binding.js';
 import { APP_PATHS, campaignRoute } from './navigation.js';
 
 export function CombatPage({
   gateway = tauriCombatSessionGateway,
+  loadTheme = loadCombatThemeForWorld,
 }: {
   readonly gateway?: CombatSessionGateway;
+  readonly loadTheme?: (world: CombatWorld) => Promise<CombatThemeBinding>;
 }) {
   const [search] = useSearchParams();
   const navigate = useNavigate();
   const campaignId = search.get('campaignId');
   const world = parseCombatWorld(search.get('world'));
   const [snapshot, setSnapshot] = useState<CombatSessionSnapshot | null>(null);
+  const [theme, setTheme] = useState<CombatThemeBinding | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -31,10 +35,12 @@ export function CombatPage({
     if (campaignId === null || world === null) return;
     let active = true;
     setError(null);
-    void gateway
-      .start(campaignId, world)
-      .then((loaded) => {
-        if (active) setSnapshot(loaded);
+    void Promise.all([gateway.start(campaignId, world), loadTheme(world)])
+      .then(([loaded, binding]) => {
+        if (active) {
+          setSnapshot(loaded);
+          setTheme(binding);
+        }
       })
       .catch(() => {
         if (active) setError('无法载入本地战斗检查点。游戏事实没有被修改。');
@@ -42,7 +48,7 @@ export function CombatPage({
     return () => {
       active = false;
     };
-  }, [campaignId, gateway, world]);
+  }, [campaignId, gateway, loadTheme, world]);
 
   const submit = useCallback(
     (command: CombatCommandEnvelope) => {
@@ -86,7 +92,7 @@ export function CombatPage({
       </main>
     );
   }
-  if (snapshot === null) {
+  if (snapshot === null || theme === null) {
     return (
       <main
         className="system-state"
@@ -116,11 +122,7 @@ export function CombatPage({
           {error}
         </p>
       )}
-      <CombatScreen
-        viewModel={snapshot.viewModel}
-        commandPort={commandPort}
-        theme={combatThemeForWorld(world)}
-      />
+      <CombatScreen viewModel={snapshot.viewModel} commandPort={commandPort} theme={theme} />
       {snapshot.viewModel.result === null ? null : (
         <nav className="combat-page__return" aria-label="战斗后续">
           <button
