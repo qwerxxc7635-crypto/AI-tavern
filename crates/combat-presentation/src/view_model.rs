@@ -1335,6 +1335,11 @@ fn validate_visible_text(value: &str, subject: &str) -> Result<(), CombatViewMod
         || value.chars().count() > 120
         || value.chars().any(char::is_control)
         || !value.chars().any(is_cjk)
+        || contains_internal_english(value)
+        || (subject != "combatantPresentation"
+            && value
+                .chars()
+                .any(|character| character.is_ascii_alphabetic()))
     {
         Err(view_error(
             CombatViewModelErrorCode::InvalidPresentationEntry,
@@ -1343,6 +1348,23 @@ fn validate_visible_text(value: &str, subject: &str) -> Result<(), CombatViewMod
     } else {
         Ok(())
     }
+}
+
+fn contains_internal_english(value: &str) -> bool {
+    value
+        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .filter(|token| !token.is_empty())
+        .any(|token| {
+            ["MISS", "CRITICAL", "HIT", "HEALTH", "MANA"]
+                .iter()
+                .any(|forbidden| token.eq_ignore_ascii_case(forbidden))
+                || (token.contains('_')
+                    && token.chars().all(|character| {
+                        character == '_'
+                            || character.is_ascii_uppercase()
+                            || character.is_ascii_digit()
+                    }))
+        })
 }
 
 fn valid_id(value: &str) -> bool {
@@ -2001,6 +2023,24 @@ mod tests {
         assert_eq!(
             projector
                 .project(&request(&state, &rules, &english))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidPresentationEntry
+        );
+        let mut mixed = names();
+        mixed[0].display_name_zh_cn = "守卫 MISS".to_owned();
+        assert_eq!(
+            projector
+                .project(&request(&state, &rules, &mixed))
+                .unwrap_err()
+                .code,
+            CombatViewModelErrorCode::InvalidPresentationEntry
+        );
+        let mut mixed_rules = rules.clone();
+        mixed_rules.actions[0].display_name_zh_cn = "火球 Fireball".to_owned();
+        assert_eq!(
+            projector
+                .project(&request(&state, &mixed_rules, &names()))
                 .unwrap_err()
                 .code,
             CombatViewModelErrorCode::InvalidPresentationEntry
