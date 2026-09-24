@@ -1,5 +1,9 @@
 import { COMBAT_THEME_ASSET_SLOTS } from '@ember-tavern/contracts';
-import type { CombatThemeAssetSlot, CombatWorldType } from '@ember-tavern/contracts';
+import type {
+  CombatLayoutPresetId,
+  CombatThemeAssetSlot,
+  CombatWorldType,
+} from '@ember-tavern/contracts';
 
 import { CombatThemeAssetResolver, type CombatThemeWarning } from './combat-theme-fallback.js';
 import {
@@ -12,7 +16,7 @@ import {
 
 export interface CombatThemeBinding {
   readonly themeId: string;
-  readonly layoutPreset: string;
+  readonly layoutPreset: CombatLayoutPresetId;
   readonly cssVariables: Readonly<Record<string, string>>;
   readonly warnings: readonly CombatThemeWarning[];
 }

@@ -1,6 +1,7 @@
 import { createRoot } from 'react-dom/client';
 
-import { CURRENT_COMBAT_VERSION_SET } from '@ember-tavern/contracts';
+import { COMBAT_LAYOUT_PRESET_IDS, CURRENT_COMBAT_VERSION_SET } from '@ember-tavern/contracts';
+import type { CombatLayoutPresetId } from '@ember-tavern/contracts';
 
 import { CombatScreen } from './combat-screen.js';
 import type { CombatScreenShellViewModel } from './combat-screen.js';
@@ -23,7 +24,7 @@ declare global {
 
 interface PublicThemeManifest {
   readonly themeId: string;
-  readonly layoutPreset: string;
+  readonly layoutPreset: CombatLayoutPresetId;
   readonly assets: Readonly<Record<string, string>>;
 }
 
@@ -79,6 +80,9 @@ async function runBenchmark(): Promise<void> {
   ]);
   if (themeManifest.themeId !== themeId || commonManifest.themeId !== 'common') {
     throw new Error('主题清单身份不一致');
+  }
+  if (!COMBAT_LAYOUT_PRESET_IDS.includes(themeManifest.layoutPreset)) {
+    throw new Error('主题布局预设无效');
   }
 
   const assetUrls = [

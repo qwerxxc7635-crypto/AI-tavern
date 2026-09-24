@@ -118,6 +118,7 @@ v0.4.1 的唯一规则来源是 `V0.4_COMBAT_SYSTEM_FINAL_DEVELOPMENT_DOCUMENT_V
 | M11-T10 — Four-World Production Playtest | FAIL | 2026-09-24 | 2026-09-23 四个 release `.app` 固定示例操作确实完成；M12-T01 审计发现其角色/Encounter/结果/Theme 未接入真实产品流程，原 PASS 判定撤销。见 [`V0_4_1_FIRST_FULL_AUDIT.md`](audit/V0_4_1_FIRST_FULL_AUDIT.md) |
 | M11 Final Gate | FAIL | 2026-09-24 | M11-T10 不满足真实生产闭环，且生产集成提交没有同源码 Windows 收据；先前 PASS 判定撤销，须在 M12-T02 修复后重跑受影响 Gate |
 | M12-T01 — First Independent Full Audit | PASS | 2026-09-24 | 三个隔离只读审计覆盖 Core/SQLite、UI/Theme/AI/Security 与 SOT/证据；P0=0、P1=10、P2=4；审计任务完成，发布判定 FAIL。见 [`V0_4_1_FIRST_FULL_AUDIT.md`](audit/V0_4_1_FIRST_FULL_AUDIT.md) |
+| M12-T02 — Audit Fix | BLOCKED | 2026-09-24 | 3 项已有本地修复但尚未完成全门禁；其余 finding 未闭环。`SB-041-001` 需要明确 Adventure→Encounter 的权威入口与定义来源，不能以固定战斗代替。见 [`V0_4_1_FIRST_FULL_AUDIT_FIXES.md`](audit/V0_4_1_FIRST_FULL_AUDIT_FIXES.md)；不得开始 M12-T03 |
 
 M0-T02 之后必须继续按 `V0.4.1_TASKS_FINAL.md` 的 `DependsOn` 顺序执行。状态只使用 `NOT_STARTED / IN_PROGRESS / BLOCKED / PASS / FAIL / NOT_RUN`；未真实执行的跨平台或 Provider 门禁不得标记为 PASS。
 

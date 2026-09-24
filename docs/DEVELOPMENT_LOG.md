@@ -6588,3 +6588,9 @@
 - 基于 `beff8f3f4904c9ce9c7dfb360b9d5e89573aaef6` 开展三个隔离上下文的只读审计：Core/SQLite/Replay、UI/Theme/AI/Security、V5.2/TASKS/证据合规。三者独立读取外部 V5.2 和最终任务清单；主线程复核阻断项调用链并汇总去重。正式 Ledger 为 `docs/audit/V0_4_1_FIRST_FULL_AUDIT.md`。
 - 结论：P0=0、P1=10、P2=4、P3=0。固定角色/敌人/伤害/胜利的 Session、空领域提交、复用战斗身份、缺少并发检查点比较、跳过执行复验和状态 Effect Pipeline、生产 Theme/AI 管线未接入，以及后于跨平台收据的生产代码没有同源码 Windows 证据，均阻断发布。Core/Native/UI 专项、素材完整性、静态中文、前端 build 与发布元数据检查通过，但这些门禁不覆盖上述最后一公里缺陷。
 - 2026-09-23 四个 release `.app` 的实际操作和 SQLite 收据仍是对固定示例的真实历史观察；审计不删除它们，但撤销其“完整真实生产战斗”推断。`docs/TASKS.md` 将 M11-T10 与 M11 Final Gate 从 PASS 改为 FAIL；M12-T01 审计任务本身 PASS，发布判定 FAIL。下一项仅为 M12-T02 Audit Fix，修复后须重跑受影响的 M11 Gate 与 Windows 证据。用户 `.gitignore` 保持未纳入任务改动。
+
+## 2026-09-24 — M12-T02 Audit Fix（partial; BLOCKED）
+
+- `ac57006` 把生产页从硬编码主题切到受验证的世界主题与 common 资产绑定；`c9b9410` 为 SQLite checkpoint 增加 expected persistence revision 并拒绝旧写者；`4ab2574` 收紧运行时中文可见文本验证。另将 Theme binding 的 layout preset 收窄为合同类型，浏览器基准页对清单预设做运行时校验。相应定向测试通过；本任务并未因此 PASS，修复细节与剩余 finding 见 `docs/audit/V0_4_1_FIRST_FULL_AUDIT_FIXES.md`。
+- 在修复真实生产 Session 时确认：当前 Adventure `CHECK_REQUIRED` 不是显式 Combat 入口，SQLite 无版本化 Encounter Definition 或 NPC Combat projection，Native `start_or_restore_combat_session` 仅从 URL 世界与固定英雄/敌人建战。V5.2 规定 EncounterStart 后的规则、目标和提交，但没有决定当前 Adventure check 是否自动转战斗，或仅由独立持久化 Encounter 事件转入。两种合理解释产生不同 CombatState/RNG/持久化事实；登记 `SB-041-001`，暂停受影响依赖链并请求产品裁定，未创造默认敌人/目标/触发规则。
+- M12-T02 当前为 BLOCKED，M12-T03 未开始，M11 Final Gate 仍 FAIL。用户 `.gitignore` 的既有修改保持原状、未纳入任务提交。
