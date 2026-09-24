@@ -207,6 +207,7 @@ impl CampaignStore {
                 let (initial, ledger) = initial_state(&combat_id, world)?;
                 let receipt = self.save_combat_checkpoint(CombatCheckpointWrite {
                     campaign_id,
+                    expected_persistence_revision: None,
                     initial_state: &initial,
                     state: &initial,
                     accepted_commands: ledger.commands(),
@@ -262,6 +263,7 @@ impl CampaignStore {
 
         let receipt = self.save_combat_checkpoint(CombatCheckpointWrite {
             campaign_id,
+            expected_persistence_revision: Some(restored.persistence_revision),
             initial_state: &restored.initial_state,
             state: &state,
             accepted_commands: ledger.commands(),

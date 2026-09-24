@@ -23,6 +23,7 @@ pub struct CombatLoopGuardContract {
 #[derive(Debug, Clone)]
 pub struct CombatCheckpointWrite<'a> {
     pub campaign_id: &'a str,
+    pub expected_persistence_revision: Option<u64>,
     pub initial_state: &'a CombatState,
     pub state: &'a CombatState,
     pub accepted_commands: &'a [AcceptedCombatCommand],
@@ -57,6 +58,8 @@ pub enum CombatPersistenceError {
     InvalidCheckpoint,
     #[error("combat checkpoint would regress monotonic runtime state")]
     StateRegression,
+    #[error("combat checkpoint was changed by another writer")]
+    CheckpointRevisionConflict,
     #[error("combat checkpoint uses unsupported combat versions")]
     IncompatibleVersion,
     #[error("combat result is not ready for canonical commit")]
@@ -128,6 +131,15 @@ impl CampaignStore {
                 },
             )
             .optional()?;
+        let actual_revision = previous
+            .as_ref()
+            .map(|(_, _, revision)| {
+                u64::try_from(*revision).map_err(|_| CombatPersistenceError::InvalidCheckpoint)
+            })
+            .transpose()?;
+        if actual_revision != write.expected_persistence_revision {
+            return Err(CombatPersistenceError::CheckpointRevisionConflict);
+        }
         let persistence_revision =
             if let Some((objective_json, reinforcement_json, revision)) = previous {
                 let old_objective: ObjectiveRuntimeState = serde_json::from_str(&objective_json)?;
@@ -927,6 +939,7 @@ fn restore_row(
     let persistence_revision = parse_u64(required(18)?)?;
     let write = CombatCheckpointWrite {
         campaign_id: &campaign_id,
+        expected_persistence_revision: None,
         initial_state: &initial_state,
         state: &state,
         accepted_commands: &accepted_commands,
@@ -1021,6 +1034,7 @@ mod tests {
         let receipt = store
             .save_combat_checkpoint(CombatCheckpointWrite {
                 campaign_id: &campaign.id,
+                expected_persistence_revision: None,
                 initial_state: &initial,
                 state: &live,
                 accepted_commands: ledger.commands(),
@@ -1117,8 +1131,9 @@ mod tests {
         let campaign = store.create_campaign().unwrap();
         let state = fixture_state();
         let events = vec![json!({"sequence": 0, "kind": "COMBAT_STARTED"})];
-        let write = || CombatCheckpointWrite {
+        let write = |expected_persistence_revision| CombatCheckpointWrite {
             campaign_id: &campaign.id,
+            expected_persistence_revision,
             initial_state: &state,
             state: &state,
             accepted_commands: &[],
@@ -1127,14 +1142,25 @@ mod tests {
         };
         assert_eq!(
             store
-                .save_combat_checkpoint(write())
+                .save_combat_checkpoint(write(None))
                 .unwrap()
                 .persistence_revision,
             1
         );
         assert_eq!(
             store
-                .save_combat_checkpoint(write())
+                .save_combat_checkpoint(write(Some(1)))
+                .unwrap()
+                .persistence_revision,
+            2
+        );
+        assert!(matches!(
+            store.save_combat_checkpoint(write(Some(1))),
+            Err(CombatPersistenceError::CheckpointRevisionConflict)
+        ));
+        assert_eq!(
+            store
+                .restore_combat_checkpoint(&state.combat_instance_id)
                 .unwrap()
                 .persistence_revision,
             2
@@ -1163,10 +1189,11 @@ mod tests {
         let (live, ledger, _, _) = pending_reaction_state();
         let events = vec![json!({"sequence": 1, "kind": "REACTION_WINDOW_OPENED"})];
 
-        for expected_revision in 1..=64 {
+        for expected_revision in 1_u64..=64 {
             let receipt = store
                 .save_combat_checkpoint(CombatCheckpointWrite {
                     campaign_id: &campaign.id,
+                    expected_persistence_revision: expected_revision.checked_sub(1),
                     initial_state: &initial,
                     state: &live,
                     accepted_commands: ledger.commands(),
@@ -1204,6 +1231,7 @@ mod tests {
         CanonicalEventChainScheduler::begin(&mut active, "chain-frozen".into(), 7, 19).unwrap();
         let result = store.save_combat_checkpoint(CombatCheckpointWrite {
             campaign_id: &campaign.id,
+            expected_persistence_revision: None,
             initial_state: &initial,
             state: &active,
             accepted_commands: &[],
@@ -1236,6 +1264,7 @@ mod tests {
         store
             .save_combat_checkpoint(CombatCheckpointWrite {
                 campaign_id: &campaign.id,
+                expected_persistence_revision: None,
                 initial_state: &initial,
                 state: &final_state,
                 accepted_commands: &[],
@@ -1452,6 +1481,7 @@ mod tests {
         store
             .save_combat_checkpoint(CombatCheckpointWrite {
                 campaign_id: &campaign.id,
+                expected_persistence_revision: None,
                 initial_state: &initial,
                 state: &final_state,
                 accepted_commands: &[],
@@ -1618,6 +1648,7 @@ mod tests {
             store
                 .save_combat_checkpoint(CombatCheckpointWrite {
                     campaign_id: &campaign.id,
+                    expected_persistence_revision: None,
                     initial_state: &initial,
                     state: &final_state,
                     accepted_commands: &[],
@@ -1715,6 +1746,7 @@ mod tests {
         store
             .save_combat_checkpoint(CombatCheckpointWrite {
                 campaign_id: &campaign.id,
+                expected_persistence_revision: None,
                 initial_state: &initial,
                 state: &final_state,
                 accepted_commands: &[],
@@ -1770,6 +1802,7 @@ mod tests {
         source
             .save_combat_checkpoint(CombatCheckpointWrite {
                 campaign_id: &campaign.id,
+                expected_persistence_revision: None,
                 initial_state: &initial,
                 state: &active,
                 accepted_commands: ledger.commands(),
