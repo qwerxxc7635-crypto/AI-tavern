@@ -6580,3 +6580,11 @@
 
 - UI 完成后串行执行 `pnpm test:combat-determinism && pnpm test:combat-stress && pnpm check && pnpm build:desktop`，总命令 exit 0。Determinism 2/2；stress Core 6/6、Native SQLite 1/1、UI 3/3、replay/numeric 2/2；完整门禁 Vitest 202 files PASS / 2 baseline skip、1252 tests PASS / 6 baseline skip，Node 40/40，Core 344、Presentation 16、Native 119、platform 5、provider 19、secure-http 12、secure-secrets 3、Tauri 14（另 1 credential-only ignore），archive interop 双向通过；production desktop build 输出 Combat chunk。
 - 先前提交 `9918048` 的 BLOCKED evidence 保留为当时真实状态，并由新 PASS evidence 显式 supersede。用户 `.gitignore` 保持未纳入任务提交。M11-T10=PASS，M11 Final Gate=PASS；下一项严格为 M12-T01 First Independent Full Audit。
+
+## 2026-09-24 — M12-T01 First Independent Full Audit
+
+### 隔离审计与对 M11 Gate 的纠正
+
+- 基于 `beff8f3f4904c9ce9c7dfb360b9d5e89573aaef6` 开展三个隔离上下文的只读审计：Core/SQLite/Replay、UI/Theme/AI/Security、V5.2/TASKS/证据合规。三者独立读取外部 V5.2 和最终任务清单；主线程复核阻断项调用链并汇总去重。正式 Ledger 为 `docs/audit/V0_4_1_FIRST_FULL_AUDIT.md`。
+- 结论：P0=0、P1=10、P2=4、P3=0。固定角色/敌人/伤害/胜利的 Session、空领域提交、复用战斗身份、缺少并发检查点比较、跳过执行复验和状态 Effect Pipeline、生产 Theme/AI 管线未接入，以及后于跨平台收据的生产代码没有同源码 Windows 证据，均阻断发布。Core/Native/UI 专项、素材完整性、静态中文、前端 build 与发布元数据检查通过，但这些门禁不覆盖上述最后一公里缺陷。
+- 2026-09-23 四个 release `.app` 的实际操作和 SQLite 收据仍是对固定示例的真实历史观察；审计不删除它们，但撤销其“完整真实生产战斗”推断。`docs/TASKS.md` 将 M11-T10 与 M11 Final Gate 从 PASS 改为 FAIL；M12-T01 审计任务本身 PASS，发布判定 FAIL。下一项仅为 M12-T02 Audit Fix，修复后须重跑受影响的 M11 Gate 与 Windows 证据。用户 `.gitignore` 保持未纳入任务改动。

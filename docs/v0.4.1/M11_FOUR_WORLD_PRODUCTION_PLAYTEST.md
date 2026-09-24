@@ -1,5 +1,7 @@
 # M11-T10 Four-World Production Playtest
 
+> 2026-09-24 审计更正：以下 PASS 是 2026-09-23 对固定示例四个 release `.app` 操作的历史判断。[`M12-T01 First Independent Full Audit`](../audit/V0_4_1_FIRST_FULL_AUDIT.md) 发现该 Session 没有真实 Campaign/Encounter、完整 Command/Objective/Domain/Theme 接入，且最终生产源码缺少 Windows 证据；M11-T10 和 M11 Final Gate 的当前状态均为 **FAIL**。原始观察和收据保留，不再作为完整生产战斗的证明。
+
 ## Verdict
 
 **PASS.** Source commit `504073649e6d286830e659a7497c9f0d65a09d66` provides the production Combat route, typed Tauri boundary, Native session orchestration, canonical Core execution, Presentation projection and SQLite checkpoint/result lifecycle required to execute four complete real-UI battles.
