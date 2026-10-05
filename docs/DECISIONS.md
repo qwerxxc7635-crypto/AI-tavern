@@ -5326,3 +5326,18 @@ Windows 存档页对导入和导出分别提供固定中文 Compatibility Gate�
 - SQLite 继续是唯一 durable truth；UI、Theme 与 AI 都不能直接修改战斗状态。
 - `CombatSessionWorld` 的分支只选择数据和既有 World Profile，不复制各世界完整 lifecycle；四 Profile 的完整机制差异继续由 Gate D 的 canonical tests 负责。
 - M11-T10 的 unit/JSDOM/build 结果只验证边界，不替代四世界真实 `.app` action/status/resource/reaction/intent/result/return/save-reopen 实机证据。
+
+## DEC-247：Combat 仅从独立持久化 Encounter 事件进入
+
+- 日期：2026-10-05
+- 状态：已采纳（事件生产者未定，见 `SB-041-002`）
+- 依据：用户对 `SB-041-001` 的明确裁定；V5.2 §4.5.2.1、§11.4.1、§11.2.1/§11.2.2；外部 TASKS M12-T04
+
+### 决定
+
+现有 Adventure `CHECK_REQUIRED` 仍为普通检定，不自动触发 Combat。只有独立、已持久化、版本化的 Encounter 事件可启动或恢复战斗；Combat ID 必须从该事件的稳定身份派生，同一 Campaign/World 的不同事件不能复用 BattleRecord。Encounter Definition 预声明稳定 roster、reinforcement 与 objective；NPC 机械属性必须经 Character Domain 的版本化 Combat projection 验证，不能从职业、人口角色或叙事文本推断。事件的引用与解析后的 InitialState/版本快照需进入 BattleRecord/ActiveCombatSave，使 Replay 不重新查询可变外部数据。
+
+### 影响与边界
+
+- DEC-246 中由 URL 世界选择固定 `hero/enemy`、以及空领域提交可视为生产闭环的表述，已被 M12-T01 审计否定，不能继续作为实现依据；历史记录保留以解释当时选择。
+- 本决定只确定 **Combat 的准入条件和数据所有权**，没有授权编造某场敌人、目标或奖励，也没有确定哪条生产流程创建 Encounter 事件。后者仍是 `SB-041-002`，解决前不能把固定示例改名为 Encounter 或宣称 M12-T02 完成。

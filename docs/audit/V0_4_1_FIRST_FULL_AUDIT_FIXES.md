@@ -10,7 +10,7 @@ Audit baseline: [`V0_4_1_FIRST_FULL_AUDIT.md`](V0_4_1_FIRST_FULL_AUDIT.md). This
 
 M12-041-001..006, 009..013 remain OPEN. M12-041-010 cannot close until the final source commit has its required Windows evidence. A partial local fix is not a release finding closure.
 
-## SB-041-001 — Encounter ingress and authoritative definition (OPEN)
+## SB-041-001 — Encounter ingress and authoritative definition (RESOLVED 2026-10-05)
 
 - **Relevant frozen rules:** V5.2 §4.5.2.1 requires validated Character Domain projections rather than parallel/hard-coded combat attributes; §11.4/§11.4.1 requires an EncounterStart-resolved and persisted Objective Runtime set; §11.2.1/§11.2.2 governs the pre-combat snapshot and canonical commit. External `V0.4.1_TASKS_FINAL.md` M12-T04 requires the real World→Character→Encounter→Combat flow.
 - **Minimal state/command:** A campaign is in `ADVENTURE`, its player character exists in SQLite, and the adventure has a `CHECK_REQUIRED` step. The player submits the next adventure action or opens Combat. Current SQLite has Adventure records and BattleRecord/ActiveCombatSave, but no persisted versioned Encounter Definition or adventure→combat command/transition; current `start_or_restore_combat_session(campaign_id, world)` accepts a URL-selected world and constructs fixed `hero/enemy` data.
@@ -20,4 +20,16 @@ M12-041-001..006, 009..013 remain OPEN. M12-041-010 cannot close until the final
 - **Affected chain:** M12-041-001, 004–006, 009–013 and the real M11/M12 release gates cannot be closed by substituting a fixed demo or inventing an enemy. The current `M12-T02` remains incomplete; `M12-T03` and later tasks must not start.
 - **Safe independent work:** Checkpoint concurrency, theme binding, language validation and their regressions are already repaired locally. Additional fixes that do not choose Encounter ingress or content can continue after this decision, but cannot establish release readiness.
 
-Decision required: Is Combat entered automatically from an existing Adventure check, or only from an explicit, persisted versioned Encounter event? If the latter, which existing or new domain record owns the roster, objective definitions and NPC stat projection? This must be resolved before implementing the authoritative production session.
+**Decision:** The user selected B: only an independent, persisted, versioned Encounter event starts Combat. Existing Adventure `CHECK_REQUIRED` remains a non-combat check. V5.2 makes Encounter Definition the owner of stable roster/reinforcement/objectives and §4.5.2.1 makes Character Domain the source of validated NPC combat projection; see `DEC-247`. This resolves the A/B ingress choice, not the event producer below.
+
+## SB-041-002 — Who creates the persisted Encounter event? (OPEN)
+
+- **Relevant frozen rules:** V5.2 §4.5.2.1, §11.4.1, §14.1 and §11.2.1/§11.2.2; external TASKS M12-T04. AI may supply bounded content candidates but may not directly mutate canonical state.
+- **Minimal state/command:** An Adventure has a valid campaign and player character and reaches a scene/action outcome. There is no existing Encounter request field, Encounter Definition table, or production Encounter event writer. The next action may or may not offer a combat option; no typed event is currently produced.
+- **Interpretation A:** A developer-authored, versioned Encounter Definition is selected by an explicit Adventure action/quest rule, then that rule persists the Encounter event. Only authored definitions can become playable combat.
+- **Interpretation B:** A structured Adventure/AI candidate proposes an Encounter Concept; the existing candidate/validator/domain-transaction boundary maps and validates it, then persists the Encounter event automatically. Different generated candidates can become playable encounters after validation.
+- **Different authoritative output:** For the same Adventure action without a matching authored definition, A produces no Encounter/CombatState or combat RNG consumption, while B may persist a validated Encounter, create an InitialState, and consume Combat RNG. The roster, objectives, result and replay identity may differ even when both create an event.
+- **Affected chain:** M12-041-001, 004–006 and 009–013; M11 Final Gate and M12-T02 onward. Both options preserve the user's explicit-event decision; selecting either without direction would add a new product behavior.
+- **Safe independent work:** Continue isolated correctness fixes and define fail-closed validation contracts. Do not add a fallback enemy/trigger, treat `CHECK_REQUIRED` as combat, or label a fixture as a real production Encounter.
+
+Decision required: which production flow emits the explicit Encounter event—an authored quest/action rule selecting a developer definition, or a validated structured Adventure/AI candidate? If both are intended, identify which is required for v0.4.1 and how the player reaches it.

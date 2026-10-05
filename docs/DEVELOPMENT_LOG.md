@@ -6594,3 +6594,9 @@
 - `ac57006` 把生产页从硬编码主题切到受验证的世界主题与 common 资产绑定；`c9b9410` 为 SQLite checkpoint 增加 expected persistence revision 并拒绝旧写者；`4ab2574` 收紧运行时中文可见文本验证。另将 Theme binding 的 layout preset 收窄为合同类型，浏览器基准页对清单预设做运行时校验。相应定向测试通过；本任务并未因此 PASS，修复细节与剩余 finding 见 `docs/audit/V0_4_1_FIRST_FULL_AUDIT_FIXES.md`。
 - 在修复真实生产 Session 时确认：当前 Adventure `CHECK_REQUIRED` 不是显式 Combat 入口，SQLite 无版本化 Encounter Definition 或 NPC Combat projection，Native `start_or_restore_combat_session` 仅从 URL 世界与固定英雄/敌人建战。V5.2 规定 EncounterStart 后的规则、目标和提交，但没有决定当前 Adventure check 是否自动转战斗，或仅由独立持久化 Encounter 事件转入。两种合理解释产生不同 CombatState/RNG/持久化事实；登记 `SB-041-001`，暂停受影响依赖链并请求产品裁定，未创造默认敌人/目标/触发规则。
 - M12-T02 当前为 BLOCKED，M12-T03 未开始，M11 Final Gate 仍 FAIL。用户 `.gitignore` 的既有修改保持原状、未纳入任务提交。
+
+## 2026-10-05 — M12-T02 Encounter 入口裁定
+
+- 用户选择 `SB-041-001` 的后者：Combat 只能从独立、持久化的 Encounter 事件进入，Adventure `CHECK_REQUIRED` 不自动转战斗。已在 `DEC-247` 记录准入、稳定身份、Encounter Definition 与 Character Domain NPC projection 所有权，并明确 supersede DEC-246 的固定示例生产闭环推断。
+- 复核当前 Adventure 输出、迁移与 Native Session 后，仓库仍无生产 Encounter 事件写入方。开发者预置 Quest/Action 规则与经现有 Candidate/Validator/Domain Transaction 自动接受的结构化 Adventure/AI 候选，会对同一冒险操作产生不同 Encounter/CombatState/RNG/持久化结果；登记 `SB-041-002` 请求确定事件生产者。未新增默认敌人、触发点或奖励。
+- M12-T02 仍为 BLOCKED，M12-T03 未开始；既有 `.gitignore` 用户修改继续保持未暂存。
