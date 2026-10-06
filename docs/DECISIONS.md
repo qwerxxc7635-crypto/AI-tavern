@@ -5369,3 +5369,17 @@ v0.4.1 的独立 Encounter 事件只能由版本化、开发者预置的 Quest/A
 ### 来源合同落地（2026-10-06，仍非生产入口）
 
 BattleRecord `events_json` 的首项使用版本化 `ENCOUNTER_STARTED`，记录已接受行动的 UUID、开发者规则 ID/版本、Encounter Definition ID/版本、World Profile、玩家角色 ID、解析后的 roster 与 objective ID。`combatInstanceId` 由 Campaign ID 与该操作 UUID 以固定域分隔 SHA-256 派生；同操作重试得到同一 ID，不同操作不能复用旧记录。首次检查点保存与现有 `COMBAT_STARTED` fact 在同一个 SQLite 事务中写入同一来源；续写不能更换或丢弃来源，恢复必须同时核对初始状态和审计 fact。旧固定示例没有这一来源，不能通过 authored Encounter 恢复校验。此合同未替代真正的 Tavern 行动生产者、NPC Character Domain 投影或 Objective 执行。
+
+## DEC-249：自由世界的 Combat Profile 显式持久化绑定
+
+- 日期：2026-10-06
+- 状态：实施中，尚未完成生产入口
+- 依据：V5.2 的四世界 Combat Profile 与 DEC-247/248 的可信来源边界
+
+### 决定
+
+自由世界叙事字段不能自行决定 Combat 机制。世界宪章锁定、单个玩家角色就绪后，由显式选择操作把 Campaign 绑定到一个版本化 Combat Profile；SQLite 以 Campaign 唯一记录该选择及宪章修订、操作 UUID，并拒绝事后修改。相同操作可幂等重试，不同操作不能悄悄重选。归档必须包含这份绑定，旧版归档恢复时不得伪造选择。
+
+### 影响与边界
+
+新增 `campaign_combat_profiles` 及 portable save v5 用于保存此绑定；这不是由 AI 文本推断 Profile，也不等于已经建立 Tavern Encounter 行动、真实 NPC 投影或完整战斗闭环。当前只实现底层存储与归档合同，M12-T02 仍为 IN_PROGRESS。

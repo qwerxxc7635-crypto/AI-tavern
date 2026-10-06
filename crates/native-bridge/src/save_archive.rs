@@ -24,12 +24,13 @@ use super::{
 };
 
 const FORMAT_VERSION: u64 = 1;
-const DATABASE_SCHEMA_VERSION: u64 = 4;
+const DATABASE_SCHEMA_VERSION: u64 = 5;
 const SAVE_SCHEMA_VERSION: u64 = 3;
 const LEGACY_DATABASE_SCHEMA_VERSION: u64 = 1;
 const V2_DATABASE_SCHEMA_VERSION: u64 = 2;
 const V3_DATABASE_SCHEMA_VERSION: u64 = 3;
-const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 34;
+const V4_DATABASE_SCHEMA_VERSION: u64 = 4;
+const LOCAL_DATABASE_SCHEMA_VERSION: i64 = 35;
 const WORLD_SCHEMA_VERSION: u64 = 1;
 const MAX_ARCHIVE_BYTES: u64 = 32 * 1024 * 1024;
 const MAX_UNCOMPRESSED_BYTES: u64 = 64 * 1024 * 1024;
@@ -153,9 +154,14 @@ const V3_CAMPAIGN_TABLES: [&str; 69] = [
     "ai_candidates",
 ];
 const COMBAT_CAMPAIGN_TABLES: [&str; 2] = ["battle_records", "active_combat_saves"];
+const PROFILE_CAMPAIGN_TABLES: [&str; 1] = ["campaign_combat_profiles"];
+
+fn v4_campaign_tables() -> impl Iterator<Item = &'static str> {
+    V3_CAMPAIGN_TABLES.into_iter().chain(COMBAT_CAMPAIGN_TABLES)
+}
 
 fn campaign_tables() -> impl Iterator<Item = &'static str> {
-    V3_CAMPAIGN_TABLES.into_iter().chain(COMBAT_CAMPAIGN_TABLES)
+    v4_campaign_tables().chain(PROFILE_CAMPAIGN_TABLES)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -749,6 +755,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         LEGACY_DATABASE_SCHEMA_VERSION,
         V2_DATABASE_SCHEMA_VERSION,
         V3_DATABASE_SCHEMA_VERSION,
+        V4_DATABASE_SCHEMA_VERSION,
         DATABASE_SCHEMA_VERSION,
     ]
     .contains(&database_version)
@@ -835,6 +842,7 @@ fn parse_archive(bytes: &[u8]) -> Result<ParsedArchive, CampaignStoreError> {
         LEGACY_DATABASE_SCHEMA_VERSION => LEGACY_CAMPAIGN_TABLES.to_vec(),
         V2_DATABASE_SCHEMA_VERSION => V2_CAMPAIGN_TABLES.to_vec(),
         V3_DATABASE_SCHEMA_VERSION => V3_CAMPAIGN_TABLES.to_vec(),
+        V4_DATABASE_SCHEMA_VERSION => v4_campaign_tables().collect::<Vec<_>>(),
         DATABASE_SCHEMA_VERSION => campaign_tables().collect::<Vec<_>>(),
         _ => return Err(CampaignStoreError::IncompatibleSchema),
     };

@@ -6,6 +6,7 @@ mod active_factions;
 mod adventure_play;
 mod authored_encounter;
 mod cache_metrics;
+mod campaign_combat_profile;
 mod career_pool;
 mod character_creation;
 mod combat_attribute_adapter;
@@ -50,6 +51,7 @@ pub use active_factions::*;
 pub use adventure_play::*;
 pub use authored_encounter::*;
 pub use cache_metrics::*;
+pub use campaign_combat_profile::*;
 pub use career_pool::*;
 pub use character_creation::*;
 pub use combat_attribute_adapter::*;
@@ -158,7 +160,9 @@ const COMBAT_PERSISTENCE_MIGRATION: &str =
     include_str!("../../../database/migrations/0033_combat_persistence.sql");
 const COMBAT_EVENT_LEDGER_MIGRATION: &str =
     include_str!("../../../database/migrations/0034_combat_event_ledger.sql");
-const LATEST_SCHEMA_VERSION: i64 = 34;
+const CAMPAIGN_COMBAT_PROFILES_MIGRATION: &str =
+    include_str!("../../../database/migrations/0035_campaign_combat_profiles.sql");
+const LATEST_SCHEMA_VERSION: i64 = 35;
 const FULL_BACKUP_RETENTION: usize = 3;
 const TIMESTAMP_FORMAT: &[FormatItem<'static>] =
     format_description!("[year]-[month]-[day]T[hour]:[minute]:[second].[subsecond digits:3]Z");
@@ -779,6 +783,11 @@ fn apply_migrations_through(
         (32_i64, "save_schema", SAVE_SCHEMA_MIGRATION),
         (33_i64, "combat_persistence", COMBAT_PERSISTENCE_MIGRATION),
         (34_i64, "combat_event_ledger", COMBAT_EVENT_LEDGER_MIGRATION),
+        (
+            35_i64,
+            "campaign_combat_profiles",
+            CAMPAIGN_COMBAT_PROFILES_MIGRATION,
+        ),
     ];
     let history = {
         let mut statement = connection.prepare(
@@ -1202,7 +1211,7 @@ mod tests {
 
         let store = CampaignStore::open(&database_path).expect("migrate database");
         let migrated = store.connect().expect("open migrated database");
-        assert_eq!(schema_version(&migrated).expect("schema version"), 34);
+        assert_eq!(schema_version(&migrated).expect("schema version"), 35);
         assert_eq!(
             migrated
                 .query_row(
@@ -1341,7 +1350,7 @@ mod tests {
 
         let store = CampaignStore::open(&database_path).expect("migrate schema zero");
         let migrated = store.connect().expect("open migrated database");
-        assert_eq!(schema_version(&migrated).expect("schema version"), 34);
+        assert_eq!(schema_version(&migrated).expect("schema version"), 35);
         assert_eq!(
             migrated
                 .query_row(

@@ -187,6 +187,11 @@ const migrations = [
     name: 'combat_event_ledger',
     source: new URL('../../../database/migrations/0034_combat_event_ledger.sql', import.meta.url),
   },
+  {
+    version: 35,
+    name: 'campaign_combat_profiles',
+    source: new URL('../../../database/migrations/0035_campaign_combat_profiles.sql', import.meta.url),
+  },
 ];
 
 export const migrationManifest = Object.freeze(

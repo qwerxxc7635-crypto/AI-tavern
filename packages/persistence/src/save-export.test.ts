@@ -102,7 +102,7 @@ describe('exportCampaignSave', () => {
     expect(manifest).toMatchObject({
       application: 'ember-tavern',
       campaignId: campaignKey,
-      databaseSchemaVersion: 4,
+      databaseSchemaVersion: 5,
       formatVersion: 1,
       files: {
         'campaign.json': { records: 1 },
@@ -117,9 +117,10 @@ describe('exportCampaignSave', () => {
     expect(campaignRow['world_schema_version']).toBe(1);
     expect(requireArray(tables['world_facts'])).toHaveLength(2);
     expect(requireArray(tables['scene_frames'])).toHaveLength(1);
-    expect(Object.keys(tables)).toHaveLength(71);
+    expect(Object.keys(tables)).toHaveLength(72);
     expect(requireArray(tables['battle_records'])).toEqual([]);
     expect(requireArray(tables['active_combat_saves'])).toEqual([]);
+    expect(requireArray(tables['campaign_combat_profiles'])).toEqual([]);
     expect(events).toHaveLength(1);
     expect(parseObject(events[0] ?? '')).toMatchObject({
       id: gameEventId('event-export'),

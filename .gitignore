@@ -42,3 +42,4 @@ windows-app/src-tauri/gen/
 *.swp
 Thumbs.db
 .DS_Store
+.gstack/

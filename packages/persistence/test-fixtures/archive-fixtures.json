@@ -25,22 +25,30 @@
     {
       "path": "packages/persistence/test-fixtures/rust-export-v3.emtavern",
       "sha256": "29d2bd59a68d2e2fdc8424898a8c02adfa8929ae5b1ed3e4f07c75a6c187f8c5"
+    },
+    {
+      "path": "packages/persistence/test-fixtures/typescript-export-v4.emtavern",
+      "sha256": "cbab1e2787bb0fa3d5684bdc1ab4686ed665a393e40fc40fec7f9e32368e52b7"
+    },
+    {
+      "path": "packages/persistence/test-fixtures/rust-export-v4.emtavern",
+      "sha256": "d2ecbf65b3250c6e443db5424a347599834aed7fb3d1733e18ecd729605edc5d"
     }
   ],
   "fixtures": {
     "typescript": {
-      "path": "packages/persistence/test-fixtures/typescript-export-v4.emtavern",
+      "path": "packages/persistence/test-fixtures/typescript-export-v5.emtavern",
       "producer": "packages/persistence/src/save-export.ts",
       "sourceTest": "packages/persistence/src/save-export.test.ts",
       "createdAt": "2026-08-01T13:00:00.000Z",
-      "sha256": "cbab1e2787bb0fa3d5684bdc1ab4686ed665a393e40fc40fec7f9e32368e52b7"
+      "sha256": "463a8b5ad314d091444877c20512cc10255afaf89c8a48b391e2d1c634ccefad"
     },
     "rust": {
-      "path": "packages/persistence/test-fixtures/rust-export-v4.emtavern",
+      "path": "packages/persistence/test-fixtures/rust-export-v5.emtavern",
       "producer": "crates/native-bridge/src/save_archive.rs",
       "sourceTest": "current_archive_interop_gate_imports_typescript_and_emits_rust",
       "createdAt": "2026-08-02T00:59:25.584Z",
-      "sha256": "d2ecbf65b3250c6e443db5424a347599834aed7fb3d1733e18ecd729605edc5d"
+      "sha256": "291cd505b1ba6e268750cc94673bbee5ae6df052ec7305bd1e657624fc0cebe0"
     }
   }
 }

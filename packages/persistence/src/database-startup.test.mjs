@@ -31,7 +31,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
 
     assert.equal(result.status, 'MIGRATED');
     assert.equal(result.fromVersion, 0);
-    assert.equal(result.toVersion, 34);
+    assert.equal(result.toVersion, 35);
     assert.notEqual(result.backupPath, null);
     await access(result.backupPath);
 
@@ -80,6 +80,7 @@ test('upgrades an old schema on a copy and preserves a pre-migration database', 
         { version: 32, name: 'save_schema' },
         { version: 33, name: 'combat_persistence' },
         { version: 34, name: 'combat_event_ledger' },
+        { version: 35, name: 'campaign_combat_profiles' },
       ],
     );
     assert.equal(migrated.prepare('PRAGMA integrity_check').get().integrity_check, 'ok');

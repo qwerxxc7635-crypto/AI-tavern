@@ -6654,3 +6654,9 @@
 - 按 DEC-247/248 在现有 BattleRecord 首事件加入版本化 `ENCOUNTER_STARTED` 来源合同：开发者规则/Definition 版本、接受的行动 UUID、World Profile、玩家 ID、解析后 roster/objective ID。Combat ID 由 Campaign + 行动 UUID 确定性派生，不再把同世界战斗视为同一身份。
 - Native 检查点首次保存时校验来源与 InitialState，并在同一 SQLite 事务的 `COMBAT_STARTED` 审计 fact 中记录来源；续写拒绝丢弃/更换来源。新增只读 authored 恢复校验，交叉检查 BattleRecord、InitialState 与审计 fact，旧固定示例不能通过；定向身份、原子性、篡改和旧示例回归通过。
 - 尚无 Tavern 行动生产者、真实角色/NPC 投影或 Objective 执行，故 M12-041-001/006 仍为 PARTIAL，M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL；用户 `.gitignore` 未纳入。
+
+## 2026-10-06 — 换设备开发检查点（M12-T02 仍在进行）
+
+- 按 DEC-249 增加 Campaign → Combat Profile 的显式 SQLite 绑定草案：要求锁定的世界宪章、TAVERN 状态与单个玩家角色；操作 UUID 幂等，绑定后不可修改。没有根据 `world_type` 或叙事文本推断机制，也尚未接入生产 UI/Encounter 入口。
+- 增加 migration 35、portable save v5 的 TypeScript/Rust 导入导出与互操作夹具；保留 v1–v4 历史夹具。归档互操作、TypeScript 类型检查、格式检查及 Native 129/129 通过。此为可跨设备继续开发的 WIP 检查点，不代表 M12-T02 验收完成。
+- 应用户“推送现在所有改动”的请求，随检查点纳入其既有 `.gitignore` 的 `.gstack/` 忽略规则；此前各日志的“未纳入”仅描述当时提交状态。

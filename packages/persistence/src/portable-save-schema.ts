@@ -1,5 +1,5 @@
 export const PORTABLE_SAVE_SCHEMA_VERSION = 3;
-export const PORTABLE_ARCHIVE_DATABASE_VERSION = 4;
+export const PORTABLE_ARCHIVE_DATABASE_VERSION = 5;
 export const WORLD_SCHEMA_VERSION = 1;
 
 export const LEGACY_CAMPAIGN_TABLES = [
@@ -83,10 +83,15 @@ export const V3_CAMPAIGN_TABLES = [
   'ai_candidates',
 ] as const;
 
-export const PORTABLE_CAMPAIGN_TABLES = [
+export const V4_CAMPAIGN_TABLES = [
   ...V3_CAMPAIGN_TABLES,
   'battle_records',
   'active_combat_saves',
+] as const;
+
+export const PORTABLE_CAMPAIGN_TABLES = [
+  ...V4_CAMPAIGN_TABLES,
+  'campaign_combat_profiles',
 ] as const;
 
 export type PortableCampaignTable = (typeof PORTABLE_CAMPAIGN_TABLES)[number];

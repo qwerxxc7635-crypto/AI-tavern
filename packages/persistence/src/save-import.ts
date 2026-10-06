@@ -40,6 +40,7 @@ import {
   PORTABLE_SAVE_SCHEMA_VERSION,
   V2_CAMPAIGN_TABLES,
   V3_CAMPAIGN_TABLES,
+  V4_CAMPAIGN_TABLES,
   WORLD_SCHEMA_VERSION,
   portableTableQuery,
   type PortableCampaignTable,
@@ -72,6 +73,7 @@ const ARCHIVE_DATABASE_SCHEMA_VERSION = PORTABLE_ARCHIVE_DATABASE_VERSION;
 const LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION = 1;
 const V2_ARCHIVE_DATABASE_SCHEMA_VERSION = 2;
 const V3_ARCHIVE_DATABASE_SCHEMA_VERSION = 3;
+const V4_ARCHIVE_DATABASE_SCHEMA_VERSION = 4;
 const ENTRY_NAMES = [
   'manifest.json',
   'campaign.json',
@@ -252,6 +254,7 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
     databaseVersion !== LEGACY_ARCHIVE_DATABASE_SCHEMA_VERSION &&
     databaseVersion !== V2_ARCHIVE_DATABASE_SCHEMA_VERSION &&
     databaseVersion !== V3_ARCHIVE_DATABASE_SCHEMA_VERSION &&
+    databaseVersion !== V4_ARCHIVE_DATABASE_SCHEMA_VERSION &&
     databaseVersion !== ARCHIVE_DATABASE_SCHEMA_VERSION
   ) {
     throw new PersistenceDataError(
@@ -300,7 +303,9 @@ function parseArchive(archive: Uint8Array): ParsedArchive {
         ? V2_CAMPAIGN_TABLES
         : databaseVersion === V3_ARCHIVE_DATABASE_SCHEMA_VERSION
           ? V3_CAMPAIGN_TABLES
-          : PORTABLE_CAMPAIGN_TABLES;
+          : databaseVersion === V4_ARCHIVE_DATABASE_SCHEMA_VERSION
+            ? V4_CAMPAIGN_TABLES
+            : PORTABLE_CAMPAIGN_TABLES;
   requireExactKeys(tableRoot, [...archiveTables], 'campaign.tables');
   const parsedTables = campaignTableRecord((table) =>
     !archiveTables.includes(table as never)
