@@ -118,7 +118,8 @@ pub use effect::{
 };
 pub use encounter::{
     CommittedEncounterEvent, EncounterDamageRule, EncounterDamageServices, EncounterRuleError,
-    EncounterRuleErrorCode, EncounterRuleExecutor, ReinforcementActivationCommit,
+    EncounterRuleErrorCode, EncounterRuleExecutor, EncounterStatusCommit,
+    ReinforcementActivationCommit,
 };
 pub use enemy_ai::{
     EnemyAiController, EnemyAiDecision, EnemyAiDecisionError, EnemyAiDecisionRequest,

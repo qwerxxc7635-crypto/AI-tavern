@@ -1,25 +1,25 @@
 use ember_combat_core::{
     AbilityUsageCommitPlan, AbilityUsageState, AcceptedCommandLedger, CURRENT_COMBAT_VERSIONS,
     CURRENT_REACTION_SCHEMA_VERSION, CURRENT_STATUS_SCHEMA_VERSION, CanonicalDomainValue,
-    CanonicalEventChainScheduler, CanonicalReactionCore, CombatCommandEnvelope,
-    CombatCommandPayload, CombatCommandSource, CombatControlAssignment, CombatControlAuthority,
-    CombatCostAsset, CombatCostRequestLine, CombatFixed, CombatPhase, CombatResultType, CombatRng,
-    CombatSide, CombatState, CombatSubmissionRequest, CombatSubmissionService, CombatantRuntime,
-    CombatantState, ControlCategory, DamageChannelCatalog, DamageChannelId, DamageImmunity,
-    DurationClock, EffectAmount, EffectDefinition, EncounterDamageRule, EncounterDamageServices,
-    EncounterRuleExecutor, EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel,
-    ExecutableRecoveryPath, ExecutionRevalidationOutcome, ExecutionRevalidationRequest,
-    ExecutionRevalidationService, GameplayTagCatalog, HardCcDrRuntime, HookPhase,
-    MitigationBalanceConfig, ObjectiveRuntimeState, ProvisionalDeltaEntry, ProvisionalRuntimeDelta,
-    ReactionBinding, ReactionDecisionChoice, ReactionDefinition, ReactionExecutionMode,
-    ReactionRouteOutcome, ReinforcementRuntimeState, ResolutionContextLifecycle, ResolutionRequest,
-    ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
-    RuntimeCommitContract, RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
+    CanonicalEventChainScheduler, CanonicalReactionCore, ClockLifecycleWindow,
+    CombatCommandEnvelope, CombatCommandPayload, CombatCommandSource, CombatControlAssignment,
+    CombatControlAuthority, CombatCostAsset, CombatCostRequestLine, CombatFixed, CombatPhase,
+    CombatResultType, CombatRng, CombatSide, CombatState, CombatSubmissionRequest,
+    CombatSubmissionService, CombatantRuntime, CombatantState, ControlCategory,
+    DamageChannelCatalog, DamageChannelId, DamageImmunity, DurationClock, EffectAmount,
+    EffectDefinition, EncounterDamageRule, EncounterDamageServices, EncounterRuleExecutor,
+    EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel, ExecutableRecoveryPath,
+    ExecutionRevalidationOutcome, ExecutionRevalidationRequest, ExecutionRevalidationService,
+    GameplayTagCatalog, HardCcDrRuntime, HookPhase, MitigationBalanceConfig, ObjectiveRuntimeState,
+    ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReactionBinding, ReactionDecisionChoice,
+    ReactionDefinition, ReactionExecutionMode, ReactionRouteOutcome, ReinforcementRuntimeState,
+    ResolutionContextLifecycle, ResolutionRequest, ResourceState, ResultCandidate,
+    RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, RuntimeCommitContract,
+    RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
     SoloRecoveryBalanceConfig, StandardLethalPolicy, StatusActivationPolicy, StatusDefinition,
-    StatusDurationDefinition, StatusExpiryPhase, StatusMergeEngine, StatusMergeOutcome,
-    StatusRefreshPolicy, StatusRuntime, StatusStackMode, StatusTickPhase,
-    TacticalSettingsProjection, TerminalOutcomeArbitrator, TerminalPriorityPolicy, TimelineEntry,
-    UtilityActionCategory, WorldCombatProfileId, WorldCombatProfileResolver,
+    StatusDurationDefinition, StatusExpiryPhase, StatusRefreshPolicy, StatusStackMode,
+    StatusTickPhase, TacticalSettingsProjection, TerminalOutcomeArbitrator, TerminalPriorityPolicy,
+    TimelineEntry, UtilityActionCategory, WorldCombatProfileId, WorldCombatProfileResolver,
 };
 use ember_combat_presentation::{
     AbilityTooltip, CombatAbilityUsageViewModel, CombatActionRuleProjection, CombatActionViewKind,
@@ -804,7 +804,7 @@ fn execute_ability(
     if state.combatants.iter().any(|combatant| {
         combatant.combatant_id == ENEMY_ID && combatant.state == CombatantState::Active
     }) {
-        apply_status(state)?;
+        apply_status(state, ledger, &envelope.command_id)?;
         push_event(
             events,
             DurableCombatEvent::Status {
@@ -835,8 +835,49 @@ fn execute_ability(
     Ok(())
 }
 
-fn apply_status(state: &mut CombatState) -> Result<(), CombatSessionError> {
-    let definition = StatusDefinition {
+fn apply_status(
+    state: &mut CombatState,
+    ledger: &AcceptedCommandLedger,
+    parent_command_id: &str,
+) -> Result<(), CombatSessionError> {
+    let definition = marked_status_definition();
+    let round_number = state.round.round_number;
+    let commit = EncounterRuleExecutor::commit_untriggered_status(
+        state,
+        ledger,
+        CombatCommandEnvelope {
+            command_id: format!("status-{parent_command_id}"),
+            source: CombatCommandSource::InternalDeterministic {
+                rule_id: "rule.player-ability-status".to_owned(),
+            },
+            actor_id: HERO_ID.to_owned(),
+            versions: CURRENT_COMBAT_VERSIONS,
+            payload: CombatCommandPayload::InternalRuleAction {
+                rule_id: "rule.player-ability-status".to_owned(),
+                target_ids: vec![ENEMY_ID.to_owned()],
+            },
+        },
+        &EffectDefinition::ApplyStatus {
+            status_definition_id: STATUS_ID.to_owned(),
+        },
+        &definition,
+        &GameplayTagCatalog::v0_4_1(),
+        Some(ClockLifecycleWindow {
+            clock: DurationClock::Round,
+            clock_index: round_number,
+            tick_phase_passed: false,
+            expiry_phase_passed: false,
+        }),
+    )
+    .map_err(|_| CombatSessionError::InvalidState)?;
+    if commit.committed_event.is_none() {
+        return Err(CombatSessionError::InvalidState);
+    }
+    Ok(())
+}
+
+fn marked_status_definition() -> StatusDefinition {
+    StatusDefinition {
         status_schema_version: CURRENT_STATUS_SCHEMA_VERSION,
         status_definition_id: STATUS_ID.to_owned(),
         tags: vec![],
@@ -858,74 +899,7 @@ fn apply_status(state: &mut CombatState) -> Result<(), CombatSessionError> {
         effects: vec![],
         triggers: vec![],
         strength_rank: None,
-    };
-    let target = state
-        .combatants
-        .iter()
-        .find(|value| value.combatant_id == ENEMY_ID)
-        .ok_or(CombatSessionError::InvalidState)?;
-    let incoming = StatusRuntime {
-        status_schema_version: CURRENT_STATUS_SCHEMA_VERSION,
-        status_instance_id: format!("marked-{}", state.last_committed_sequence + 1),
-        status_definition_id: STATUS_ID.to_owned(),
-        source_combatant_id: Some(HERO_ID.to_owned()),
-        stack_group_id: STATUS_ID.to_owned(),
-        stack_count: 1,
-        remaining_duration: Some(2),
-        duration_clock: DurationClock::Round,
-        application_sequence: state.last_committed_sequence + 1,
-        activation_clock_index: state.round.round_number,
-        applied_round_index: state.round.round_number,
-        applied_owner_turn_index: Some(target.normal_owner_turn_index),
-        tick_eligible_clock_index: state.round.round_number,
-        last_duration_advanced_clock_index: None,
-        strength_rank: None,
-    };
-    let outcome = StatusMergeEngine::merge(
-        &definition,
-        &GameplayTagCatalog::v0_4_1(),
-        &target.statuses,
-        incoming,
-    )
-    .map_err(|_| CombatSessionError::InvalidState)?;
-    let target = state
-        .combatants
-        .iter_mut()
-        .find(|value| value.combatant_id == ENEMY_ID)
-        .ok_or(CombatSessionError::InvalidState)?;
-    match outcome {
-        StatusMergeOutcome::Applied {
-            instance,
-            existing_instance_id,
-            ..
-        } => {
-            if let Some(existing_id) = existing_instance_id {
-                let existing = target
-                    .statuses
-                    .iter_mut()
-                    .find(|value| value.status_instance_id == existing_id)
-                    .ok_or(CombatSessionError::InvalidState)?;
-                *existing = instance;
-            } else {
-                target.statuses.push(instance);
-                target.statuses.sort_by_key(|value| {
-                    (value.application_sequence, value.status_instance_id.clone())
-                });
-            }
-        }
-        StatusMergeOutcome::Replaced { removed, applied } => {
-            target
-                .statuses
-                .retain(|value| value.status_instance_id != removed.status_instance_id);
-            target.statuses.push(applied);
-        }
-        StatusMergeOutcome::NoOp { .. } => {}
     }
-    state.last_committed_sequence += 1;
-    state.revision += 1;
-    state
-        .validate_for_commit()
-        .map_err(|_| CombatSessionError::InvalidState)
 }
 
 fn project_snapshot(
@@ -1286,6 +1260,72 @@ mod tests {
     use super::*;
 
     #[test]
+    fn status_commit_rejects_mismatched_effect_and_trigger_without_mutating_state() {
+        let (mut state, ledger) =
+            initial_state("status-boundary", CombatSessionWorld::Fantasy).unwrap();
+        let baseline = state.clone();
+        let command = || CombatCommandEnvelope {
+            command_id: "status-test-command".to_owned(),
+            source: CombatCommandSource::InternalDeterministic {
+                rule_id: "rule.status-test".to_owned(),
+            },
+            actor_id: HERO_ID.to_owned(),
+            versions: CURRENT_COMBAT_VERSIONS,
+            payload: CombatCommandPayload::InternalRuleAction {
+                rule_id: "rule.status-test".to_owned(),
+                target_ids: vec![ENEMY_ID.to_owned()],
+            },
+        };
+        let window = Some(ClockLifecycleWindow {
+            clock: DurationClock::Round,
+            clock_index: 1,
+            tick_phase_passed: false,
+            expiry_phase_passed: false,
+        });
+        let definition = marked_status_definition();
+        assert!(
+            EncounterRuleExecutor::commit_untriggered_status(
+                &mut state,
+                &ledger,
+                command(),
+                &EffectDefinition::ApplyStatus {
+                    status_definition_id: "status.wrong".to_owned()
+                },
+                &definition,
+                &GameplayTagCatalog::v0_4_1(),
+                window,
+            )
+            .is_err()
+        );
+        assert_eq!(state, baseline);
+
+        let mut triggered = definition.clone();
+        triggered
+            .triggers
+            .push(ember_combat_core::StatusTriggerDefinition {
+                trigger_id: "trigger.test".to_owned(),
+                hook: ember_combat_core::StatusTriggerHook::StatusApplied,
+                priority: 0,
+                effects: vec![],
+            });
+        assert!(
+            EncounterRuleExecutor::commit_untriggered_status(
+                &mut state,
+                &ledger,
+                command(),
+                &EffectDefinition::ApplyStatus {
+                    status_definition_id: STATUS_ID.to_owned()
+                },
+                &triggered,
+                &GameplayTagCatalog::v0_4_1(),
+                window,
+            )
+            .is_err()
+        );
+        assert_eq!(state, baseline);
+    }
+
+    #[test]
     fn four_world_sessions_react_spend_apply_status_win_and_restore() {
         for world in [
             CombatSessionWorld::Cultivation,
@@ -1355,6 +1395,21 @@ mod tests {
             let first_checkpoint = store
                 .restore_combat_checkpoint(&first.view_model.combat_instance_id)
                 .unwrap();
+            assert!(
+                first_checkpoint
+                    .state
+                    .provisional_delta
+                    .entries
+                    .iter()
+                    .any(|entry| {
+                        matches!(entry, ProvisionalDeltaEntry::StatusPresence {
+                    combatant_id,
+                    before: false,
+                    after: true,
+                    ..
+                } if combatant_id == ENEMY_ID)
+                    })
+            );
             let first_hero = first_checkpoint
                 .state
                 .combatants

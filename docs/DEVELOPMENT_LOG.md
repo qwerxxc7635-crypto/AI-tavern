@@ -6613,3 +6613,9 @@
 - 复核 Quest/Adventure 真正调用链：现有 Quest 是 AI 生成且没有开发者 rule/template ID，Adventure action 为自由文本/AI 建议，`CHECK_REQUIRED` 为普通检定。按用户的“开发者预置规则”裁定，选择酒馆内显式开发者 Encounter 行动作为本版最小生产入口，不依赖叙事文本匹配。
 - 曾在未提交分支尝试独立 SQLite Encounter 表与 migration 35；定向 Node 迁移测试通过，但继续追踪发现 portable save v4 仅携带 `battle_records`/`active_combat_saves`，新增表会导致导出/恢复遗漏。草案在提交及任何用户存档迁移之前撤回；继续复用 BattleRecord 初始状态、ordered events 与 `COMBAT_STARTED` 来存独立事件，避免第二份事实源。`DEC-248` 补充此最小落地决策。
 - 目前只完成架构与回归验证，未将生产按钮、角色/NPC 投影、Encounter Objective、Result Delta 接通；M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始。用户 `.gitignore` 保持原样。
+
+## 2026-10-06 — M12-T02 状态提交局部修复（仍在进行）
+
+- 为四世界 Session 增加持久化 `StatusPresence` 回归断言，旧直接写状态路径按预期失败。新增 Core Encounter 的受限状态提交入口：校验内部命令与 typed `ApplyStatus`、使用状态时钟和合并规则，在 cloned working state 写入状态及 provisional delta，通过不变量后一次提交并返回 `StatusApplied` 事实。Native Session 不再直接修改状态数组和提交序号。
+- 当前入口仅支持无触发器的首次状态应用；触发器、替换和已有实例重叠写入在完整事件链/可表达领域增量接通前显式拒绝。新增错误路径原子性测试。Core 344/344、Native 120/120 通过；没有进行 Windows 运行实测。
+- M12-041-003 仅为局部修复，生产 Encounter、Trigger Pipeline、Replay/Domain Delta 仍未闭环；M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始。用户 `.gitignore` 保持未纳入。

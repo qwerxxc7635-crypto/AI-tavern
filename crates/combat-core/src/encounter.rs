@@ -3,13 +3,15 @@ use std::{error::Error, fmt};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AcceptedCommandLedger, CombatCommandBoundaryError, CombatCommandEnvelope, CombatFixed,
-    CombatState, CombatantState, DamageBundle, DamageBundleCommit, DamageBundleComponent,
-    DamageBundleError, DamageDefenseProfile, DamageImmunity, EffectDefinition, EffectError,
-    EffectHandlerSet, EffectValueContext, LethalOutcomeResolver, MitigationBalanceConfig,
+    AcceptedCommandLedger, ClockLifecycleWindow, CombatCommandBoundaryError, CombatCommandEnvelope,
+    CombatFixed, CombatState, CombatantState, CommittedTriggerEvent, DamageBundle,
+    DamageBundleCommit, DamageBundleComponent, DamageBundleError, DamageDefenseProfile,
+    DamageImmunity, EffectDefinition, EffectError, EffectHandlerSet, EffectValueContext,
+    GameplayTagCatalog, LethalOutcomeResolver, MitigationBalanceConfig, ProvisionalDeltaEntry,
     RecoveryEffectCommit, RecoveryEffectProcessor, RecoveryEffectRequest, RecoveryRuleError,
-    ResolutionError, ResolutionRequest, ResolutionResolver, ReviveFollowupApplier,
-    ShieldInteraction, TimelineEntry,
+    ResolutionError, ResolutionRequest, ResolutionResolver, ResolvedEffect, ReviveFollowupApplier,
+    ShieldInteraction, StatusApplicationClockContext, StatusClockEngine, StatusDefinition,
+    StatusMergeEngine, StatusMergeOutcome, StatusRuntime, TimelineEntry,
 };
 
 /// Encounter-owned damage knobs. This is deliberately local and typed: encounter
@@ -50,6 +52,12 @@ pub struct ReinforcementActivationCommit {
     pub committed_events: Vec<CommittedEncounterEvent>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncounterStatusCommit {
+    pub committed_state_revision: u64,
+    pub committed_event: Option<CommittedTriggerEvent>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncounterRuleErrorCode {
     CommandRejected,
@@ -60,6 +68,7 @@ pub enum EncounterRuleErrorCode {
     ResolutionFailed,
     DamageCommitFailed,
     RecoveryCommitFailed,
+    StatusCommitFailed,
     ReinforcementMissing,
     ReinforcementAlreadyDeployed,
     ReinforcementStateConflict,
@@ -88,6 +97,164 @@ impl Error for EncounterRuleError {}
 pub struct EncounterRuleExecutor;
 
 impl EncounterRuleExecutor {
+    /// Commit an untriggered status as one working-state transaction. Statuses
+    /// with triggers require a live event chain and are rejected here until the
+    /// encounter scheduler owns their full dispatch lifecycle.
+    pub fn commit_untriggered_status(
+        state: &mut CombatState,
+        ledger: &AcceptedCommandLedger,
+        envelope: CombatCommandEnvelope,
+        effect: &EffectDefinition,
+        definition: &StatusDefinition,
+        tag_catalog: &GameplayTagCatalog,
+        current_window: Option<ClockLifecycleWindow>,
+    ) -> Result<EncounterStatusCommit, EncounterRuleError> {
+        let command = validate_internal_action(state, ledger, envelope)?;
+        let target_id = exactly_one_target(&command.target_ids)?;
+        let context = target_context(state, target_id)?;
+        let resolved = EffectHandlerSet::resolve(effect, &context).map_err(map_effect)?;
+        if !matches!(resolved, ResolvedEffect::ApplyStatus { ref status_definition_id }
+            if status_definition_id == &definition.status_definition_id)
+            || !definition.triggers.is_empty()
+        {
+            return Err(encounter_error(
+                EncounterRuleErrorCode::StatusCommitFailed,
+                "statusDefinition",
+            ));
+        }
+        state.validate_for_commit().map_err(|_| {
+            encounter_error(EncounterRuleErrorCode::InvariantFailed, "initialState")
+        })?;
+        let mut working = state.clone();
+        let sequence = working
+            .last_committed_sequence
+            .checked_add(1)
+            .ok_or_else(|| {
+                encounter_error(EncounterRuleErrorCode::NumericOverflow, "committedSequence")
+            })?;
+        let target = working
+            .combatants
+            .iter()
+            .find(|value| value.combatant_id == target_id)
+            .ok_or_else(|| encounter_error(EncounterRuleErrorCode::TargetMissing, target_id))?;
+        let assignment = StatusClockEngine::assign_application(
+            definition,
+            StatusApplicationClockContext {
+                round_index: working.round.round_number,
+                owner_turn_index: target.normal_owner_turn_index,
+                current_window,
+            },
+        )
+        .map_err(|error| {
+            encounter_error(
+                EncounterRuleErrorCode::StatusCommitFailed,
+                format!("clock:{:?}", error.code),
+            )
+        })?;
+        let mut incoming = StatusRuntime {
+            status_schema_version: definition.status_schema_version,
+            status_instance_id: format!("status:{}:{}", command.command_id, sequence),
+            status_definition_id: definition.status_definition_id.clone(),
+            source_combatant_id: Some(command.actor_id),
+            stack_group_id: definition.stack_group_id.clone(),
+            stack_count: 1,
+            remaining_duration: definition.duration.duration,
+            duration_clock: definition.duration.clock,
+            application_sequence: sequence,
+            activation_clock_index: 0,
+            applied_round_index: 0,
+            applied_owner_turn_index: None,
+            tick_eligible_clock_index: 0,
+            last_duration_advanced_clock_index: None,
+            strength_rank: definition.strength_rank,
+        };
+        StatusClockEngine::apply_assignment(&mut incoming, assignment);
+        let outcome = StatusMergeEngine::merge(definition, tag_catalog, &target.statuses, incoming)
+            .map_err(|error| {
+                encounter_error(
+                    EncounterRuleErrorCode::StatusCommitFailed,
+                    format!("merge:{:?}", error.code),
+                )
+            })?;
+        let target = working
+            .combatants
+            .iter_mut()
+            .find(|value| value.combatant_id == target_id)
+            .expect("target existed during status merge");
+        let applied_id = match outcome {
+            StatusMergeOutcome::Applied {
+                instance,
+                existing_instance_id,
+                ..
+            } => {
+                let id = instance.status_instance_id.clone();
+                if existing_instance_id.is_some() {
+                    return Err(encounter_error(
+                        EncounterRuleErrorCode::StatusCommitFailed,
+                        "reapplicationRequiresDomainDelta",
+                    ));
+                } else {
+                    target.statuses.push(instance);
+                    working
+                        .provisional_delta
+                        .entries
+                        .push(ProvisionalDeltaEntry::StatusPresence {
+                            combatant_id: target_id.to_owned(),
+                            status_instance_id: id.clone(),
+                            before: false,
+                            after: true,
+                        });
+                    working.provisional_delta.revision = working
+                        .provisional_delta
+                        .revision
+                        .checked_add(1)
+                        .ok_or_else(|| {
+                            encounter_error(
+                                EncounterRuleErrorCode::NumericOverflow,
+                                "provisionalRevision",
+                            )
+                        })?;
+                }
+                Some(id)
+            }
+            StatusMergeOutcome::Replaced { .. } => {
+                return Err(encounter_error(
+                    EncounterRuleErrorCode::StatusCommitFailed,
+                    "replacementRequiresEventChain",
+                ));
+            }
+            StatusMergeOutcome::NoOp { .. } => None,
+        };
+        if let Some(status_instance_id) = applied_id {
+            target.statuses.sort_by_key(|value| {
+                (value.application_sequence, value.status_instance_id.clone())
+            });
+            working.last_committed_sequence = sequence;
+            working.revision = working.revision.checked_add(1).ok_or_else(|| {
+                encounter_error(EncounterRuleErrorCode::NumericOverflow, "stateRevision")
+            })?;
+            working.validate_for_commit().map_err(|_| {
+                encounter_error(EncounterRuleErrorCode::InvariantFailed, "workingState")
+            })?;
+            let event = CommittedTriggerEvent::StatusApplied {
+                target_combatant_id: target_id.to_owned(),
+                status_instance_id,
+                event_chain_id: format!("encounter-chain:{}", command.rule_id),
+                committed_sequence: sequence,
+            };
+            *state = working;
+            Ok(EncounterStatusCommit {
+                committed_state_revision: state.revision,
+                committed_event: Some(event),
+            })
+        } else {
+            Ok(EncounterStatusCommit {
+                committed_state_revision: state.revision,
+                committed_event: None,
+            })
+        }
+    }
+
     pub fn commit_damage<P: DamageDefenseProfile, L: LethalOutcomeResolver>(
         state: &mut CombatState,
         ledger: &AcceptedCommandLedger,
