@@ -1,20 +1,20 @@
 use ember_combat_core::{
-    AbilityUsageState, AcceptedCommandLedger, CURRENT_COMBAT_VERSIONS,
+    AbilityUsageCommitPlan, AbilityUsageState, AcceptedCommandLedger, CURRENT_COMBAT_VERSIONS,
     CURRENT_REACTION_SCHEMA_VERSION, CURRENT_STATUS_SCHEMA_VERSION, CanonicalDomainValue,
     CanonicalEventChainScheduler, CanonicalReactionCore, CombatCommandEnvelope,
     CombatCommandPayload, CombatCommandSource, CombatControlAssignment, CombatControlAuthority,
     CombatCostAsset, CombatCostRequestLine, CombatFixed, CombatPhase, CombatResultType, CombatRng,
     CombatSide, CombatState, CombatSubmissionRequest, CombatSubmissionService, CombatantRuntime,
-    CombatantState, ControlCategory, CostReservationModel, DamageChannelCatalog, DamageChannelId,
-    DamageImmunity, DurationClock, EffectAmount, EffectDefinition, EncounterDamageRule,
-    EncounterDamageServices, EncounterRuleExecutor, EnemyIntentCategory, EnemyIntentPlan,
-    EnemyIntentTelegraphLevel, ExecutableRecoveryPath, GameplayTagCatalog, HardCcDrRuntime,
-    HookPhase, MitigationBalanceConfig, ObjectiveRuntimeState, ProvisionalDeltaEntry,
-    ProvisionalRuntimeDelta, ReactionBinding, ReactionDecisionChoice, ReactionDefinition,
-    ReactionExecutionMode, ReactionRouteOutcome, ReinforcementRuntimeState,
-    ResolutionContextLifecycle, ResolutionRequest, ResourceState, ResultCandidate,
-    RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, RuntimeCommitContract,
-    RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
+    CombatantState, ControlCategory, DamageChannelCatalog, DamageChannelId, DamageImmunity,
+    DurationClock, EffectAmount, EffectDefinition, EncounterDamageRule, EncounterDamageServices,
+    EncounterRuleExecutor, EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel,
+    ExecutableRecoveryPath, ExecutionRevalidationOutcome, ExecutionRevalidationRequest,
+    ExecutionRevalidationService, GameplayTagCatalog, HardCcDrRuntime, HookPhase,
+    MitigationBalanceConfig, ObjectiveRuntimeState, ProvisionalDeltaEntry, ProvisionalRuntimeDelta,
+    ReactionBinding, ReactionDecisionChoice, ReactionDefinition, ReactionExecutionMode,
+    ReactionRouteOutcome, ReinforcementRuntimeState, ResolutionContextLifecycle, ResolutionRequest,
+    ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
+    RuntimeCommitContract, RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
     SoloRecoveryBalanceConfig, StandardLethalPolicy, StatusActivationPolicy, StatusDefinition,
     StatusDurationDefinition, StatusExpiryPhase, StatusMergeEngine, StatusMergeOutcome,
     StatusRefreshPolicy, StatusRuntime, StatusStackMode, StatusTickPhase,
@@ -686,9 +686,42 @@ fn execute_ability(
         },
     )
     .map_err(|_| CombatSessionError::CommandRejected)?;
-    if submission.reservation.is_some() {
-        CostReservationModel::commit(state, &envelope.command_id)
-            .map_err(|_| CombatSessionError::InvalidState)?;
+    ResolutionContextLifecycle::create(
+        state,
+        submission.command.command,
+        format!("chain-{}", envelope.command_id),
+        submission
+            .reservation
+            .as_ref()
+            .map(|receipt| receipt.record.reservation_id.clone()),
+    )
+    .map_err(|_| CombatSessionError::InvalidState)?;
+    ResolutionContextLifecycle::complete_hook(state, HookPhase::PreAction, HookPhase::BeforeRoll)
+        .map_err(|_| CombatSessionError::InvalidState)?;
+    ResolutionContextLifecycle::mark_ready_for_revalidation(state)
+        .map_err(|_| CombatSessionError::InvalidState)?;
+    match ExecutionRevalidationService::revalidate_and_commit(
+        state,
+        ExecutionRevalidationRequest {
+            known_ability_ids: vec![data.ability_id.to_owned()],
+            disabled_ability_ids: vec![],
+            legal_target_ids: vec![ENEMY_ID.to_owned()],
+            entity_tags: vec![],
+            ability_preconditions: vec![],
+            usage_commit: Some(AbilityUsageCommitPlan {
+                ability_id: data.ability_id.to_owned(),
+                cooldown_turns: None,
+                increment_uses_this_normal_owner_turn: true,
+                increment_uses_this_battle: true,
+                increment_basic_attack_count: false,
+                once_counters: vec![],
+            }),
+        },
+    )
+    .map_err(|_| CombatSessionError::InvalidState)?
+    {
+        ExecutionRevalidationOutcome::ReadyForResolution { .. } => {}
+        ExecutionRevalidationOutcome::CancelledBeforeResolution { .. } => return Ok(()),
     }
 
     let channels = DamageChannelCatalog::v0_4_1();
@@ -759,6 +792,14 @@ fn execute_ability(
             hit_point_damage: result.hp_damage,
         },
     )?;
+    state.resolution_context = None;
+    state.revision = state
+        .revision
+        .checked_add(1)
+        .ok_or(CombatSessionError::InvalidState)?;
+    state
+        .validate_for_commit()
+        .map_err(|_| CombatSessionError::InvalidState)?;
 
     if state.combatants.iter().any(|combatant| {
         combatant.combatant_id == ENEMY_ID && combatant.state == CombatantState::Active
@@ -1311,6 +1352,17 @@ mod tests {
                     .len(),
                 1
             );
+            let first_checkpoint = store
+                .restore_combat_checkpoint(&first.view_model.combat_instance_id)
+                .unwrap();
+            let first_hero = first_checkpoint
+                .state
+                .combatants
+                .iter()
+                .find(|value| value.combatant_id == HERO_ID)
+                .unwrap();
+            assert_eq!(first_hero.ability_usage[0].uses_this_normal_owner_turn, 1);
+            assert_eq!(first_hero.ability_usage[0].uses_this_battle, 1);
             drop(store);
             let reopened = CampaignStore::open(&path).unwrap();
             let restored = reopened
@@ -1334,6 +1386,17 @@ mod tests {
                 final_snapshot.view_model.result.as_ref().unwrap().kind,
                 ember_combat_presentation::CombatResultViewKind::Victory
             );
+            let final_checkpoint = reopened
+                .restore_combat_checkpoint(&final_snapshot.view_model.combat_instance_id)
+                .unwrap();
+            let final_hero = final_checkpoint
+                .state
+                .combatants
+                .iter()
+                .find(|value| value.combatant_id == HERO_ID)
+                .unwrap();
+            assert_eq!(final_hero.ability_usage[0].uses_this_normal_owner_turn, 2);
+            assert_eq!(final_hero.ability_usage[0].uses_this_battle, 2);
             assert!(
                 final_snapshot
                     .view_model

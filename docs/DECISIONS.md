@@ -5341,3 +5341,21 @@ Windows 存档页对导入和导出分别提供固定中文 Compatibility Gate�
 
 - DEC-246 中由 URL 世界选择固定 `hero/enemy`、以及空领域提交可视为生产闭环的表述，已被 M12-T01 审计否定，不能继续作为实现依据；历史记录保留以解释当时选择。
 - 本决定只确定 **Combat 的准入条件和数据所有权**，没有授权编造某场敌人、目标或奖励，也没有确定哪条生产流程创建 Encounter 事件。后者仍是 `SB-041-002`，解决前不能把固定示例改名为 Encounter 或宣称 M12-T02 完成。
+
+## DEC-248：v0.4.1 Encounter 事件由开发者预置任务／行动规则产生
+
+- 日期：2026-10-05
+- 状态：已采纳
+- 依据：用户对 `SB-041-002` 的明确裁定；V5.2 §4.5.2.1、§11.4.1、§14.1；DEC-247
+
+### 决定
+
+v0.4.1 的独立 Encounter 事件只能由版本化、开发者预置的 Quest/Action 规则选择开发者定义的 Encounter 并在 SQLite 事务中写入。普通 AI 叙事、自由文本、Quest 风险等级与 Adventure `CHECK_REQUIRED` 本身都不是 Combat 触发权限。规则的稳定 ID、所选 Definition 版本、事件身份及解析后的初始战斗输入必须可恢复、可重放，并且同一规则重试不得创建第二场战斗。
+
+开发者 Encounter Definition 拥有预声明 roster、reinforcement 和 objective；NPC 数值来自 Character Domain 的版本化 Combat projection。AI Combat 内容候选继续受 Gate E 验证边界约束，但不作为本版 Encounter 事件生产者。
+
+### 影响与边界
+
+- 现有 AI 生成的 Quest 没有 authored rule ID，不能通过匹配标题、摘要、风险或普通检定来假定其绑定到 Encounter；需要新增显式的开发者规则/行动入口。
+- 本决定不规定任意新敌人、奖励或隐式剧情触发，不扩大到地图系统或普通 Spawn/Summon。
+- `SB-041-002` 的 A/B 产品选择已关闭；具体 schema/API/UI 接入由 M12-T02 实现和回归测试验证。

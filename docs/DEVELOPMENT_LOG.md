@@ -6600,3 +6600,10 @@
 - 用户选择 `SB-041-001` 的后者：Combat 只能从独立、持久化的 Encounter 事件进入，Adventure `CHECK_REQUIRED` 不自动转战斗。已在 `DEC-247` 记录准入、稳定身份、Encounter Definition 与 Character Domain NPC projection 所有权，并明确 supersede DEC-246 的固定示例生产闭环推断。
 - 复核当前 Adventure 输出、迁移与 Native Session 后，仓库仍无生产 Encounter 事件写入方。开发者预置 Quest/Action 规则与经现有 Candidate/Validator/Domain Transaction 自动接受的结构化 Adventure/AI 候选，会对同一冒险操作产生不同 Encounter/CombatState/RNG/持久化结果；登记 `SB-041-002` 请求确定事件生产者。未新增默认敌人、触发点或奖励。
 - M12-T02 仍为 BLOCKED，M12-T03 未开始；既有 `.gitignore` 用户修改继续保持未暂存。
+
+## 2026-10-06 — M12-T02 执行复验修复与 Encounter 事件生产者裁定
+
+- 用户选择 `SB-041-002` 的前者并授权普通工程取舍：v0.4.1 由开发者预置 Quest/Action 规则选择开发者 Encounter Definition，再持久化独立 Encounter 事件；不由 AI 文本、Quest 风险或普通 `CHECK_REQUIRED` 隐式触发。`DEC-248` 记录该架构边界，M12-T02 从 BLOCKED 恢复为 IN_PROGRESS。
+- 根因验证：原 Native Session 在 Submission 后直接 `CostReservationModel::commit`，未建立技能 `ResolutionContext` 或调用 Execution Revalidation；四世界回归加入已使用次数断言，旧代码在 `0 != 1` 处失败。修复后通过 Core 的 ready/revalidate/atomic usage 路径，第一次与第二次技能分别持久化 usage `1`、`2`，原定向测试通过。
+- 完整 Native `--lib` 首跑揭出旧 checkpoint 并发修复的测试错误：压力测试首轮将 `checked_sub(1)` 解释为 `Some(0)`，但新记录的 expected revision 必须为 `None`。只修测试输入，不降低冲突保护；64 次恢复专项和 Native 119/119 通过。生产 Encounter 仍未接入，M12-041-002 仅为现有 Session 的局部修复，不宣称 finding 或任务 PASS。
+- 用户 `.gitignore` 既有修改未纳入本次代码/文档改动。

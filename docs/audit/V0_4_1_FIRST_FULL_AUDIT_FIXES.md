@@ -7,8 +7,9 @@ Audit baseline: [`V0_4_1_FIRST_FULL_AUDIT.md`](V0_4_1_FIRST_FULL_AUDIT.md). This
 | M12-041-007 | Checkpoint save advanced the database revision but did not compare the writer's restored revision. | `c9b9410` adds an expected persistence revision checked in the immediate SQLite transaction. | Native exact repeated-save/stale-writer test and combat-session test pass. | FIXED LOCALLY; full gate pending |
 | M12-041-008 | The production Combat page bypassed the validated Theme Loader/Resolver and returned a synthetic hard-coded binding. | `ac57006` loads the selected `*-default` package and common fallback assets; current branch also narrows the binding layout type to the contract enum. | Targeted UI/theme tests (15) and TypeScript check pass; real Windows/RC playtest pending. | FIXED LOCALLY; platform gate pending |
 | M12-041-014 | Visible-text validation accepted any string containing one Chinese character. | `4ab2574` rejects embedded internal combat tokens and ASCII functional text while preserving user-supplied combatant names. | Combat presentation unit suite (16) passes, including mixed-language regression cases. | FIXED LOCALLY; full language gate pending |
+| M12-041-002 | Native Session accepted an ability and directly committed its reservation, without a ResolutionContext or Execution Revalidation. | Current branch creates the canonical context, revalidates immediately before resolution, and atomically commits costs plus ability usage. | Four-world session regression first failed at usage 0, then passed at 1/2 after fix; Native suite 119/119 passed. | PARTIAL; current Session still uses fixed demo content |
 
-M12-041-001..006, 009..013 remain OPEN. M12-041-010 cannot close until the final source commit has its required Windows evidence. A partial local fix is not a release finding closure.
+M12-041-001, 003..006, 009..013 remain OPEN; 002 has a verified fix in the existing Session but cannot close until the real Encounter session uses the same path. M12-041-010 cannot close until the final source commit has its required Windows evidence. A partial local fix is not a release finding closure.
 
 ## SB-041-001 — Encounter ingress and authoritative definition (RESOLVED 2026-10-05)
 
@@ -22,7 +23,7 @@ M12-041-001..006, 009..013 remain OPEN. M12-041-010 cannot close until the final
 
 **Decision:** The user selected B: only an independent, persisted, versioned Encounter event starts Combat. Existing Adventure `CHECK_REQUIRED` remains a non-combat check. V5.2 makes Encounter Definition the owner of stable roster/reinforcement/objectives and §4.5.2.1 makes Character Domain the source of validated NPC combat projection; see `DEC-247`. This resolves the A/B ingress choice, not the event producer below.
 
-## SB-041-002 — Who creates the persisted Encounter event? (OPEN)
+## SB-041-002 — Who creates the persisted Encounter event? (RESOLVED 2026-10-05)
 
 - **Relevant frozen rules:** V5.2 §4.5.2.1, §11.4.1, §14.1 and §11.2.1/§11.2.2; external TASKS M12-T04. AI may supply bounded content candidates but may not directly mutate canonical state.
 - **Minimal state/command:** An Adventure has a valid campaign and player character and reaches a scene/action outcome. There is no existing Encounter request field, Encounter Definition table, or production Encounter event writer. The next action may or may not offer a combat option; no typed event is currently produced.
@@ -32,4 +33,4 @@ M12-041-001..006, 009..013 remain OPEN. M12-041-010 cannot close until the final
 - **Affected chain:** M12-041-001, 004–006 and 009–013; M11 Final Gate and M12-T02 onward. Both options preserve the user's explicit-event decision; selecting either without direction would add a new product behavior.
 - **Safe independent work:** Continue isolated correctness fixes and define fail-closed validation contracts. Do not add a fallback enemy/trigger, treat `CHECK_REQUIRED` as combat, or label a fixture as a real production Encounter.
 
-Decision required: which production flow emits the explicit Encounter event—an authored quest/action rule selecting a developer definition, or a validated structured Adventure/AI candidate? If both are intended, identify which is required for v0.4.1 and how the player reaches it.
+**Decision:** The user selected A for v0.4.1: a pre-authored Quest/Action rule selects a developer-defined Encounter and persists the event. AI narrative/candidate text cannot emit the event. The implementation must introduce a versioned authored rule identity and explicit action boundary; matching on free-text quest prose/risk or silently treating `CHECK_REQUIRED` as combat would violate this decision. The exact rule/definition content is developer-owned implementation data, not an LLM runtime choice.

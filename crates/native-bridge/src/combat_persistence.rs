@@ -1193,7 +1193,8 @@ mod tests {
             let receipt = store
                 .save_combat_checkpoint(CombatCheckpointWrite {
                     campaign_id: &campaign.id,
-                    expected_persistence_revision: expected_revision.checked_sub(1),
+                    expected_persistence_revision: (expected_revision > 1)
+                        .then_some(expected_revision - 1),
                     initial_state: &initial,
                     state: &live,
                     accepted_commands: ledger.commands(),
