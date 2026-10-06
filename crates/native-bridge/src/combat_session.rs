@@ -11,6 +11,7 @@ use ember_combat_core::{
     EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel, ExecutableRecoveryPath,
     ExecutionRevalidationOutcome, ExecutionRevalidationRequest, ExecutionRevalidationService,
     GameplayTagCatalog, HardCcDrRuntime, HookPhase, MitigationBalanceConfig, ObjectiveRuntimeState,
+    PreconditionFailure, PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec,
     ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReactionBinding, ReactionDecisionChoice,
     ReactionDefinition, ReactionExecutionMode, ReactionRouteOutcome, ReinforcementRuntimeState,
     ResolutionContextLifecycle, ResolutionRequest, ResourceState, ResultCandidate,
@@ -650,42 +651,9 @@ fn execute_ability(
         return Err(CombatSessionError::CommandRejected);
     }
     let data = world.data();
-    let submission = CombatSubmissionService::submit(
-        state,
-        ledger,
-        CombatSubmissionRequest {
-            envelope: envelope.clone(),
-            control_assignments: assignments(),
-            stable_input_point: true,
-            utility_ai_evaluation_in_progress: false,
-            known_ability_ids: vec![data.ability_id.to_owned()],
-            disabled_ability_ids: vec![],
-            legal_target_ids: vec![ENEMY_ID.to_owned()],
-            entity_tags: vec![],
-            ability_preconditions: vec![],
-            costs: vec![
-                CombatCostRequestLine {
-                    cost_id: "action-point".to_owned(),
-                    asset: CombatCostAsset::ActionPoints {
-                        combatant_id: HERO_ID.to_owned(),
-                    },
-                    amount: 1,
-                    consume_cost_on_interrupt: false,
-                },
-                CombatCostRequestLine {
-                    cost_id: "world-resource".to_owned(),
-                    asset: CombatCostAsset::Resource {
-                        combatant_id: HERO_ID.to_owned(),
-                        resource_id: data.resource_id.to_owned(),
-                    },
-                    amount: 2,
-                    consume_cost_on_interrupt: false,
-                },
-            ],
-            parent_reservation_id: None,
-        },
-    )
-    .map_err(|_| CombatSessionError::CommandRejected)?;
+    let request = ability_submission_request(state, envelope.clone(), data);
+    let submission = CombatSubmissionService::submit(state, ledger, request)
+        .map_err(|_| CombatSessionError::CommandRejected)?;
     ResolutionContextLifecycle::create(
         state,
         submission.command.command,
@@ -700,14 +668,16 @@ fn execute_ability(
         .map_err(|_| CombatSessionError::InvalidState)?;
     ResolutionContextLifecycle::mark_ready_for_revalidation(state)
         .map_err(|_| CombatSessionError::InvalidState)?;
+    let legal_target_ids =
+        ability_submission_request(state, envelope.clone(), data).legal_target_ids;
     match ExecutionRevalidationService::revalidate_and_commit(
         state,
         ExecutionRevalidationRequest {
             known_ability_ids: vec![data.ability_id.to_owned()],
             disabled_ability_ids: vec![],
-            legal_target_ids: vec![ENEMY_ID.to_owned()],
+            legal_target_ids,
             entity_tags: vec![],
-            ability_preconditions: vec![],
+            ability_preconditions: ability_preconditions(),
             usage_commit: Some(AbilityUsageCommitPlan {
                 ability_id: data.ability_id.to_owned(),
                 cooldown_turns: None,
@@ -835,6 +805,59 @@ fn execute_ability(
     Ok(())
 }
 
+fn ability_preconditions() -> Vec<PreconditionRuleSpec> {
+    vec![PreconditionRuleSpec::with_default_timing(
+        "ability.cooldown",
+        PreconditionRule::CooldownReady,
+    )]
+}
+
+fn ability_submission_request(
+    state: &CombatState,
+    envelope: CombatCommandEnvelope,
+    data: WorldSessionData,
+) -> CombatSubmissionRequest {
+    let enemy_active = state
+        .combatants
+        .iter()
+        .any(|value| value.combatant_id == ENEMY_ID && value.state == CombatantState::Active);
+    CombatSubmissionRequest {
+        envelope,
+        control_assignments: assignments(),
+        stable_input_point: true,
+        utility_ai_evaluation_in_progress: false,
+        known_ability_ids: vec![data.ability_id.to_owned()],
+        disabled_ability_ids: vec![],
+        legal_target_ids: if enemy_active {
+            vec![ENEMY_ID.to_owned()]
+        } else {
+            vec![]
+        },
+        entity_tags: vec![],
+        ability_preconditions: ability_preconditions(),
+        costs: vec![
+            CombatCostRequestLine {
+                cost_id: "action-point".to_owned(),
+                asset: CombatCostAsset::ActionPoints {
+                    combatant_id: HERO_ID.to_owned(),
+                },
+                amount: 1,
+                consume_cost_on_interrupt: false,
+            },
+            CombatCostRequestLine {
+                cost_id: "world-resource".to_owned(),
+                asset: CombatCostAsset::Resource {
+                    combatant_id: HERO_ID.to_owned(),
+                    resource_id: data.resource_id.to_owned(),
+                },
+                amount: 2,
+                consume_cost_on_interrupt: false,
+            },
+        ],
+        parent_reservation_id: None,
+    }
+}
+
 fn apply_status(
     state: &mut CombatState,
     ledger: &AcceptedCommandLedger,
@@ -915,32 +938,63 @@ fn project_snapshot(
         .iter()
         .find(|value| value.combatant_id == HERO_ID)
         .ok_or(CombatSessionError::InvalidState)?;
-    let enemy_active = state
-        .combatants
-        .iter()
-        .any(|value| value.combatant_id == ENEMY_ID && value.state == CombatantState::Active);
-    let legal = state.confirmed_result.is_none()
-        && state.pending_reaction.is_none()
-        && enemy_active
-        && hero.action_points >= 1
-        && hero
-            .resources
-            .iter()
-            .any(|resource| resource.resource_id == data.resource_id && resource.current >= 2);
+    let request = ability_submission_request(
+        state,
+        CombatCommandEnvelope {
+            command_id: format!("preview-{}", state.revision),
+            source: CombatCommandSource::Player {
+                controller_id: CONTROLLER_ID.to_owned(),
+            },
+            actor_id: HERO_ID.to_owned(),
+            versions: state.versions,
+            payload: CombatCommandPayload::UseAbility {
+                ability_id: data.ability_id.to_owned(),
+                target_id: Some(ENEMY_ID.to_owned()),
+            },
+        },
+        data,
+    );
+    let preview = CombatSubmissionService::preview(state, &request)
+        .map_err(|_| CombatSessionError::InvalidState)?;
+    let legal = state.confirmed_result.is_none() && preview.is_legal();
     let usage = hero
         .ability_usage
         .iter()
         .find(|value| value.ability_id == data.ability_id)
         .ok_or(CombatSessionError::InvalidState)?;
-    let failures = if legal {
-        vec![]
-    } else {
-        vec![ember_combat_core::PreconditionFailure {
-            rule_id: "runtime.available".to_owned(),
-            code: ember_combat_core::PreconditionFailureCode::ActorCannotAct,
+    let mut failures = preview.preconditions.failures;
+    if preview.input_barrier.is_some() {
+        failures.push(PreconditionFailure {
+            rule_id: "submission.input-barrier".to_owned(),
+            code: PreconditionFailureCode::UnstableInputPoint,
             subject_id: Some(HERO_ID.to_owned()),
-        }]
-    };
+        });
+    }
+    if state.confirmed_result.is_some() {
+        failures.push(PreconditionFailure {
+            rule_id: "submission.terminal".to_owned(),
+            code: PreconditionFailureCode::ActorCannotAct,
+            subject_id: Some(HERO_ID.to_owned()),
+        });
+    }
+    let action_point_cost = request
+        .costs
+        .iter()
+        .find_map(|line| match &line.asset {
+            CombatCostAsset::ActionPoints { .. } => Some(line.amount),
+            _ => None,
+        })
+        .ok_or(CombatSessionError::InvalidState)?;
+    let resource_cost = request
+        .costs
+        .iter()
+        .find_map(|line| match &line.asset {
+            CombatCostAsset::Resource { resource_id, .. } if resource_id == data.resource_id => {
+                Some(line.amount)
+            }
+            _ => None,
+        })
+        .ok_or(CombatSessionError::InvalidState)?;
     let resource = hero
         .resources
         .iter()
@@ -955,7 +1009,7 @@ fn project_snapshot(
             requires_target: true,
             is_legal: legal,
             legal_target_ids: if legal {
-                vec![ENEMY_ID.to_owned()]
+                request.legal_target_ids
             } else {
                 vec![]
             },
@@ -969,11 +1023,11 @@ fn project_snapshot(
             }),
             cost_preview: Some(CombatCostPreviewRuleProjection {
                 action_points_before: hero.action_points,
-                action_points_after: (hero.action_points - 1).max(0),
+                action_points_after: (hero.action_points - action_point_cost).max(0),
                 resource_transitions: vec![CombatResourceTransitionRuleProjection {
                     resource_id: data.resource_id.to_owned(),
                     before: resource.current,
-                    after: (resource.current - 2).max(resource.min_value),
+                    after: (resource.current - resource_cost).max(resource.min_value),
                 }],
             }),
             tooltip: Some(tooltip(data)?),
@@ -1258,6 +1312,125 @@ fn push_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn projected_ability_respects_core_cooldown_rule() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("combat.sqlite")).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let world = CombatSessionWorld::Fantasy;
+        let initial = store
+            .start_or_restore_combat_session(&campaign.id, world)
+            .unwrap();
+        let reaction = initial.view_model.pending_reaction.as_ref().unwrap();
+        let after_reaction = store
+            .submit_combat_session_command(
+                &campaign.id,
+                world,
+                envelope(
+                    &initial,
+                    CombatCommandPayload::ResolveReaction {
+                        reaction_window_id: reaction.reaction_window_id.clone(),
+                        choice: ReactionDecisionChoice::Trigger,
+                        selected_reaction_id: Some(REACTION_ID.to_owned()),
+                    },
+                ),
+            )
+            .unwrap();
+        let mut restored = store
+            .restore_combat_checkpoint(&after_reaction.view_model.combat_instance_id)
+            .unwrap();
+        restored
+            .state
+            .combatants
+            .iter_mut()
+            .find(|value| value.combatant_id == HERO_ID)
+            .unwrap()
+            .ability_usage[0]
+            .cooldown_remaining = 1;
+        let projected = project_snapshot(
+            campaign.id.clone(),
+            world,
+            restored.persistence_revision,
+            &restored.state,
+            &restored.events,
+        )
+        .unwrap();
+        let ability = projected
+            .view_model
+            .actions
+            .iter()
+            .find(|value| value.action_id == world.data().ability_id)
+            .unwrap();
+        assert!(!ability.enabled);
+        assert!(
+            ability
+                .disabled_reasons_zh_cn
+                .contains(&"技能仍在冷却".to_owned())
+        );
+        let request = ability_submission_request(
+            &restored.state,
+            envelope(
+                &after_reaction,
+                CombatCommandPayload::UseAbility {
+                    ability_id: world.data().ability_id.to_owned(),
+                    target_id: Some(ENEMY_ID.to_owned()),
+                },
+            ),
+            world.data(),
+        );
+        let preview = CombatSubmissionService::preview(&restored.state, &request).unwrap();
+        let mut submitted_state = restored.state.clone();
+        let mut ledger =
+            AcceptedCommandLedger::restore(restored.accepted_commands.clone()).unwrap();
+        let ember_combat_core::CombatSubmissionError::PreconditionsFailed(actual) =
+            CombatSubmissionService::submit(&mut submitted_state, &mut ledger, request)
+                .unwrap_err()
+        else {
+            panic!("cooldown should reject at the shared submission boundary");
+        };
+        assert_eq!(actual.failures, preview.preconditions.failures);
+        assert_eq!(submitted_state, restored.state);
+
+        let hero = restored
+            .state
+            .combatants
+            .iter_mut()
+            .find(|value| value.combatant_id == HERO_ID)
+            .unwrap();
+        hero.ability_usage[0].cooldown_remaining = 0;
+        hero.action_points = 0;
+        hero.resources
+            .iter_mut()
+            .find(|value| value.resource_id == world.data().resource_id)
+            .unwrap()
+            .current = 0;
+        let projected = project_snapshot(
+            campaign.id,
+            world,
+            restored.persistence_revision,
+            &restored.state,
+            &restored.events,
+        )
+        .unwrap();
+        let ability = projected
+            .view_model
+            .actions
+            .iter()
+            .find(|value| value.action_id == world.data().ability_id)
+            .unwrap();
+        assert!(!ability.enabled);
+        assert!(
+            ability
+                .disabled_reasons_zh_cn
+                .contains(&"行动点不足".to_owned())
+        );
+        assert!(
+            ability
+                .disabled_reasons_zh_cn
+                .contains(&"资源不足".to_owned())
+        );
+    }
 
     #[test]
     fn status_commit_rejects_mismatched_effect_and_trigger_without_mutating_state() {

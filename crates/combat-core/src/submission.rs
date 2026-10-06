@@ -8,8 +8,9 @@ use crate::{
     CombatCostRequestLine, CombatState, CommandAcceptanceStatus, CostReservationError,
     CostReservationModel, CostReservationReceipt, CostReservationRequest, EntityTagFacts,
     ExternalInputActivity, ExternalInputBarrier, ExternalInputBarrierError,
-    PreconditionDefinitionError, PreconditionEvaluation, PreconditionEvaluationContext,
-    PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem, PreconditionTiming,
+    ExternalInputBarrierErrorCode, PreconditionDefinitionError, PreconditionEvaluation,
+    PreconditionEvaluationContext, PreconditionRule, PreconditionRuleSpec, PreconditionRuleSystem,
+    PreconditionTiming,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -54,6 +55,19 @@ pub struct CombatSubmissionAccepted {
     pub reservation: Option<CostReservationReceipt>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CombatSubmissionPreview {
+    pub preconditions: PreconditionEvaluation,
+    pub input_barrier: Option<ExternalInputBarrierErrorCode>,
+}
+
+impl CombatSubmissionPreview {
+    #[must_use]
+    pub fn is_legal(&self) -> bool {
+        self.input_barrier.is_none() && self.preconditions.passed()
+    }
+}
+
 #[derive(Debug)]
 pub enum CombatSubmissionError {
     CommandBoundary(CombatCommandBoundaryError),
@@ -76,6 +90,29 @@ impl Error for CombatSubmissionError {}
 pub struct CombatSubmissionService;
 
 impl CombatSubmissionService {
+    /// Read-only preview using the same mandatory, cost, and authored ability
+    /// rules as submission. It does not accept a command or reserve costs.
+    pub fn preview(
+        state: &CombatState,
+        request: &CombatSubmissionRequest,
+    ) -> Result<CombatSubmissionPreview, CombatSubmissionError> {
+        validate_submission_facts(request)?;
+        let input_barrier = ExternalInputBarrier::validate(
+            state,
+            &request.envelope,
+            ExternalInputActivity {
+                utility_ai_evaluation_in_progress: request.utility_ai_evaluation_in_progress,
+            },
+        )
+        .err()
+        .map(|error| error.code);
+        let preconditions = evaluate_submission_preconditions(state, request)?;
+        Ok(CombatSubmissionPreview {
+            preconditions,
+            input_barrier,
+        })
+    }
+
     pub fn submit(
         state: &mut CombatState,
         accepted_commands: &mut AcceptedCommandLedger,
@@ -131,29 +168,7 @@ impl CombatSubmissionService {
             },
         )
         .map_err(CombatSubmissionError::ExternalInputBarrier)?;
-        let source_controls_actor = source_controls_actor(
-            &working_state,
-            &request.envelope.source,
-            &request.envelope.actor_id,
-            &request.control_assignments,
-        );
-        let rules = submission_rules(&request);
-        let effective_target_id = selected_target_id(&request.envelope);
-        let context = PreconditionEvaluationContext {
-            state: &working_state,
-            command: &request.envelope,
-            effective_target_id,
-            source_controls_actor,
-            stable_input_point: request.stable_input_point,
-            reservation_id: None,
-            known_ability_ids: &request.known_ability_ids,
-            disabled_ability_ids: &request.disabled_ability_ids,
-            legal_target_ids: &request.legal_target_ids,
-            entity_tags: &request.entity_tags,
-        };
-        let preconditions =
-            PreconditionRuleSystem::evaluate(PreconditionTiming::Submission, &rules, &context)
-                .map_err(CombatSubmissionError::PreconditionDefinition)?;
+        let preconditions = evaluate_submission_preconditions(&working_state, &request)?;
         if !preconditions.passed() {
             return Err(CombatSubmissionError::PreconditionsFailed(preconditions));
         }
@@ -193,6 +208,33 @@ impl CombatSubmissionService {
             reservation,
         })
     }
+}
+
+fn evaluate_submission_preconditions(
+    state: &CombatState,
+    request: &CombatSubmissionRequest,
+) -> Result<PreconditionEvaluation, CombatSubmissionError> {
+    let source_controls_actor = source_controls_actor(
+        state,
+        &request.envelope.source,
+        &request.envelope.actor_id,
+        &request.control_assignments,
+    );
+    let rules = submission_rules(request);
+    let context = PreconditionEvaluationContext {
+        state,
+        command: &request.envelope,
+        effective_target_id: selected_target_id(&request.envelope),
+        source_controls_actor,
+        stable_input_point: request.stable_input_point,
+        reservation_id: None,
+        known_ability_ids: &request.known_ability_ids,
+        disabled_ability_ids: &request.disabled_ability_ids,
+        legal_target_ids: &request.legal_target_ids,
+        entity_tags: &request.entity_tags,
+    };
+    PreconditionRuleSystem::evaluate(PreconditionTiming::Submission, &rules, &context)
+        .map_err(CombatSubmissionError::PreconditionDefinition)
 }
 
 fn submission_rules(request: &CombatSubmissionRequest) -> Vec<PreconditionRuleSpec> {

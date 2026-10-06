@@ -6625,3 +6625,9 @@
 - 复核生产入口后确认 NPC 当前 Schema 只有叙事字段，`CombatAttributeResolver` 对 `NpcWithoutCombatProjection` 明确拒绝；按 V5.2 §4.5.2.1 不用自由文本猜战斗数值，也不把固定示例敌人标为真实 Encounter。
 - 四世界回归加入“完成并清理后再次启动同一 Campaign/World”与历史 Replay Input 不变断言；旧实现按预期失败。`save_combat_checkpoint` 在 IMMEDIATE SQLite 事务内检查同 ID BattleRecord：新建时如已有历史即拒绝；续写时要求历史所属 Campaign、InitialStateHash 一致且无结果提交标记。回归与 Native 120/120 通过。
 - 这只阻断旧历史被重用，不会产生第二场独立身份；后续仍须从开发者预置 Encounter 事件生成新 Combat ID 并接入角色/NPC 投影、Objective 与领域事务。M12-041-006 未关闭；M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL。用户 `.gitignore` 未纳入任务改动。
+
+## 2026-10-06 — M12-T02 UI 行动合法性局部同源（仍在进行）
+
+- 复核发现 Native 会话的 `project_snapshot` 手写 AP/资源/敌人检查并将所有非法状态折叠成“角色无法行动”，而真实提交由 Core 的 Precondition/Cost rules 判定。增加只读 `CombatSubmissionService::preview`，与提交共用 mandatory/cost/ability rule evaluator；Native 预览与提交共用同一 request builder 和冷却规则，费用显示读取同一 cost line 的数额。
+- 冷却回归在旧代码下显示技能可用；修复后 UI 给出“技能仍在冷却”，直接提交返回完全相同的 Core 失败记录且状态不变。AP 和资源不足分别显示对应原因。Core 344/344、Native 121/121 通过，未进行 Windows 实测。
+- 通用 GetLegalTargets、真实 Encounter action catalog 及全类型费用预览仍未完成，M12-041-013 只记局部修复。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL；用户 `.gitignore` 保持未纳入。

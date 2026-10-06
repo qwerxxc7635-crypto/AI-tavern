@@ -270,7 +270,8 @@ pub use status_merge::{
 };
 pub use submission::{
     CombatControlAssignment, CombatControlAuthority, CombatSubmissionAccepted,
-    CombatSubmissionError, CombatSubmissionRequest, CombatSubmissionService,
+    CombatSubmissionError, CombatSubmissionPreview, CombatSubmissionRequest,
+    CombatSubmissionService,
 };
 pub use tactical::{
     CompanionTacticalSettings, ConsumablePolicy, ProtectMainCharacterPriority,
