@@ -6648,3 +6648,9 @@
 
 - 生产入口只恢复后，缺失检查点是正常的“尚未开始战斗”，不应冒充数据库故障。Tauri 将 `CombatPersistenceError::NotFound` 映射为非重试的 `COMBAT_NOT_STARTED`；Combat 页面据此显示返回冒险的明确提示，其他载入失败仍显示通用无修改说明。
 - 增加桌面错误契约与页面回归；这没有创建 Encounter 或开放新的触发条件。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始；用户 `.gitignore` 保持未纳入。
+
+## 2026-10-06 — M12-T02 Encounter 来源与身份合同（仍在进行）
+
+- 按 DEC-247/248 在现有 BattleRecord 首事件加入版本化 `ENCOUNTER_STARTED` 来源合同：开发者规则/Definition 版本、接受的行动 UUID、World Profile、玩家 ID、解析后 roster/objective ID。Combat ID 由 Campaign + 行动 UUID 确定性派生，不再把同世界战斗视为同一身份。
+- Native 检查点首次保存时校验来源与 InitialState，并在同一 SQLite 事务的 `COMBAT_STARTED` 审计 fact 中记录来源；续写拒绝丢弃/更换来源。新增只读 authored 恢复校验，交叉检查 BattleRecord、InitialState 与审计 fact，旧固定示例不能通过；定向身份、原子性、篡改和旧示例回归通过。
+- 尚无 Tavern 行动生产者、真实角色/NPC 投影或 Objective 执行，故 M12-041-001/006 仍为 PARTIAL，M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL；用户 `.gitignore` 未纳入。

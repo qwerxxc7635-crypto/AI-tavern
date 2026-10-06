@@ -11,7 +11,10 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
-use crate::{CampaignStore, CampaignStoreError, current_timestamp};
+use crate::{
+    AuthoredEncounterEvent, AuthoredEncounterOrigin, CampaignStore, CampaignStoreError,
+    current_timestamp,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -113,6 +116,12 @@ impl CampaignStore {
         write: CombatCheckpointWrite<'_>,
     ) -> Result<CombatCheckpointReceipt, CombatPersistenceError> {
         let parts = validate_and_partition(&write)?;
+        let authored_origin = authored_origin_from_events(write.events)?;
+        if let Some(origin) = &authored_origin {
+            origin
+                .validate_initial_state(write.campaign_id, write.initial_state)
+                .map_err(|_| CombatPersistenceError::InvalidCheckpoint)?;
+        }
         let at = current_timestamp().map_err(CombatPersistenceError::Store)?;
         let mut connection = self.connect().map_err(CombatPersistenceError::Store)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -143,7 +152,7 @@ impl CampaignStore {
         }
         let historical = transaction
             .query_row(
-                "SELECT campaign_id,initial_state_hash,result_commit_id
+                "SELECT campaign_id,initial_state_hash,result_commit_id,events_json
                  FROM battle_records WHERE combat_instance_id=?1",
                 [&write.state.combat_instance_id],
                 |row| {
@@ -151,14 +160,21 @@ impl CampaignStore {
                         row.get::<_, String>(0)?,
                         row.get::<_, String>(1)?,
                         row.get::<_, Option<String>>(2)?,
+                        row.get::<_, String>(3)?,
                     ))
                 },
             )
             .optional()?;
         match (actual_revision, historical) {
             (None, Some(_)) => return Err(CombatPersistenceError::ResultCommitConflict),
-            (Some(_), Some((campaign, hash, None)))
-                if campaign == write.campaign_id && hash == initial_hash => {}
+            (Some(_), Some((campaign, hash, None, historical_events)))
+                if campaign == write.campaign_id && hash == initial_hash =>
+            {
+                let historical_values: Vec<Value> = serde_json::from_str(&historical_events)?;
+                if authored_origin_from_events(&historical_values)? != authored_origin {
+                    return Err(CombatPersistenceError::InvalidCheckpoint);
+                }
+            }
             (Some(_), _) => return Err(CombatPersistenceError::ResultCommitConflict),
             (None, None) => {}
         }
@@ -212,6 +228,7 @@ impl CampaignStore {
             write.campaign_id,
             &write.state.combat_instance_id,
             &initial_hash,
+            authored_origin.as_ref(),
             &at,
         )?;
 
@@ -636,20 +653,44 @@ fn archive_combat_error(error: CombatPersistenceError) -> CampaignStoreError {
     }
 }
 
+fn authored_origin_from_events(
+    events: &[Value],
+) -> Result<Option<AuthoredEncounterOrigin>, CombatPersistenceError> {
+    if events
+        .iter()
+        .skip(1)
+        .any(|value| value.get("kind").and_then(Value::as_str) == Some("ENCOUNTER_STARTED"))
+    {
+        return Err(CombatPersistenceError::InvalidCheckpoint);
+    }
+    match events.first() {
+        Some(value) if value.get("kind").and_then(Value::as_str) == Some("ENCOUNTER_STARTED") => {
+            AuthoredEncounterEvent::from_first_event(value)
+                .map(Some)
+                .map_err(|_| CombatPersistenceError::InvalidCheckpoint)
+        }
+        _ => Ok(None),
+    }
+}
+
 fn ensure_combat_started_fact(
     transaction: &rusqlite::Transaction<'_>,
     campaign_id: &str,
     combat_instance_id: &str,
     initial_state_hash: &str,
+    authored_origin: Option<&AuthoredEncounterOrigin>,
     occurred_at: &str,
 ) -> Result<(), CombatPersistenceError> {
     let expected_id = format!("combat-ledger-start:{combat_instance_id}");
     let expected_operation = format!("combat-start:{combat_instance_id}");
-    let expected_payload = serde_json::json!({
+    let mut expected_payload = serde_json::json!({
         "combatInstanceId": combat_instance_id,
         "event": "combat.started",
         "initialStateHash": initial_state_hash,
     });
+    if let Some(origin) = authored_origin {
+        expected_payload["encounterOrigin"] = serde_json::to_value(origin)?;
+    }
     let stored = transaction
         .query_row(
             "SELECT id,campaign_id,event_type,operation_id,payload_json,payload_version,source
@@ -1041,6 +1082,126 @@ mod tests {
     use super::*;
 
     const SEED: &str = "00112233445566778899aabbccddeeff";
+
+    #[test]
+    fn authored_start_provenance_is_atomic_and_immutable_with_the_checkpoint() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("combat.sqlite")).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let origin = AuthoredEncounterOrigin {
+            schema_version: 1,
+            operation_id: "f6a931df-cb50-4bc8-8f30-48caf969383e".to_owned(),
+            rule_id: "tavern.sparring".to_owned(),
+            rule_version: 1,
+            definition_id: "encounter.sparring.fantasy".to_owned(),
+            definition_version: 1,
+            world_profile_id: WorldCombatProfileId::Fantasy,
+            player_character_id: "actor-a".to_owned(),
+            roster_combatant_ids: vec!["actor-a".to_owned(), "actor-b".to_owned()],
+            objective_ids: vec!["survive-one-round".to_owned()],
+        };
+        let mut state = fixture_state_with_id(&origin.combat_instance_id(&campaign.id).unwrap());
+        state.objectives.objectives.push(ObjectiveRuntime {
+            objective_id: "survive-one-round".to_owned(),
+            kind: ObjectiveKind::Survive,
+            required: true,
+            tracked_combatant_ids: vec![],
+            target_id: None,
+            rounds_required: Some(1),
+            fail_on_downed: false,
+            removed_counts_as_defeated: false,
+            terminal_priority: None,
+            scripted_result: None,
+        });
+        state
+            .objectives
+            .required_objective_ids
+            .push("survive-one-round".to_owned());
+        let start = serde_json::to_value(AuthoredEncounterEvent::EncounterStarted {
+            sequence: 1,
+            origin: origin.clone(),
+        })
+        .unwrap();
+        let events = vec![start.clone()];
+        fn write_authored<'a>(
+            campaign_id: &'a str,
+            state: &'a CombatState,
+            events: &'a [Value],
+            revision: Option<u64>,
+        ) -> CombatCheckpointWrite<'a> {
+            CombatCheckpointWrite {
+                campaign_id,
+                expected_persistence_revision: revision,
+                initial_state: state,
+                state,
+                accepted_commands: &[],
+                events,
+                loop_guard: guard(),
+            }
+        }
+        store
+            .save_combat_checkpoint(write_authored(&campaign.id, &state, &events, None))
+            .unwrap();
+        let started_payload: String = store
+            .connect()
+            .unwrap()
+            .query_row(
+                "SELECT payload_json FROM event_ledger WHERE aggregate_type='COMBAT' AND aggregate_id=?1",
+                [&state.combat_instance_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        let started_payload: Value = serde_json::from_str(&started_payload).unwrap();
+        assert_eq!(
+            started_payload["encounterOrigin"]["operationId"],
+            origin.operation_id
+        );
+        assert_eq!(started_payload["encounterOrigin"]["definitionVersion"], 1);
+
+        let mut changed = origin.clone();
+        changed.definition_version = 2;
+        let forged = vec![
+            serde_json::to_value(AuthoredEncounterEvent::EncounterStarted {
+                sequence: 1,
+                origin: changed,
+            })
+            .unwrap(),
+        ];
+        assert!(matches!(
+            store.save_combat_checkpoint(write_authored(&campaign.id, &state, &forged, Some(1))),
+            Err(CombatPersistenceError::InvalidCheckpoint)
+        ));
+        assert!(matches!(
+            store.save_combat_checkpoint(write_authored(&campaign.id, &state, &[], Some(1))),
+            Err(CombatPersistenceError::InvalidCheckpoint)
+        ));
+        assert!(matches!(
+            store.save_combat_checkpoint(write_authored(
+                &campaign.id,
+                &state,
+                &[start.clone(), start],
+                Some(1)
+            )),
+            Err(CombatPersistenceError::InvalidCheckpoint)
+        ));
+        let restored = store
+            .restore_combat_checkpoint(&state.combat_instance_id)
+            .unwrap();
+        assert_eq!(restored.events, events);
+        assert_eq!(restored.persistence_revision, 1);
+        let (authored, restored_origin) = store
+            .restore_authored_encounter_checkpoint(&campaign.id, &state.combat_instance_id)
+            .unwrap();
+        assert_eq!(authored.state, state);
+        assert_eq!(restored_origin, origin);
+        assert!(matches!(
+            store.restore_authored_encounter_checkpoint(
+                "another-campaign",
+                &state.combat_instance_id
+            ),
+            Err(CombatPersistenceError::InvalidCheckpoint)
+        ));
+    }
 
     #[test]
     fn crash_resume_preserves_pending_reaction_and_continues_deterministically() {

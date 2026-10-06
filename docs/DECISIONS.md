@@ -5365,3 +5365,7 @@ v0.4.1 的独立 Encounter 事件只能由版本化、开发者预置的 Quest/A
 现有 Quest 全部由 AI 生成，`quests`/Adventure action 均没有开发者 template/rule ID。v0.4.1 的首条正式入口因此选择**酒馆内显式的开发者预置 Encounter 行动**，不从 AI 任务标题、风险、建议行动或 `CHECK_REQUIRED` 猜测规则。该行动必须由 Native 校验 Campaign/角色/World 并选择受信任的版本化定义；UI 只发结构化行动请求。
 
 独立 Encounter 事件复用现有 `BattleRecord` 初始状态、事件数组与同事务 `COMBAT_STARTED` 审计事实，不另建平行持久化表。`combatInstanceId` 从每次已接受的稳定行动操作身份派生，而非 Campaign+World；定义 ID/版本、来源 Rule/Operation 与解析后的 InitialState 固定写入 BattleRecord，使重试返回同一场、后续行动可创建新场且 portable save v4 不丢来源。此处是实现方向，**当前代码尚未接通**，不得因本决定将 M12-041-001/004/006 判为关闭。
+
+### 来源合同落地（2026-10-06，仍非生产入口）
+
+BattleRecord `events_json` 的首项使用版本化 `ENCOUNTER_STARTED`，记录已接受行动的 UUID、开发者规则 ID/版本、Encounter Definition ID/版本、World Profile、玩家角色 ID、解析后的 roster 与 objective ID。`combatInstanceId` 由 Campaign ID 与该操作 UUID 以固定域分隔 SHA-256 派生；同操作重试得到同一 ID，不同操作不能复用旧记录。首次检查点保存与现有 `COMBAT_STARTED` fact 在同一个 SQLite 事务中写入同一来源；续写不能更换或丢弃来源，恢复必须同时核对初始状态和审计 fact。旧固定示例没有这一来源，不能通过 authored Encounter 恢复校验。此合同未替代真正的 Tavern 行动生产者、NPC Character Domain 投影或 Objective 执行。

@@ -1432,6 +1432,13 @@ mod tests {
         let created_fixture = store
             .start_or_restore_combat_session(&campaign.id, world)
             .unwrap();
+        assert!(matches!(
+            store.restore_authored_encounter_checkpoint(
+                &campaign.id,
+                &created_fixture.view_model.combat_instance_id,
+            ),
+            Err(CombatPersistenceError::InvalidCheckpoint)
+        ));
         let restored = store
             .restore_existing_combat_session(&campaign.id, world)
             .unwrap();

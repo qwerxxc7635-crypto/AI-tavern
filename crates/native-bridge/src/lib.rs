@@ -4,6 +4,7 @@
 
 mod active_factions;
 mod adventure_play;
+mod authored_encounter;
 mod cache_metrics;
 mod career_pool;
 mod character_creation;
@@ -47,6 +48,7 @@ mod world_director;
 mod world_seed;
 pub use active_factions::*;
 pub use adventure_play::*;
+pub use authored_encounter::*;
 pub use cache_metrics::*;
 pub use career_pool::*;
 pub use character_creation::*;
