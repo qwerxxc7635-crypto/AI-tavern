@@ -1,22 +1,23 @@
 use ember_combat_core::{
-    AbilityUsageCommitPlan, AbilityUsageState, AcceptedCommandLedger, CURRENT_COMBAT_VERSIONS,
-    CURRENT_REACTION_SCHEMA_VERSION, CURRENT_STATUS_SCHEMA_VERSION, CanonicalDomainValue,
-    CanonicalEventChainScheduler, CanonicalReactionCore, ClockLifecycleWindow,
-    CombatCommandEnvelope, CombatCommandPayload, CombatCommandSource, CombatControlAssignment,
-    CombatControlAuthority, CombatCostAsset, CombatCostRequestLine, CombatFixed, CombatPhase,
-    CombatResultType, CombatRng, CombatSide, CombatState, CombatSubmissionRequest,
-    CombatSubmissionService, CombatantRuntime, CombatantState, ControlCategory,
-    DamageChannelCatalog, DamageChannelId, DamageImmunity, DurationClock, EffectAmount,
-    EffectDefinition, EncounterDamageRule, EncounterDamageServices, EncounterRuleExecutor,
-    EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel, ExecutableRecoveryPath,
-    ExecutionRevalidationOutcome, ExecutionRevalidationRequest, ExecutionRevalidationService,
-    GameplayTagCatalog, HardCcDrRuntime, HookPhase, MitigationBalanceConfig, ObjectiveRuntimeState,
-    PreconditionFailure, PreconditionFailureCode, PreconditionRule, PreconditionRuleSpec,
-    ProvisionalDeltaEntry, ProvisionalRuntimeDelta, ReactionBinding, ReactionDecisionChoice,
-    ReactionDefinition, ReactionExecutionMode, ReactionRouteOutcome, ReinforcementRuntimeState,
-    ResolutionContextLifecycle, ResolutionRequest, ResourceState, ResultCandidate,
-    RoundRosterEntry, RoundRosterStatus, RoundRuntimeState, RuntimeCommitContract,
-    RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
+    AbilityUsageCommitPlan, AbilityUsageState, AcceptedCombatCommand, AcceptedCommandLedger,
+    AcceptedCommandSource, CURRENT_COMBAT_VERSIONS, CURRENT_REACTION_SCHEMA_VERSION,
+    CURRENT_STATUS_SCHEMA_VERSION, CanonicalDomainValue, CanonicalEventChainScheduler,
+    CanonicalReactionCore, ClockLifecycleWindow, CombatCommandEnvelope, CombatCommandPayload,
+    CombatCommandSource, CombatControlAssignment, CombatControlAuthority, CombatCostAsset,
+    CombatCostRequestLine, CombatFixed, CombatPhase, CombatReplayError, CombatReplayReceipt,
+    CombatReplayRunner, CombatReplayStepTrace, CombatResultType, CombatRng, CombatSide,
+    CombatState, CombatSubmissionRequest, CombatSubmissionService, CombatantRuntime,
+    CombatantState, ControlCategory, DamageChannelCatalog, DamageChannelId, DamageImmunity,
+    DurationClock, EffectAmount, EffectDefinition, EncounterDamageRule, EncounterDamageServices,
+    EncounterRuleExecutor, EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel,
+    ExecutableRecoveryPath, ExecutionRevalidationOutcome, ExecutionRevalidationRequest,
+    ExecutionRevalidationService, GameplayTagCatalog, HardCcDrRuntime, HookPhase,
+    MitigationBalanceConfig, ObjectiveRuntimeState, PreconditionFailure, PreconditionFailureCode,
+    PreconditionRule, PreconditionRuleSpec, ProvisionalDeltaEntry, ProvisionalRuntimeDelta,
+    ReactionBinding, ReactionDecisionChoice, ReactionDefinition, ReactionExecutionMode,
+    ReactionRouteOutcome, ReinforcementRuntimeState, ResolutionContextLifecycle, ResolutionRequest,
+    ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
+    RuntimeCommitContract, RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
     SoloRecoveryBalanceConfig, StandardLethalPolicy, StatusActivationPolicy, StatusDefinition,
     StatusDurationDefinition, StatusExpiryPhase, StatusRefreshPolicy, StatusStackMode,
     StatusTickPhase, TacticalSettingsProjection, TerminalOutcomeArbitrator, TerminalPriorityPolicy,
@@ -163,6 +164,8 @@ pub enum CombatSessionError {
     InvalidState,
     #[error("combat session persistence failed")]
     Persistence(#[from] CombatPersistenceError),
+    #[error("combat session replay failed")]
+    Replay(#[from] CombatReplayError),
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -190,6 +193,38 @@ enum DurableCombatEvent {
 }
 
 impl CampaignStore {
+    /// Re-executes the accepted player history against InitialState and checks
+    /// both state and event history against the durable active checkpoint.
+    pub fn replay_active_combat_session(
+        &self,
+        campaign_id: &str,
+        world: CombatSessionWorld,
+    ) -> Result<CombatReplayReceipt, CombatSessionError> {
+        let combat_id = combat_instance_id(campaign_id, world)?;
+        let restored = self.restore_combat_checkpoint(&combat_id)?;
+        if restored.campaign_id != campaign_id {
+            return Err(CombatSessionError::InvalidState);
+        }
+        let input = self.load_combat_replay_input(&combat_id)?;
+        let mut events = Vec::new();
+        let receipt = CombatReplayRunner::run(input, |state, command, visible_ledger| {
+            let mut ledger = visible_ledger.clone();
+            let envelope = live_envelope_for_replay(command)?;
+            apply_session_command(state, &mut ledger, envelope, world, &mut events)?;
+            if ledger.commands().last() != Some(command) {
+                return Err(CombatSessionError::InvalidState);
+            }
+            Ok(CombatReplayStepTrace {
+                rolls: vec![],
+                scheduler_executions: vec![],
+            })
+        })?;
+        if receipt.final_state != restored.state || events != restored.events {
+            return Err(CombatSessionError::InvalidState);
+        }
+        Ok(receipt)
+    }
+
     pub fn start_or_restore_combat_session(
         &self,
         campaign_id: &str,
@@ -247,20 +282,7 @@ impl CampaignStore {
             .map_err(|_| CombatSessionError::InvalidState)?;
         let mut events = restored.events;
 
-        match envelope.payload.clone() {
-            CombatCommandPayload::ResolveReaction { .. } => {
-                resolve_reaction(&mut state, &mut ledger, envelope, &mut events)?;
-            }
-            CombatCommandPayload::UseAbility {
-                ref ability_id,
-                ref target_id,
-            } if ability_id == world.data().ability_id
-                && target_id.as_deref() == Some(ENEMY_ID) =>
-            {
-                execute_ability(&mut state, &mut ledger, envelope, world, &mut events)?;
-            }
-            _ => return Err(CombatSessionError::CommandRejected),
-        }
+        apply_session_command(&mut state, &mut ledger, envelope, world, &mut events)?;
 
         let receipt = self.save_combat_checkpoint(CombatCheckpointWrite {
             campaign_id,
@@ -314,6 +336,50 @@ impl CampaignStore {
             result_commit_id: receipt.result_commit_id,
             checkpoint_removed,
         })
+    }
+}
+
+fn live_envelope_for_replay(
+    command: &AcceptedCombatCommand,
+) -> Result<CombatCommandEnvelope, CombatSessionError> {
+    let source = match &command.source {
+        AcceptedCommandSource::Player { controller_id } if controller_id == CONTROLLER_ID => {
+            CombatCommandSource::Player {
+                controller_id: controller_id.clone(),
+            }
+        }
+        _ => return Err(CombatSessionError::CommandRejected),
+    };
+    if command.actor_id != HERO_ID || command.versions != CURRENT_COMBAT_VERSIONS {
+        return Err(CombatSessionError::CommandRejected);
+    }
+    Ok(CombatCommandEnvelope {
+        command_id: command.command_id.clone(),
+        source,
+        actor_id: command.actor_id.clone(),
+        versions: command.versions,
+        payload: command.payload.clone(),
+    })
+}
+
+fn apply_session_command(
+    state: &mut CombatState,
+    ledger: &mut AcceptedCommandLedger,
+    envelope: CombatCommandEnvelope,
+    world: CombatSessionWorld,
+    events: &mut Vec<Value>,
+) -> Result<(), CombatSessionError> {
+    match envelope.payload.clone() {
+        CombatCommandPayload::ResolveReaction { .. } => {
+            resolve_reaction(state, ledger, envelope, events)
+        }
+        CombatCommandPayload::UseAbility {
+            ability_id,
+            target_id,
+        } if ability_id == world.data().ability_id && target_id.as_deref() == Some(ENEMY_ID) => {
+            execute_ability(state, ledger, envelope, world, events)
+        }
+        _ => Err(CombatSessionError::CommandRejected),
     }
 }
 
@@ -594,7 +660,9 @@ fn initial_state(
     ) {
         return Err(CombatSessionError::InvalidState);
     }
-    Ok((state, ledger))
+    // The opening reaction is already represented by InitialState. Its
+    // deterministic setup command must not be replayed as a player input.
+    Ok((state, AcceptedCommandLedger::new()))
 }
 
 fn resolve_reaction(
@@ -1314,6 +1382,37 @@ mod tests {
     use super::*;
 
     #[test]
+    fn active_replay_rejects_durable_event_history_that_live_rules_cannot_reproduce() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("combat.sqlite")).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let world = CombatSessionWorld::Fantasy;
+        let initial = store
+            .start_or_restore_combat_session(&campaign.id, world)
+            .unwrap();
+        let restored = store
+            .restore_combat_checkpoint(&initial.view_model.combat_instance_id)
+            .unwrap();
+        let mut events = restored.events.clone();
+        events.push(json!({ "kind": "FABRICATED", "sequence": 1 }));
+        store
+            .save_combat_checkpoint(CombatCheckpointWrite {
+                campaign_id: &campaign.id,
+                expected_persistence_revision: Some(restored.persistence_revision),
+                initial_state: &restored.initial_state,
+                state: &restored.state,
+                accepted_commands: &restored.accepted_commands,
+                events: &events,
+                loop_guard: restored.loop_guard,
+            })
+            .unwrap();
+        assert!(matches!(
+            store.replay_active_combat_session(&campaign.id, world),
+            Err(CombatSessionError::InvalidState)
+        ));
+    }
+
+    #[test]
     fn projected_ability_respects_core_cooldown_rule() {
         let directory = tempfile::tempdir().unwrap();
         let store = CampaignStore::open(directory.path().join("combat.sqlite")).unwrap();
@@ -1513,6 +1612,23 @@ mod tests {
             let initial = store
                 .start_or_restore_combat_session(&campaign.id, world)
                 .unwrap();
+            assert!(
+                store
+                    .load_combat_replay_input(&initial.view_model.combat_instance_id)
+                    .unwrap()
+                    .accepted_commands
+                    .is_empty()
+            );
+            assert_eq!(
+                store
+                    .replay_active_combat_session(&campaign.id, world)
+                    .unwrap()
+                    .final_state,
+                store
+                    .restore_combat_checkpoint(&initial.view_model.combat_instance_id)
+                    .unwrap()
+                    .state
+            );
             assert!(initial.view_model.pending_reaction.is_some());
             let reaction = initial.view_model.pending_reaction.as_ref().unwrap();
             let after_reaction = store
@@ -1568,6 +1684,13 @@ mod tests {
             let first_checkpoint = store
                 .restore_combat_checkpoint(&first.view_model.combat_instance_id)
                 .unwrap();
+            assert_eq!(
+                store
+                    .replay_active_combat_session(&campaign.id, world)
+                    .unwrap()
+                    .final_state,
+                first_checkpoint.state
+            );
             assert!(
                 first_checkpoint
                     .state
@@ -1617,6 +1740,13 @@ mod tests {
             let final_checkpoint = reopened
                 .restore_combat_checkpoint(&final_snapshot.view_model.combat_instance_id)
                 .unwrap();
+            assert_eq!(
+                reopened
+                    .replay_active_combat_session(&campaign.id, world)
+                    .unwrap()
+                    .final_state,
+                final_checkpoint.state
+            );
             let final_hero = final_checkpoint
                 .state
                 .combatants

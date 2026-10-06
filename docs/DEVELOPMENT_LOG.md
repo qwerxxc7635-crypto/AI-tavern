@@ -6631,3 +6631,9 @@
 - 复核发现 Native 会话的 `project_snapshot` 手写 AP/资源/敌人检查并将所有非法状态折叠成“角色无法行动”，而真实提交由 Core 的 Precondition/Cost rules 判定。增加只读 `CombatSubmissionService::preview`，与提交共用 mandatory/cost/ability rule evaluator；Native 预览与提交共用同一 request builder 和冷却规则，费用显示读取同一 cost line 的数额。
 - 冷却回归在旧代码下显示技能可用；修复后 UI 给出“技能仍在冷却”，直接提交返回完全相同的 Core 失败记录且状态不变。AP 和资源不足分别显示对应原因。Core 344/344、Native 121/121 通过，未进行 Windows 实测。
 - 通用 GetLegalTargets、真实 Encounter action catalog 及全类型费用预览仍未完成，M12-041-013 只记局部修复。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL；用户 `.gitignore` 保持未纳入。
+
+## 2026-10-06 — M12-T02 活跃战斗回放局部修复（仍在进行）
+
+- 发现示例 InitialState 已包含开场反应检查点，却把构造该检查点所用的 `opening-threat` 再记入 AcceptedCommands。加入首帧历史为空的回归，旧实现失败；修复后 AcceptedCommands 只从检查点之后的真实玩家决定开始。
+- 抽出 Native 现场命令执行入口供 `CombatReplayRunner` 复用，新增活跃战斗回放并比对最终 CombatState 和 durable event list。四世界初始、首技能、终局前状态均可重放；人为加入结构有效但现场规则无法生成的事件会拒绝。Native 122/122 通过。
+- 回放仅覆盖当前固定示例的活跃检查点；结束后没有持久化最终状态哈希，真实 Encounter 的 RNG/调度轨迹和生产回放仍未闭环，M12-041-011 不关闭。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始；用户 `.gitignore` 未纳入。
