@@ -6607,3 +6607,9 @@
 - 根因验证：原 Native Session 在 Submission 后直接 `CostReservationModel::commit`，未建立技能 `ResolutionContext` 或调用 Execution Revalidation；四世界回归加入已使用次数断言，旧代码在 `0 != 1` 处失败。修复后通过 Core 的 ready/revalidate/atomic usage 路径，第一次与第二次技能分别持久化 usage `1`、`2`，原定向测试通过。
 - 完整 Native `--lib` 首跑揭出旧 checkpoint 并发修复的测试错误：压力测试首轮将 `checked_sub(1)` 解释为 `Some(0)`，但新记录的 expected revision 必须为 `None`。只修测试输入，不降低冲突保护；64 次恢复专项和 Native 119/119 通过。生产 Encounter 仍未接入，M12-041-002 仅为现有 Session 的局部修复，不宣称 finding 或任务 PASS。
 - 用户 `.gitignore` 既有修改未纳入本次代码/文档改动。
+
+## 2026-10-06 — M12-T02 Encounter 持久化边界复核（仍在进行）
+
+- 复核 Quest/Adventure 真正调用链：现有 Quest 是 AI 生成且没有开发者 rule/template ID，Adventure action 为自由文本/AI 建议，`CHECK_REQUIRED` 为普通检定。按用户的“开发者预置规则”裁定，选择酒馆内显式开发者 Encounter 行动作为本版最小生产入口，不依赖叙事文本匹配。
+- 曾在未提交分支尝试独立 SQLite Encounter 表与 migration 35；定向 Node 迁移测试通过，但继续追踪发现 portable save v4 仅携带 `battle_records`/`active_combat_saves`，新增表会导致导出/恢复遗漏。草案在提交及任何用户存档迁移之前撤回；继续复用 BattleRecord 初始状态、ordered events 与 `COMBAT_STARTED` 来存独立事件，避免第二份事实源。`DEC-248` 补充此最小落地决策。
+- 目前只完成架构与回归验证，未将生产按钮、角色/NPC 投影、Encounter Objective、Result Delta 接通；M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始。用户 `.gitignore` 保持原样。
