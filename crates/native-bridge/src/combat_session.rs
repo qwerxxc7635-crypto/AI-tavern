@@ -1,27 +1,32 @@
 use ember_combat_core::{
-    AbilityUsageCommitPlan, AbilityUsageState, AcceptedCombatCommand, AcceptedCommandLedger,
-    AcceptedCommandSource, CURRENT_COMBAT_VERSIONS, CURRENT_REACTION_SCHEMA_VERSION,
-    CURRENT_STATUS_SCHEMA_VERSION, CanonicalDomainValue, CanonicalEventChainScheduler,
-    CanonicalReactionCore, ClockLifecycleWindow, CombatCommandEnvelope, CombatCommandPayload,
-    CombatCommandSource, CombatControlAssignment, CombatControlAuthority, CombatCostAsset,
-    CombatCostRequestLine, CombatFixed, CombatPhase, CombatReplayError, CombatReplayReceipt,
-    CombatReplayRunner, CombatReplayStepTrace, CombatResultType, CombatRng, CombatSide,
-    CombatState, CombatSubmissionRequest, CombatSubmissionService, CombatantRuntime,
-    CombatantState, ControlCategory, DamageChannelCatalog, DamageChannelId, DamageImmunity,
-    DurationClock, EffectAmount, EffectDefinition, EncounterDamageRule, EncounterDamageServices,
-    EncounterRuleExecutor, EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel,
-    ExecutableRecoveryPath, ExecutionRevalidationOutcome, ExecutionRevalidationRequest,
-    ExecutionRevalidationService, GameplayTagCatalog, HardCcDrRuntime, HookPhase,
-    MitigationBalanceConfig, ObjectiveRuntimeState, PreconditionFailure, PreconditionFailureCode,
-    PreconditionRule, PreconditionRuleSpec, ProvisionalDeltaEntry, ProvisionalRuntimeDelta,
-    ReactionBinding, ReactionDecisionChoice, ReactionDefinition, ReactionExecutionMode,
-    ReactionRouteOutcome, ReinforcementRuntimeState, ResolutionContextLifecycle, ResolutionRequest,
-    ResourceState, ResultCandidate, RoundRosterEntry, RoundRosterStatus, RoundRuntimeState,
-    RuntimeCommitContract, RuntimeFinalizationRequest, ShieldInteraction, ShieldRechargeRuntime,
+    AbilityUsageCommitPlan, AcceptedCombatCommand, AcceptedCommandLedger, AcceptedCommandSource,
+    CURRENT_COMBAT_VERSIONS, CURRENT_REACTION_SCHEMA_VERSION, CURRENT_STATUS_SCHEMA_VERSION,
+    CanonicalDomainValue, CanonicalReactionCore, ClockLifecycleWindow, CombatCommandEnvelope,
+    CombatCommandPayload, CombatCommandSource, CombatControlAssignment, CombatControlAuthority,
+    CombatCostAsset, CombatCostRequestLine, CombatFixed, CombatReplayError, CombatReplayReceipt,
+    CombatReplayRunner, CombatReplayStepTrace, CombatResultType, CombatState,
+    CombatSubmissionRequest, CombatSubmissionService, CombatantRuntime, CombatantState,
+    ControlCategory, DamageChannelCatalog, DamageChannelId, DamageImmunity, DurationClock,
+    EffectAmount, EffectDefinition, EncounterDamageRule, EncounterDamageServices,
+    EncounterRuleExecutor, ExecutableRecoveryPath, ExecutionRevalidationOutcome,
+    ExecutionRevalidationRequest, ExecutionRevalidationService, GameplayTagCatalog, HookPhase,
+    MitigationBalanceConfig, PreconditionFailure, PreconditionFailureCode, PreconditionRule,
+    PreconditionRuleSpec, ProvisionalDeltaEntry, ReactionBinding, ReactionDecisionChoice,
+    ReactionDefinition, ReactionExecutionMode, ResolutionContextLifecycle, ResolutionRequest,
+    ResultCandidate, RuntimeCommitContract, RuntimeFinalizationRequest, ShieldInteraction,
     SoloRecoveryBalanceConfig, StandardLethalPolicy, StatusActivationPolicy, StatusDefinition,
     StatusDurationDefinition, StatusExpiryPhase, StatusRefreshPolicy, StatusStackMode,
-    StatusTickPhase, TacticalSettingsProjection, TerminalOutcomeArbitrator, TerminalPriorityPolicy,
-    TimelineEntry, UtilityActionCategory, WorldCombatProfileId, WorldCombatProfileResolver,
+    StatusTickPhase, TacticalSettingsProjection, TerminalOutcomeArbitrator, WorldCombatProfileId,
+    WorldCombatProfileResolver,
+};
+#[cfg(test)]
+use ember_combat_core::{
+    AbilityUsageState, CanonicalEventChainScheduler, CombatPhase, CombatRng, CombatSide,
+    EnemyIntentCategory, EnemyIntentPlan, EnemyIntentTelegraphLevel, HardCcDrRuntime,
+    ObjectiveRuntimeState, ProvisionalRuntimeDelta, ReactionRouteOutcome,
+    ReinforcementRuntimeState, ResourceState, RoundRosterEntry, RoundRosterStatus,
+    RoundRuntimeState, ShieldRechargeRuntime, TerminalPriorityPolicy, TimelineEntry,
+    UtilityActionCategory,
 };
 use ember_combat_presentation::{
     AbilityTooltip, CombatAbilityUsageViewModel, CombatActionRuleProjection, CombatActionViewKind,
@@ -46,6 +51,7 @@ const ENEMY_ID: &str = "enemy";
 const CONTROLLER_ID: &str = "local-player";
 const REACTION_ID: &str = "reaction.guard";
 const STATUS_ID: &str = "status.marked";
+#[cfg(test)]
 const SEED: &str = "8417a1f8cb9144e9b4f28f44a91cf101";
 const LOOP_GUARD: CombatLoopGuardContract = CombatLoopGuardContract {
     max_trigger_depth: 32,
@@ -225,6 +231,28 @@ impl CampaignStore {
         Ok(receipt)
     }
 
+    /// Production read path: a route may restore an already persisted combat,
+    /// but cannot create a fixture encounter from its URL parameters.
+    pub fn restore_existing_combat_session(
+        &self,
+        campaign_id: &str,
+        world: CombatSessionWorld,
+    ) -> Result<CombatSessionSnapshot, CombatSessionError> {
+        let combat_id = combat_instance_id(campaign_id, world)?;
+        let restored = self.restore_combat_checkpoint(&combat_id)?;
+        if restored.campaign_id != campaign_id {
+            return Err(CombatSessionError::InvalidState);
+        }
+        project_snapshot(
+            restored.campaign_id,
+            world,
+            restored.persistence_revision,
+            &restored.state,
+            &restored.events,
+        )
+    }
+
+    #[cfg(test)]
     pub fn start_or_restore_combat_session(
         &self,
         campaign_id: &str,
@@ -232,13 +260,7 @@ impl CampaignStore {
     ) -> Result<CombatSessionSnapshot, CombatSessionError> {
         let combat_id = combat_instance_id(campaign_id, world)?;
         match self.restore_combat_checkpoint(&combat_id) {
-            Ok(restored) => project_snapshot(
-                restored.campaign_id,
-                world,
-                restored.persistence_revision,
-                &restored.state,
-                &restored.events,
-            ),
+            Ok(_) => self.restore_existing_combat_session(campaign_id, world),
             Err(CombatPersistenceError::NotFound) => {
                 let (initial, ledger) = initial_state(&combat_id, world)?;
                 let receipt = self.save_combat_checkpoint(CombatCheckpointWrite {
@@ -517,6 +539,7 @@ fn initial_combatant<'a>(
         .ok_or(CombatSessionError::InvalidState)
 }
 
+#[cfg(test)]
 fn initial_state(
     combat_id: &str,
     world: CombatSessionWorld,
@@ -1284,6 +1307,7 @@ fn assignments() -> Vec<CombatControlAssignment> {
     ]
 }
 
+#[cfg(test)]
 fn combatant(
     id: &str,
     side: CombatSide,
@@ -1337,6 +1361,7 @@ fn combatant(
     }
 }
 
+#[cfg(test)]
 fn timeline(id: &str, initiative: i64, sequence: u64) -> TimelineEntry {
     TimelineEntry {
         combatant_id: id.to_owned(),
@@ -1380,6 +1405,47 @@ fn push_event(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn production_restore_does_not_create_a_demo_battle_from_url_world() {
+        let directory = tempfile::tempdir().unwrap();
+        let store = CampaignStore::open(directory.path().join("combat.sqlite")).unwrap();
+        let campaign = store.create_campaign().unwrap();
+        let world = CombatSessionWorld::Fantasy;
+        assert!(matches!(
+            store.restore_existing_combat_session(&campaign.id, world),
+            Err(CombatSessionError::Persistence(
+                CombatPersistenceError::NotFound
+            ))
+        ));
+        let count: i64 = store
+            .connect()
+            .unwrap()
+            .query_row(
+                "SELECT COUNT(*) FROM battle_records WHERE campaign_id=?1",
+                [&campaign.id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 0);
+
+        let created_fixture = store
+            .start_or_restore_combat_session(&campaign.id, world)
+            .unwrap();
+        let restored = store
+            .restore_existing_combat_session(&campaign.id, world)
+            .unwrap();
+        assert_eq!(restored.campaign_id, created_fixture.campaign_id);
+        assert_eq!(restored.world, created_fixture.world);
+        assert_eq!(
+            restored.persistence_revision,
+            created_fixture.persistence_revision
+        );
+        assert_eq!(
+            serde_json::to_value(restored.view_model).unwrap(),
+            serde_json::to_value(created_fixture.view_model).unwrap()
+        );
+    }
 
     #[test]
     fn active_replay_rejects_durable_event_history_that_live_rules_cannot_reproduce() {

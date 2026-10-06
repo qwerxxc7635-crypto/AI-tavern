@@ -255,7 +255,7 @@ impl From<CombatSessionError> for CommandError {
                 code: "COMBAT_COMMAND_REJECTED",
                 message: "当前战斗状态不允许执行该操作。",
             },
-            CombatSessionError::InvalidState => Self {
+            CombatSessionError::InvalidState | CombatSessionError::Replay(_) => Self {
                 code: "COMBAT_STATE_INVALID",
                 message: "战斗状态未通过本地规则校验。",
             },
@@ -1153,7 +1153,7 @@ fn combat_session_start(
     store: State<'_, CampaignStore>,
 ) -> Result<CombatSessionSnapshot, CommandError> {
     store
-        .start_or_restore_combat_session(&campaign_id, world)
+        .restore_existing_combat_session(&campaign_id, world)
         .map_err(Into::into)
 }
 

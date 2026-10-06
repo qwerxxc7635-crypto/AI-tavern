@@ -6637,3 +6637,9 @@
 - 发现示例 InitialState 已包含开场反应检查点，却把构造该检查点所用的 `opening-threat` 再记入 AcceptedCommands。加入首帧历史为空的回归，旧实现失败；修复后 AcceptedCommands 只从检查点之后的真实玩家决定开始。
 - 抽出 Native 现场命令执行入口供 `CombatReplayRunner` 复用，新增活跃战斗回放并比对最终 CombatState 和 durable event list。四世界初始、首技能、终局前状态均可重放；人为加入结构有效但现场规则无法生成的事件会拒绝。Native 122/122 通过。
 - 回放仅覆盖当前固定示例的活跃检查点；结束后没有持久化最终状态哈希，真实 Encounter 的 RNG/调度轨迹和生产回放仍未闭环，M12-041-011 不关闭。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始；用户 `.gitignore` 未纳入。
+
+## 2026-10-06 — M12-T02 生产 Combat 入口停止创建固定示例（仍在进行）
+
+- Tauri `combat_session_start` 现在只恢复已有 SQLite 战斗检查点；Native 固定 `hero/enemy` 的 `start_or_restore_combat_session` 仅在单元测试中编译。空白 Campaign 通过 URL 进入 Combat 不再生成 BattleRecord，新增无副作用回归测试；Native 123/123 通过。
+- 这只是 M12-041-001 的局部防护：既有固定示例检查点仍可恢复，开发者预置 Quest/Action → 独立 Encounter 事件、真实 Character/NPC 投影及 Objective 尚未接入。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始；用户 `.gitignore` 未纳入任务改动。
+- 桌面编译还发现先前新增的 `CombatSessionError::Replay` 未覆盖 Tauri 错误映射；现映射为 `COMBAT_STATE_INVALID`，不向界面暴露内部回放细节。固定示例构造及其专用类型导入均限定为测试编译。
