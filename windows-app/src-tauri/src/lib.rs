@@ -18,8 +18,8 @@ use ember_native_bridge::{
     CampaignRecoverySnapshot, CampaignStore, CampaignStoreError, CampaignSummary, CapabilitySource,
     CareerPool, CareerPoolGenerationCommit, CharacterCandidateConfirm, CharacterCompletionCommit,
     CharacterCreationSnapshot, CharacterRulesState, CharacterTraitGenerationCommit,
-    CombatSessionCompletion, CombatSessionError, CombatSessionSnapshot, CombatSessionWorld,
-    CredentialAction, CredentialCleanupReason, DialogueSuggestionCommit,
+    CombatPersistenceError, CombatSessionCompletion, CombatSessionError, CombatSessionSnapshot,
+    CombatSessionWorld, CredentialAction, CredentialCleanupReason, DialogueSuggestionCommit,
     DialogueSuggestionPreparation, DialogueSuggestionPrepareCommand, DialogueSuggestionSet,
     DirectorBudgetAdmitCommand, DirectorBudgetSnapshot, DynamicLocationGenerationCommit,
     DynamicLocationGenerationRequest, DynamicLocationGenerationSnapshot, DynamicLocationSnapshot,
@@ -146,7 +146,8 @@ fn command_error_policy(code: &str) -> CommandErrorPolicy {
                 &["RETRY", "CANCEL"],
             )
         }
-        "CAMPAIGN_NOT_FOUND"
+        "COMBAT_NOT_STARTED"
+        | "CAMPAIGN_NOT_FOUND"
         | "CAMPAIGN_ARCHIVED"
         | "CAMPAIGN_DATA_INVALID"
         | "SAVE_COMPATIBILITY_REQUIRED"
@@ -258,6 +259,10 @@ impl From<CombatSessionError> for CommandError {
             CombatSessionError::InvalidState | CombatSessionError::Replay(_) => Self {
                 code: "COMBAT_STATE_INVALID",
                 message: "战斗状态未通过本地规则校验。",
+            },
+            CombatSessionError::Persistence(CombatPersistenceError::NotFound) => Self {
+                code: "COMBAT_NOT_STARTED",
+                message: "当前存档没有进行中的战斗，请从冒险返回。",
             },
             CombatSessionError::Persistence(_) => Self {
                 code: "LOCAL_STORAGE_UNAVAILABLE",
@@ -2211,6 +2216,18 @@ mod tests {
         ] {
             assert!(!command_error_policy(code).fallback_eligible);
         }
+    }
+
+    #[test]
+    fn missing_combat_checkpoint_is_not_reported_as_storage_failure() {
+        let error = CommandError::from(CombatSessionError::Persistence(
+            CombatPersistenceError::NotFound,
+        ));
+        assert_eq!(error.code, "COMBAT_NOT_STARTED");
+        let serialized = serde_json::to_value(error).unwrap();
+        assert_eq!(serialized["kind"], "PERSISTENCE");
+        assert_eq!(serialized["retryable"], false);
+        assert_eq!(serialized["fallbackEligible"], false);
     }
 
     #[test]

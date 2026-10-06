@@ -76,6 +76,21 @@ describe('combat production page', () => {
     );
     expect(screen.getByRole('alert').textContent).toContain('缺少存档或世界类型');
   });
+
+  it('explains that a fresh campaign has no active encounter', async () => {
+    class NoActiveCombatGateway extends FakeCombatGateway {
+      override async start(): Promise<CombatSessionSnapshot> {
+        throw { code: 'COMBAT_NOT_STARTED' };
+      }
+    }
+    render(
+      <MemoryRouter initialEntries={['/combat?campaignId=campaign-ui&world=FANTASY']}>
+        <CombatPage gateway={new NoActiveCombatGateway()} loadTheme={async () => ({} as never)} />
+      </MemoryRouter>,
+    );
+    expect((await screen.findByRole('alert')).textContent).toContain('没有进行中的战斗');
+    expect(screen.getByRole('link', { name: '返回冒险' })).toBeTruthy();
+  });
 });
 
 class FakeCombatGateway implements CombatSessionGateway {

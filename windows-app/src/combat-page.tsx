@@ -42,8 +42,14 @@ export function CombatPage({
           setTheme(binding);
         }
       })
-      .catch(() => {
-        if (active) setError('无法载入本地战斗检查点。游戏事实没有被修改。');
+      .catch((cause: unknown) => {
+        if (active) {
+          setError(
+            isCombatNotStarted(cause)
+              ? '当前存档没有进行中的战斗。请返回冒险；游戏事实没有被修改。'
+              : '无法载入本地战斗检查点。游戏事实没有被修改。',
+          );
+        }
       });
     return () => {
       active = false;
@@ -144,5 +150,14 @@ export function CombatPage({
         </nav>
       )}
     </div>
+  );
+}
+
+function isCombatNotStarted(cause: unknown): boolean {
+  return (
+    typeof cause === 'object' &&
+    cause !== null &&
+    'code' in cause &&
+    cause.code === 'COMBAT_NOT_STARTED'
   );
 }

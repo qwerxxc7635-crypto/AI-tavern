@@ -6643,3 +6643,8 @@
 - Tauri `combat_session_start` 现在只恢复已有 SQLite 战斗检查点；Native 固定 `hero/enemy` 的 `start_or_restore_combat_session` 仅在单元测试中编译。空白 Campaign 通过 URL 进入 Combat 不再生成 BattleRecord，新增无副作用回归测试；Native 123/123 通过。
 - 这只是 M12-041-001 的局部防护：既有固定示例检查点仍可恢复，开发者预置 Quest/Action → 独立 Encounter 事件、真实 Character/NPC 投影及 Objective 尚未接入。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始；用户 `.gitignore` 未纳入任务改动。
 - 桌面编译还发现先前新增的 `CombatSessionError::Replay` 未覆盖 Tauri 错误映射；现映射为 `COMBAT_STATE_INVALID`，不向界面暴露内部回放细节。固定示例构造及其专用类型导入均限定为测试编译。
+
+## 2026-10-06 — M12-T02 空白战斗入口错误语义（仍在进行）
+
+- 生产入口只恢复后，缺失检查点是正常的“尚未开始战斗”，不应冒充数据库故障。Tauri 将 `CombatPersistenceError::NotFound` 映射为非重试的 `COMBAT_NOT_STARTED`；Combat 页面据此显示返回冒险的明确提示，其他载入失败仍显示通用无修改说明。
+- 增加桌面错误契约与页面回归；这没有创建 Encounter 或开放新的触发条件。M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始；用户 `.gitignore` 保持未纳入。
