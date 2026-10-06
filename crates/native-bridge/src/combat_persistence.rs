@@ -116,6 +116,7 @@ impl CampaignStore {
         let at = current_timestamp().map_err(CombatPersistenceError::Store)?;
         let mut connection = self.connect().map_err(CombatPersistenceError::Store)?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let initial_hash = write.initial_state.state_hash_sha256()?;
 
         let previous = transaction
             .query_row(
@@ -140,6 +141,27 @@ impl CampaignStore {
         if actual_revision != write.expected_persistence_revision {
             return Err(CombatPersistenceError::CheckpointRevisionConflict);
         }
+        let historical = transaction
+            .query_row(
+                "SELECT campaign_id,initial_state_hash,result_commit_id
+                 FROM battle_records WHERE combat_instance_id=?1",
+                [&write.state.combat_instance_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, String>(1)?,
+                        row.get::<_, Option<String>>(2)?,
+                    ))
+                },
+            )
+            .optional()?;
+        match (actual_revision, historical) {
+            (None, Some(_)) => return Err(CombatPersistenceError::ResultCommitConflict),
+            (Some(_), Some((campaign, hash, None)))
+                if campaign == write.campaign_id && hash == initial_hash => {}
+            (Some(_), _) => return Err(CombatPersistenceError::ResultCommitConflict),
+            (None, None) => {}
+        }
         let persistence_revision =
             if let Some((objective_json, reinforcement_json, revision)) = previous {
                 let old_objective: ObjectiveRuntimeState = serde_json::from_str(&objective_json)?;
@@ -161,7 +183,6 @@ impl CampaignStore {
 
         let versions = write.state.versions;
         let initial_json = serde_json::to_string(write.initial_state)?;
-        let initial_hash = write.initial_state.state_hash_sha256()?;
         let commands_json = serde_json::to_string(write.accepted_commands)?;
         let events_json = serde_json::to_string(write.events)?;
         let event_digest = digest(events_json.as_bytes());
@@ -1154,6 +1175,20 @@ mod tests {
                 .persistence_revision,
             2
         );
+        let mut changed_initial = state.clone();
+        changed_initial.combatants[0].hit_points -= 1;
+        assert!(matches!(
+            store.save_combat_checkpoint(CombatCheckpointWrite {
+                campaign_id: &campaign.id,
+                expected_persistence_revision: Some(2),
+                initial_state: &changed_initial,
+                state: &state,
+                accepted_commands: &[],
+                events: &events,
+                loop_guard: guard(),
+            }),
+            Err(CombatPersistenceError::ResultCommitConflict)
+        ));
         assert!(matches!(
             store.save_combat_checkpoint(write(Some(1))),
             Err(CombatPersistenceError::CheckpointRevisionConflict)

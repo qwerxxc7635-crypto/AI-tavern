@@ -1478,6 +1478,21 @@ mod tests {
                 reopened.restore_combat_checkpoint(&final_snapshot.view_model.combat_instance_id),
                 Err(CombatPersistenceError::NotFound)
             ));
+            let historical = reopened
+                .load_combat_replay_input(&final_snapshot.view_model.combat_instance_id)
+                .unwrap();
+            assert!(matches!(
+                reopened.start_or_restore_combat_session(&campaign.id, world),
+                Err(CombatSessionError::Persistence(
+                    CombatPersistenceError::ResultCommitConflict
+                ))
+            ));
+            assert_eq!(
+                reopened
+                    .load_combat_replay_input(&final_snapshot.view_model.combat_instance_id)
+                    .unwrap(),
+                historical
+            );
         }
     }
 

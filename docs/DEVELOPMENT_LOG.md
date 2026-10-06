@@ -6619,3 +6619,9 @@
 - 为四世界 Session 增加持久化 `StatusPresence` 回归断言，旧直接写状态路径按预期失败。新增 Core Encounter 的受限状态提交入口：校验内部命令与 typed `ApplyStatus`、使用状态时钟和合并规则，在 cloned working state 写入状态及 provisional delta，通过不变量后一次提交并返回 `StatusApplied` 事实。Native Session 不再直接修改状态数组和提交序号。
 - 当前入口仅支持无触发器的首次状态应用；触发器、替换和已有实例重叠写入在完整事件链/可表达领域增量接通前显式拒绝。新增错误路径原子性测试。Core 344/344、Native 120/120 通过；没有进行 Windows 运行实测。
 - M12-041-003 仅为局部修复，生产 Encounter、Trigger Pipeline、Replay/Domain Delta 仍未闭环；M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL，M12-T03 未开始。用户 `.gitignore` 保持未纳入。
+
+## 2026-10-06 — M12-T02 BattleRecord 身份复用防护（仍在进行）
+
+- 复核生产入口后确认 NPC 当前 Schema 只有叙事字段，`CombatAttributeResolver` 对 `NpcWithoutCombatProjection` 明确拒绝；按 V5.2 §4.5.2.1 不用自由文本猜战斗数值，也不把固定示例敌人标为真实 Encounter。
+- 四世界回归加入“完成并清理后再次启动同一 Campaign/World”与历史 Replay Input 不变断言；旧实现按预期失败。`save_combat_checkpoint` 在 IMMEDIATE SQLite 事务内检查同 ID BattleRecord：新建时如已有历史即拒绝；续写时要求历史所属 Campaign、InitialStateHash 一致且无结果提交标记。回归与 Native 120/120 通过。
+- 这只阻断旧历史被重用，不会产生第二场独立身份；后续仍须从开发者预置 Encounter 事件生成新 Combat ID 并接入角色/NPC 投影、Objective 与领域事务。M12-041-006 未关闭；M12-T02 继续 IN_PROGRESS，M11 Final Gate 仍 FAIL。用户 `.gitignore` 未纳入任务改动。
